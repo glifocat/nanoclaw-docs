@@ -1,0 +1,256 @@
+---
+title: Quick start
+description: Get NanoClaw running in 5 minutes with Claude Code
+---
+
+# Quick start
+
+Get NanoClaw up and running in minutes. Claude Code handles everything: dependencies, authentication, container setup, and service configuration.
+
+<Note>
+This guide assumes you have Node.js 20+ and Claude Code installed. See [Installation](/installation) for detailed requirements.
+</Note>
+
+## Setup process
+
+<Steps>
+  <Step title="Clone the repository">
+    Clone NanoClaw to your local machine:
+
+    ```bash
+    git clone https://github.com/qwibitai/NanoClaw.git
+    cd NanoClaw
+    ```
+  </Step>
+
+  <Step title="Launch Claude Code">
+    Open Claude Code in the NanoClaw directory:
+
+    ```bash
+    claude
+    ```
+
+    This launches Claude Code with access to the NanoClaw codebase.
+  </Step>
+
+  <Step title="Run the setup command">
+    In Claude Code, run:
+
+    ```
+    /setup
+    ```
+
+    Claude Code will automatically handle:
+    - Installing Node.js dependencies
+    - Setting up your container runtime (Apple Container or Docker)
+    - Building the agent container image
+    - Authenticating with Claude
+    - Connecting to WhatsApp
+    - Configuring your main channel
+    - Starting the background service
+
+    <Info>
+    The `/setup` skill is AI-native: no installation wizard, just Claude guiding you through each step.
+    </Info>
+  </Step>
+
+  <Step title="Authenticate with WhatsApp">
+    During setup, you'll be prompted to authenticate with WhatsApp. Choose one of three methods:
+
+    **QR code in browser** (recommended for desktop)
+    - A browser window opens with a QR code
+    - Scan it with WhatsApp on your phone
+    - Go to **Settings → Linked Devices → Link a Device**
+
+    **Pairing code** (recommended for headless servers)
+    - Enter your phone number
+    - Receive a pairing code
+    - Enter it in WhatsApp on your phone
+
+    **QR code in terminal**
+    - QR code prints in your terminal
+    - Scan it with WhatsApp
+
+    <Warning>
+    WhatsApp only allows linking to one device at a time in self-chat mode. If you're already using WhatsApp Web, consider using a dedicated number or group-based setup.
+    </Warning>
+  </Step>
+
+  <Step title="Configure your main channel">
+    Claude will ask you to configure:
+
+    **Trigger word**: The word that activates NanoClaw (default: `@Andy`)
+
+    **Channel type**: Choose one:
+    - **Self-chat** (recommended): Message yourself on WhatsApp
+    - **Solo group**: Create a group with just you
+    - **DM with bot**: Use a dedicated phone number
+
+    **Mount allowlist** (optional): Allow agents to access external directories
+
+    <Info>
+    Self-chat is the most private option. Your main channel has full admin control over all groups.
+    </Info>
+  </Step>
+
+  <Step title="Verify the setup">
+    Claude will verify that everything is running correctly:
+
+    ✓ Service running
+    ✓ Credentials configured
+    ✓ WhatsApp authenticated
+    ✓ Main channel registered
+    ✓ Container runtime ready
+
+    If any checks fail, Claude will help you fix them.
+  </Step>
+
+  <Step title="Send your first message">
+    Open WhatsApp and message your main channel:
+
+    ```
+    @Andy hello!
+    ```
+
+    NanoClaw should respond. You're all set!
+
+    <Tip>
+    In self-chat mode, the trigger word is optional. Just send any message and NanoClaw will respond.
+    </Tip>
+  </Step>
+</Steps>
+
+## What happens during setup?
+
+Here's what Claude Code does when you run `/setup`:
+
+<Accordion title="1. Bootstrap dependencies">
+  - Verifies Node.js 20+ is installed
+  - Runs `npm install` to install dependencies
+  - Tests that native modules (better-sqlite3) load correctly
+  - Detects your platform (macOS/Linux) and environment (WSL, headless)
+</Accordion>
+
+<Accordion title="2. Container runtime setup">
+  - **macOS**: Offers choice between Docker (default) or Apple Container (native)
+  - **Linux**: Uses Docker (only option)
+  - Installs the chosen runtime if not present
+  - Starts the runtime service
+  - Builds the agent container image
+  - Tests that containers can run successfully
+</Accordion>
+
+<Accordion title="3. Claude authentication">
+  - Asks if you have a Claude subscription (Pro/Max) or Anthropic API key
+  - **Subscription**: Guides you to run `claude setup-token` and add token to `.env`
+  - **API key**: Guides you to add `ANTHROPIC_API_KEY` to `.env`
+  - These credentials allow agents to authenticate with Claude Code
+</Accordion>
+
+<Accordion title="4. WhatsApp authentication">
+  - Chooses the best authentication method for your environment
+  - Handles QR code display or pairing code generation
+  - Saves authentication session to `store/auth/`
+  - Verifies connection is stable
+</Accordion>
+
+<Accordion title="5. Channel configuration">
+  - Syncs WhatsApp groups from your account
+  - Registers your main channel in the database
+  - Creates the main group folder at `groups/main/`
+  - Sets up the `CLAUDE.md` memory file
+  - Creates mount allowlist at `~/.config/nanoclaw/mount-allowlist.json`
+</Accordion>
+
+<Accordion title="6. Service installation">
+  - **macOS**: Creates launchd service at `~/Library/LaunchAgents/com.nanoclaw.plist`
+  - **Linux**: Creates systemd service (user or system level)
+  - **WSL without systemd**: Creates `start-nanoclaw.sh` wrapper script
+  - Starts the service
+  - Verifies the service is running
+</Accordion>
+
+## Usage examples
+
+Once setup is complete, you can start using NanoClaw:
+
+<CodeGroup>
+```text Basic conversation
+@Andy what's the weather like today?
+@Andy write a Python script to parse CSV files
+@Andy summarize this document [attach file]
+```
+
+```text Scheduled tasks
+@Andy send me a daily standup reminder at 9am on weekdays
+@Andy every Friday at 5pm, review this week's git commits and summarize changes
+@Andy monitor Hacker News and message me when there's a trending AI article
+```
+
+```text Admin commands (main channel only)
+@Andy list all scheduled tasks
+@Andy pause the standup reminder
+@Andy join the Family Chat group
+@Andy show me what groups I'm in
+```
+</CodeGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Customizing NanoClaw" icon="wrench" href="/features/customization">
+    Learn how to modify NanoClaw for your needs
+  </Card>
+  <Card title="Security model" icon="shield" href="/concepts/security">
+    Understand how container isolation works
+  </Card>
+  <Card title="Adding skills" icon="puzzle-piece" href="/integrations/skills-system">
+    Install additional capabilities like `/add-telegram`
+  </Card>
+  <Card title="Troubleshooting" icon="life-ring" href="/advanced/troubleshooting">
+    Fix common issues
+  </Card>
+</CardGroup>
+
+## Monitoring and logs
+
+Check what NanoClaw is doing:
+
+```bash
+# View real-time logs
+tail -f logs/nanoclaw.log
+
+# Check service status
+# macOS
+launchctl list | grep nanoclaw
+
+# Linux
+systemctl --user status nanoclaw
+```
+
+Or just ask Claude Code:
+
+```
+Why isn't the scheduler running?
+What's in the recent logs?
+Why did this message not get a response?
+```
+
+<Tip>
+That's the AI-native approach: no monitoring dashboard, just ask Claude what's happening.
+</Tip>
+
+## Updating NanoClaw
+
+To pull upstream changes and merge with your customizations:
+
+```
+/update
+```
+
+Claude Code will:
+- Pull the latest changes from GitHub
+- Merge with your local modifications
+- Run any database migrations
+- Rebuild the container if needed
+- Restart the service

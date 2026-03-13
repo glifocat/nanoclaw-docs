@@ -1,0 +1,232 @@
+---
+title: Message routing
+description: Message formatting and routing API
+---
+
+The message router handles formatting messages for agents and routing outbound messages to the correct channel.
+
+## Core functions
+
+### escapeXml
+
+Escapes special XML characters in strings.
+
+```typescript
+function escapeXml(s: string): string
+```
+
+<ParamField path="s" type="string" required>
+  String to escape
+</ParamField>
+
+<ResponseField name="return" type="string">
+  XML-escaped string with `&`, `<`, `>`, and `"` replaced with entities
+</ResponseField>
+
+**Example:**
+
+```typescript
+import { escapeXml } from './router.js';
+
+const escaped = escapeXml('Hello <world> & "friends"');
+// 'Hello &lt;world&gt; &amp; &quot;friends&quot;'
+```
+
+### formatMessages
+
+Formats an array of messages as XML for agent consumption.
+
+```typescript
+function formatMessages(messages: NewMessage[]): string
+```
+
+<ParamField path="messages" type="NewMessage[]" required>
+  Array of messages to format
+</ParamField>
+
+<ResponseField name="return" type="string">
+  XML-formatted messages wrapped in `<messages>` tags
+</ResponseField>
+
+**Message format:**
+
+```xml
+<messages>
+<message sender="John Doe" time="2026-02-28T12:34:56.789Z">Hello!</message>
+<message sender="Jane Smith" time="2026-02-28T12:35:01.234Z">Hi there!</message>
+</messages>
+```
+
+**Example:**
+
+```typescript
+import { formatMessages } from './router.js';
+
+const messages = [
+  {
+    id: '1',
+    chat_jid: '123@g.us',
+    sender: '456@s.whatsapp.net',
+    sender_name: 'John',
+    content: 'Hello!',
+    timestamp: '2026-02-28T12:34:56.789Z',
+  },
+];
+
+const formatted = formatMessages(messages);
+```
+
+### stripInternalTags
+
+Removes `<internal>...</internal>` blocks from agent output.
+
+```typescript
+function stripInternalTags(text: string): string
+```
+
+<ParamField path="text" type="string" required>
+  Text containing potential `<internal>` tags
+</ParamField>
+
+<ResponseField name="return" type="string">
+  Text with all `<internal>` blocks removed and trimmed
+</ResponseField>
+
+**Purpose:**
+
+Agents use `<internal>` tags for internal reasoning that should not be shown to users.
+
+**Example:**
+
+```typescript
+import { stripInternalTags } from './router.js';
+
+const raw = `<internal>Analyzing request...</internal>Here's your answer!`;
+const clean = stripInternalTags(raw);
+// "Here's your answer!"
+```
+
+### formatOutbound
+
+Prepares agent output for sending to users (strips internal tags).
+
+```typescript
+function formatOutbound(rawText: string): string
+```
+
+<ParamField path="rawText" type="string" required>
+  Raw text from agent
+</ParamField>
+
+<ResponseField name="return" type="string">
+  Cleaned text ready for user display (empty string if no content after stripping)
+</ResponseField>
+
+**Example:**
+
+```typescript
+import { formatOutbound } from './router.js';
+
+const raw = `<internal>Debug info</internal>Response to user`;
+const outbound = formatOutbound(raw);
+// "Response to user"
+```
+
+### routeOutbound
+
+Routes a message to the appropriate channel.
+
+```typescript
+function routeOutbound(
+  channels: Channel[],
+  jid: string,
+  text: string,
+): Promise<void>
+```
+
+<ParamField path="channels" type="Channel[]" required>
+  Array of available channels
+</ParamField>
+
+<ParamField path="jid" type="string" required>
+  Chat JID to send to
+</ParamField>
+
+<ParamField path="text" type="string" required>
+  Text to send
+</ParamField>
+
+**Throws:** Error if no connected channel owns the JID
+
+**Example:**
+
+```typescript
+import { routeOutbound } from './router.js';
+
+await routeOutbound(channels, '123@g.us', 'Hello!');
+```
+
+### findChannel
+
+Finds the channel that owns a given JID.
+
+```typescript
+function findChannel(
+  channels: Channel[],
+  jid: string,
+): Channel | undefined
+```
+
+<ParamField path="channels" type="Channel[]" required>
+  Array of available channels
+</ParamField>
+
+<ParamField path="jid" type="string" required>
+  Chat JID to look up
+</ParamField>
+
+<ResponseField name="return" type="Channel | undefined">
+  Channel that owns the JID, or `undefined` if none found
+</ResponseField>
+
+**Example:**
+
+```typescript
+import { findChannel } from './router.js';
+
+const channel = findChannel(channels, '123@g.us');
+if (channel) {
+  await channel.sendMessage('123@g.us', 'Hello!');
+}
+```
+
+## Types
+
+### NewMessage
+
+```typescript
+interface NewMessage {
+  id: string;              // Unique message ID
+  chat_jid: string;        // Chat identifier (e.g., "123@g.us")
+  sender: string;          // Sender JID (e.g., "456@s.whatsapp.net")
+  sender_name: string;     // Display name
+  content: string;         // Message text
+  timestamp: string;       // ISO 8601 timestamp
+  is_from_me?: boolean;    // Whether sent by the bot
+  is_bot_message?: boolean; // Whether this is a bot message
+}
+```
+
+### Channel
+
+```typescript
+interface Channel {
+  name: string;
+  connect(): Promise<void>;
+  sendMessage(jid: string, text: string): Promise<void>;
+  isConnected(): boolean;
+  ownsJid(jid: string): boolean;
+  disconnect(): Promise<void>;
+  setTyping?(jid: string, isTyping: boolean): Promise<void>; // Optional
+}
+```

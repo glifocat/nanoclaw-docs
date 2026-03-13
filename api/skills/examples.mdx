@@ -1,0 +1,600 @@
+---
+title: Examples
+description: Real skill examples from the NanoClaw repository showing different patterns and techniques
+---
+
+Learn from actual skills in the NanoClaw repository. These examples show different patterns for interactive and deterministic skills.
+
+## Interactive skill: setup
+
+The `/setup` skill guides users through initial NanoClaw installation. It's a pure interactive skill with no code packages.
+
+### Key characteristics
+
+- Multi-phase workflow (11 distinct steps)
+- Heavy error recovery and troubleshooting
+- Platform detection (macOS vs Linux vs WSL)
+- User authentication flows
+- Service management
+
+### Structure
+
+```markdown
+---
+name: setup
+description: Run initial NanoClaw setup. Use when user wants to install dependencies, authenticate WhatsApp, register their main channel, or start the background services.
+---
+
+# NanoClaw Setup
+
+**Principle:** When something is broken or missing, fix it. Don't tell the user to go fix it themselves unless it genuinely requires their manual action.
+
+**UX Note:** Use `AskUserQuestion` for all user-facing questions.
+
+## 1. Bootstrap (Node.js + Dependencies)
+
+Run `bash setup.sh` and parse the status block.
+
+- If NODE_OK=false → Node.js is missing or too old. Use `AskUserQuestion: Would you like me to install Node.js 22?`
+  - macOS: `brew install node@22` or install nvm
+  - Linux: `curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -`
+...
+```
+
+### Pattern: Status block parsing
+
+The skill runs scripts and parses structured output:
+
+<CodeGroup>
+
+```bash setup.sh output
+--- STATUS ---
+NODE_OK=true
+DEPS_OK=true
+NATIVE_OK=true
+PLATFORM=macos
+IS_WSL=false
+--- END STATUS ---
+```
+
+```markdown SKILL.md usage
+Run `bash setup.sh` and parse the status block.
+
+- If NODE_OK=false → install Node.js
+- If DEPS_OK=false → delete node_modules and retry
+- Record PLATFORM and IS_WSL for later steps
+```
+
+</CodeGroup>
+
+### Pattern: Conditional flows
+
+Different platforms require different commands:
+
+```markdown
+### 3a. Choose runtime
+
+- PLATFORM=linux → Docker (only option)
+- PLATFORM=macos + APPLE_CONTAINER=installed → 
+  AskUserQuestion: Docker (default) or Apple Container?
+- PLATFORM=macos + APPLE_CONTAINER=not_found → Docker (default)
+```
+
+### Pattern: Error recovery
+
+Comprehensive troubleshooting for each failure mode:
+
+```markdown
+**If BUILD_OK=false:** Read `logs/setup.log` tail for the build error.
+- Cache issue: `docker builder prune -f` and retry
+- Dockerfile syntax: diagnose from log and fix, then retry
+
+**If TEST_OK=false but BUILD_OK=true:** The image built but won't run.
+- Check logs — common cause is runtime not fully started
+- Wait a moment and retry the test
+```
+
+## Deterministic skill: add-telegram
+
+The `/add-telegram` skill adds Telegram channel support using the skills engine for code changes.
+
+### Package structure
+
+```
+.claude/skills/add-telegram/
+├── SKILL.md
+├── manifest.yaml
+├── add/
+│   └── src/channels/
+│       ├── telegram.ts        # Complete implementation
+│       └── telegram.test.ts   # 46 unit tests
+├── modify/
+│   └── src/
+│       ├── index.ts           # Multi-channel support
+│       ├── index.ts.intent.md
+│       ├── config.ts          # Telegram config
+│       └── config.ts.intent.md
+└── tests/
+    └── telegram.test.ts       # Integration tests
+```
+
+### manifest.yaml
+
+```yaml
+skill: telegram
+version: 1.0.0
+description: "Telegram Bot API integration via Grammy"
+core_version: 0.1.0
+adds:
+  - src/channels/telegram.ts
+  - src/channels/telegram.test.ts
+modifies:
+  - src/index.ts
+  - src/config.ts
+  - src/routing.test.ts
+structured:
+  npm_dependencies:
+    grammy: "^1.39.3"
+  env_additions:
+    - TELEGRAM_BOT_TOKEN
+    - TELEGRAM_ONLY
+conflicts: []
+depends: []
+test: "npx vitest run src/channels/telegram.test.ts"
+```
+
+### SKILL.md phases
+
+<Steps>
+
+<Step title="Phase 1: Pre-flight">
+
+```markdown
+## Phase 1: Pre-flight
+
+### Check if already applied
+
+Read `.nanoclaw/state.yaml`. If `telegram` is in `applied_skills`, 
+skip to Phase 3 (Setup).
+
+### Ask the user
+
+AskUserQuestion: Should Telegram replace WhatsApp or run alongside it?
+- **Replace WhatsApp** - sets TELEGRAM_ONLY=true
+- **Alongside** - both channels active
+
+AskUserQuestion: Do you have a Telegram bot token, or do you need to 
+create one?
+```
+
+</Step>
+
+<Step title="Phase 2: Apply code changes">
+
+The skill applies deterministic code changes:
+
+Initialize skills system (if needed):
+
+```bash
+npx tsx scripts/apply-skill.ts --init
+```
+
+Apply the skill:
+
+```bash
+npx tsx scripts/apply-skill.ts .claude/skills/add-telegram
+```
+
+This deterministically:
+- Adds `src/channels/telegram.ts` (TelegramChannel class)
+- Adds `src/channels/telegram.test.ts` (46 unit tests)
+- Three-way merges Telegram support into `src/index.ts`
+- Three-way merges Telegram config into `src/config.ts`
+- Installs the `grammy` npm dependency
+- Records application in `.nanoclaw/state.yaml`
+
+Validate code changes:
+
+```bash
+npm test
+npm run build
+```
+
+</Step>
+
+<Step title="Phase 3: Setup">
+
+Create Telegram Bot (if needed):
+
+If the user doesn't have a bot token, tell them:
+
+1. Open Telegram and search for `@BotFather`
+2. Send `/newbot` and follow prompts
+3. Copy the bot token
+
+Configure environment by adding to `.env`:
+
+```bash
+TELEGRAM_BOT_TOKEN=<their-token>
+```
+
+Sync to container environment:
+
+```bash
+mkdir -p data/env && cp .env data/env/env
+```
+
+</Step>
+
+<Step title="Phase 4: Registration">
+
+Get the Chat ID:
+
+Tell the user:
+
+1. Open your bot in Telegram
+2. Send `/chatid` — it will reply with the chat ID
+3. For groups: add the bot first, then send `/chatid`
+
+Wait for the user to provide the chat ID.
+
+Register the chat:
+
+```typescript
+registerGroup("tg:<chat-id>", {
+  name: "<chat-name>",
+  folder: "main",
+  trigger: `@${ASSISTANT_NAME}`,
+  added_at: new Date().toISOString(),
+  requiresTrigger: false,
+});
+```
+
+</Step>
+
+<Step title="Phase 5: Verify">
+
+Test the connection:
+
+Tell the user to send a message to their registered Telegram chat. The bot should respond within a few seconds.
+
+Check logs if needed:
+
+```bash
+tail -f logs/nanoclaw.log
+```
+
+</Step>
+
+</Steps>
+
+### Intent file example
+
+From `modify/src/index.ts.intent.md`:
+
+```markdown
+# Intent: src/index.ts modifications
+
+## What changed
+Refactored from single WhatsApp channel to multi-channel architecture 
+using the `Channel` interface.
+
+## Key sections
+
+### Imports (top of file)
+- Added: `TelegramChannel` from `./channels/telegram.js`
+- Added: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ONLY` from `./config.js`
+- Added: `findChannel` from `./router.js`
+- Added: `Channel` type from `./types.js`
+
+### Module-level state
+- Added: `const channels: Channel[] = []` — array of all active channels
+- Kept: `let whatsapp: WhatsAppChannel` — still needed for 
+  `syncGroupMetadata` reference
+
+### processGroupMessages()
+- Added: `findChannel(channels, chatJid)` lookup at the start
+- Changed: `whatsapp.setTyping()` → `channel.setTyping?.()` 
+  (optional chaining)
+- Changed: `whatsapp.sendMessage()` → `channel.sendMessage()` in 
+  output callback
+
+## Invariants
+- All existing message processing logic (triggers, cursors, idle timers) 
+  is preserved
+- The `runAgent` function is completely unchanged
+- State management (loadState/saveState) is unchanged
+- Recovery logic is unchanged
+
+## Must-keep
+- The `escapeXml` and `formatMessages` re-exports
+- The `_setRegisteredGroups` test helper
+- All error handling and cursor rollback logic
+```
+
+## Interactive skill: customize
+
+The `/customize` skill is an interactive guide for common customizations.
+
+### Key patterns
+
+```markdown
+---
+name: customize
+description: Add new capabilities or modify NanoClaw behavior. Use when user wants to add channels, change triggers, add integrations, or make any other customizations.
+---
+
+# NanoClaw Customization
+
+## Workflow
+
+1. **Understand the request** - Ask clarifying questions
+2. **Plan the changes** - Identify files to modify
+3. **Implement** - Make changes directly to the code
+4. **Test guidance** - Tell user how to verify
+
+## Common Customization Patterns
+
+### Adding a New Input Channel
+
+Questions to ask:
+- Which channel? (Telegram, Slack, Discord, email, SMS, etc.)
+- Same trigger word or different?
+- Same memory hierarchy or separate?
+
+Implementation pattern:
+1. Create `src/channels/{name}.ts` implementing the `Channel` interface
+2. Add the channel instance to `main()` in `src/index.ts`
+3. Messages are stored via the `onMessage` callback
+```
+
+### Pattern: Guided workflows
+
+For each customization type, provide:
+
+1. **Questions to ask** - What information do you need?
+2. **Implementation pattern** - How to make the changes
+3. **Verification** - How to test it works
+
+<CodeGroup>
+
+```markdown Adding a channel
+### Adding a New Input Channel
+
+Questions to ask:
+- Which channel?
+- Same trigger word or different?
+- Same memory hierarchy or separate?
+
+Implementation pattern:
+1. Create `src/channels/{name}.ts`
+2. Add to `main()` in `src/index.ts`
+3. Wire callbacks
+```
+
+```markdown Changing behavior
+### Changing Assistant Behavior
+
+Questions to ask:
+- What aspect? (name, trigger, persona, response style)
+- Apply to all groups or specific ones?
+
+Simple changes → edit `src/config.ts`
+Persona changes → edit `groups/CLAUDE.md`
+Per-group behavior → edit specific group's `CLAUDE.md`
+```
+
+```markdown Adding commands
+### Adding New Commands
+
+Questions to ask:
+- What should the command do?
+- Available in all groups or main only?
+- Does it need new MCP tools?
+
+Implementation:
+1. Add instructions to `groups/CLAUDE.md`
+2. For trigger-level routing, modify `processGroupMessages()`
+```
+
+</CodeGroup>
+
+## Deterministic skill: add-slack
+
+The `/add-slack` skill shows a complete channel integration with detailed setup documentation.
+
+### Supplementary documentation
+
+The skill includes a separate `SLACK_SETUP.md` file:
+
+```
+.claude/skills/add-slack/
+├── SKILL.md
+├── SLACK_SETUP.md        # Step-by-step setup guide
+├── manifest.yaml
+├── add/
+└── modify/
+```
+
+From `SKILL.md`:
+
+```markdown
+### Create Slack App (if needed)
+
+If the user doesn't have a Slack app, share [SLACK_SETUP.md](SLACK_SETUP.md) 
+which has step-by-step instructions with screenshots guidance, troubleshooting, 
+and a token reference table.
+
+Quick summary of what's needed:
+1. Create a Slack app at api.slack.com/apps
+2. Enable Socket Mode and generate an App-Level Token
+3. Subscribe to bot events: `message.channels`, `message.groups`, `message.im`
+4. Add OAuth scopes: `chat:write`, `channels:history`, etc.
+5. Install to workspace and copy the Bot Token
+```
+
+### Known limitations
+
+The skill documents limitations clearly:
+
+```markdown
+## Known Limitations
+
+- **Threads are flattened** — Threaded replies are delivered to the agent 
+  as regular channel messages. The agent sees them but has no awareness 
+  they originated in a thread. Responses always go to the channel, not 
+  back into the thread.
+  
+- **No typing indicator** — Slack's Bot API does not expose a typing 
+  indicator endpoint. The `setTyping()` method is a no-op.
+  
+- **Message splitting is naive** — Long messages are split at a fixed 
+  4000-character boundary, which may break mid-word or mid-sentence.
+  
+- **No file/image handling** — The bot only processes text content. File 
+  uploads, images, and rich message blocks are not forwarded to the agent.
+```
+
+## Advanced skill: add-parallel
+
+The `/add-parallel` skill adds an MCP integration with non-blocking async operations.
+
+### Key techniques
+
+<Tabs>
+
+<Tab title="Environment passing">
+
+```markdown
+### 3. Update Container Runner
+
+Add `PARALLEL_API_KEY` to allowed environment variables:
+
+```typescript
+const allowedVars = [
+  'CLAUDE_CODE_OAUTH_TOKEN', 
+  'ANTHROPIC_API_KEY', 
+  'PARALLEL_API_KEY'
+];
+```
+```
+
+</Tab>
+
+<Tab title="MCP server config">
+
+```markdown
+### 4. Configure MCP Servers
+
+Add HTTP MCP servers:
+
+```typescript
+if (parallelApiKey) {
+  mcpServers['parallel-search'] = {
+    type: 'http',  // REQUIRED for HTTP servers
+    url: 'https://search-mcp.parallel.ai/mcp',
+    headers: {
+      'Authorization': `Bearer ${parallelApiKey}`
+    }
+  };
+  mcpServers['parallel-task'] = {
+    type: 'http',
+    url: 'https://task-mcp.parallel.ai/mcp',
+    headers: {
+      'Authorization': `Bearer ${parallelApiKey}`
+    }
+  };
+}
+```
+```
+
+</Tab>
+
+<Tab title="Non-blocking async">
+
+```markdown
+### Deep Research - DO NOT BLOCK!
+
+**After permission - Use scheduler instead:**
+
+1. Create the task using `mcp__parallel-task__create_task_run`
+2. Get the `run_id` from the response
+3. Create a polling scheduled task:
+   ```
+   Prompt: "Check Parallel AI task run [run_id] and send results 
+   when ready.
+   
+   1. Use the Parallel Task MCP to check the task status
+   2. If status is 'completed', extract the results
+   3. Send results with mcp__nanoclaw__send_message
+   4. Use mcp__nanoclaw__complete_scheduled_task
+   
+   If status is still 'running', do nothing (task will run again 
+   in 30s)."
+   
+   Schedule: interval every 30 seconds
+   Context mode: isolated
+   ```
+4. Send acknowledgment with tracking link
+5. Exit immediately - scheduler handles the rest
+```
+
+</Tab>
+
+<Tab title="Usage instructions">
+
+```markdown
+### 5. Add Usage Instructions to CLAUDE.md
+
+## Web Research Tools
+
+### Quick Web Search (`mcp__parallel-search__search`)
+**When to use:** Freely use for factual lookups, current events
+**Permission:** Not needed - use whenever it helps
+
+### Deep Research (`mcp__parallel-task__create_task_run`)
+**When to use:** Comprehensive analysis, complex topics
+**Permission:** ALWAYS use `AskUserQuestion` before using this tool
+
+**How to ask permission:**
+```
+AskUserQuestion: I can do deep research on [topic] using Parallel's 
+Task API. This will take 2-5 minutes and provide comprehensive analysis. 
+Should I proceed?
+```
+```
+
+</Tab>
+
+</Tabs>
+
+## Pattern summary
+
+<Note>
+All skills follow these principles from the NanoClaw philosophy:
+- Fix problems automatically when possible
+- Use `AskUserQuestion` for all user input
+- Provide comprehensive troubleshooting
+- Handle platform differences (macOS/Linux)
+- Verify changes with tests and logs
+</Note>
+
+### Common patterns
+
+| Pattern | Used in | Purpose |
+|---------|---------|----------|
+| Status block parsing | `/setup` | Parse structured command output |
+| Three-way merge | `/add-telegram`, `/add-slack` | Apply code changes preserving customizations |
+| Intent files | All deterministic skills | Document merge strategy |
+| AskUserQuestion | All skills | Get user input consistently |
+| Multi-phase structure | Most skills | Organize complex workflows |
+| Platform detection | `/setup` | Handle macOS/Linux differences |
+| Verification steps | All skills | Confirm changes worked |
+| Troubleshooting section | All skills | Help users fix common issues |
+
+## Next steps
+
+- Start [Creating skills](/api/skills/creating-skills) for your use case
+- Understand [Skill structure](/api/skills/skill-structure) in depth
+- Browse the [NanoClaw skills directory](https://github.com/qwibitai/NanoClaw/tree/main/.claude/skills)
+- Contribute your own skills via pull request

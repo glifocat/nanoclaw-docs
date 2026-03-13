@@ -1,0 +1,432 @@
+---
+title: Customize NanoClaw
+description: Learn how to modify NanoClaw's behavior by changing code, not configuration files
+---
+
+## Philosophy
+
+NanoClaw doesn't use configuration files. Instead, it's designed to be customized by modifying the code directly. The codebase is small enough (a few thousand lines) that you can safely make changes.
+
+<Note>
+**From the README:**
+
+"NanoClaw doesn't use configuration files. To make changes, just tell Claude Code what you want... The codebase is small enough that Claude can safely modify it."
+</Note>
+
+## Why no config files?
+
+Configuration files lead to sprawl - dozens of options, complex validation, and bloat. NanoClaw takes a different approach:
+
+- **Small codebase**: ~5,000 lines across a handful of files
+- **AI-native**: Claude Code understands and modifies the code for you
+- **Bespoke**: Your fork does exactly what you need, not what a generic system supports
+- **No feature bloat**: Customizations are skills, not core features
+
+## Common customizations
+
+Here are the most common ways to customize NanoClaw:
+
+### Change the trigger word
+
+The default trigger is `@Andy`. To change it:
+
+```
+Change the trigger word to @Bob
+```
+
+Claude Code will update:
+- `ASSISTANT_NAME` in `src/config.ts`
+- The `.env` file
+- Trigger pattern regex in `src/config.ts:56-59`
+
+### Adjust response style
+
+To change how the agent responds:
+
+```
+Remember in the future to make responses shorter and more direct
+```
+
+This updates the agent's memory (stored in `groups/main/CLAUDE.md`).
+
+### Add a custom greeting
+
+```
+Add a custom greeting when I say good morning
+```
+
+Claude Code will modify the message processing logic to detect "good morning" and respond appropriately.
+
+### Change polling intervals
+
+Adjust how often NanoClaw checks for messages or due tasks:
+
+```typescript
+// src/config.ts
+export const POLL_INTERVAL = 2000; // Message polling (2 seconds)
+export const SCHEDULER_POLL_INTERVAL = 60000; // Task polling (60 seconds)
+```
+
+To change:
+
+```
+Reduce the message polling interval to 1 second for faster responses
+```
+
+### Modify container limits
+
+Control how many agent containers can run simultaneously:
+
+```typescript
+// src/config.ts
+export const MAX_CONCURRENT_CONTAINERS = Math.max(
+  1,
+  parseInt(process.env.MAX_CONCURRENT_CONTAINERS || '5', 10) || 5,
+);
+```
+
+To change:
+
+```
+Increase the max concurrent containers to 10
+```
+
+Or set the environment variable:
+
+```bash
+export MAX_CONCURRENT_CONTAINERS=10
+```
+
+### Adjust idle timeout
+
+Change how long containers stay alive after the last response:
+
+```typescript
+// src/config.ts
+export const IDLE_TIMEOUT = parseInt(process.env.IDLE_TIMEOUT || '1800000', 10); // 30 minutes
+```
+
+To change:
+
+```
+Set the idle timeout to 10 minutes
+```
+
+Or:
+
+```bash
+export IDLE_TIMEOUT=600000  # 10 minutes in milliseconds
+```
+
+## Configuration via environment
+
+While NanoClaw avoids config files, it does support a minimal `.env` file for secrets and deployment settings:
+
+```bash
+# .env
+ASSISTANT_NAME=Andy
+ASSISTANT_HAS_OWN_NUMBER=false
+ANTHROPIC_API_KEY=sk-ant-...
+MAX_CONCURRENT_CONTAINERS=5
+IDLE_TIMEOUT=1800000
+CONTAINER_TIMEOUT=1800000
+```
+
+### Environment variable precedence
+
+```typescript
+// From src/config.ts:11-15
+export const ASSISTANT_NAME =
+  process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';
+export const ASSISTANT_HAS_OWN_NUMBER =
+  (process.env.ASSISTANT_HAS_OWN_NUMBER ||
+    envConfig.ASSISTANT_HAS_OWN_NUMBER) === 'true';
+```
+
+1. `process.env` (runtime environment variables)
+2. `.env` file values
+3. Hardcoded defaults
+
+## Key configuration files
+
+### src/config.ts
+
+The main configuration file:
+
+```typescript
+// Trigger pattern
+export const ASSISTANT_NAME = 'Andy';
+export const TRIGGER_PATTERN = new RegExp(
+  `^@${escapeRegex(ASSISTANT_NAME)}\\b`,
+  'i',
+);
+
+// Polling intervals
+export const POLL_INTERVAL = 2000;
+export const SCHEDULER_POLL_INTERVAL = 60000;
+
+// Container settings
+export const CONTAINER_IMAGE = 'nanoclaw-agent:latest';
+export const CONTAINER_TIMEOUT = 1800000;
+export const IDLE_TIMEOUT = 1800000;
+export const MAX_CONCURRENT_CONTAINERS = 5;
+
+// Paths
+export const GROUPS_DIR = path.resolve(PROJECT_ROOT, 'groups');
+export const DATA_DIR = path.resolve(PROJECT_ROOT, 'data');
+export const MAIN_GROUP_FOLDER = 'main';
+
+// Timezone
+export const TIMEZONE = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+```
+
+See the full file at `src/config.ts:1-65`.
+
+### groups/main/CLAUDE.md
+
+Memory for the main channel (your private self-chat). Edit this to change the agent's behavior:
+
+```markdown
+# NanoClaw Assistant
+
+You are Andy, a helpful AI assistant...
+
+## Preferences
+
+- Keep responses concise
+- Use bullet points for lists
+- Always confirm before making changes
+```
+
+### .claude/settings.json
+
+Per-group Claude Code settings (auto-generated):
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1",
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "0"
+  }
+}
+```
+
+Generated in `src/container-runner.ts:112-134`.
+
+## Customization workflow
+
+<Steps>
+  <Step title="Identify what to change">
+    Describe what you want in natural language:
+    
+    ```
+    I want the agent to respond faster
+    ```
+  </Step>
+  
+  <Step title="Ask Claude Code">
+    Either:
+    - Tell Claude directly: `"Reduce the polling interval to 1 second"`
+    - Use guided mode: `/customize`
+  </Step>
+  
+  <Step title="Review changes">
+    Claude shows you the diff before applying:
+    
+    ```diff
+    - export const POLL_INTERVAL = 2000;
+    + export const POLL_INTERVAL = 1000;
+    ```
+  </Step>
+  
+  <Step title="Test and iterate">
+    Run NanoClaw and verify the change works as expected
+  </Step>
+</Steps>
+
+## The /customize skill
+
+Run `/customize` for guided customization:
+
+```
+/customize
+```
+
+Claude will ask:
+- What channel you want to add (WhatsApp, Telegram, Discord, etc.)
+- What integrations you need (Gmail, Calendar, etc.)
+- How you want to change behavior
+- What features to modify
+
+## Adding channels
+
+Channels are added via skills, not by modifying core code:
+
+```
+/add-telegram
+/add-slack
+/add-discord
+```
+
+Each skill teaches Claude how to transform your NanoClaw installation to support that channel.
+
+<Warning>
+**Don't add features via PRs.**
+
+Contribute skills instead. This keeps the base system minimal and lets users customize cleanly.
+</Warning>
+
+## Adding integrations
+
+Same pattern - use skills:
+
+```
+/add-gmail
+/add-calendar
+/add-notion
+```
+
+The skill modifies your codebase to add the integration.
+
+## Mount configuration
+
+Control what directories agents can access:
+
+### Main channel
+
+Gets read-only access to the project root:
+
+```typescript
+// From src/container-runner.ts:65-75
+if (isMain) {
+  mounts.push({
+    hostPath: projectRoot,
+    containerPath: '/workspace/project',
+    readonly: true,
+  });
+  
+  mounts.push({
+    hostPath: groupDir,
+    containerPath: '/workspace/group',
+    readonly: false,
+  });
+}
+```
+
+### Other channels
+
+Only get their own group folder:
+
+```typescript
+// From src/container-runner.ts:83-89
+mounts.push({
+  hostPath: groupDir,
+  containerPath: '/workspace/group',
+  readonly: false,
+});
+```
+
+### Mount allowlist
+
+Groups can request additional mounts via `containerConfig.mounts` in their registration:
+
+```typescript
+containerConfig: {
+  mounts: [
+    { path: '/Users/you/Documents/vault', readonly: true }
+  ]
+}
+```
+
+Requests are validated against `~/.config/nanoclaw/mount-allowlist.json`:
+
+```json
+{
+  "allowedPaths": [
+    "/Users/you/Documents/vault",
+    "/Users/you/code/project"
+  ]
+}
+```
+
+See `src/mount-security.ts` for validation logic.
+
+## Debugging customizations
+
+If a customization doesn't work:
+
+### Check logs
+
+```bash
+tail -f groups/main/logs/agent.log
+```
+
+### Ask Claude Code
+
+```
+Why isn't the polling interval change working?
+Show me the current value of POLL_INTERVAL
+```
+
+### Use the /debug skill
+
+```
+/debug
+```
+
+Claude will:
+- Check recent logs
+- Verify configuration values
+- Identify common issues
+- Suggest fixes
+
+## Contributing customizations
+
+If your customization would benefit others, contribute it as a skill:
+
+1. Create `.claude/skills/{skill-name}/SKILL.md`
+2. Document the transformation steps
+3. Submit a PR with just the skill file
+
+**Don't submit PRs that add features to the core codebase.** Only bug fixes, security fixes, and clear improvements are accepted.
+
+## Advanced: Direct code modification
+
+For complex customizations, you can modify the code directly:
+
+### Example: Custom message filtering
+
+Add logic to filter messages before processing:
+
+```typescript
+// src/index.ts (in processGroupMessages)
+const missedMessages = getMessagesSince(
+  chatJid,
+  sinceTimestamp,
+  ASSISTANT_NAME,
+).filter(m => {
+  // Custom filter: ignore messages from specific users
+  return !m.sender_name.includes('spam');
+});
+```
+
+### Example: Custom IPC handlers
+
+Add new IPC message types:
+
+```typescript
+// src/ipc.ts (in processTaskIpc)
+case 'custom_action':
+  if (data.customData) {
+    // Your custom logic here
+    logger.info({ data }, 'Custom action received');
+  }
+  break;
+```
+
+## Related documentation
+
+- [Messaging](/features/messaging) - Customize trigger patterns
+- [Scheduled tasks](/features/scheduled-tasks) - Customize task behavior
+- [Agent Swarms](/features/agent-swarms) - Adjust container limits for swarms

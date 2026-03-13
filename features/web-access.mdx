@@ -1,0 +1,524 @@
+---
+title: Web access and browser automation
+description: Use web search, content fetching, and browser automation to research topics, extract data, and interact with web applications
+---
+
+## Overview
+
+NanoClaw agents have full access to the web through the `agent-browser` tool. This enables:
+
+- **Web search**: Find information across the internet
+- **Content extraction**: Read articles, documentation, and web pages
+- **Form automation**: Fill out forms and submit data
+- **Web scraping**: Extract structured data from websites
+- **Screenshot capture**: Save visual snapshots of pages
+- **Authentication**: Save and reuse login sessions
+
+<Note>
+The `agent-browser` skill is available to all agents automatically. No configuration required.
+</Note>
+
+## Quick start
+
+Ask the agent to use the web naturally:
+
+```
+@Andy what are the top stories on Hacker News today?
+@Andy search for recent Claude API updates
+@Andy read this article and summarize it: https://example.com/article
+@Andy extract all product prices from https://store.example.com
+```
+
+The agent will use `agent-browser` commands automatically.
+
+## Browser automation workflow
+
+The typical workflow for browser tasks:
+
+<Steps>
+  <Step title="Navigate to page">
+    ```bash
+    agent-browser open https://example.com
+    ```
+  </Step>
+  
+  <Step title="Take snapshot">
+    Get interactive elements with references:
+    ```bash
+    agent-browser snapshot -i
+    ```
+    
+    Output:
+    ```
+    textbox "Email" [ref=e1]
+    textbox "Password" [ref=e2]  
+    button "Sign In" [ref=e3]
+    ```
+  </Step>
+  
+  <Step title="Interact with elements">
+    Use the refs from the snapshot:
+    ```bash
+    agent-browser fill @e1 "user@example.com"
+    agent-browser fill @e2 "password123"
+    agent-browser click @e3
+    ```
+  </Step>
+  
+  <Step title="Wait and verify">
+    ```bash
+    agent-browser wait --url "**/dashboard"
+    agent-browser snapshot -i  # Verify we're logged in
+    ```
+  </Step>
+</Steps>
+
+## Core commands
+
+### Navigation
+
+<CodeGroup>
+```bash Open URL
+agent-browser open https://example.com
+```
+
+```bash Navigate back
+agent-browser back
+```
+
+```bash Navigate forward
+agent-browser forward
+```
+
+```bash Reload page
+agent-browser reload
+```
+
+```bash Close browser
+agent-browser close
+```
+</CodeGroup>
+
+### Page analysis
+
+The `snapshot` command returns the page's accessibility tree:
+
+```bash
+# Interactive elements only (recommended)
+agent-browser snapshot -i
+
+# Full accessibility tree
+agent-browser snapshot
+
+# Compact output
+agent-browser snapshot -c
+
+# Limit depth
+agent-browser snapshot -d 3
+
+# Scope to specific area
+agent-browser snapshot -s "#main-content"
+```
+
+**Example output:**
+
+```
+heading "Welcome" [ref=e1]
+textbox "Search" [ref=e2] placeholder="Type to search..."
+button "Search" [ref=e3]
+link "Documentation" [ref=e4] href="/docs"
+link "API Reference" [ref=e5] href="/api"
+```
+
+### Interactions
+
+Use `@ref` from snapshots to interact:
+
+<Tabs>
+  <Tab title="Click">
+    ```bash
+    agent-browser click @e1           # Click
+    agent-browser dblclick @e1        # Double-click  
+    agent-browser hover @e1           # Hover
+    ```
+  </Tab>
+  
+  <Tab title="Type">
+    ```bash
+    agent-browser fill @e2 "text"     # Clear and type
+    agent-browser type @e2 "text"     # Type without clearing
+    agent-browser press Enter         # Press key
+    ```
+  </Tab>
+  
+  <Tab title="Forms">
+    ```bash
+    agent-browser check @e1           # Check checkbox
+    agent-browser uncheck @e1         # Uncheck checkbox  
+    agent-browser select @e1 "value"  # Select dropdown option
+    agent-browser upload @e1 file.pdf # Upload file
+    ```
+  </Tab>
+</Tabs>
+
+### Get information
+
+```bash
+agent-browser get text @e1        # Get element text
+agent-browser get html @e1        # Get innerHTML
+agent-browser get value @e1       # Get input value
+agent-browser get attr @e1 href   # Get attribute
+agent-browser get title           # Get page title
+agent-browser get url             # Get current URL
+agent-browser get count ".item"   # Count matching elements
+```
+
+### Wait conditions
+
+```bash
+agent-browser wait @e1                     # Wait for element
+agent-browser wait 2000                    # Wait milliseconds
+agent-browser wait --text "Success"        # Wait for text
+agent-browser wait --url "**/dashboard"    # Wait for URL pattern
+agent-browser wait --load networkidle      # Wait for network idle
+```
+
+### Screenshots and PDF
+
+```bash
+# Save screenshot
+agent-browser screenshot
+agent-browser screenshot path.png
+agent-browser screenshot --full   # Full page
+
+# Save as PDF
+agent-browser pdf output.pdf
+```
+
+## Advanced features
+
+### Semantic locators
+
+Instead of refs, you can find elements semantically:
+
+```bash
+agent-browser find role button click --name "Submit"
+agent-browser find text "Sign In" click
+agent-browser find label "Email" fill "user@test.com"
+agent-browser find placeholder "Search" type "query"
+```
+
+Useful when you want to interact without taking a snapshot first.
+
+### Saved authentication state
+
+Login once, then reuse the session:
+
+<Steps>
+  <Step title="Login and save state">
+    ```bash
+    agent-browser open https://app.example.com/login
+    agent-browser snapshot -i
+    agent-browser fill @e1 "username"
+    agent-browser fill @e2 "password"
+    agent-browser click @e3
+    agent-browser wait --url "**/dashboard"
+    agent-browser state save auth.json
+    ```
+  </Step>
+  
+  <Step title="Load saved state later">
+    ```bash
+    agent-browser state load auth.json
+    agent-browser open https://app.example.com/dashboard
+    # Already logged in!
+    ```
+  </Step>
+</Steps>
+
+State files are saved in the group folder and persist between sessions.
+
+### Cookie and storage management
+
+```bash
+# Cookies
+agent-browser cookies                     # Get all cookies
+agent-browser cookies set name value      # Set cookie
+agent-browser cookies clear               # Clear cookies
+
+# LocalStorage
+agent-browser storage local               # Get localStorage
+agent-browser storage local set k v       # Set value
+```
+
+### JavaScript execution
+
+Run arbitrary JavaScript:
+
+```bash
+agent-browser eval "document.title"
+agent-browser eval "localStorage.getItem('token')"
+agent-browser eval "document.querySelectorAll('.item').length"
+```
+
+## Example use cases
+
+### Daily news aggregation
+
+```
+@Andy every morning at 8am, check Hacker News and TechCrunch for 
+AI-related articles and send me a summary
+```
+
+The agent will:
+1. Open Hacker News
+2. Extract top stories
+3. Filter for AI topics
+4. Open TechCrunch
+5. Extract AI articles
+6. Compile and send summary
+
+### Form submission
+
+```
+@Andy fill out the contact form at https://example.com/contact with 
+my name, email, and this message: "Interested in a demo"
+```
+
+```bash
+agent-browser open https://example.com/contact
+agent-browser snapshot -i
+# Output: textbox "Name" [ref=e1], textbox "Email" [ref=e2], 
+#         textarea "Message" [ref=e3], button "Submit" [ref=e4]
+
+agent-browser fill @e1 "John Doe"
+agent-browser fill @e2 "john@example.com"
+agent-browser fill @e3 "Interested in a demo"
+agent-browser click @e4
+agent-browser wait --text "Thank you"
+```
+
+### Data extraction
+
+```
+@Andy extract all product names and prices from https://store.example.com
+```
+
+```bash
+agent-browser open https://store.example.com
+agent-browser snapshot -i
+# Find all product elements
+agent-browser get count ".product"
+# Extract data from each
+agent-browser get text @e1  # Product name
+agent-browser get text @e2  # Price
+# ... repeat for all products
+```
+
+### Monitoring and alerts
+
+```
+@Andy check https://status.example.com every hour and alert me if 
+the status changes from "All Systems Operational"
+```
+
+Scheduled task:
+```bash
+agent-browser open https://status.example.com
+agent-browser snapshot
+agent-browser get text @e1  # Status element
+# Compare to expected value and send alert if different
+```
+
+### Research and screenshots
+
+```
+@Andy research the top 3 Y Combinator startups from this batch and 
+take screenshots of their landing pages
+```
+
+```bash
+agent-browser open https://ycombinator.com/companies
+agent-browser snapshot -i
+# Find top 3 companies
+agent-browser click @e1  # First company
+agent-browser screenshot startup-1.png
+agent-browser back
+# Repeat for others
+```
+
+## Access from scheduled tasks
+
+Browser automation works in scheduled tasks:
+
+```
+@Andy every Monday at 9am, check my GitHub notifications and summarize 
+any new issues assigned to me
+```
+
+The scheduled task can:
+1. Open GitHub
+2. Load saved auth state
+3. Navigate to notifications
+4. Extract issue data
+5. Send summary via IPC
+
+## Browser availability
+
+The `agent-browser` skill is loaded automatically for all agents:
+
+```typescript
+// From src/container-runner.ts:136-146
+const skillsSrc = path.join(process.cwd(), 'container', 'skills');
+const skillsDst = path.join(groupSessionsDir, 'skills');
+if (fs.existsSync(skillsSrc)) {
+  for (const skillDir of fs.readdirSync(skillsSrc)) {
+    const srcDir = path.join(skillsSrc, skillDir);
+    if (!fs.statSync(srcDir).isDirectory()) continue;
+    const dstDir = path.join(skillsDst, skillDir);
+    fs.cpSync(srcDir, dstDir, { recursive: true });
+  }
+}
+```
+
+Skills from `container/skills/` are synced to each group's `.claude/skills/` directory.
+
+## Browser persistence
+
+Browser state (cookies, localStorage, auth) is saved per-group:
+
+```
+groups/
+  main/
+    browser-state.json
+  family-chat/
+    browser-state.json
+```
+
+Each group's browser sessions are isolated from other groups.
+
+## Performance considerations
+
+### Headless mode
+
+The browser runs in headless mode (no GUI) for efficiency:
+
+```bash
+# Configured in agent-browser implementation
+--headless=new
+```
+
+### Resource usage
+
+Browser automation is resource-intensive:
+- Each browser instance uses ~100-200MB RAM
+- Multiple concurrent browsers multiply this
+- Consider reducing `MAX_CONCURRENT_CONTAINERS` if memory is limited
+
+```typescript
+// From src/config.ts
+export const MAX_CONCURRENT_CONTAINERS = 5;
+```
+
+### Timeouts
+
+Browser operations respect container timeout:
+
+```typescript
+// From src/config.ts  
+export const CONTAINER_TIMEOUT = 1800000; // 30 minutes
+```
+
+Long-running scraping tasks may hit this limit. Increase if needed:
+
+```bash
+export CONTAINER_TIMEOUT=3600000  # 1 hour
+```
+
+## Debugging browser automation
+
+### Enable verbose logging
+
+Ask the agent to show browser commands:
+
+```
+@Andy show me the exact agent-browser commands you're running
+```
+
+### Save screenshots for debugging
+
+```bash
+agent-browser screenshot debug-step-1.png
+# ... do something
+agent-browser screenshot debug-step-2.png
+```
+
+### Check browser state files
+
+```bash
+ls -la groups/main/*.json
+cat groups/main/auth.json  # Inspect saved state
+```
+
+## Limitations
+
+<Warning>
+Current limitations:
+
+- **JavaScript-heavy sites**: May have timing issues with dynamic content
+- **CAPTCHAs**: Cannot solve CAPTCHAs automatically
+- **Rate limiting**: Aggressive scraping may trigger rate limits
+- **Complex interactions**: Some advanced UI patterns may not work
+</Warning>
+
+## Best practices
+
+### When to use browser automation
+
+✅ **Good use cases:**
+- Extracting data from websites without APIs
+- Monitoring page changes
+- Automating form submissions
+- Taking screenshots for documentation
+- Testing web interfaces
+
+❌ **Avoid for:**
+- Sites with good APIs (use the API instead)
+- Real-time data (too slow)
+- Sites with aggressive anti-bot protection
+- Critical workflows (too fragile)
+
+### Optimize for reliability
+
+1. **Use waits**: Don't assume instant page loads
+   ```bash
+   agent-browser wait --load networkidle
+   agent-browser wait @e1  # Wait for element
+   ```
+
+2. **Take snapshots frequently**: Re-snapshot after navigation
+   ```bash
+   agent-browser click @e1
+   agent-browser wait --load networkidle  
+   agent-browser snapshot -i  # Fresh refs
+   ```
+
+3. **Save state for auth**: Avoid re-login on every run
+   ```bash
+   agent-browser state save auth.json
+   ```
+
+4. **Handle errors gracefully**: Check if elements exist before interacting
+   ```bash
+   agent-browser get count ".error-message"
+   ```
+
+## Related documentation
+
+- [Scheduled tasks](/features/scheduled-tasks) - Automate browser tasks on a schedule
+- [Agent Swarms](/features/agent-swarms) - Use multiple agents for parallel scraping
+- [Customization](/features/customization) - Adjust container timeouts and limits
+
+## Skill documentation
+
+Full `agent-browser` skill documentation: `container/skills/agent-browser/SKILL.md`

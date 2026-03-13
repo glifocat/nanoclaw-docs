@@ -1,0 +1,351 @@
+---
+title: Skill structure
+description: Understanding the file structure and format of NanoClaw skills with deterministic code packages
+---
+
+Deterministic skills use a structured package format that allows the skills engine to apply code changes reproducibly across different user forks.
+
+## Directory structure
+
+A complete skill package looks like this:
+
+```
+.claude/skills/add-telegram/
+├── SKILL.md                    # Execution instructions
+├── manifest.yaml               # Package metadata
+├── add/                        # New files to create
+│   └── src/
+│       ├── channels/telegram.ts
+│       └── channels/telegram.test.ts
+├── modify/                     # Existing files to modify
+│   └── src/
+│       ├── index.ts
+│       ├── index.ts.intent.md
+│       ├── config.ts
+│       └── config.ts.intent.md
+└── tests/                      # Skill-level tests
+    └── telegram.test.ts
+```
+
+## manifest.yaml
+
+The manifest defines the skill's metadata and dependencies.
+
+### Example
+
+```yaml
+skill: telegram
+version: 1.0.0
+description: "Telegram Bot API integration via Grammy"
+core_version: 0.1.0
+adds:
+  - src/channels/telegram.ts
+  - src/channels/telegram.test.ts
+modifies:
+  - src/index.ts
+  - src/config.ts
+  - src/routing.test.ts
+structured:
+  npm_dependencies:
+    grammy: "^1.39.3"
+  env_additions:
+    - TELEGRAM_BOT_TOKEN
+    - TELEGRAM_ONLY
+conflicts: []
+depends: []
+test: "npx vitest run src/channels/telegram.test.ts"
+```
+
+### Fields
+
+<Note>
+All paths in `adds` and `modifies` are relative to the repository root.
+</Note>
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `skill` | string | Skill identifier (matches directory name) |
+| `version` | string | Semantic version of the skill |
+| `description` | string | What this skill adds |
+| `core_version` | string | Minimum NanoClaw version required |
+| `adds` | array | Files to create (paths relative to repo root) |
+| `modifies` | array | Files to modify (paths relative to repo root) |
+| `structured` | object | Additional changes (dependencies, env vars) |
+| `conflicts` | array | Skills that conflict with this one |
+| `depends` | array | Skills that must be applied first |
+| `test` | string | Command to test the skill application |
+
+### Structured changes
+
+The `structured` field supports:
+
+```yaml
+structured:
+  npm_dependencies:
+    package-name: "^version"
+  env_additions:
+    - ENV_VAR_NAME
+    - ANOTHER_VAR
+```
+
+## add/ directory
+
+Contains complete files to add to the codebase.
+
+### Directory structure mirrors target
+
+The structure inside `add/` mirrors where files should be created:
+
+```
+add/
+└── src/
+    └── channels/
+        └── telegram.ts
+```
+
+Creates: `src/channels/telegram.ts`
+
+### Full file contents
+
+Files in `add/` contain complete code:
+
+```typescript
+// add/src/channels/telegram.ts
+import { Bot } from 'grammy';
+import { Channel } from '../types.js';
+
+export class TelegramChannel implements Channel {
+  name = 'telegram';
+  
+  async connect(): Promise<void> {
+    // Complete implementation...
+  }
+  
+  // ...
+}
+```
+
+## modify/ directory
+
+Contains changes to existing files using three-way merge.
+
+### File pairs
+
+Each modified file needs two files:
+
+1. **Modified file** - The new version after applying the skill
+2. **Intent file** - Describes what changed and why
+
+```
+modify/
+└── src/
+    ├── config.ts              # New version
+    └── config.ts.intent.md    # What changed
+```
+
+### Intent files (.intent.md)
+
+Intent files document the changes for three-way merge resolution.
+
+#### Example: config.ts.intent.md
+
+```markdown
+# Intent: src/config.ts modifications
+
+## What changed
+Added two new configuration exports for Telegram channel support.
+
+## Key sections
+- **readEnvFile call**: Must include `TELEGRAM_BOT_TOKEN` and 
+  `TELEGRAM_ONLY` in the keys array. NanoClaw does NOT load `.env` 
+  into `process.env` — all `.env` values must be explicitly 
+  requested via `readEnvFile()`.
+- **TELEGRAM_BOT_TOKEN**: Read from `process.env` first, then 
+  `envConfig` fallback, defaults to empty string (channel disabled 
+  when empty)
+- **TELEGRAM_ONLY**: Boolean flag from `process.env` or `envConfig`, 
+  when `true` disables WhatsApp channel creation
+
+## Invariants
+- All existing config exports remain unchanged
+- New Telegram keys are added to the `readEnvFile` call alongside 
+  existing keys
+- New exports are appended at the end of the file
+- No existing behavior is modified — Telegram config is additive only
+- Both `process.env` and `envConfig` are checked (same pattern as 
+  `ASSISTANT_NAME`)
+
+## Must-keep
+- All existing exports (`ASSISTANT_NAME`, `POLL_INTERVAL`, 
+  `TRIGGER_PATTERN`, etc.)
+- The `readEnvFile` pattern — ALL config read from `.env` must go 
+  through this function
+- The `escapeRegex` helper and `TRIGGER_PATTERN` construction
+```
+
+#### Intent file sections
+
+<Steps>
+
+<Step title="What changed">
+Summary of the modifications made to this file.
+</Step>
+
+<Step title="Key sections">
+Describe the important parts that were modified and their purpose.
+</Step>
+
+<Step title="Invariants">
+List what must remain unchanged for the skill to work correctly.
+</Step>
+
+<Step title="Must-keep">
+Critical code patterns that must be preserved during merge.
+</Step>
+
+</Steps>
+
+## Applying skills
+
+### Initialize the skills system
+
+First-time setup creates `.nanoclaw/state.yaml`:
+
+```bash
+npx tsx scripts/apply-skill.ts --init
+```
+
+### Apply a skill
+
+The skills engine performs three-way merge:
+
+```bash
+npx tsx scripts/apply-skill.ts .claude/skills/add-telegram
+```
+
+This:
+
+1. **Checks** if already applied (reads `.nanoclaw/state.yaml`)
+2. **Adds** new files from `add/`
+3. **Merges** changes from `modify/` using intent files
+4. **Installs** npm dependencies from manifest
+5. **Updates** `.env.example` with new variables
+6. **Records** application in `.nanoclaw/state.yaml`
+
+### Validation
+
+After applying, always validate:
+
+```bash
+npm test
+npm run build
+```
+
+All tests must pass before proceeding to setup.
+
+## Three-way merge
+
+The skills engine uses three-way merge to handle conflicts:
+
+<CodeGroup>
+
+```typescript Base (original)
+export const ASSISTANT_NAME = 'Andy';
+export const POLL_INTERVAL = 2000;
+```
+
+```typescript Theirs (user's changes)
+export const ASSISTANT_NAME = 'Bob';
+export const POLL_INTERVAL = 2000;
+export const CUSTOM_FEATURE = true;
+```
+
+```typescript Ours (skill changes)
+export const ASSISTANT_NAME = 'Andy';
+export const POLL_INTERVAL = 2000;
+export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+```
+
+```typescript Result (merged)
+export const ASSISTANT_NAME = 'Bob';
+export const POLL_INTERVAL = 2000;
+export const CUSTOM_FEATURE = true;
+export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+```
+
+</CodeGroup>
+
+The merge:
+- Keeps user's `ASSISTANT_NAME = 'Bob'`
+- Keeps user's `CUSTOM_FEATURE`
+- Adds skill's `TELEGRAM_BOT_TOKEN`
+
+## State tracking
+
+Applied skills are tracked in `.nanoclaw/state.yaml`:
+
+```yaml
+applied_skills:
+  - telegram
+  - slack
+core_version: 0.1.0
+last_updated: '2026-02-28T12:00:00.000Z'
+```
+
+This prevents re-applying skills and enables:
+
+- **Idempotency** - Skills can be run multiple times safely
+- **Dependency checking** - Verify required skills are applied
+- **Conflict detection** - Prevent incompatible skills
+
+## Testing skills
+
+Skills should include tests at multiple levels:
+
+### Unit tests
+
+Test new code added by the skill:
+
+```typescript
+// add/src/channels/telegram.test.ts
+import { describe, it, expect } from 'vitest';
+import { TelegramChannel } from './telegram.js';
+
+describe('TelegramChannel', () => {
+  it('should format JIDs correctly', () => {
+    const channel = new TelegramChannel('token', /* ... */);
+    expect(channel.ownsJid('tg:123456')).toBe(true);
+    expect(channel.ownsJid('wa:123456')).toBe(false);
+  });
+});
+```
+
+### Integration tests
+
+Test that the skill integrates correctly:
+
+```typescript
+// tests/telegram.test.ts
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+
+describe('Telegram skill integration', () => {
+  it('should add Telegram exports to config', () => {
+    const config = readFileSync('src/config.ts', 'utf-8');
+    expect(config).toContain('TELEGRAM_BOT_TOKEN');
+    expect(config).toContain('TELEGRAM_ONLY');
+  });
+  
+  it('should add TelegramChannel to index', () => {
+    const index = readFileSync('src/index.ts', 'utf-8');
+    expect(index).toContain('TelegramChannel');
+    expect(index).toContain('channels.push');
+  });
+});
+```
+
+## Next steps
+
+- See [Creating skills](/api/skills/creating-skills) for the complete workflow
+- Review [Examples](/api/skills/examples) of real skills
+- Study the [skills engine source](https://github.com/qwibitai/NanoClaw/tree/main/skills-engine)

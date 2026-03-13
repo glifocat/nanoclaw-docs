@@ -1,0 +1,348 @@
+---
+title: Group isolation
+description: How NanoClaw isolates groups and manages per-group contexts
+---
+
+Groups in NanoClaw represent isolated contexts, typically corresponding to WhatsApp group chats or individual conversations. Each group has its own filesystem, memory, and session.
+
+## What is a group?
+
+A group is:
+
+- A WhatsApp group chat or individual conversation (identified by `jid`)
+- A dedicated folder under `groups/{name}/`
+- An isolated Claude conversation session
+- A set of permissions and mount configurations
+- A separate IPC namespace for container communication
+
+<Info>
+Groups are the fundamental isolation boundary in NanoClaw. Each group operates independently with its own context and history.
+</Info>
+
+## Group types
+
+### Main group (admin)
+
+The main group is special:
+
+- Typically your WhatsApp self-chat
+- Has full administrative privileges
+- Can manage other groups
+- Can schedule tasks for any group
+- Has read-write access to project root (read-only mount)
+- Folder is always `main`
+
+**Identifying main group:**
+
+```typescript
+const isMain = group.folder === 'main';
+```
+
+### Non-main groups
+
+All other groups:
+
+- One per WhatsApp group chat or conversation
+- Limited to their own context and operations
+- Cannot access other groups' data
+- Cannot send messages to other chats
+- Require trigger pattern (`@{ASSISTANT_NAME}`) unless disabled
+
+## Group registration
+
+Groups must be registered before the agent will respond to messages.
+
+### Registration process
+
+1. Main group sends command to register a new group
+2. Agent calls `register_group` via IPC
+3. Host validates folder name and creates directory structure
+4. Group added to SQLite database
+5. Group folder and logs directory created
+
+### Registration data structure
+
+```typescript
+interface RegisteredGroup {
+  name: string;              // Display name
+  folder: string;            // Filesystem folder name (alphanumeric + dash/underscore)
+  requiresTrigger?: boolean; // Default: true (false for main)
+  containerConfig?: {
+    timeout?: number;                    // Container timeout (ms)
+    additionalMounts?: AdditionalMount[]; // Extra directories to mount
+  };
+}
+```
+
+### Folder naming rules
+
+- Must be alphanumeric with dashes/underscores only
+- Cannot contain `..` or `/`
+- Main group always uses `main`
+- Typically derived from group name (e.g., "Family Chat" → `family-chat`)
+
+<Warning>
+Folder names cannot be changed after registration. The folder name becomes the group's stable identifier across sessions.
+</Warning>
+
+## Group isolation mechanisms
+
+### 1. Filesystem isolation
+
+Each group has a dedicated directory structure:
+
+```
+groups/
+└── {group-folder}/
+    ├── CLAUDE.md           # Per-group memory
+    ├── logs/               # Container execution logs
+    └── ...                 # Any files created by the agent
+```
+
+**What groups can access:**
+
+| Path | Main Group | Non-Main Group |
+|------|------------|----------------|
+| Own group folder | Read-write | Read-write |
+| Project root | Read-only | Not mounted |
+| Global memory (`groups/global/`) | Implicit via project | Read-only mount |
+| Other groups' folders | Via project root (ro) | Not accessible |
+| Additional mounts | Configurable | Read-only unless allowed |
+
+<Note>
+Main group can technically access other groups' folders via the project root mount, but non-main groups cannot access anything outside their own folder.
+</Note>
+
+### 2. Session isolation
+
+Each group maintains a separate Claude conversation session:
+
+```
+data/sessions/
+└── {group-folder}/
+    ├── .claude/            # Claude session data
+    │   ├── settings.json   # Per-group settings
+    │   ├── skills/         # Synced from container/skills/
+    │   └── ...             # Session database
+    └── agent-runner-src/   # Per-group agent runner code
+```
+
+**Session isolation ensures:**
+
+- Groups cannot see other groups' conversation history
+- Groups cannot access files read by other groups
+- Groups cannot see other groups' user preferences (memory)
+- Each group starts with fresh session on first invocation
+
+### 3. IPC namespace isolation
+
+Each group has its own IPC directory:
+
+```
+data/ipc/
+└── {group-folder}/
+    ├── messages/       # Outbound messages queue
+    ├── tasks/          # Task operations queue
+    ├── input/          # Follow-up messages from router
+    ├── current_tasks.json      # Filtered task list
+    └── available_groups.json   # Filtered group list
+```
+
+**IPC isolation prevents:**
+
+- Groups from sending messages on behalf of other groups
+- Groups from scheduling tasks for other groups
+- Groups from seeing other groups' task lists
+- Cross-group privilege escalation via IPC
+
+### 4. Message cursor isolation
+
+Each group has its own message processing cursor:
+
+```typescript
+// Per-group cursor tracks last processed message
+lastAgentTimestamp[chatJid] = messages[messages.length - 1].timestamp;
+```
+
+**Cursor isolation ensures:**
+
+- Messages to one group don't affect others
+- Each group processes messages independently
+- Crash recovery works per-group (no cross-contamination)
+- Groups can have different processing states
+
+## Global memory
+
+The global memory directory (`groups/global/`) is special:
+
+- Writable only by main group
+- Read-only for all other groups
+- Contains shared knowledge and context
+- Typically includes a `CLAUDE.md` file loaded by all agents
+
+**Use cases:**
+
+- Shared instructions for all agents
+- Common reference information
+- Cross-group context (user preferences, facts)
+- Coordination data between groups
+
+<Accordion title="How global memory is loaded">
+Claude Agent SDK automatically loads `CLAUDE.md` files from all mounted directories when `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1` is set.
+
+Mount structure:
+- `/workspace/group/CLAUDE.md` (per-group, read-write)
+- `/workspace/global/CLAUDE.md` (global, read-only for non-main)
+- `/workspace/project/CLAUDE.md` (project context, main only)
+
+All three are merged into the agent's context.
+</Accordion>
+
+## Group queue and concurrency
+
+The GroupQueue manages per-group execution:
+
+- **Max concurrent containers**: 5 by default (`MAX_CONCURRENT_CONTAINERS`)
+- **Per-group queueing**: Each group has independent message and task queues
+- **Priority**: Tasks before messages (tasks won't be re-discovered from DB)
+- **Idle containers**: Kept alive for 30 minutes to handle follow-ups
+- **Message piping**: Follow-up messages sent to active containers via IPC
+
+**State tracking per group:**
+
+```typescript
+interface GroupState {
+  active: boolean;              // Container currently running?
+  idleWaiting: boolean;         // Container idle, waiting for input?
+  isTaskContainer: boolean;     // Running a task vs. message?
+  pendingMessages: boolean;     // Messages queued?
+  pendingTasks: QueuedTask[];   // Tasks queued
+  process: ChildProcess | null; // Container process
+  containerName: string | null; // Docker container name
+  groupFolder: string | null;   // Group folder identifier
+  retryCount: number;           // Failed run retry counter
+}
+```
+
+<Info>
+When a group's container is already active, new messages are piped directly to the running container instead of spawning a new one. This preserves conversation flow.
+</Info>
+
+## Trigger pattern
+
+Non-main groups require a trigger pattern to activate:
+
+- **Default pattern**: `@{ASSISTANT_NAME}` (case insensitive)
+- **Configured via**: `ASSISTANT_NAME` environment variable
+- **Example**: `@Andy` if `ASSISTANT_NAME=Andy`
+- **Can be disabled**: Set `requiresTrigger: false` in group config
+
+**Why triggers are required:**
+
+1. Prevents agent from responding to every message in group chats
+2. Allows selective activation ("@Andy what's the weather?")
+3. Reduces noise in active group conversations
+4. Main group doesn't need trigger (private self-chat)
+
+**Messages without trigger:**
+
+- Stored in database
+- Included as context when trigger eventually arrives
+- Not processed immediately
+- Accumulate between triggered responses
+
+<Note>
+Triggers only check the message content, not the sender. Anyone in the group can trigger the agent with `@{ASSISTANT_NAME}`.
+</Note>
+
+## Additional mounts
+
+Groups can have extra directories mounted via `containerConfig.additionalMounts`:
+
+```typescript
+interface AdditionalMount {
+  hostPath: string;        // Absolute path on host
+  containerPath: string;   // Path inside container (relative, no ..)
+  readonly?: boolean;      // Force read-only (default: false)
+}
+```
+
+**Example:**
+
+```json
+{
+  "name": "Website Team",
+  "folder": "website-team",
+  "containerConfig": {
+    "additionalMounts": [
+      {
+        "hostPath": "/Users/you/projects/website",
+        "containerPath": "/workspace/website",
+        "readonly": true
+      }
+    ]
+  }
+}
+```
+
+**Security validation:**
+
+- Checked against mount allowlist (`~/.config/nanoclaw/mount-allowlist.json`)
+- Symlinks resolved before validation
+- Blocked patterns rejected (`.ssh`, `.env`, etc.)
+- `nonMainReadOnly` setting enforced for non-main groups
+
+<Warning>
+Additional mounts bypass group isolation. Only mount directories that are safe for the group to access.
+</Warning>
+
+## Group lifecycle
+
+### Creation
+
+1. Main group sends registration command
+2. Folder created under `groups/{folder}/`
+3. Session directory created under `data/sessions/{folder}/`
+4. IPC directory created under `data/ipc/{folder}/`
+5. Skills synced to `.claude/skills/`
+6. Agent runner source copied to `agent-runner-src/`
+7. Group added to database
+
+### Active operation
+
+1. Messages arrive via WhatsApp
+2. Stored in database with chat JID
+3. Router checks for trigger (if required)
+4. GroupQueue spawns container or pipes to active one
+5. Container mounts group folder and session
+6. Agent processes messages and generates response
+7. Response sent back via WhatsApp channel
+
+### Deactivation
+
+- No explicit deactivation needed
+- Groups remain registered until explicitly removed
+- Inactive groups simply don't receive messages
+- Sessions and folders persist across restarts
+
+### Removal
+
+- Must be done manually (no built-in unregister)
+- Delete group from database: `DELETE FROM registered_groups WHERE folder = '{folder}'`
+- Optionally delete folders: `groups/{folder}/`, `data/sessions/{folder}/`, `data/ipc/{folder}/`
+
+## Best practices
+
+1. **Use descriptive folder names**: `project-x` instead of `group1`
+2. **Set requiresTrigger: false carefully**: Only for private contexts
+3. **Limit additional mounts**: Only mount what's necessary
+4. **Use global memory for shared context**: Avoid duplicating common knowledge
+5. **Monitor group logs**: Check `groups/{folder}/logs/` for issues
+6. **Keep main group secure**: It has full access to everything
+
+## Related topics
+
+- [Security model and trust boundaries](/concepts/security)
+- [Container isolation details](/concepts/containers)
+- [Scheduled tasks per group](/concepts/tasks)
+- [System architecture](/concepts/architecture)

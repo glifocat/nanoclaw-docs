@@ -1,0 +1,103 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "NanoClaw",
+  "theme": "aspen",
+  "colors": {
+    "primary": "#5B7FFF",
+    "light": "#7B9CFF",
+    "dark": "#3D5FDD"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/qwibitai/nanoclaw"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/qwibitai/nanoclaw"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/security",
+              "concepts/groups",
+              "concepts/tasks",
+              "concepts/containers"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/messaging",
+              "features/scheduled-tasks",
+              "features/agent-swarms",
+              "features/customization",
+              "features/web-access"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/overview",
+              "integrations/skills-system",
+              "integrations/whatsapp",
+              "integrations/telegram",
+              "integrations/discord",
+              "integrations/slack",
+              "integrations/gmail"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/security-model",
+              "advanced/ipc-system",
+              "advanced/container-runtime",
+              "advanced/troubleshooting",
+              "advanced/contributing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api/overview",
+              "api/configuration",
+              "api/message-routing",
+              "api/group-management",
+              "api/task-scheduling"
+            ]
+          },
+          {
+            "group": "Skills Development",
+            "pages": [
+              "api/skills/creating-skills",
+              "api/skills/skill-structure",
+              "api/skills/examples"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

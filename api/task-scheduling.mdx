@@ -1,0 +1,347 @@
+---
+title: Task scheduling
+description: Task scheduling API for automated agent execution
+---
+
+The task scheduler enables automated execution of agent prompts on a schedule (cron, interval, or one-time).
+
+## Core functions
+
+### startSchedulerLoop
+
+Starts the task scheduler loop.
+
+```typescript
+function startSchedulerLoop(deps: SchedulerDependencies): void
+```
+
+<ParamField path="deps" type="SchedulerDependencies" required>
+  Dependency injection object with required services
+</ParamField>
+
+**Behavior:**
+
+- Polls database every `SCHEDULER_POLL_INTERVAL` (60 seconds) for due tasks
+- Enqueues tasks in the group queue
+- Only starts once (ignores duplicate calls)
+
+**Example:**
+
+```typescript
+import { startSchedulerLoop } from './task-scheduler.js';
+
+startSchedulerLoop({
+  registeredGroups: () => registeredGroups,
+  getSessions: () => sessions,
+  queue: groupQueue,
+  onProcess: (groupJid, proc, containerName, groupFolder) => {
+    queue.registerProcess(groupJid, proc, containerName, groupFolder);
+  },
+  sendMessage: async (jid, text) => {
+    await channel.sendMessage(jid, text);
+  },
+});
+```
+
+### runTask
+
+Executes a scheduled task.
+
+```typescript
+async function runTask(
+  task: ScheduledTask,
+  deps: SchedulerDependencies,
+): Promise<void>
+```
+
+<ParamField path="task" type="ScheduledTask" required>
+  Task to execute
+</ParamField>
+
+<ParamField path="deps" type="SchedulerDependencies" required>
+  Dependency injection object
+</ParamField>
+
+**Behavior:**
+
+1. Validates group folder exists
+2. Creates group directory if needed
+3. Loads session ID based on context mode:
+   - `"group"`: Uses group's current session
+   - `"isolated"`: No session (fresh context)
+4. Spawns agent container with task prompt
+5. Streams results to chat via `sendMessage`
+6. Logs execution to `task_run_logs` table
+7. Calculates next run time based on schedule type
+8. Updates task status (`"completed"` for one-time tasks)
+9. Closes container after result (10-second delay for final MCP calls)
+
+## Database operations
+
+### createTask
+
+Creates a new scheduled task.
+
+```typescript
+function createTask(
+  task: Omit<ScheduledTask, 'last_run' | 'last_result'>
+): void
+```
+
+<ParamField path="task" type="Omit<ScheduledTask, 'last_run' | 'last_result'>" required>
+  Task definition (without runtime fields)
+</ParamField>
+
+**Example:**
+
+```typescript
+import { createTask } from './db.js';
+import { randomUUID } from 'crypto';
+
+createTask({
+  id: randomUUID(),
+  group_folder: 'main',
+  chat_jid: '123@g.us',
+  prompt: 'Check server status',
+  schedule_type: 'cron',
+  schedule_value: '0 */6 * * *', // Every 6 hours
+  context_mode: 'group',
+  next_run: new Date(Date.now() + 3600000).toISOString(),
+  status: 'active',
+  created_at: new Date().toISOString(),
+});
+```
+
+### getTaskById
+
+Retrieves a task by ID.
+
+```typescript
+function getTaskById(id: string): ScheduledTask | undefined
+```
+
+### getTasksForGroup
+
+Retrieves all tasks for a group folder.
+
+```typescript
+function getTasksForGroup(groupFolder: string): ScheduledTask[]
+```
+
+### getAllTasks
+
+Retrieves all tasks.
+
+```typescript
+function getAllTasks(): ScheduledTask[]
+```
+
+### updateTask
+
+Updates task fields.
+
+```typescript
+function updateTask(
+  id: string,
+  updates: Partial<Pick<ScheduledTask, 'prompt' | 'schedule_type' | 'schedule_value' | 'next_run' | 'status'>>
+): void
+```
+
+**Example:**
+
+```typescript
+import { updateTask } from './db.js';
+
+// Pause a task
+updateTask('task-id', { status: 'paused' });
+
+// Update schedule
+updateTask('task-id', {
+  schedule_type: 'interval',
+  schedule_value: '3600000', // 1 hour in ms
+});
+```
+
+### deleteTask
+
+Deletes a task and its run logs.
+
+```typescript
+function deleteTask(id: string): void
+```
+
+### getDueTasks
+
+Returns tasks that are due for execution.
+
+```typescript
+function getDueTasks(): ScheduledTask[]
+```
+
+**Behavior:**
+
+- Filters for `status = 'active'`
+- Filters for `next_run <= NOW()`
+- Orders by `next_run` ascending
+
+### updateTaskAfterRun
+
+Updates task state after execution.
+
+```typescript
+function updateTaskAfterRun(
+  id: string,
+  nextRun: string | null,
+  lastResult: string,
+): void
+```
+
+<ParamField path="id" type="string" required>
+  Task ID
+</ParamField>
+
+<ParamField path="nextRun" type="string | null" required>
+  Next run time (null for one-time tasks)
+</ParamField>
+
+<ParamField path="lastResult" type="string" required>
+  Result summary (truncated to 200 chars)
+</ParamField>
+
+**Behavior:**
+
+- Updates `last_run` to current time
+- Updates `next_run` to calculated next time
+- Updates `last_result` with result summary
+- Sets `status = 'completed'` if `next_run` is null
+
+### logTaskRun
+
+Logs a task execution.
+
+```typescript
+function logTaskRun(log: TaskRunLog): void
+```
+
+## Types
+
+### ScheduledTask
+
+```typescript
+interface ScheduledTask {
+  id: string;                           // Unique task ID
+  group_folder: string;                 // Group folder name
+  chat_jid: string;                     // Chat to send results to
+  prompt: string;                       // Agent prompt
+  schedule_type: 'cron' | 'interval' | 'once';
+  schedule_value: string;               // Cron expression, interval ms, or ISO timestamp
+  context_mode: 'group' | 'isolated';   // Session mode
+  next_run: string | null;              // ISO timestamp of next run
+  last_run: string | null;              // ISO timestamp of last run
+  last_result: string | null;           // Result summary
+  status: 'active' | 'paused' | 'completed';
+  created_at: string;                   // ISO timestamp
+}
+```
+
+### TaskRunLog
+
+```typescript
+interface TaskRunLog {
+  task_id: string;       // Foreign key to scheduled_tasks
+  run_at: string;        // ISO timestamp of execution
+  duration_ms: number;   // Execution time in milliseconds
+  status: 'success' | 'error';
+  result: string | null; // Agent output
+  error: string | null;  // Error message if failed
+}
+```
+
+### SchedulerDependencies
+
+```typescript
+interface SchedulerDependencies {
+  registeredGroups: () => Record<string, RegisteredGroup>;
+  getSessions: () => Record<string, string>;
+  queue: GroupQueue;
+  onProcess: (
+    groupJid: string,
+    proc: ChildProcess,
+    containerName: string,
+    groupFolder: string,
+  ) => void;
+  sendMessage: (jid: string, text: string) => Promise<void>;
+}
+```
+
+## Schedule types
+
+### Cron
+
+```typescript
+schedule_type: 'cron'
+schedule_value: '0 */6 * * *'  // Cron expression
+```
+
+Uses `cron-parser` with the configured `TIMEZONE` environment variable.
+
+**Examples:**
+
+- `"0 */6 * * *"` - Every 6 hours
+- `"0 9 * * 1-5"` - 9 AM weekdays
+- `"*/15 * * * *"` - Every 15 minutes
+
+### Interval
+
+```typescript
+schedule_type: 'interval'
+schedule_value: '3600000'  // Milliseconds
+```
+
+Runs every N milliseconds from the last run time.
+
+**Examples:**
+
+- `"3600000"` - Every hour
+- `"86400000"` - Every day
+- `"300000"` - Every 5 minutes
+
+### One-time
+
+```typescript
+schedule_type: 'once'
+schedule_value: ''  // Ignored
+```
+
+Runs once and then sets `status = 'completed'`.
+
+## Context modes
+
+### Group context
+
+```typescript
+context_mode: 'group'
+```
+
+Uses the group's current session ID, preserving conversation history.
+
+### Isolated context
+
+```typescript
+context_mode: 'isolated'
+```
+
+Starts with no session, providing a fresh context for each execution.
+
+## Configuration
+
+```typescript
+// Scheduler poll interval (1 minute)
+export const SCHEDULER_POLL_INTERVAL = 60000;
+
+// Timezone for cron expressions
+export const TIMEZONE = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+// Container close delay after task result (10 seconds)
+const TASK_CLOSE_DELAY_MS = 10000;
+```

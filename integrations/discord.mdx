@@ -1,0 +1,415 @@
+---
+title: Discord integration
+description: Add Discord support using the /add-discord skill
+---
+
+Add Discord as a messaging channel for NanoClaw. Perfect for team collaboration and community management.
+
+## Overview
+
+The Discord integration uses [discord.js](https://discord.js.org/) to connect to Discord's Gateway API. It supports text channels, DMs, threads, and rich message features.
+
+### Features
+
+- **Text channels and DMs** - Respond in server channels or direct messages
+- **Attachment handling** - Detects and describes attachments in messages
+- **Reply context** - Shows when users reply to previous messages
+- **@Mention translation** - Converts Discord mentions to trigger format
+- **Message splitting** - Automatically splits long responses (2000 char limit)
+- **Typing indicators** - Shows when the assistant is working
+
+## Adding Discord
+
+Use the `/add-discord` skill to add Discord support:
+
+<Steps>
+  <Step title="Run the skill">
+    ```bash
+    claude
+    /add-discord
+    ```
+  </Step>
+  
+  <Step title="Choose deployment mode">
+    - **Replace WhatsApp** - Discord becomes the only channel
+    - **Alongside** - Both WhatsApp and Discord run simultaneously
+  </Step>
+  
+  <Step title="Apply code changes">
+    The skill runs the skills engine which:
+    - Adds `src/channels/discord.ts` (DiscordChannel implementation)
+    - Adds `src/channels/discord.test.ts` (unit tests)
+    - Merges multi-channel support into `src/index.ts`
+    - Adds Discord config to `src/config.ts`
+    - Installs the `discord.js` NPM package
+  </Step>
+  
+  <Step title="Create Discord bot">
+    Set up a bot in the Discord Developer Portal
+  </Step>
+  
+  <Step title="Configure environment">
+    Add bot token to `.env` and sync to container
+  </Step>
+  
+  <Step title="Register channels">
+    Get channel IDs and register them with NanoClaw
+  </Step>
+</Steps>
+
+## Creating a Discord bot
+
+If you don't already have a Discord bot:
+
+<Steps>
+  <Step title="Create application">
+    1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
+    2. Click **New Application**
+    3. Give it a name (e.g., "Andy Assistant")
+    4. Click **Create App**
+  </Step>
+  
+  <Step title="Create bot user">
+    1. Go to the **Bot** tab in the left sidebar
+    2. Click **Reset Token** to generate a bot token
+    3. **Copy the token immediately** (you can only see it once)
+  </Step>
+  
+  <Step title="Enable intents">
+    Under **Privileged Gateway Intents**, enable:
+    - **Message Content Intent** (required to read message text)
+    - **Server Members Intent** (optional, for member display names)
+  </Step>
+  
+  <Step title="Generate invite URL">
+    1. Go to **OAuth2** → **URL Generator**
+    2. Select scopes:
+       - `bot`
+    3. Select bot permissions:
+       - `Send Messages`
+       - `Read Message History`
+       - `View Channels`
+    4. Copy the generated URL
+  </Step>
+  
+  <Step title="Invite bot to server">
+    Open the generated URL in your browser and select the server to add the bot to
+  </Step>
+</Steps>
+
+<Warning>
+  Without the **Message Content Intent** enabled, the bot can connect but won't be able to read message text.
+</Warning>
+
+## Configuration
+
+### Environment variables
+
+Add to `.env`:
+
+```bash
+DISCORD_BOT_TOKEN=<your-bot-token>
+```
+
+If you chose to replace WhatsApp:
+
+```bash
+DISCORD_ONLY=true
+```
+
+### Sync to container
+
+```bash
+cp .env data/env/env
+```
+
+## Build and restart
+
+<CodeGroup>
+```bash macOS
+npm run build
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+```
+
+```bash Linux
+npm run build
+systemctl --user restart nanoclaw
+```
+</CodeGroup>
+
+## Registering channels
+
+### Get channel ID
+
+<Steps>
+  <Step title="Enable Developer Mode">
+    In Discord: **User Settings** → **Advanced** → Enable **Developer Mode**
+  </Step>
+  
+  <Step title="Copy channel ID">
+    1. Right-click the text channel you want the bot to respond in
+    2. Click **Copy Channel ID**
+    3. The ID will be a long number like `1234567890123456`
+  </Step>
+</Steps>
+
+### Register the channel
+
+For your main channel (responds to all messages):
+
+```typescript
+registerGroup("dc:<channel-id>", {
+  name: "Server Name #channel-name",
+  folder: "main",
+  trigger: `@${ASSISTANT_NAME}`,
+  added_at: new Date().toISOString(),
+  requiresTrigger: false,
+});
+```
+
+For additional channels (trigger-only):
+
+```typescript
+registerGroup("dc:<channel-id>", {
+  name: "Team Server #general",
+  folder: "team-general",
+  trigger: `@${ASSISTANT_NAME}`,
+  added_at: new Date().toISOString(),
+  requiresTrigger: true,
+});
+```
+
+<Tip>
+  Use `requiresTrigger: true` for shared channels so the assistant only responds when @mentioned.
+</Tip>
+
+## Testing the connection
+
+Send a message in your registered Discord channel:
+
+- **For main channel:** Any message works
+- **For non-main channels:** @mention the bot (Discord will autocomplete it)
+
+The bot should respond within a few seconds.
+
+### Check logs
+
+```bash
+tail -f logs/nanoclaw.log
+```
+
+Look for:
+
+```
+Connected to Discord
+Received message from dc:1234567890123456
+Agent response queued
+```
+
+## JID format
+
+Discord channels use the `dc:` prefix:
+
+- **Text channel:** `dc:1234567890123456`
+- **DM:** `dc:1234567890123456`
+- **Thread:** `dc:1234567890123456` (treated as a regular channel)
+
+## Message features
+
+### Attachment detection
+
+When a message includes attachments:
+
+```
+User message: Check out this screenshot
+[Image attachment: screenshot.png]
+```
+
+The agent sees the attachment description but not the actual file content.
+
+### Reply context
+
+When replying to previous messages:
+
+```
+[Replying to: Andy] Original message here
+User's reply text
+```
+
+### @Mention translation
+
+Discord mentions like `<@123456789>` are translated to your trigger format:
+
+```
+User: <@bot-id> hello
+Agent sees: @Andy hello
+```
+
+### Message splitting
+
+Discord has a 2000 character limit per message. Long responses are automatically split:
+
+```typescript
+if (text.length > 2000) {
+  const chunks = text.match(/[\s\S]{1,2000}/g) || [];
+  for (const chunk of chunks) {
+    await channel.send(chunk);
+  }
+}
+```
+
+## Implementation details
+
+The Discord channel implements the `Channel` interface:
+
+```typescript
+export class DiscordChannel implements Channel {
+  name = 'discord';
+  
+  async connect(): Promise<void> {
+    this.client = new Client({
+      intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.DirectMessages,
+      ],
+    });
+    
+    this.client.on('messageCreate', async (message) => {
+      if (message.author.bot) return;
+      
+      const channelJid = `dc:${message.channelId}`;
+      
+      // Build message content with attachment info
+      let content = message.content;
+      if (message.attachments.size > 0) {
+        const attachmentDesc = Array.from(message.attachments.values())
+          .map(a => `[${a.contentType} attachment: ${a.name}]`)
+          .join('\n');
+        content += '\n' + attachmentDesc;
+      }
+      
+      this.opts.onMessage(channelJid, {
+        id: message.id,
+        chat_jid: channelJid,
+        sender: message.author.id,
+        sender_name: message.author.username,
+        content,
+        timestamp: message.createdAt.toISOString(),
+        is_from_me: false,
+        is_bot_message: false,
+      });
+    });
+    
+    await this.client.login(process.env.DISCORD_BOT_TOKEN);
+  }
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Bot not responding">
+    Check these items:
+    
+    1. `DISCORD_BOT_TOKEN` is set in `.env` AND synced to `data/env/env`
+    2. Channel is registered:
+       ```bash
+       sqlite3 store/messages.db "SELECT * FROM registered_groups WHERE jid LIKE 'dc:%'"
+       ```
+    3. For non-main channels: message must @mention the bot
+    4. Service is running:
+       ```bash
+       launchctl list | grep nanoclaw  # macOS
+       systemctl --user status nanoclaw  # Linux
+       ```
+    5. Bot has been invited to the server (check OAuth2 URL was used)
+  </Accordion>
+  
+  <Accordion title="Bot can't read messages">
+    The **Message Content Intent** must be enabled:
+    
+    1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+    2. Select your application → **Bot** tab
+    3. Under **Privileged Gateway Intents**, enable **Message Content Intent**
+    4. Restart NanoClaw
+  </Accordion>
+  
+  <Accordion title="Bot only responds to @mentions">
+    This is the behavior for non-main channels with `requiresTrigger: true`.
+    
+    To make it respond to all messages:
+    - Update the registered group's `requiresTrigger` to `false`, or
+    - Register the channel as your main channel
+  </Accordion>
+  
+  <Accordion title="Can't copy channel ID">
+    Ensure **Developer Mode** is enabled:
+    
+    **User Settings** → **Advanced** → **Developer Mode** → On
+    
+    Then right-click the channel name → **Copy Channel ID**
+  </Accordion>
+</AccordionGroup>
+
+## Limitations
+
+- **Threads are treated as channels** - Thread-aware routing (respond in-thread) requires pipeline-wide changes
+- **No typing indicator** - Discord bots can't show typing status via the Gateway API
+- **Basic message splitting** - Long messages split at 2000 chars, may break mid-word
+- **No file upload support** - Bot only processes text content
+
+## Removing Discord
+
+To remove the Discord integration:
+
+<Steps>
+  <Step title="Delete channel files">
+    ```bash
+    rm src/channels/discord.ts
+    rm src/channels/discord.test.ts
+    ```
+  </Step>
+  
+  <Step title="Revert code changes">
+    - Remove `DiscordChannel` import and creation from `src/index.ts`
+    - Remove Discord config from `src/config.ts`
+    - Remove Discord JID tests from `src/routing.test.ts`
+  </Step>
+  
+  <Step title="Remove registrations">
+    ```bash
+    sqlite3 store/messages.db "DELETE FROM registered_groups WHERE jid LIKE 'dc:%'"
+    ```
+  </Step>
+  
+  <Step title="Uninstall dependency">
+    ```bash
+    npm uninstall discord.js
+    ```
+  </Step>
+  
+  <Step title="Rebuild and restart">
+    ```bash
+    npm run build
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    ```
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Add Slack" icon="slack" href="/integrations/slack">
+    Add Slack support to your installation
+  </Card>
+  
+  <Card title="Add Telegram" icon="telegram" href="/integrations/telegram">
+    Add Telegram support to your installation
+  </Card>
+  
+  <Card title="Skills system" icon="puzzle-piece" href="/integrations/skills-system">
+    Learn more about how skills work
+  </Card>
+</CardGroup>

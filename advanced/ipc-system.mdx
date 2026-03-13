@@ -1,0 +1,375 @@
+---
+title: IPC system
+description: Inter-process communication architecture and implementation
+---
+
+NanoClaw uses a filesystem-based IPC system to enable communication between the host process and containerized agents. This design avoids network sockets while maintaining security boundaries.
+
+## Architecture overview
+
+The IPC system is built on three core components:
+
+1. **Per-group namespaces** - Each group gets its own IPC directory at `data/ipc/{group}/`
+2. **File-based message passing** - JSON files are written to subdirectories and polled by the host
+3. **Authorization checks** - The directory name determines the source group identity
+
+```
+data/ipc/
+├── main/                    # Main group IPC namespace
+│   ├── messages/            # Outbound messages to WhatsApp
+│   ├── tasks/               # Task management operations
+│   └── input/               # Inbound messages from host
+├── family-chat/             # Non-main group namespace
+│   ├── messages/
+│   ├── tasks/
+│   └── input/
+└── errors/                  # Failed IPC operations
+```
+
+## How it works
+
+### Starting the IPC watcher
+
+The IPC watcher starts at application launch and runs continuously, polling for new files at `IPC_POLL_INTERVAL` (default: 500ms).
+
+From `src/ipc.ts:34`:
+
+```typescript
+export function startIpcWatcher(deps: IpcDeps): void {
+  if (ipcWatcherRunning) {
+    logger.debug('IPC watcher already running, skipping duplicate start');
+    return;
+  }
+  ipcWatcherRunning = true;
+
+  const ipcBaseDir = path.join(DATA_DIR, 'ipc');
+  fs.mkdirSync(ipcBaseDir, { recursive: true });
+
+  const processIpcFiles = async () => {
+    // Scan all group IPC directories
+    let groupFolders: string[];
+    try {
+      groupFolders = fs.readdirSync(ipcBaseDir).filter((f) => {
+        const stat = fs.statSync(path.join(ipcBaseDir, f));
+        return stat.isDirectory() && f !== 'errors';
+      });
+    } catch (err) {
+      logger.error({ err }, 'Error reading IPC base directory');
+      setTimeout(processIpcFiles, IPC_POLL_INTERVAL);
+      return;
+    }
+    // ...
+  };
+
+  processIpcFiles();
+}
+```
+
+### Message flow
+
+<Steps>
+  <Step title="Agent writes IPC file">
+    The agent running in a container writes a JSON file to `/workspace/ipc/messages/` or `/workspace/ipc/tasks/`.
+    
+    Example message file:
+    ```json
+    {
+      "type": "message",
+      "chatJid": "1234567890@s.whatsapp.net",
+      "text": "Hello from the agent!"
+    }
+    ```
+  </Step>
+  
+  <Step title="Host polls IPC directory">
+    The IPC watcher on the host scans `data/ipc/{group}/messages/` and finds the new JSON file.
+  </Step>
+  
+  <Step title="Authorization check">
+    The host determines the source group from the directory path (`{group}`) and verifies the operation is authorized.
+    
+    From `src/ipc.ts:76`:
+    ```typescript
+    // Authorization: verify this group can send to this chatJid
+    const targetGroup = registeredGroups[data.chatJid];
+    if (
+      isMain ||
+      (targetGroup && targetGroup.folder === sourceGroup)
+    ) {
+      await deps.sendMessage(data.chatJid, data.text);
+    } else {
+      logger.warn(
+        { chatJid: data.chatJid, sourceGroup },
+        'Unauthorized IPC message attempt blocked',
+      );
+    }
+    ```
+  </Step>
+  
+  <Step title="Execute operation">
+    If authorized, the host executes the requested operation (send message, schedule task, etc.).
+  </Step>
+  
+  <Step title="Delete IPC file">
+    The IPC file is deleted after processing. If processing fails, the file is moved to `data/ipc/errors/` for debugging.
+  </Step>
+</Steps>
+
+## IPC operations
+
+### Send message
+
+Allows agents to send messages to WhatsApp chats.
+
+**File location:** `data/ipc/{group}/messages/message-{timestamp}.json`
+
+**Format:**
+```json
+{
+  "type": "message",
+  "chatJid": "1234567890@s.whatsapp.net",
+  "text": "Message content"
+}
+```
+
+**Authorization:**
+- Main group can send to any chat
+- Non-main groups can only send to their own chat
+
+### Schedule task
+
+Creates a scheduled task that runs at specified intervals.
+
+**File location:** `data/ipc/{group}/tasks/task-{timestamp}.json`
+
+**Format:**
+```json
+{
+  "type": "schedule_task",
+  "prompt": "Task prompt for the agent",
+  "schedule_type": "cron",
+  "schedule_value": "0 9 * * 1",
+  "context_mode": "group",
+  "targetJid": "1234567890@s.whatsapp.net"
+}
+```
+
+**Parameters:**
+- `schedule_type`: `cron`, `interval`, or `once`
+- `schedule_value`: Cron expression, milliseconds, or ISO timestamp
+- `context_mode`: `group` (shared session) or `isolated` (fresh session)
+- `targetJid`: The chat JID to associate with this task
+
+**Authorization:**
+- Main group can schedule tasks for any group
+- Non-main groups can only schedule tasks for themselves
+
+From `src/ipc.ts:202`:
+
+```typescript
+// Authorization: non-main groups can only schedule for themselves
+if (!isMain && targetFolder !== sourceGroup) {
+  logger.warn(
+    { sourceGroup, targetFolder },
+    'Unauthorized schedule_task attempt blocked',
+  );
+  break;
+}
+```
+
+### Pause task
+
+Pauses an active task.
+
+**Format:**
+```json
+{
+  "type": "pause_task",
+  "taskId": "task-1234567890-abc123"
+}
+```
+
+### Resume task
+
+Resumes a paused task.
+
+**Format:**
+```json
+{
+  "type": "resume_task",
+  "taskId": "task-1234567890-abc123"
+}
+```
+
+### Cancel task
+
+Deletes a task permanently.
+
+**Format:**
+```json
+{
+  "type": "cancel_task",
+  "taskId": "task-1234567890-abc123"
+}
+```
+
+### Refresh groups
+
+Forces a refresh of WhatsApp group metadata. **Main group only.**
+
+**Format:**
+```json
+{
+  "type": "refresh_groups"
+}
+```
+
+From `src/ipc.ts:327`:
+
+```typescript
+case 'refresh_groups':
+  // Only main group can request a refresh
+  if (isMain) {
+    logger.info(
+      { sourceGroup },
+      'Group metadata refresh requested via IPC',
+    );
+    await deps.syncGroupMetadata(true);
+  } else {
+    logger.warn(
+      { sourceGroup },
+      'Unauthorized refresh_groups attempt blocked',
+    );
+  }
+  break;
+```
+
+### Register group
+
+Registers a new WhatsApp group for agent access. **Main group only.**
+
+**Format:**
+```json
+{
+  "type": "register_group",
+  "jid": "1234567890-9876543210@g.us",
+  "name": "Family Chat",
+  "folder": "family-chat",
+  "trigger": "@Andy",
+  "requiresTrigger": true,
+  "containerConfig": {
+    "additionalMounts": [],
+    "timeout": 1800000
+  }
+}
+```
+
+## Security model
+
+### Identity verification
+
+The source group identity is determined by the directory path, not the file contents. This prevents impersonation attacks.
+
+From `src/ipc.ts:60`:
+
+```typescript
+for (const sourceGroup of groupFolders) {
+  const isMain = sourceGroup === MAIN_GROUP_FOLDER;
+  const messagesDir = path.join(ipcBaseDir, sourceGroup, 'messages');
+  const tasksDir = path.join(ipcBaseDir, sourceGroup, 'tasks');
+  // Process files with verified identity
+}
+```
+
+### Mount isolation
+
+Each container can only write to its own IPC namespace:
+
+- Main group: `/workspace/ipc` → `data/ipc/main/`
+- Other groups: `/workspace/ipc` → `data/ipc/{group}/`
+
+This is enforced at mount time in `src/container-runner.ts:155`:
+
+```typescript
+// Per-group IPC namespace: each group gets its own IPC directory
+// This prevents cross-group privilege escalation via IPC
+const groupIpcDir = resolveGroupIpcPath(group.folder);
+fs.mkdirSync(path.join(groupIpcDir, 'messages'), { recursive: true });
+fs.mkdirSync(path.join(groupIpcDir, 'tasks'), { recursive: true });
+fs.mkdirSync(path.join(groupIpcDir, 'input'), { recursive: true });
+mounts.push({
+  hostPath: groupIpcDir,
+  containerPath: '/workspace/ipc',
+  readonly: false,
+});
+```
+
+### Error handling
+
+Failed IPC operations are moved to `data/ipc/errors/` with a prefix identifying the source group:
+
+From `src/ipc.ts:100`:
+
+```typescript
+const errorDir = path.join(ipcBaseDir, 'errors');
+fs.mkdirSync(errorDir, { recursive: true });
+fs.renameSync(
+  filePath,
+  path.join(errorDir, `${sourceGroup}-${file}`),
+);
+```
+
+## Debugging IPC issues
+
+<Accordion title="Check for failed IPC operations">
+  ```bash
+  ls -la data/ipc/errors/
+  cat data/ipc/errors/main-message-*.json
+  ```
+  
+  Failed operations are moved here with the source group prefix.
+</Accordion>
+
+<Accordion title="Monitor IPC activity">
+  ```bash
+  grep 'IPC' logs/nanoclaw.log | tail -20
+  ```
+  
+  All IPC operations are logged with the source group and operation type.
+</Accordion>
+
+<Accordion title="Verify IPC directory permissions">
+  ```bash
+  ls -la data/ipc/main/
+  ls -la data/ipc/family-chat/
+  ```
+  
+  Ensure the host process can read and write these directories.
+</Accordion>
+
+<Accordion title="Test IPC manually">
+  ```bash
+  # Write a test message
+  echo '{"type":"message","chatJid":"me","text":"test"}' > \
+    data/ipc/main/messages/test.json
+  
+  # Watch logs for processing
+  tail -f logs/nanoclaw.log | grep IPC
+  ```
+</Accordion>
+
+## Performance considerations
+
+<Tip>
+  The IPC poll interval is configurable via `IPC_POLL_INTERVAL` in `src/config.ts`. The default is 500ms. Lowering it reduces latency but increases CPU usage. Raising it saves resources but increases response time.
+</Tip>
+
+<Warning>
+  IPC operations are processed sequentially. If processing a single operation takes longer than the poll interval, a backlog can form. Monitor `data/ipc/{group}/` directories for accumulating files.
+</Warning>
+
+## Related pages
+
+- [Security model](/advanced/security-model) - Authorization and trust boundaries
+- [Container runtime](/advanced/container-runtime) - How agents execute in containers
+- [Troubleshooting](/advanced/troubleshooting) - Common IPC issues

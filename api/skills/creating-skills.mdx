@@ -1,0 +1,270 @@
+---
+title: Creating skills
+description: Learn how to create custom NanoClaw skills that transform the codebase to add new capabilities
+---
+
+Skills are NanoClaw's approach to extending functionality. Instead of adding features to the core codebase, you create skills that teach Claude Code how to transform a user's fork to add exactly what they need.
+
+## Philosophy
+
+**Skills over features.** Instead of adding features (e.g. support for Telegram) to the codebase, contributors submit skills like `/add-telegram` that transform your fork. You end up with clean code that does exactly what you need.
+
+From the [NanoClaw README](https://github.com/qwibitai/NanoClaw):
+
+> NanoClaw isn't a monolithic framework; it's software that fits each user's exact needs. Instead of becoming bloatware, NanoClaw is designed to be bespoke. You make your own fork and have Claude Code modify it to match your needs.
+
+## How skills work
+
+Skills are stored in `.claude/skills/` and consist of:
+
+1. **SKILL.md** - Instructions for Claude Code on how to execute the skill
+2. **Code packages** - Files to add or modify (for deterministic skills)
+3. **Intent files** - Describe what changed and why (for merge operations)
+4. **Tests** - Validation that the skill was applied correctly
+
+## Skill types
+
+There are two main types of skills:
+
+### Interactive skills
+
+Skills that guide Claude Code through a multi-step process with user interaction.
+
+**Example:** `/setup` - Runs installation, asks questions, handles errors
+
+**Characteristics:**
+- Heavy use of `AskUserQuestion` for user input
+- Multi-phase execution (preflight, setup, validation)
+- Error recovery and troubleshooting
+- No deterministic code changes
+
+### Deterministic skills
+
+Skills that use the skills engine to make reproducible code changes, then guide setup.
+
+**Example:** `/add-telegram` - Applies code package, then configures Telegram
+
+**Characteristics:**
+- Phase 1: Check if already applied
+- Phase 2: Apply code changes via skills engine
+- Phase 3: Interactive setup and configuration
+- Phase 4: Validation and testing
+- Tracked in `.nanoclaw/state.yaml`
+
+## Creating your first skill
+
+<Steps>
+
+<Step title="Choose a skill name">
+
+Skill names should be descriptive and use kebab-case:
+
+- `add-telegram` - Adds Telegram channel support
+- `add-slack` - Adds Slack channel support
+- `customize` - Interactive customization guide
+- `debug` - Troubleshooting helper
+
+</Step>
+
+<Step title="Create the skill directory">
+
+```bash
+mkdir -p .claude/skills/your-skill-name
+```
+
+</Step>
+
+<Step title="Write SKILL.md">
+
+Create `.claude/skills/your-skill-name/SKILL.md` with frontmatter:
+
+```markdown
+---
+name: your-skill-name
+description: Brief description of what this skill does and when to use it
+---
+
+# Skill Title
+
+Detailed instructions for Claude Code...
+```
+
+**Frontmatter fields:**
+- `name` (required) - The skill command name
+- `description` (required) - When to invoke this skill
+
+</Step>
+
+<Step title="Structure the skill content">
+
+Organize instructions into clear phases:
+
+```markdown
+## Phase 1: Pre-flight
+
+### Check prerequisites
+- What needs to exist before running?
+- What to ask the user?
+
+### Collect configuration
+Use `AskUserQuestion` for user input.
+
+## Phase 2: Implementation
+
+### Step-by-step instructions
+- What commands to run?
+- What files to modify?
+- What to validate?
+
+## Phase 3: Verification
+
+### Test the changes
+- How to verify it works?
+- What logs to check?
+
+## Troubleshooting
+
+### Common issues
+- Problem: Description
+- Solution: How to fix
+```
+
+</Step>
+
+<Step title="Add code packages (optional)">
+
+For deterministic skills, create a package structure:
+
+```
+.claude/skills/your-skill-name/
+├── SKILL.md
+├── manifest.yaml
+├── add/
+│   └── src/
+│       └── new-file.ts
+└── modify/
+    └── src/
+        ├── existing-file.ts
+        └── existing-file.ts.intent.md
+```
+
+See [Skill structure](/api/skills/skill-structure) for details.
+
+</Step>
+
+<Step title="Test the skill">
+
+Run the skill command in Claude Code:
+
+```bash
+cd NanoClaw
+claude
+```
+
+Then run `/your-skill-name` and verify it works as expected.
+
+</Step>
+
+</Steps>
+
+## Best practices
+
+### Writing clear instructions
+
+<Note>
+**Principle from `/setup`:** When something is broken or missing, fix it. Don't tell the user to go fix it themselves unless it genuinely requires their manual action (e.g. scanning a QR code, pasting a secret token).
+</Note>
+
+- Use `AskUserQuestion` for all user-facing questions
+- Provide clear, step-by-step commands
+- Include error recovery steps
+- Show expected output and how to verify success
+
+### Handling user input
+
+Always use `AskUserQuestion` instead of asking in prose:
+
+<CodeGroup>
+
+```markdown Good
+AskUserQuestion: Should Telegram replace WhatsApp or run alongside it?
+- **Replace WhatsApp** - Telegram will be the only channel
+- **Alongside** - Both channels active
+```
+
+```markdown Bad
+Do you want Telegram to replace WhatsApp or run alongside it?
+```
+
+</CodeGroup>
+
+### Error handling
+
+Provide specific troubleshooting steps:
+
+```markdown
+## Troubleshooting
+
+### Bot not responding
+
+Check:
+1. `TELEGRAM_BOT_TOKEN` is set in `.env` AND synced to `data/env/env`
+2. Chat is registered in SQLite
+3. For non-main chats: message includes trigger pattern
+4. Service is running: `launchctl list | grep nanoclaw`
+```
+
+### Platform compatibility
+
+Handle macOS and Linux differences:
+
+```markdown
+### Build and restart
+
+```bash
+npm run build
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
+# Linux: systemctl --user restart nanoclaw
+```
+```
+
+### Verification steps
+
+Always include a verification phase:
+
+```markdown
+## Phase 5: Verify
+
+### Test the connection
+
+Tell the user:
+
+> Send a message to your registered chat:
+> - For main chat: Any message works
+> - For non-main: `@Andy hello` or @mention the bot
+>
+> The bot should respond within a few seconds.
+
+### Check logs if needed
+
+```bash
+tail -f logs/nanoclaw.log
+```
+```
+
+## Next steps
+
+- Learn about [Skill structure](/api/skills/skill-structure) for deterministic skills
+- See [Examples](/api/skills/examples) of real skills from the repository
+- Contribute your skill via pull request
+
+## Contributing skills
+
+When you're ready to contribute:
+
+1. Test your skill on a fresh NanoClaw installation
+2. Verify it works on both macOS and Linux (if applicable)
+3. Include comprehensive troubleshooting steps
+4. Submit a PR to the [NanoClaw repository](https://github.com/qwibitai/NanoClaw)
+
+**Remember:** Don't add features. Add skills. Users run `/your-skill` on their fork and get clean code that does exactly what they need.

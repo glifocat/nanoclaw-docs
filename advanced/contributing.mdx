@@ -1,0 +1,318 @@
+---
+title: Contributing
+description: How to contribute to NanoClaw
+---
+
+NanoClaw is designed to stay small and minimal. Contributions should prioritize reducing code, not adding features.
+
+## Philosophy
+
+NanoClaw is **not** a framework that tries to support every use case. It's software that each user customizes to fit their exact needs.
+
+Instead of adding features to the codebase, we contribute **skills** that teach Claude Code how to transform a NanoClaw installation.
+
+## What we accept
+
+### Source code changes
+
+<Accordion title="Accepted: Bug fixes">
+  Fixes for broken functionality, crashes, or incorrect behavior.
+  
+  **Example:** Fix message cursor advancing before agent succeeds, causing messages to be lost on timeout.
+</Accordion>
+
+<Accordion title="Accepted: Security fixes">
+  Patches for security vulnerabilities or improvements to the security model.
+  
+  **Example:** Add symlink resolution to mount validation to prevent traversal attacks.
+</Accordion>
+
+<Accordion title="Accepted: Simplifications">
+  Refactoring that reduces complexity, removes dependencies, or makes the codebase easier to understand.
+  
+  **Example:** Consolidate duplicate mount validation logic into a single function.
+</Accordion>
+
+<Accordion title="Accepted: Code reduction">
+  Removing unnecessary code, dependencies, or features.
+  
+  **Example:** Remove unused configuration options.
+</Accordion>
+
+<Accordion title="Not accepted: Features">
+  New capabilities, integrations, or functionality expansions.
+  
+  **Why:** Features should be skills, not source code.
+  
+  **Example:** Adding Telegram support, Gmail integration, or new scheduling options.
+</Accordion>
+
+<Accordion title="Not accepted: Enhancements">
+  Improvements to existing features or performance optimizations.
+  
+  **Why:** Users should customize their fork to add enhancements they need.
+  
+  **Example:** Adding caching, improving query performance, or adding retry logic.
+</Accordion>
+
+<Accordion title="Not accepted: Compatibility">
+  Support for new platforms, runtimes, or environments.
+  
+  **Why:** Compatibility changes should be skills.
+  
+  **Example:** Adding Windows support, Podman support, or ARM64 optimization.
+</Accordion>
+
+## Contributing skills
+
+A [skill](https://code.claude.com/docs/en/skills) is a markdown file in `.claude/skills/` that teaches Claude Code how to transform a NanoClaw installation.
+
+### Skill structure
+
+Skills should be self-contained directories under `.claude/skills/{skill-name}/`:
+
+```
+.claude/skills/
+└── add-telegram/
+    ├── SKILL.md          # Main instructions
+    ├── package.json      # Optional: dependencies to install
+    └── templates/        # Optional: code templates
+        └── telegram.ts.template
+```
+
+### Writing a skill
+
+<Steps>
+  <Step title="Provide clear instructions">
+    The skill should contain **instructions** Claude follows to add the feature, not pre-built code.
+    
+    Good example from `/add-telegram`:
+    ```markdown
+    ## Instructions
+    
+    1. Install the Telegram bot library:
+       ```bash
+       npm install node-telegram-bot-api
+       ```
+    
+    2. Create `src/channels/telegram.ts` with the following structure:
+       - Export a `connectToTelegram()` function
+       - Handle incoming messages
+       - Export a `sendTelegramMessage()` function
+    
+    3. Modify `src/index.ts` to import and call `connectToTelegram()`
+    ```
+  </Step>
+  
+  <Step title="Include context and rationale">
+    Explain **why** certain decisions are made, so Claude understands the reasoning.
+    
+    ```markdown
+    ## Design decisions
+    
+    - Use polling instead of webhooks for simplicity
+    - Store Telegram credentials in the same `.env` file as WhatsApp
+    - Reuse the existing message queue system
+    ```
+  </Step>
+  
+  <Step title="Provide templates if needed">
+    If the skill requires boilerplate code, include it in a `templates/` directory.
+    
+    ```markdown
+    ## Implementation
+    
+    Create `src/channels/telegram.ts` using the template in `templates/telegram.ts.template`.
+    ```
+  </Step>
+  
+  <Step title="Test on a fresh clone">
+    Before submitting, test your skill on a fresh NanoClaw installation to ensure it works without manual intervention.
+  </Step>
+</Steps>
+
+### Why skills instead of features?
+
+**Every user should have clean and minimal code that does exactly what they need.**
+
+Skills let users selectively add features to their fork without inheriting code for features they don't want.
+
+<Tabs>
+  <Tab title="With skills">
+    ```
+    # User A wants WhatsApp only
+    git clone nanoclaw
+    claude /setup
+    # Clean codebase, no Telegram code
+    
+    # User B wants Telegram only
+    git clone nanoclaw
+    claude /setup
+    claude /add-telegram
+    claude /remove-whatsapp
+    # Clean codebase, no WhatsApp code
+    ```
+  </Tab>
+  
+  <Tab title="Without skills (traditional approach)">
+    ```
+    # Everyone gets both
+    git clone nanoclaw
+    npm install
+    # Codebase includes WhatsApp, Telegram, Discord, Slack...
+    # Configuration sprawl to enable/disable features
+    # Unused dependencies and code
+    ```
+  </Tab>
+</Tabs>
+
+### Skill guidelines
+
+<Accordion title="Skills should not modify source files">
+  A PR that contributes a skill should not touch `src/`, `container/`, or other core files. The skill's instructions tell Claude how to make those changes.
+  
+  **Exception:** If the skill requires changes to the skill system itself (e.g., new skill loading behavior), those can be source changes.
+</Accordion>
+
+<Accordion title="Skills should be reversible">
+  Users should be able to remove a skill's changes if they no longer want it. Include removal instructions in the skill or create a separate `/remove-{feature}` skill.
+</Accordion>
+
+<Accordion title="Skills should be composable">
+  Skills should work together without conflicts. If your skill is incompatible with another skill, document this clearly.
+</Accordion>
+
+<Accordion title="Skills should preserve security">
+  Skills that add new capabilities must respect the existing security model. Don't bypass container isolation, mount validation, or IPC authorization.
+</Accordion>
+
+## Request for skills (RFS)
+
+Skills we'd like to see contributed:
+
+### Communication channels
+
+<Note>
+  Slack, Discord, Telegram, and Gmail integrations already exist! Check the [integrations overview](/integrations/overview).
+</Note>
+
+- `/add-signal` - Add Signal integration
+- `/add-matrix` - Add Matrix integration
+- `/add-whatsapp-cloud-api` - Add WhatsApp Cloud API (for business accounts)
+
+### Session management
+
+- `/clear` - Compact conversation (summarize context while preserving critical information in the same session). Requires figuring out how to trigger compaction programmatically via the Claude Agent SDK.
+
+### Deployment
+
+- `/deploy-railway` - Deploy NanoClaw to Railway
+- `/deploy-fly` - Deploy NanoClaw to Fly.io
+- `/deploy-vps` - Deploy NanoClaw to a VPS with systemd
+
+### Integrations
+
+- `/add-calendar` - Google Calendar integration
+- `/add-todoist` - Todoist integration
+- `/add-notion` - Notion integration
+
+### Runtime
+
+- `/convert-to-podman` - Switch from Docker to Podman
+- `/add-windows-support` - WSL2 support for Windows
+
+## Submitting a contribution
+
+<Steps>
+  <Step title="Fork the repository">
+    ```bash
+    git clone https://github.com/qwibitai/NanoClaw.git
+    cd NanoClaw
+    git checkout -b my-contribution
+    ```
+  </Step>
+  
+  <Step title="Make your changes">
+    For skills:
+    ```bash
+    mkdir -p .claude/skills/my-skill
+    # Write SKILL.md and any templates
+    ```
+    
+    For source changes:
+    ```bash
+    # Edit files in src/, container/, etc.
+    npm run build
+    npm test
+    ```
+  </Step>
+  
+  <Step title="Test thoroughly">
+    For skills:
+    ```bash
+    # Test on a fresh clone
+    cd /tmp
+    git clone https://github.com/qwibitai/NanoClaw.git test-nanoclaw
+    cd test-nanoclaw
+    # Copy your skill
+    cp -r /path/to/your/skill .claude/skills/
+    # Run the skill
+    claude
+    # Then run: /my-skill
+    ```
+    
+    For source changes:
+    ```bash
+    npm test
+    npm run build
+    # Manual testing
+    ```
+  </Step>
+  
+  <Step title="Create a pull request">
+    ```bash
+    git add .
+    git commit -m "Add /my-skill for X functionality"
+    git push origin my-contribution
+    ```
+    
+    Then open a PR on GitHub with:
+    - Clear description of what the contribution does
+    - Why it should be accepted (follows contribution guidelines)
+    - Testing notes
+  </Step>
+</Steps>
+
+## Code style
+
+When contributing source code:
+
+- Follow existing TypeScript conventions
+- Use meaningful variable names
+- Add comments for non-obvious logic
+- Keep functions small and focused
+- Prefer explicit over implicit
+
+<Note>
+NanoClaw doesn't use a linter or formatter. Code style is enforced through review. The goal is readability and simplicity, not stylistic uniformity.
+</Note>
+
+## Getting help
+
+If you're working on a contribution and need help:
+
+1. **Ask Claude Code:** Describe what you're trying to do. Claude can help write skills or refactor code.
+
+2. **Join the Discord:** [Community Discord](https://discord.gg/VDdww8qS42)
+
+3. **Open a draft PR:** Start a discussion before the work is complete.
+
+## License
+
+By contributing to NanoClaw, you agree that your contributions will be licensed under the MIT License.
+
+## Related pages
+
+- [Security model](/advanced/security-model) - Understanding security boundaries
+- [IPC system](/advanced/ipc-system) - How agents communicate with the host
+- [Container runtime](/advanced/container-runtime) - Container execution details

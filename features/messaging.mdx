@@ -1,0 +1,266 @@
+---
+title: Message handling and routing
+description: Learn how NanoClaw processes messages, triggers agent responses, and routes communication across channels
+---
+
+## Overview
+
+NanoClaw processes messages through a polling-based architecture that connects messaging channels (like WhatsApp) to isolated Claude agent containers. Each group has its own message queue, session state, and isolated filesystem.
+
+## Message flow
+
+<Steps>
+  <Step title="Message arrives">
+    Incoming messages are stored in SQLite with metadata (sender, timestamp, chat JID)
+  </Step>
+  
+  <Step title="Trigger detection">
+    NanoClaw checks if the message contains the trigger pattern (default: `@Andy`)
+  </Step>
+  
+  <Step title="Context gathering">
+    All messages since the last agent response are gathered for context
+  </Step>
+  
+  <Step title="Agent invocation">
+    Messages are formatted and sent to a Claude agent running in an isolated container
+  </Step>
+  
+  <Step title="Response routing">
+    The agent's response is stripped of internal tags and sent back to the channel
+  </Step>
+</Steps>
+
+## Trigger patterns
+
+Trigger patterns determine when the agent should respond. The default trigger is `@{ASSISTANT_NAME}` at the start of a message.
+
+```typescript
+// From src/config.ts
+export const TRIGGER_PATTERN = new RegExp(
+  `^@${escapeRegex(ASSISTANT_NAME)}\\b`,
+  'i',
+);
+```
+
+### Usage examples
+
+```
+@Andy what's on my calendar today?
+@Andy search for recent AI developments
+@ANDY help me debug this error (case-insensitive)
+```
+
+<Note>
+The main channel (your self-chat) doesn't require a trigger - every message is processed automatically.
+</Note>
+
+## Message formatting
+
+Messages are formatted as XML before being sent to the agent, preserving sender information and timestamps:
+
+```typescript
+// From src/router.ts
+function formatMessages(messages: NewMessage[]): string {
+  const lines = messages.map(
+    (m) =>
+      `<message sender="${escapeXml(m.sender_name)}" time="${m.timestamp}">${escapeXml(m.content)}</message>`,
+  );
+  return `<messages>\n${lines.join('\n')}\n</messages>`;
+}
+```
+
+### Example formatted output
+
+```xml
+<messages>
+  <message sender="Alice" time="2026-02-28T10:30:00Z">@Andy what's the weather?</message>
+  <message sender="Bob" time="2026-02-28T10:31:15Z">I think it's sunny</message>
+  <message sender="Alice" time="2026-02-28T10:32:00Z">Can you check?</message>
+</messages>
+```
+
+## Internal tags
+
+Agents can use `<internal>...</internal>` tags for reasoning that won't be sent to users:
+
+```typescript
+// From src/router.ts
+export function stripInternalTags(text: string): string {
+  return text.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
+}
+```
+
+### Agent output example
+
+```
+<internal>
+User asked about weather. I should check the forecast API.
+</internal>
+
+The weather today is sunny with a high of 75°F.
+```
+
+Only the visible text is sent to the user.
+
+## Group message queues
+
+NanoClaw uses a per-group queue system with global concurrency limits to prevent resource exhaustion:
+
+```typescript
+// From src/config.ts
+export const MAX_CONCURRENT_CONTAINERS = Math.max(
+  1,
+  parseInt(process.env.MAX_CONCURRENT_CONTAINERS || '5', 10) || 5,
+);
+```
+
+### How it works
+
+- Each group gets its own message queue
+- Multiple groups can have active containers simultaneously (up to `MAX_CONCURRENT_CONTAINERS`)
+- When a container is idle, new messages can be piped directly to stdin without spawning a new container
+- Idle timeout: 30 minutes by default (configurable via `IDLE_TIMEOUT`)
+
+<Accordion title="Advanced: Message piping to active containers">
+When an agent container is already running and idle, NanoClaw can pipe new messages directly to its stdin instead of spawning a new container:
+
+```typescript
+// From src/index.ts:398-411
+if (queue.sendMessage(chatJid, formatted)) {
+  logger.debug(
+    { chatJid, count: messagesToSend.length },
+    'Piped messages to active container',
+  );
+  lastAgentTimestamp[chatJid] =
+    messagesToSend[messagesToSend.length - 1].timestamp;
+  saveState();
+  channel
+    .setTyping?.(chatJid, true)
+    ?.catch((err) =>
+      logger.warn({ chatJid, err }, 'Failed to set typing indicator'),
+    );
+} else {
+  queue.enqueueMessageCheck(chatJid);
+}
+```
+
+This optimization reduces latency and container churn for active conversations.
+</Accordion>
+
+## Channel routing
+
+NanoClaw supports multiple messaging channels through a unified `Channel` interface:
+
+```typescript
+// From src/router.ts
+export function routeOutbound(
+  channels: Channel[],
+  jid: string,
+  text: string,
+): Promise<void> {
+  const channel = channels.find((c) => c.ownsJid(jid) && c.isConnected());
+  if (!channel) throw new Error(`No channel for JID: ${jid}`);
+  return channel.sendMessage(jid, text);
+}
+```
+
+### Supported channels
+
+- WhatsApp (built-in)
+- Telegram (via `/add-telegram` skill)
+- Discord (via `/add-discord` skill)
+- Slack (via `/add-slack` skill)
+- Gmail (via `/add-gmail` skill)
+
+<Warning>
+Channels are added via skills, not configuration files. Use `/add-telegram` or similar skills to add new channels. See the [integrations overview](/integrations/overview).
+</Warning>
+
+## Message persistence
+
+All messages are stored in SQLite (`data/nanoclaw.db`) with full history:
+
+```typescript
+// From src/db.ts
+function storeMessage(msg: NewMessage): void {
+  db.prepare(
+    `INSERT INTO messages (chat_jid, sender_jid, sender_name, content, timestamp)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(msg.chat_jid, msg.sender_jid, msg.sender_name, msg.content, msg.timestamp);
+}
+```
+
+### Message retrieval
+
+```typescript
+// Get messages since a specific timestamp
+const messages = getMessagesSince(
+  chatJid,
+  lastTimestamp,
+  ASSISTANT_NAME
+);
+```
+
+## Configuration
+
+### Polling interval
+
+```typescript
+// From src/config.ts
+export const POLL_INTERVAL = 2000; // 2 seconds
+```
+
+Messages are polled every 2 seconds by default. This can be adjusted by modifying the source code.
+
+### Trigger customization
+
+To change the trigger word, ask Claude Code to modify it:
+
+```
+Change the trigger word to @Bob
+```
+
+This updates `ASSISTANT_NAME` in `src/config.ts` and `.env`.
+
+## Group registration
+
+Groups must be registered before the agent can respond. The main channel can register groups via IPC:
+
+```typescript
+// From src/ipc.ts:351-382
+case 'register_group':
+  if (!isMain) {
+    logger.warn(
+      { sourceGroup },
+      'Unauthorized register_group attempt blocked',
+    );
+    break;
+  }
+  if (data.jid && data.name && data.folder && data.trigger) {
+    deps.registerGroup(data.jid, {
+      name: data.name,
+      folder: data.folder,
+      trigger: data.trigger,
+      added_at: new Date().toISOString(),
+      containerConfig: data.containerConfig,
+      requiresTrigger: data.requiresTrigger,
+    });
+  }
+```
+
+### Example
+
+From the main channel:
+
+```
+@Andy join the Family Chat group
+```
+
+The agent will discover available groups and register to the one you specify.
+
+## Related documentation
+
+- [Scheduled tasks](/features/scheduled-tasks) - Automate recurring agent tasks
+- [Agent Swarms](/features/agent-swarms) - Multi-agent collaboration
+- [Customization](/features/customization) - Modify trigger patterns and behavior

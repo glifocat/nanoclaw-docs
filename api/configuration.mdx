@@ -1,0 +1,117 @@
+---
+title: Configuration
+description: Configuration options for NanoClaw
+---
+
+NanoClaw configuration is managed through environment variables and the `config.ts` module.
+
+## Environment variables
+
+Configuration is read from `.env` file or `process.env`.
+
+<ParamField path="ASSISTANT_NAME" type="string" default="Andy">
+  Name of the assistant. Used in trigger pattern and message routing.
+</ParamField>
+
+<ParamField path="ASSISTANT_HAS_OWN_NUMBER" type="boolean" default="false">
+  Whether the assistant has its own WhatsApp number. Set to `"true"` to enable.
+</ParamField>
+
+<ParamField path="CONTAINER_IMAGE" type="string" default="nanoclaw-agent:latest">
+  Docker image to use for agent containers.
+</ParamField>
+
+<ParamField path="CONTAINER_TIMEOUT" type="number" default="1800000">
+  Container timeout in milliseconds (default: 30 minutes).
+</ParamField>
+
+<ParamField path="CONTAINER_MAX_OUTPUT_SIZE" type="number" default="10485760">
+  Maximum container output size in bytes (default: 10MB).
+</ParamField>
+
+<ParamField path="IDLE_TIMEOUT" type="number" default="1800000">
+  How long to keep container alive after last result in milliseconds (default: 30 minutes).
+</ParamField>
+
+<ParamField path="MAX_CONCURRENT_CONTAINERS" type="number" default="5">
+  Maximum number of concurrent agent containers.
+</ParamField>
+
+<ParamField path="TZ" type="string" default="system timezone">
+  Timezone for scheduled tasks (cron expressions). Uses `Intl.DateTimeFormat().resolvedOptions().timeZone` by default.
+</ParamField>
+
+## Configuration constants
+
+Defined in `src/config.ts`:
+
+```typescript
+export const POLL_INTERVAL = 2000; // Message loop interval (ms)
+export const SCHEDULER_POLL_INTERVAL = 60000; // Task scheduler interval (ms)
+export const IPC_POLL_INTERVAL = 1000; // IPC watcher interval (ms)
+```
+
+## Directory paths
+
+All paths are absolute and resolved from the project root:
+
+<ResponseField name="STORE_DIR" type="string">
+  `{PROJECT_ROOT}/store` - Database and persistent storage
+</ResponseField>
+
+<ResponseField name="GROUPS_DIR" type="string">
+  `{PROJECT_ROOT}/groups` - Group folders and memory files
+</ResponseField>
+
+<ResponseField name="DATA_DIR" type="string">
+  `{PROJECT_ROOT}/data` - Legacy data directory (migrated to SQLite)
+</ResponseField>
+
+<ResponseField name="MOUNT_ALLOWLIST_PATH" type="string">
+  `~/.config/nanoclaw/mount-allowlist.json` - Mount security allowlist (never mounted into containers)
+</ResponseField>
+
+<ResponseField name="MAIN_GROUP_FOLDER" type="string">
+  `"main"` - Folder name for the main group
+</ResponseField>
+
+## Trigger pattern
+
+The trigger pattern is generated from `ASSISTANT_NAME`:
+
+```typescript
+export const TRIGGER_PATTERN = new RegExp(
+  `^@${escapeRegex(ASSISTANT_NAME)}\\b`,
+  'i',
+);
+```
+
+Matches messages starting with `@{ASSISTANT_NAME}` (case-insensitive).
+
+## Timezone configuration
+
+Scheduled tasks use the configured timezone:
+
+```typescript
+export const TIMEZONE =
+  process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+```
+
+This affects cron expression evaluation for scheduled tasks.
+
+## Example .env file
+
+```bash
+ASSISTANT_NAME=Andy
+ASSISTANT_HAS_OWN_NUMBER=false
+CONTAINER_TIMEOUT=1800000
+MAX_CONCURRENT_CONTAINERS=5
+TZ=America/Los_Angeles
+```
+
+## Security notes
+
+- **Secrets** (API keys, credentials) are NOT read in `config.ts`
+- Secrets stay on disk and are loaded only where needed (`container-runner.ts`)
+- This prevents leaking secrets to child processes
+- Mount allowlist is stored OUTSIDE project root and never mounted into containers

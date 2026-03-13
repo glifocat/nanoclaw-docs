@@ -1,0 +1,101 @@
+---
+title: Integrations overview
+description: Connect NanoClaw to your favorite messaging platforms and services
+---
+
+NanoClaw supports multiple communication channels and integrations, allowing you to interact with your AI assistant wherever you work.
+
+## Built-in integration
+
+NanoClaw comes with WhatsApp support out of the box:
+
+<Card title="WhatsApp" icon="whatsapp" href="/integrations/whatsapp">
+  Built-in messaging channel using the Baileys library. No additional setup required after initial authentication.
+</Card>
+
+## Available integration skills
+
+Add additional integrations using the skills system. Each skill transforms your NanoClaw installation to support a new platform:
+
+<CardGroup cols={2}>
+  <Card title="Telegram" icon="telegram" href="/integrations/telegram">
+    Add Telegram as a channel using `/add-telegram`. Can replace WhatsApp or run alongside it.
+  </Card>
+  
+  <Card title="Discord" icon="discord" href="/integrations/discord">
+    Add Discord support with `/add-discord`. Perfect for team collaboration and community management.
+  </Card>
+  
+  <Card title="Slack" icon="slack" href="/integrations/slack">
+    Connect to Slack workspaces using `/add-slack`. Uses Socket Mode—no public URL needed.
+  </Card>
+  
+  <Card title="Gmail" icon="envelope" href="/integrations/gmail">
+    Add Gmail integration with `/add-gmail`. Use as a tool or full channel for email monitoring.
+  </Card>
+</CardGroup>
+
+## How the skills system works
+
+NanoClaw uses a skills-based architecture instead of bundling all integrations into the core codebase. This approach:
+
+- **Keeps your installation lean** - Only add what you need
+- **Maintains clean code** - No unused features cluttering the codebase
+- **Enables customization** - Each installation is tailored to your needs
+- **Prevents bloat** - The base system stays minimal and understandable
+
+Learn more about the [skills system](/integrations/skills-system).
+
+## Channel capabilities
+
+All channel integrations support:
+
+- **Isolated contexts** - Each chat/channel has its own memory and filesystem
+- **Trigger patterns** - Configure when the assistant responds (`@Andy`, etc.)
+- **Scheduled tasks** - Set up recurring jobs that can message you
+- **Container isolation** - Every context runs in its own sandboxed environment
+- **Multi-channel support** - Run multiple channels simultaneously
+
+## Adding an integration
+
+To add an integration, use the corresponding skill command in Claude Code:
+
+```bash
+/add-telegram    # Add Telegram
+/add-discord     # Add Discord
+/add-slack       # Add Slack
+/add-gmail       # Add Gmail
+```
+
+Each skill will:
+
+1. Apply code changes using the skills engine
+2. Guide you through platform-specific setup
+3. Help you configure authentication
+4. Register your first chat/channel
+5. Verify the connection works
+
+<Tip>
+  Skills can be combined. For example, you can run WhatsApp, Telegram, and Discord simultaneously, each with its own registered chats.
+</Tip>
+
+## Choosing your primary channel
+
+You can either:
+
+- **Keep WhatsApp** and add channels alongside it (default)
+- **Replace WhatsApp** entirely with a different channel
+
+When adding a skill, you'll be asked which mode you prefer. You can set `TELEGRAM_ONLY=true`, `DISCORD_ONLY=true`, or `SLACK_ONLY=true` to disable WhatsApp.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Skills system" icon="puzzle-piece" href="/integrations/skills-system">
+    Learn how the skills system works and how to manage installed skills
+  </Card>
+  
+  <Card title="WhatsApp setup" icon="whatsapp" href="/integrations/whatsapp">
+    Set up the built-in WhatsApp integration
+  </Card>
+</CardGroup>

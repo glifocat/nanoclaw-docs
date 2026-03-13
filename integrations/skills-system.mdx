@@ -1,0 +1,259 @@
+---
+title: Skills system
+description: How NanoClaw uses skills to add integrations without bloating the codebase
+---
+
+NanoClaw's skills system allows you to add integrations and features by applying deterministic code transformations to your fork. This keeps the base codebase minimal while enabling powerful customization.
+
+## Philosophy: Skills over features
+
+From the NanoClaw README:
+
+> **Skills over features.** Instead of adding features (e.g. support for Telegram) to the codebase, contributors submit claude code skills like `/add-telegram` that transform your fork. You end up with clean code that does exactly what you need.
+
+This approach means:
+
+- The base NanoClaw codebase stays small (under 35k tokens)
+- Each installation is customized to your exact needs
+- No configuration sprawl or unused features
+- The code remains understandable and modifiable
+
+## How skills work
+
+Skills are located in `.claude/skills/` and consist of:
+
+1. **SKILL.md** - Instructions for Claude Code on how to apply the skill
+2. **Code packages** - New files to add (e.g., `add/src/channels/telegram.ts`)
+3. **Intent files** - Descriptions of how to merge changes into existing files (e.g., `modify/src/index.ts.intent.md`)
+4. **Dependencies** - NPM packages to install
+
+When you run a skill like `/add-telegram`, Claude Code:
+
+<Steps>
+  <Step title="Checks if already applied">
+    Reads `.nanoclaw/state.yaml` to see if the skill is already installed
+  </Step>
+  
+  <Step title="Asks configuration questions">
+    Collects information like "Should Telegram replace WhatsApp or run alongside it?"
+  </Step>
+  
+  <Step title="Applies code changes">
+    Runs the skills engine via `npx tsx scripts/apply-skill.ts .claude/skills/add-telegram`
+  </Step>
+  
+  <Step title="Validates changes">
+    Runs `npm test` and `npm run build` to ensure everything still works
+  </Step>
+  
+  <Step title="Guides setup">
+    Walks you through platform-specific configuration (creating bot tokens, registering chats, etc.)
+  </Step>
+  
+  <Step title="Records application">
+    Updates `.nanoclaw/state.yaml` to track that the skill was applied
+  </Step>
+</Steps>
+
+## The skills engine
+
+The skills engine performs deterministic code transformations:
+
+```bash
+npx tsx scripts/apply-skill.ts .claude/skills/add-telegram
+```
+
+This command:
+
+- Adds new files from the `add/` directory
+- Three-way merges changes into existing files using intent descriptions
+- Installs NPM dependencies
+- Updates configuration files
+- Records the application in state
+
+The engine ensures that skills can be applied idempotently and that conflicts are detected and reported.
+
+## Available integration skills
+
+### Messaging platforms
+
+- **`/add-telegram`** - Adds Telegram support via the grammy library
+- **`/add-discord`** - Adds Discord support via discord.js
+- **`/add-slack`** - Adds Slack support via @slack/bolt with Socket Mode
+
+### Services
+
+- **`/add-gmail`** - Adds Gmail integration (as a tool or full channel)
+
+### System
+
+- **`/convert-to-apple-container`** - Switches from Docker to Apple Container on macOS
+- **`/add-voice-transcription`** - Adds voice message transcription for WhatsApp
+- **`/add-telegram-swarm`** - Adds Agent Swarm support for Telegram teams
+
+## Managing skills
+
+### Check applied skills
+
+View which skills have been applied to your installation:
+
+```bash
+cat .nanoclaw/state.yaml
+```
+
+Example output:
+
+```yaml
+applied_skills:
+  - telegram
+  - discord
+  - gmail
+```
+
+### Removing a skill
+
+Skills document their removal process in the SKILL.md file. For example, to remove Telegram:
+
+<Steps>
+  <Step title="Delete added files">
+    ```bash
+    rm src/channels/telegram.ts
+    rm src/channels/telegram.test.ts
+    ```
+  </Step>
+  
+  <Step title="Revert code changes">
+    Remove TelegramChannel imports and creation from `src/index.ts`, revert config changes, etc.
+  </Step>
+  
+  <Step title="Remove dependencies">
+    ```bash
+    npm uninstall grammy
+    ```
+  </Step>
+  
+  <Step title="Update state">
+    Remove the skill from `.nanoclaw/state.yaml`
+  </Step>
+  
+  <Step title="Rebuild">
+    ```bash
+    npm run build
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  Each skill's SKILL.md includes detailed removal instructions. Check the specific skill documentation for exact steps.
+</Note>
+
+## Creating your own skills
+
+Skills are just directories in `.claude/skills/` with a specific structure:
+
+```
+.claude/skills/add-example/
+├── SKILL.md                    # Instructions for Claude Code
+├── add/                        # New files to create
+│   └── src/channels/example.ts
+└── modify/                     # Intent files for existing files
+    └── src/index.ts.intent.md
+```
+
+### Skill structure
+
+**SKILL.md** contains phases:
+
+- **Phase 1: Pre-flight** - Checks and questions
+- **Phase 2: Apply Code Changes** - Run the skills engine
+- **Phase 3: Setup** - Platform-specific configuration
+- **Phase 4: Registration** - Register chats/channels
+- **Phase 5: Verify** - Test the integration
+
+**Intent files** describe what changed and why:
+
+```markdown
+# Intent: Add ExampleChannel to multi-channel array
+
+## What Changed
+
+Added ExampleChannel creation to the channels array in index.ts.
+
+## Invariants
+
+- WhatsAppChannel is always created (unless EXAMPLE_ONLY=true)
+- Channel creation order doesn't matter
+- Each channel implements the Channel interface
+```
+
+### Contributing skills
+
+The NanoClaw philosophy: **Don't add features, add skills.**
+
+If you want to contribute Slack support, don't create a PR that adds Slack to the base codebase. Instead:
+
+1. Create `.claude/skills/add-slack/SKILL.md`
+2. Include all code packages and intent files
+3. Submit a PR with just the skill directory
+
+Users can then run `/add-slack` to get clean Slack integration code in their fork.
+
+## Skills vs configuration files
+
+NanoClaw deliberately avoids configuration files. From the README:
+
+> **Customization = code changes.** No configuration sprawl. Want different behavior? Modify the code. The codebase is small enough that it's safe to make changes.
+
+Skills extend this philosophy: instead of a config file with `integrations: [telegram, discord, slack]`, you apply skills that modify the source code directly. You end up with code that does exactly what you need, nothing more.
+
+## Skill state tracking
+
+The `.nanoclaw/state.yaml` file tracks applied skills:
+
+```yaml
+applied_skills:
+  - telegram
+  - discord
+last_migration: 2026-02-28T10:30:00Z
+```
+
+This prevents double-application and helps with updates. When you run `/update`, the update process respects your applied skills and attempts to preserve your customizations.
+
+## Best practices
+
+<Tip>
+  **Apply skills one at a time.** Test each integration before adding the next one. This makes troubleshooting easier.
+</Tip>
+
+<Tip>
+  **Keep your fork up to date.** Run `/update` periodically to pull upstream changes and run migrations.
+</Tip>
+
+<Tip>
+  **Read the SKILL.md before applying.** Each skill documents prerequisites, configuration options, and troubleshooting steps.
+</Tip>
+
+<Warning>
+  Skills modify your source code. Commit your changes before applying a new skill so you can easily revert if needed.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Add Telegram" icon="telegram" href="/integrations/telegram">
+    Add Telegram support to your installation
+  </Card>
+  
+  <Card title="Add Discord" icon="discord" href="/integrations/discord">
+    Add Discord support to your installation
+  </Card>
+  
+  <Card title="Add Slack" icon="slack" href="/integrations/slack">
+    Add Slack support to your installation
+  </Card>
+  
+  <Card title="Add Gmail" icon="envelope" href="/integrations/gmail">
+    Add Gmail integration to your installation
+  </Card>
+</CardGroup>

@@ -1,0 +1,74 @@
+---
+title: API overview
+description: Core API reference for NanoClaw architecture and data flow
+---
+
+NanoClaw is a single Node.js process that connects to messaging channels (WhatsApp, etc.) and routes messages to Claude Agent SDK instances running in isolated containers. Each group has its own filesystem and memory.
+
+## Architecture
+
+### Core components
+
+- **Orchestrator** (`src/index.ts`) - State management, message loop, and agent invocation
+- **Message Router** (`src/router.ts`) - Message formatting and outbound routing
+- **Container Runner** (`src/container-runner.ts`) - Spawns agent containers with mounts
+- **Task Scheduler** (`src/task-scheduler.ts`) - Runs scheduled tasks
+- **Database** (`src/db.ts`) - SQLite operations for messages, groups, and tasks
+- **Channels** (`src/channels/whatsapp.ts`) - Channel connections and message delivery
+
+### Key concepts
+
+#### Groups
+
+Groups are isolated workspaces for the agent. Each group has:
+
+- Unique folder in `groups/{name}/`
+- Isolated filesystem and memory
+- Persistent session ID
+- Optional trigger pattern (default: requires `@{ASSISTANT_NAME}` mention)
+
+#### Message flow
+
+1. Channel receives message and calls `onMessage` callback
+2. Message is stored in database via `storeMessage()`
+3. Message loop detects new messages for registered groups
+4. Router formats messages as XML and passes to agent container
+5. Agent processes messages and returns output
+6. Output is stripped of `<internal>` tags and sent back through channel
+
+#### Sessions
+
+Each group maintains a persistent session ID that preserves conversation context across container restarts. Sessions are stored in the database and loaded when spawning containers.
+
+## Database schema
+
+NanoClaw uses SQLite for persistent storage:
+
+- `chats` - Chat metadata (JID, name, last activity)
+- `messages` - Full message history for registered groups
+- `registered_groups` - Group configuration and settings
+- `sessions` - Session IDs by group folder
+- `scheduled_tasks` - Task definitions and schedules
+- `task_run_logs` - Task execution history
+- `router_state` - Message cursor positions
+
+## Configuration files
+
+See [Configuration](/api/configuration) for detailed configuration options.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/api/configuration">
+    Environment variables and config options
+  </Card>
+  <Card title="Message routing" icon="route" href="/api/message-routing">
+    Message formatting and routing API
+  </Card>
+  <Card title="Group management" icon="users" href="/api/group-management">
+    Register and manage groups
+  </Card>
+  <Card title="Task scheduling" icon="clock" href="/api/task-scheduling">
+    Schedule automated tasks
+  </Card>
+</CardGroup>

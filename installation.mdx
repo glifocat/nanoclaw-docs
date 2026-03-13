@@ -1,0 +1,515 @@
+---
+title: Installation
+description: Detailed installation requirements and setup for macOS and Linux
+---
+
+# Installation
+
+Complete installation guide for NanoClaw on macOS and Linux.
+
+## System requirements
+
+### Operating system
+
+<Tabs>
+  <Tab title="macOS">
+    - macOS 11 (Big Sur) or later
+    - Intel or Apple Silicon (M1/M2/M3)
+    - 4GB RAM minimum, 8GB recommended
+    - 2GB free disk space
+  </Tab>
+  
+  <Tab title="Linux">
+    - Ubuntu 20.04+, Debian 11+, or equivalent
+    - x86_64 architecture
+    - 2GB RAM minimum, 4GB recommended
+    - 2GB free disk space
+    - systemd (for service management)
+  </Tab>
+</Tabs>
+
+<Warning>
+Windows is not officially supported. You can use WSL2 (Windows Subsystem for Linux) with Ubuntu.
+</Warning>
+
+## Prerequisites
+
+### 1. Node.js 20 or later
+
+NanoClaw requires Node.js 20 or later.
+
+<Tabs>
+  <Tab title="macOS">
+    **Using Homebrew** (recommended):
+    ```bash
+    brew install node@22
+    ```
+
+    **Using nvm**:
+    ```bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+    nvm install 22
+    nvm use 22
+    ```
+
+    Verify installation:
+    ```bash
+    node --version  # Should show v20.x or higher
+    ```
+  </Tab>
+  
+  <Tab title="Linux">
+    **Using NodeSource**:
+    ```bash
+    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+    ```
+
+    **Using nvm**:
+    ```bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+    nvm install 22
+    nvm use 22
+    ```
+
+    Verify installation:
+    ```bash
+    node --version  # Should show v20.x or higher
+    ```
+  </Tab>
+</Tabs>
+
+### 2. Claude Code
+
+Claude Code is required to run the `/setup` command and customize NanoClaw.
+
+Download from: [claude.ai/download](https://claude.ai/download)
+
+<Tabs>
+  <Tab title="macOS">
+    1. Download Claude Code for macOS
+    2. Open the DMG file
+    3. Drag Claude Code to Applications
+    4. Launch Claude Code
+    5. Sign in with your Anthropic account
+
+    Verify installation:
+    ```bash
+    claude --version
+    ```
+  </Tab>
+  
+  <Tab title="Linux">
+    1. Download Claude Code for Linux (.deb or .AppImage)
+    2. Install the package:
+       ```bash
+       sudo dpkg -i claude-code_*.deb
+       # or run the AppImage directly
+       ```
+    3. Launch Claude Code
+    4. Sign in with your Anthropic account
+
+    Verify installation:
+    ```bash
+    claude --version
+    ```
+  </Tab>
+</Tabs>
+
+<Info>
+You need a Claude Pro or Claude Team subscription, or an Anthropic API key.
+</Info>
+
+### 3. Container runtime
+
+Agents run in isolated containers. You need either Apple Container (macOS only) or Docker.
+
+<Tabs>
+  <Tab title="Apple Container (macOS)">
+    Apple Container is a lightweight, native macOS container runtime.
+
+    **Installation**:
+    ```bash
+    brew install container
+    ```
+
+    **Verify**:
+    ```bash
+    container --version
+    ```
+
+    **Benefits**:
+    - Native macOS integration
+    - Lighter resource usage than Docker
+    - Faster startup times
+
+    <Note>
+    Apple Container is macOS-only. During setup, you can choose between Apple Container and Docker. Docker is the default and works on both macOS and Linux.
+    </Note>
+  </Tab>
+  
+  <Tab title="Docker">
+    Docker is the default container runtime and works on both macOS and Linux.
+
+    **macOS**:
+    ```bash
+    # Using Homebrew
+    brew install --cask docker
+
+    # Start Docker Desktop
+    open -a Docker
+    ```
+
+    **Linux**:
+    ```bash
+    # Install Docker
+    curl -fsSL https://get.docker.com | sh
+
+    # Add your user to the docker group
+    sudo usermod -aG docker $USER
+
+    # Start Docker service
+    sudo systemctl start docker
+    sudo systemctl enable docker
+
+    # Log out and back in for group changes to take effect
+    ```
+
+    **Verify**:
+    ```bash
+    docker --version
+    docker info
+    ```
+
+    <Warning>
+    On Linux, after adding yourself to the docker group, you must log out and back in for the changes to take effect.
+    </Warning>
+  </Tab>
+</Tabs>
+
+### 4. Build tools (for native modules)
+
+NanoClaw uses `better-sqlite3`, which requires native compilation.
+
+<Tabs>
+  <Tab title="macOS">
+    Install Xcode Command Line Tools:
+    ```bash
+    xcode-select --install
+    ```
+
+    Verify:
+    ```bash
+    gcc --version
+    ```
+  </Tab>
+  
+  <Tab title="Linux">
+    Install build essentials:
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y build-essential python3
+    ```
+
+    Verify:
+    ```bash
+    gcc --version
+    python3 --version
+    ```
+  </Tab>
+</Tabs>
+
+## Installation steps
+
+Once all prerequisites are installed:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/qwibitai/NanoClaw.git
+    cd NanoClaw
+    ```
+  </Step>
+
+  <Step title="Launch Claude Code">
+    ```bash
+    claude
+    ```
+  </Step>
+
+  <Step title="Run setup">
+    In Claude Code:
+    ```
+    /setup
+    ```
+
+    Claude will handle the rest automatically.
+  </Step>
+</Steps>
+
+See the [Quick start guide](/quickstart) for detailed setup instructions.
+
+## Package dependencies
+
+NanoClaw uses these core dependencies (from `package.json`):
+
+```json
+{
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",  // WhatsApp Web API
+    "better-sqlite3": "^11.8.1",                // SQLite database
+    "cron-parser": "^5.5.0",                    // Task scheduling
+    "pino": "^9.6.0",                           // Logging
+    "pino-pretty": "^13.0.0",                   // Log formatting
+    "qrcode": "^1.5.4",                         // QR code generation
+    "qrcode-terminal": "^0.12.0",               // Terminal QR codes
+    "yaml": "^2.8.2",                           // YAML parsing
+    "zod": "^4.3.6"                             // Schema validation
+  }
+}
+```
+
+<Info>
+All dependencies are installed automatically by `/setup` via `npm install`.
+</Info>
+
+## Container image
+
+The agent container includes:
+
+- **Base**: Node.js 22 Alpine Linux
+- **Claude Agent SDK**: Pre-installed
+- **Tools**: bash, git, curl, jq
+- **User**: Non-root `node` user (uid 1000)
+
+The container is built during setup:
+
+```bash
+./container/build.sh
+```
+
+This creates the `nanoclaw-agent` image.
+
+## File structure
+
+After installation, NanoClaw creates:
+
+```
+NanoClaw/
+├── src/                    # Source code
+├── dist/                   # Compiled JavaScript
+├── container/              # Container build files
+├── groups/                 # Per-group data
+│   └── main/              # Main channel
+│       ├── CLAUDE.md      # Group memory
+│       └── logs/          # Container logs
+├── store/                  # WhatsApp session
+│   └── auth/              # Authentication data
+├── data/                   # SQLite database
+│   ├── nanoclaw.db        # Messages, groups, tasks
+│   └── sessions/          # Claude sessions per group
+├── logs/                   # Application logs
+│   ├── nanoclaw.log       # Main log
+│   └── nanoclaw.error.log # Error log
+├── .env                    # Credentials (not in git)
+└── package.json           # Dependencies
+```
+
+**External files**:
+- `~/.config/nanoclaw/mount-allowlist.json` - Mount permissions
+- `~/Library/LaunchAgents/com.nanoclaw.plist` (macOS) - Service config
+- `~/.config/systemd/user/nanoclaw.service` (Linux) - Service config
+
+## Service management
+
+NanoClaw runs as a background service:
+
+<Tabs>
+  <Tab title="macOS (launchd)">
+    ```bash
+    # Start service
+    launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
+
+    # Stop service
+    launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
+
+    # Restart service
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+
+    # Check status
+    launchctl list | grep nanoclaw
+
+    # View logs
+    tail -f ~/workspace/NanoClaw/logs/nanoclaw.log
+    ```
+  </Tab>
+  
+  <Tab title="Linux (systemd)">
+    ```bash
+    # Start service
+    systemctl --user start nanoclaw
+
+    # Stop service
+    systemctl --user stop nanoclaw
+
+    # Restart service
+    systemctl --user restart nanoclaw
+
+    # Check status
+    systemctl --user status nanoclaw
+
+    # Enable on boot
+    systemctl --user enable nanoclaw
+
+    # View logs
+    journalctl --user -u nanoclaw -f
+    ```
+  </Tab>
+  
+  <Tab title="WSL (without systemd)">
+    If your WSL doesn't have systemd enabled:
+
+    ```bash
+    # Start service
+    bash start-nanoclaw.sh
+
+    # Stop service
+    pkill -f "node dist/index.js"
+
+    # View logs
+    tail -f logs/nanoclaw.log
+    ```
+
+    To enable systemd in WSL:
+    ```bash
+    echo -e "[boot]\nsystemd=true" | sudo tee /etc/wsl.conf
+    # Restart WSL
+    ```
+  </Tab>
+</Tabs>
+
+## Verification
+
+Verify your installation:
+
+```bash
+# Check service is running
+# macOS
+launchctl list | grep nanoclaw
+
+# Linux
+systemctl --user status nanoclaw
+
+# Check logs
+tail -f logs/nanoclaw.log
+
+# Test database
+node -e "const db=require('./dist/db.js');console.log(db.getGroups())"
+```
+
+Or ask Claude Code:
+```
+/debug
+```
+
+## Troubleshooting
+
+### Node.js native module errors
+
+```bash
+# Rebuild native modules
+npm rebuild
+
+# Or reinstall dependencies
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Container build fails
+
+```bash
+# Clear build cache
+# Docker
+docker builder prune -f
+
+# Apple Container
+container builder stop
+container builder rm
+container builder start
+
+# Rebuild
+./container/build.sh
+```
+
+### Service won't start
+
+<Tabs>
+  <Tab title="macOS">
+    ```bash
+    # Check error logs
+    cat logs/nanoclaw.error.log
+
+    # Verify Node.js path
+    which node
+
+    # Ensure .env exists
+    ls -la .env
+
+    # Rebuild and restart
+    npm run build
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    ```
+  </Tab>
+  
+  <Tab title="Linux">
+    ```bash
+    # Check service status
+    systemctl --user status nanoclaw
+
+    # View logs
+    journalctl --user -u nanoclaw -n 50
+
+    # Verify Docker access
+    docker ps
+
+    # Rebuild and restart
+    npm run build
+    systemctl --user restart nanoclaw
+    ```
+  </Tab>
+</Tabs>
+
+### Docker group permission issues (Linux)
+
+If you see "permission denied" errors:
+
+```bash
+# Immediate fix
+sudo setfacl -m u:$USER:rw /var/run/docker.sock
+
+# Persistent fix
+sudo mkdir -p /etc/systemd/system/docker.service.d
+sudo tee /etc/systemd/system/docker.service.d/socket-acl.conf << EOF
+[Service]
+ExecStartPost=/usr/bin/setfacl -m u:$USER:rw /var/run/docker.sock
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Complete the setup process
+  </Card>
+  <Card title="Security" icon="shield" href="/concepts/security">
+    Learn about container isolation
+  </Card>
+  <Card title="Customizing" icon="wrench" href="/features/customization">
+    Modify NanoClaw for your needs
+  </Card>
+  <Card title="Troubleshooting" icon="life-ring" href="/advanced/troubleshooting">
+    Fix common issues
+  </Card>
+</CardGroup>

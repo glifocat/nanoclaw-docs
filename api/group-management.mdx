@@ -1,0 +1,201 @@
+---
+title: Group management
+description: Group registration and management API
+---
+
+Group management functions for registering groups, retrieving group lists, and managing group state.
+
+## Core functions
+
+### registerGroup
+
+Registers a new group with NanoClaw.
+
+```typescript
+function registerGroup(jid: string, group: RegisteredGroup): void
+```
+
+<ParamField path="jid" type="string" required>
+  Chat JID (e.g., `"123456789@g.us"` for WhatsApp groups)
+</ParamField>
+
+<ParamField path="group" type="RegisteredGroup" required>
+  Group configuration object
+</ParamField>
+
+**Behavior:**
+
+- Validates the group folder path
+- Creates the group directory structure (`groups/{folder}/logs/`)
+- Stores group configuration in database
+- Rejects registration if folder is invalid
+
+**Example:**
+
+```typescript
+registerGroup('123@g.us', {
+  name: 'Team Chat',
+  folder: 'team',
+  trigger: '^@Andy\\b',
+  added_at: new Date().toISOString(),
+  requiresTrigger: true,
+});
+```
+
+### getAvailableGroups
+
+Returns list of all available groups ordered by most recent activity.
+
+```typescript
+function getAvailableGroups(): AvailableGroup[]
+```
+
+<ResponseField name="return" type="AvailableGroup[]">
+  Array of available groups with metadata
+</ResponseField>
+
+**Returns:**
+
+```typescript
+interface AvailableGroup {
+  jid: string;           // Chat JID
+  name: string;          // Chat display name
+  lastActivity: string;  // ISO timestamp of last message
+  isRegistered: boolean; // Whether group is registered
+}
+```
+
+**Example:**
+
+```typescript
+import { getAvailableGroups } from './index.js';
+
+const groups = getAvailableGroups();
+console.log(`Found ${groups.length} groups`);
+
+for (const group of groups) {
+  console.log(`${group.name} (${group.isRegistered ? 'registered' : 'not registered'})`);
+}
+```
+
+## State management
+
+### loadState
+
+Loads router state from database.
+
+```typescript
+function loadState(): void
+```
+
+**Loads:**
+
+- Last timestamp cursor (`last_timestamp`)
+- Last agent timestamp per group (`last_agent_timestamp`)
+- Session IDs by group folder
+- Registered groups configuration
+
+### saveState
+
+Saves router state to database.
+
+```typescript
+function saveState(): void
+```
+
+**Saves:**
+
+- Last timestamp cursor
+- Last agent timestamp per group
+
+### recoverPendingMessages
+
+Recovery function that checks for unprocessed messages on startup.
+
+```typescript
+function recoverPendingMessages(): void
+```
+
+**Purpose:**
+
+Handles crash recovery by detecting messages that were stored in the database but not yet processed by the agent (e.g., if the process crashed between advancing `lastTimestamp` and processing messages).
+
+## Types
+
+### RegisteredGroup
+
+```typescript
+interface RegisteredGroup {
+  name: string;                    // Display name
+  folder: string;                  // Folder name (alphanumeric + hyphens/underscores)
+  trigger: string;                 // Trigger pattern regex
+  added_at: string;                // ISO timestamp of registration
+  containerConfig?: ContainerConfig; // Optional container configuration
+  requiresTrigger?: boolean;       // Whether trigger is required (default: true)
+}
+```
+
+### ContainerConfig
+
+```typescript
+interface ContainerConfig {
+  additionalMounts?: AdditionalMount[]; // Extra filesystem mounts
+  timeout?: number;                     // Container timeout in ms
+}
+```
+
+### AdditionalMount
+
+```typescript
+interface AdditionalMount {
+  hostPath: string;       // Absolute path on host (supports ~)
+  containerPath?: string; // Optional container path (defaults to basename)
+  readonly?: boolean;     // Default: true for safety
+}
+```
+
+## Database operations
+
+Group data is persisted in the SQLite database:
+
+### setRegisteredGroup
+
+```typescript
+function setRegisteredGroup(jid: string, group: RegisteredGroup): void
+```
+
+Stores or updates a registered group in the database.
+
+### getRegisteredGroup
+
+```typescript
+function getRegisteredGroup(jid: string): (RegisteredGroup & { jid: string }) | undefined
+```
+
+Retrieves a registered group by JID.
+
+### getAllRegisteredGroups
+
+```typescript
+function getAllRegisteredGroups(): Record<string, RegisteredGroup>
+```
+
+Returns all registered groups as a map from JID to group configuration.
+
+## Folder validation
+
+Group folders must:
+
+- Contain only alphanumeric characters, hyphens, and underscores
+- Not be empty
+- Not contain path traversal characters (`..`, `/`)
+
+Invalid folders are rejected during registration and skipped when loading from database.
+
+## Main group
+
+The "main" group (folder name `"main"`) has special privileges:
+
+- Can see all available groups
+- Does not require trigger by default
+- Has access to group management functions via IPC

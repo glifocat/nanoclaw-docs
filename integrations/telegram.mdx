@@ -1,0 +1,392 @@
+---
+title: Telegram integration
+description: Add Telegram support using the /add-telegram skill
+---
+
+Add Telegram as a messaging channel for NanoClaw. Telegram can run alongside WhatsApp or replace it entirely.
+
+## Overview
+
+The Telegram integration uses the [grammy](https://grammy.dev/) library to connect to Telegram's Bot API. It supports all core NanoClaw features including group chats, isolated contexts, scheduled tasks, and typing indicators.
+
+### Features
+
+- **Full channel support** - Direct messages, group chats, and channels
+- **Bot commands** - Built-in `/chatid` command for registration
+- **Typing indicators** - Shows when the assistant is working
+- **Concurrent chats** - Handle multiple conversations simultaneously
+- **Flexible deployment** - Run alongside WhatsApp or as the only channel
+
+## Adding Telegram
+
+Use the `/add-telegram` skill to add Telegram support:
+
+<Steps>
+  <Step title="Run the skill">
+    ```bash
+    claude
+    /add-telegram
+    ```
+  </Step>
+  
+  <Step title="Choose deployment mode">
+    - **Replace WhatsApp** - Telegram becomes the only channel
+    - **Alongside** - Both WhatsApp and Telegram run simultaneously
+  </Step>
+  
+  <Step title="Apply code changes">
+    The skill runs `npx tsx scripts/apply-skill.ts .claude/skills/add-telegram` which:
+    - Adds `src/channels/telegram.ts` (TelegramChannel implementation)
+    - Adds `src/channels/telegram.test.ts` (46 unit tests)
+    - Merges multi-channel support into `src/index.ts`
+    - Adds Telegram config to `src/config.ts`
+    - Installs the `grammy` NPM package
+  </Step>
+  
+  <Step title="Create Telegram bot">
+    If you don't have a bot token yet, create one through @BotFather
+  </Step>
+  
+  <Step title="Configure environment">
+    Add bot token to `.env` and sync to container
+  </Step>
+  
+  <Step title="Register chats">
+    Use the `/chatid` command to get chat IDs and register them
+  </Step>
+</Steps>
+
+## Creating a Telegram bot
+
+If you don't already have a Telegram bot:
+
+<Steps>
+  <Step title="Open Telegram">
+    Search for `@BotFather` and start a conversation
+  </Step>
+  
+  <Step title="Create the bot">
+    Send `/newbot` and follow the prompts:
+    - **Bot name:** Something friendly (e.g., "Andy Assistant")
+    - **Bot username:** Must end with "bot" (e.g., "andy_ai_bot")
+  </Step>
+  
+  <Step title="Save the token">
+    Copy the bot token. It looks like:
+    ```
+    123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+    ```
+  </Step>
+</Steps>
+
+## Configuration
+
+### Environment variables
+
+Add to `.env`:
+
+```bash
+TELEGRAM_BOT_TOKEN=<your-bot-token>
+```
+
+If you chose to replace WhatsApp:
+
+```bash
+TELEGRAM_ONLY=true
+```
+
+### Sync to container
+
+The container reads environment from `data/env/env`:
+
+```bash
+mkdir -p data/env && cp .env data/env/env
+```
+
+### Group privacy settings
+
+By default, Telegram bots only see messages that @mention them or start with `/` in group chats.
+
+To let the bot see all messages in groups:
+
+<Steps>
+  <Step title="Open @BotFather">
+    Search for `@BotFather` in Telegram
+  </Step>
+  
+  <Step title="Select your bot">
+    Send `/mybots` and select your bot from the list
+  </Step>
+  
+  <Step title="Disable group privacy">
+    Go to **Bot Settings** → **Group Privacy** → **Turn off**
+  </Step>
+</Steps>
+
+<Note>
+  This is optional. If you only want trigger-based responses (via @mentions), leave group privacy enabled.
+</Note>
+
+## Build and restart
+
+After configuration:
+
+<CodeGroup>
+```bash macOS
+npm run build
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+```
+
+```bash Linux
+npm run build
+systemctl --user restart nanoclaw
+```
+</CodeGroup>
+
+## Registering chats
+
+### Get chat ID
+
+<Steps>
+  <Step title="Start conversation">
+    Open your bot in Telegram (search for its username)
+  </Step>
+  
+  <Step title="Get the chat ID">
+    Send `/chatid` to the bot. It will reply with the chat ID:
+    ```
+    Your chat ID: tg:123456789
+    ```
+  </Step>
+  
+  <Step title="For group chats">
+    1. Add the bot to the group
+    2. Send `/chatid` in the group
+    3. The bot will reply with the group's chat ID (format: `tg:-1001234567890`)
+  </Step>
+</Steps>
+
+### Register the chat
+
+For your main chat (responds to all messages):
+
+```typescript
+registerGroup("tg:<chat-id>", {
+  name: "Main",
+  folder: "main",
+  trigger: `@${ASSISTANT_NAME}`,
+  added_at: new Date().toISOString(),
+  requiresTrigger: false,
+});
+```
+
+For additional chats (trigger-only):
+
+```typescript
+registerGroup("tg:<chat-id>", {
+  name: "Team Chat",
+  folder: "team-chat",
+  trigger: `@${ASSISTANT_NAME}`,
+  added_at: new Date().toISOString(),
+  requiresTrigger: true,
+});
+```
+
+<Tip>
+  Set `requiresTrigger: true` for group chats so the assistant only responds when explicitly mentioned.
+</Tip>
+
+## Testing the connection
+
+Send a message to your registered Telegram chat:
+
+- **For main chat:** Any message works
+- **For non-main chats:** `@Andy hello` or @mention the bot
+
+The bot should respond within a few seconds.
+
+### Check logs
+
+```bash
+tail -f logs/nanoclaw.log
+```
+
+Look for:
+
+```
+Connected to Telegram
+Received message from tg:123456789
+Agent response queued
+```
+
+## JID format
+
+Telegram chats use the `tg:` prefix:
+
+- **Individual chat:** `tg:123456789`
+- **Group chat:** `tg:-1001234567890`
+- **Channel:** `tg:-1001234567890`
+
+## Implementation details
+
+The Telegram channel implements the `Channel` interface:
+
+```typescript
+export class TelegramChannel implements Channel {
+  name = 'telegram';
+  
+  async connect(): Promise<void> {
+    this.bot = new Bot(process.env.TELEGRAM_BOT_TOKEN!);
+    
+    // Handle text messages
+    this.bot.on('message:text', async (ctx) => {
+      const chatId = `tg:${ctx.chat.id}`;
+      this.opts.onMessage(chatId, {
+        id: ctx.message.message_id.toString(),
+        chat_jid: chatId,
+        sender: `${ctx.from.id}`,
+        sender_name: ctx.from.first_name,
+        content: ctx.message.text,
+        timestamp: new Date(ctx.message.date * 1000).toISOString(),
+        is_from_me: ctx.from.is_bot,
+        is_bot_message: ctx.from.id === this.bot.botInfo?.id,
+      });
+    });
+    
+    await this.bot.start();
+  }
+  
+  async sendMessage(jid: string, text: string): Promise<void> {
+    const chatId = jid.replace('tg:', '');
+    await this.bot.api.sendMessage(chatId, text);
+  }
+}
+```
+
+## Troubleshooting
+
+### Bot not responding
+
+Check these common issues:
+
+<AccordionGroup>
+  <Accordion title="Token not configured">
+    Verify `TELEGRAM_BOT_TOKEN` is set in `.env` and synced to `data/env/env`:
+    ```bash
+    grep TELEGRAM_BOT_TOKEN .env
+    grep TELEGRAM_BOT_TOKEN data/env/env
+    ```
+  </Accordion>
+  
+  <Accordion title="Chat not registered">
+    Check if the chat is in the database:
+    ```bash
+    sqlite3 store/messages.db "SELECT * FROM registered_groups WHERE jid LIKE 'tg:%'"
+    ```
+  </Accordion>
+  
+  <Accordion title="Service not running">
+    Check if NanoClaw is running:
+    ```bash
+    # macOS
+    launchctl list | grep nanoclaw
+    
+    # Linux
+    systemctl --user status nanoclaw
+    ```
+  </Accordion>
+  
+  <Accordion title="Trigger pattern not matched">
+    For non-main chats with `requiresTrigger: true`, messages must include the trigger pattern (e.g., `@Andy`).
+  </Accordion>
+</AccordionGroup>
+
+### Bot only responds to @mentions in groups
+
+This is the default Telegram behavior. To change:
+
+1. Open @BotFather
+2. Send `/mybots` and select your bot
+3. **Bot Settings** → **Group Privacy** → **Turn off**
+4. Remove and re-add the bot to the group (required for change to take effect)
+
+### Getting chat ID fails
+
+If `/chatid` doesn't work:
+
+1. Verify the bot token:
+   ```bash
+   curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe"
+   ```
+
+2. Check that NanoClaw is running:
+   ```bash
+   tail -f logs/nanoclaw.log
+   ```
+
+3. Make sure the bot is started (it should connect on launch)
+
+## Agent swarms (teams)
+
+For advanced team collaboration, you can add Agent Swarm support where each subagent appears as a different bot in the Telegram group:
+
+```bash
+/add-telegram-swarm
+```
+
+This allows you to see which agent is speaking and have interactive team sessions.
+
+## Removing Telegram
+
+To remove the Telegram integration:
+
+<Steps>
+  <Step title="Delete channel files">
+    ```bash
+    rm src/channels/telegram.ts
+    rm src/channels/telegram.test.ts
+    ```
+  </Step>
+  
+  <Step title="Revert code changes">
+    - Remove `TelegramChannel` import and creation from `src/index.ts`
+    - Remove `channels` array, revert to using `whatsapp` directly
+    - Remove Telegram config from `src/config.ts`
+  </Step>
+  
+  <Step title="Remove registrations">
+    ```bash
+    sqlite3 store/messages.db "DELETE FROM registered_groups WHERE jid LIKE 'tg:%'"
+    ```
+  </Step>
+  
+  <Step title="Uninstall dependency">
+    ```bash
+    npm uninstall grammy
+    ```
+  </Step>
+  
+  <Step title="Rebuild and restart">
+    ```bash
+    npm run build
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
+    # or: systemctl --user restart nanoclaw (Linux)
+    ```
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Add Discord" icon="discord" href="/integrations/discord">
+    Add Discord support to your installation
+  </Card>
+  
+  <Card title="Add Slack" icon="slack" href="/integrations/slack">
+    Add Slack support to your installation
+  </Card>
+  
+  <Card title="Skills system" icon="puzzle-piece" href="/integrations/skills-system">
+    Learn more about how skills work
+  </Card>
+</CardGroup>

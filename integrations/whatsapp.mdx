@@ -1,0 +1,348 @@
+---
+title: WhatsApp integration
+description: Built-in WhatsApp support using the Baileys library
+---
+
+WhatsApp is the default communication channel for NanoClaw. It's built into the core codebase and requires no additional skills or installation steps beyond initial authentication.
+
+## Overview
+
+NanoClaw connects to WhatsApp using the [Baileys](https://github.com/WhiskeySockets/Baileys) library, which provides a clean interface to WhatsApp's Web API.
+
+### Features
+
+- **Group and individual chats** - Message the assistant in any WhatsApp chat
+- **Multi-device support** - Uses WhatsApp's official multi-device protocol
+- **Automatic reconnection** - Handles disconnections gracefully
+- **Typing indicators** - Shows when the assistant is working
+- **Message queuing** - Queues messages when disconnected and flushes on reconnect
+- **LID translation** - Handles WhatsApp's Locally IDentified (LID) JID format
+- **Group metadata sync** - Automatically syncs group names every 24 hours
+
+## How it works
+
+The WhatsApp channel implementation is in `src/channels/whatsapp.ts` (src/channels/whatsapp.ts:1):
+
+```typescript
+export class WhatsAppChannel implements Channel {
+  name = 'whatsapp';
+  
+  async connect(): Promise<void> {
+    // Connects to WhatsApp using Baileys
+  }
+  
+  async sendMessage(jid: string, text: string): Promise<void> {
+    // Sends messages with assistant name prefix
+  }
+  
+  async setTyping(jid: string, isTyping: boolean): Promise<void> {
+    // Shows typing indicator
+  }
+}
+```
+
+### Architecture
+
+```
+WhatsApp (Baileys) → SQLite → Polling loop → Container (Claude Agent SDK) → Response
+```
+
+<Steps>
+  <Step title="Authentication">
+    WhatsApp Web QR code authentication. Credentials stored in `store/auth/`.
+  </Step>
+  
+  <Step title="Message receipt">
+    Baileys emits `messages.upsert` events, filtered by registered groups.
+  </Step>
+  
+  <Step title="Message storage">
+    Messages are stored in SQLite (`store/messages.db`).
+  </Step>
+  
+  <Step title="Queue processing">
+    The polling loop checks for messages that require agent responses.
+  </Step>
+  
+  <Step title="Container invocation">
+    Agent runs in an isolated Linux container with the group's filesystem mounted.
+  </Step>
+  
+  <Step title="Response routing">
+    Response is sent back via `sendMessage()` with assistant name prefix.
+  </Step>
+</Steps>
+
+## Setup
+
+WhatsApp setup is handled by the `/setup` skill when you first install NanoClaw:
+
+```bash
+claude
+/setup
+```
+
+The setup process will:
+
+1. Generate a QR code for WhatsApp Web authentication
+2. Wait for you to scan it with your phone
+3. Store authentication credentials in `store/auth/`
+4. Connect to WhatsApp and verify the connection
+
+<Note>
+  If authentication fails or expires, run `/setup` again to re-authenticate.
+</Note>
+
+## Configuration
+
+### Assistant has own number
+
+Set this in `src/config.ts` (src/config.ts:1):
+
+```typescript
+export const ASSISTANT_HAS_OWN_NUMBER = false; // Default: shared number
+```
+
+**Shared number (false):**
+- You and the assistant share the same WhatsApp number
+- Assistant messages are prefixed with the assistant name (e.g., "Andy: Hello!")
+- Required for self-chat (messaging yourself)
+
+**Own number (true):**
+- The assistant has its own dedicated WhatsApp number
+- No message prefix needed
+- Cleaner appearance in group chats
+
+### Assistant name
+
+The assistant name is used as the message prefix and trigger pattern:
+
+```typescript
+export const ASSISTANT_NAME = 'Andy';
+```
+
+Messages from the assistant appear as:
+
+```
+Andy: Your scheduled task completed successfully.
+```
+
+### Connection settings
+
+Connection logic is in `src/channels/whatsapp.ts` (src/channels/whatsapp.ts:52):
+
+```typescript
+const { version } = await fetchLatestWaWebVersion({});
+this.sock = makeWASocket({
+  version,
+  auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
+  printQRInTerminal: false,
+  logger,
+  browser: Browsers.macOS('Chrome'),
+});
+```
+
+## Message handling
+
+### Bot message detection
+
+The channel determines if a message came from the bot (src/channels/whatsapp.ts:216):
+
+```typescript
+const isBotMessage = ASSISTANT_HAS_OWN_NUMBER
+  ? fromMe
+  : content.startsWith(`${ASSISTANT_NAME}:`);
+```
+
+This prevents the bot from responding to its own messages.
+
+### Message prefix
+
+Outgoing messages are prefixed unless using a dedicated number (src/channels/whatsapp.ts:240):
+
+```typescript
+const prefixed = ASSISTANT_HAS_OWN_NUMBER
+  ? text
+  : `${ASSISTANT_NAME}: ${text}`;
+```
+
+### Group metadata sync
+
+Group names are synced from WhatsApp every 24 hours (src/channels/whatsapp.ts:293):
+
+```typescript
+async syncGroupMetadata(force = false): Promise<void> {
+  const groups = await this.sock.groupFetchAllParticipating();
+  for (const [jid, metadata] of Object.entries(groups)) {
+    if (metadata.subject) {
+      updateChatName(jid, metadata.subject);
+    }
+  }
+}
+```
+
+This ensures group names in the database match their current WhatsApp names.
+
+## JID format
+
+WhatsApp uses JIDs (Jabber IDs) to identify chats:
+
+- **Individual:** `1234567890@s.whatsapp.net`
+- **Group:** `120363012345678901@g.us`
+- **LID (newer format):** `123456:78@lid`
+
+The channel translates LID JIDs to phone JIDs automatically (src/channels/whatsapp.ts:324).
+
+## Registering chats
+
+To make the assistant respond in a chat, register it:
+
+### Main chat (self-chat)
+
+Your self-chat is the admin control channel:
+
+```typescript
+registerGroup("<your-number>@s.whatsapp.net", {
+  name: "Main",
+  folder: "main",
+  trigger: `@${ASSISTANT_NAME}`,
+  added_at: new Date().toISOString(),
+  requiresTrigger: false,
+});
+```
+
+### Group chats
+
+For WhatsApp groups:
+
+```typescript
+registerGroup("<group-jid>@g.us", {
+  name: "Family Chat",
+  folder: "family-chat",
+  trigger: `@${ASSISTANT_NAME}`,
+  added_at: new Date().toISOString(),
+  requiresTrigger: true, // Only responds when mentioned
+});
+```
+
+<Tip>
+  Use `requiresTrigger: true` for group chats so the assistant only responds when explicitly mentioned.
+</Tip>
+
+## Troubleshooting
+
+### Authentication expired
+
+If you see "WhatsApp authentication required" notifications:
+
+```bash
+claude
+/setup
+```
+
+Follow the QR code authentication flow again.
+
+### Connection issues
+
+The channel automatically reconnects on disconnection (src/channels/whatsapp.ts:95):
+
+```typescript
+if (connection === 'close') {
+  const shouldReconnect = reason !== DisconnectReason.loggedOut;
+  if (shouldReconnect) {
+    logger.info('Reconnecting...');
+    this.connectInternal().catch(...);
+  }
+}
+```
+
+Messages are queued during disconnection and flushed on reconnect.
+
+### Not receiving messages
+
+Check if the chat is registered:
+
+```bash
+sqlite3 store/messages.db "SELECT * FROM registered_groups"
+```
+
+If the chat isn't listed, register it using the process above.
+
+### Bot responding to itself
+
+Ensure `ASSISTANT_HAS_OWN_NUMBER` is set correctly in `src/config.ts`:
+
+- If sharing a number, set to `false` (bot messages will have the name prefix)
+- If using a dedicated number, set to `true` (bot messages are identified by `fromMe`)
+
+## Switching to another channel
+
+You can add other channels alongside WhatsApp or replace it entirely:
+
+### Add alongside WhatsApp
+
+```bash
+/add-telegram  # Keeps WhatsApp, adds Telegram
+```
+
+### Replace WhatsApp
+
+When adding a new channel, choose "Replace WhatsApp" and set the appropriate flag:
+
+```bash
+TELEGRAM_ONLY=true  # in .env
+```
+
+This disables WhatsApp channel creation while keeping the implementation available.
+
+## Implementation details
+
+### Message queue
+
+Messages sent while disconnected are queued and flushed on reconnect (src/channels/whatsapp.ts:357):
+
+```typescript
+private async flushOutgoingQueue(): Promise<void> {
+  while (this.outgoingQueue.length > 0) {
+    const item = this.outgoingQueue.shift()!;
+    await this.sock.sendMessage(item.jid, { text: item.text });
+  }
+}
+```
+
+### Presence updates
+
+The channel announces availability on connection (src/channels/whatsapp.ts:129):
+
+```typescript
+this.sock.sendPresenceUpdate('available').catch(...);
+```
+
+And sends typing indicators per chat (src/channels/whatsapp.ts:278):
+
+```typescript
+async setTyping(jid: string, isTyping: boolean): Promise<void> {
+  const status = isTyping ? 'composing' : 'paused';
+  await this.sock.sendPresenceUpdate(status, jid);
+}
+```
+
+## Source code reference
+
+The WhatsApp implementation is fully contained in:
+
+- **`src/channels/whatsapp.ts`** - Main WhatsAppChannel class (379 lines)
+- **`src/config.ts`** - Configuration constants
+- **`src/index.ts`** - Channel initialization and routing
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Add Telegram" icon="telegram" href="/integrations/telegram">
+    Add Telegram support alongside or instead of WhatsApp
+  </Card>
+  
+  <Card title="Add Discord" icon="discord" href="/integrations/discord">
+    Add Discord support to your installation
+  </Card>
+</CardGroup>

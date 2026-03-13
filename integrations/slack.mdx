@@ -1,0 +1,417 @@
+---
+title: Slack integration
+description: Add Slack support using the /add-slack skill
+---
+
+Add Slack as a messaging channel for NanoClaw. Perfect for team workspaces and professional communication.
+
+## Overview
+
+The Slack integration uses [@slack/bolt](https://slack.dev/bolt-js/) with Socket Mode, which means no public URL is required. The bot connects directly to Slack from your machine.
+
+### Features
+
+- **Socket Mode** - No webhooks or public URLs needed
+- **Public and private channels** - Respond in any channel the bot is added to
+- **Direct messages** - Users can DM the bot directly
+- **Multi-channel support** - Monitor multiple channels simultaneously
+- **Channel metadata sync** - Automatically syncs channel names
+- **Thread flattening** - Reads threaded replies (responds in main channel)
+
+## Adding Slack
+
+Use the `/add-slack` skill to add Slack support:
+
+<Steps>
+  <Step title="Run the skill">
+    ```bash
+    claude
+    /add-slack
+    ```
+  </Step>
+  
+  <Step title="Choose deployment mode">
+    - **Replace WhatsApp** - Slack becomes the only channel
+    - **Alongside** - Both WhatsApp and Slack run simultaneously
+  </Step>
+  
+  <Step title="Apply code changes">
+    The skill runs the skills engine which:
+    - Adds `src/channels/slack.ts` (SlackChannel implementation)
+    - Adds `src/channels/slack.test.ts` (46 unit tests)
+    - Merges multi-channel support into `src/index.ts`
+    - Adds Slack config to `src/config.ts`
+    - Installs the `@slack/bolt` NPM package
+  </Step>
+  
+  <Step title="Create Slack app">
+    Set up a Slack app with Socket Mode and proper scopes
+  </Step>
+  
+  <Step title="Configure environment">
+    Add both tokens to `.env` and sync to container
+  </Step>
+  
+  <Step title="Register channels">
+    Get channel IDs and register them with NanoClaw
+  </Step>
+</Steps>
+
+## Creating a Slack app
+
+The setup process requires two tokens: a Bot Token (`xoxb-`) and an App-Level Token (`xapp-`).
+
+### Quick setup
+
+<Steps>
+  <Step title="Create the app">
+    1. Go to [api.slack.com/apps](https://api.slack.com/apps)
+    2. Click **Create New App** → **From scratch**
+    3. Enter app name and select workspace
+  </Step>
+  
+  <Step title="Enable Socket Mode">
+    1. Go to **Socket Mode** in sidebar
+    2. Toggle **Enable Socket Mode** to On
+    3. Generate token with name `nanoclaw`
+    4. **Copy the App-Level Token** (starts with `xapp-`)
+  </Step>
+  
+  <Step title="Subscribe to events">
+    1. Go to **Event Subscriptions**
+    2. Toggle **Enable Events** to On
+    3. Add bot events:
+       - `message.channels` (public channels)
+       - `message.groups` (private channels)
+       - `message.im` (direct messages)
+    4. Click **Save Changes**
+  </Step>
+  
+  <Step title="Add OAuth scopes">
+    1. Go to **OAuth & Permissions**
+    2. Add these **Bot Token Scopes**:
+       - `chat:write` (send messages)
+       - `channels:history` (read public channels)
+       - `groups:history` (read private channels)
+       - `im:history` (read DMs)
+       - `channels:read` (list channels)
+       - `groups:read` (list private channels)
+       - `users:read` (look up display names)
+  </Step>
+  
+  <Step title="Install to workspace">
+    1. Go to **Install App**
+    2. Click **Install to Workspace**
+    3. Review permissions and click **Allow**
+    4. **Copy the Bot User OAuth Token** (starts with `xoxb-`)
+  </Step>
+</Steps>
+
+<Tip>
+  For detailed setup with screenshots, see the [SLACK_SETUP.md guide](https://github.com/qwibitai/NanoClaw/blob/main/.claude/skills/add-slack/SLACK_SETUP.md).
+</Tip>
+
+## Configuration
+
+### Environment variables
+
+Add to `.env`:
+
+```bash
+SLACK_BOT_TOKEN=xoxb-your-bot-token-here
+SLACK_APP_TOKEN=xapp-your-app-token-here
+```
+
+If you chose to replace WhatsApp:
+
+```bash
+SLACK_ONLY=true
+```
+
+### Token reference
+
+| Token | Prefix | Where to find it |
+|-------|--------|------------------|
+| Bot User OAuth Token | `xoxb-` | **OAuth & Permissions** → **Bot User OAuth Token** |
+| App-Level Token | `xapp-` | **Basic Information** → **App-Level Tokens** |
+
+### Sync to container
+
+```bash
+mkdir -p data/env && cp .env data/env/env
+```
+
+## Build and restart
+
+<CodeGroup>
+```bash macOS
+npm run build
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+```
+
+```bash Linux
+npm run build
+systemctl --user restart nanoclaw
+```
+</CodeGroup>
+
+## Adding bot to channels
+
+The bot only receives messages from channels it has been explicitly added to.
+
+<Steps>
+  <Step title="Open channel details">
+    Click the channel name at the top of Slack
+  </Step>
+  
+  <Step title="Add integration">
+    Go to **Integrations** → **Add apps**
+  </Step>
+  
+  <Step title="Search and add">
+    Search for your bot name and add it to the channel
+  </Step>
+</Steps>
+
+Repeat for each channel you want the bot to monitor.
+
+## Registering channels
+
+### Get channel ID
+
+**Option A - From URL:**
+
+Open the channel in Slack on the web. The URL looks like:
+
+```
+https://app.slack.com/client/TXXXXXXX/C0123456789
+```
+
+The `C0123456789` part is the channel ID.
+
+**Option B - Right-click:**
+
+Right-click the channel name → **Copy link** → extract the `C...` ID from the URL
+
+**Option C - Via API:**
+
+```bash
+curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+  "https://slack.com/api/conversations.list" | jq '.channels[] | {id, name}'
+```
+
+### Register the channel
+
+The JID format is `slack:` followed by the channel ID.
+
+For your main channel (responds to all messages):
+
+```typescript
+registerGroup("slack:C0123456789", {
+  name: "#general",
+  folder: "main",
+  trigger: `@${ASSISTANT_NAME}`,
+  added_at: new Date().toISOString(),
+  requiresTrigger: false,
+});
+```
+
+For additional channels (trigger-only):
+
+```typescript
+registerGroup("slack:C9876543210", {
+  name: "#team-chat",
+  folder: "team-chat",
+  trigger: `@${ASSISTANT_NAME}`,
+  added_at: new Date().toISOString(),
+  requiresTrigger: true,
+});
+```
+
+## Testing the connection
+
+Send a message in your registered Slack channel:
+
+- **For main channel:** Any message works
+- **For non-main channels:** Include your trigger pattern (e.g., `@Andy hello`)
+
+The bot should respond within a few seconds.
+
+### Check logs
+
+```bash
+tail -f logs/nanoclaw.log
+```
+
+Look for:
+
+```
+Connected to Slack
+Received message from slack:C0123456789
+Agent response queued
+```
+
+## JID format
+
+Slack channels use the `slack:` prefix:
+
+- **Public channel:** `slack:C0123456789`
+- **Private channel:** `slack:G0123456789`
+- **Direct message:** `slack:D0123456789`
+
+## Channel types
+
+The Slack integration supports:
+
+- **Public channels** - Bot must be added to the channel
+- **Private channels** - Bot must be invited to the channel
+- **Direct messages** - Users can DM the bot directly
+- **Multi-channel** - Can monitor multiple channels simultaneously
+
+## Implementation details
+
+The Slack channel implements the `Channel` interface using Socket Mode:
+
+```typescript
+export class SlackChannel implements Channel {
+  name = 'slack';
+  
+  async connect(): Promise<void> {
+    this.app = new App({
+      token: process.env.SLACK_BOT_TOKEN,
+      appToken: process.env.SLACK_APP_TOKEN,
+      socketMode: true,
+    });
+    
+    this.app.message(async ({ message, client }) => {
+      const channelJid = `slack:${message.channel}`;
+      
+      this.opts.onMessage(channelJid, {
+        id: message.ts,
+        chat_jid: channelJid,
+        sender: message.user,
+        sender_name: await this.getUserName(message.user),
+        content: message.text,
+        timestamp: new Date(parseFloat(message.ts) * 1000).toISOString(),
+        is_from_me: false,
+        is_bot_message: message.bot_id !== undefined,
+      });
+    });
+    
+    await this.app.start();
+  }
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Bot not responding">
+    Check these items:
+    
+    1. Both tokens are set in `.env` AND synced to `data/env/env`
+    2. Channel is registered:
+       ```bash
+       sqlite3 store/messages.db "SELECT * FROM registered_groups WHERE jid LIKE 'slack:%'"
+       ```
+    3. For non-main channels: message must include trigger pattern
+    4. Service is running:
+       ```bash
+       launchctl list | grep nanoclaw
+       ```
+  </Accordion>
+  
+  <Accordion title="Bot not receiving messages">
+    Verify these settings:
+    
+    1. Socket Mode is enabled (Slack app settings)
+    2. Bot is subscribed to correct events:
+       - `message.channels`
+       - `message.groups`
+       - `message.im`
+    3. Bot has been added to the channel
+    4. Bot has required OAuth scopes
+  </Accordion>
+  
+  <Accordion title="Missing scope errors">
+    If logs show `missing_scope` errors:
+    
+    1. Go to **OAuth & Permissions** in Slack app settings
+    2. Add the missing scope listed in the error
+    3. **Reinstall the app** to workspace (scope changes require reinstall)
+    4. Copy the new Bot Token (it changes on reinstall)
+    5. Update `.env` and sync: `cp .env data/env/env`
+    6. Restart: `launchctl kickstart -k gui/$(id -u)/com.nanoclaw`
+  </Accordion>
+  
+  <Accordion title="Wrong token used">
+    Verify token format:
+    
+    - Bot tokens start with `xoxb-`
+    - App tokens start with `xapp-`
+    
+    If your token doesn't match, you may have copied the wrong one.
+  </Accordion>
+</AccordionGroup>
+
+## Known limitations
+
+- **Threads are flattened** - Threaded replies appear as regular channel messages. Responses go to main channel, not back into threads.
+- **No typing indicator** - Slack's Bot API doesn't expose a typing indicator endpoint.
+- **Naive message splitting** - Long messages split at 4000 chars, may break mid-sentence.
+- **No file handling** - Only text content is processed. File uploads and rich blocks are ignored.
+- **Unbounded metadata sync** - Channel list pagination has no upper bound, may be slow in large workspaces.
+
+## Removing Slack
+
+To remove the Slack integration:
+
+<Steps>
+  <Step title="Delete channel files">
+    ```bash
+    rm src/channels/slack.ts
+    rm src/channels/slack.test.ts
+    ```
+  </Step>
+  
+  <Step title="Revert code changes">
+    - Remove `SlackChannel` import and creation from `src/index.ts`
+    - Remove Slack config from `src/config.ts`
+    - Remove Slack JID tests from `src/routing.test.ts`
+  </Step>
+  
+  <Step title="Remove registrations">
+    ```bash
+    sqlite3 store/messages.db "DELETE FROM registered_groups WHERE jid LIKE 'slack:%'"
+    ```
+  </Step>
+  
+  <Step title="Uninstall dependency">
+    ```bash
+    npm uninstall @slack/bolt
+    ```
+  </Step>
+  
+  <Step title="Rebuild and restart">
+    ```bash
+    npm run build
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    ```
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Add Gmail" icon="envelope" href="/integrations/gmail">
+    Add Gmail integration to your installation
+  </Card>
+  
+  <Card title="Add Discord" icon="discord" href="/integrations/discord">
+    Add Discord support to your installation
+  </Card>
+  
+  <Card title="Skills system" icon="puzzle-piece" href="/integrations/skills-system">
+    Learn more about how skills work
+  </Card>
+</CardGroup>

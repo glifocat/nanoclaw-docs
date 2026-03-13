@@ -1,0 +1,119 @@
+{
+  "projectType": "saas",
+  "projectName": "NanoClaw",
+  "projectDescription": "A lightweight, secure AI assistant that runs agents in isolated containers and connects to WhatsApp.",
+  "theme": "aspen",
+  "primaryColor": "#5B7FFF",
+  "lightColor": "#7B9CFF",
+  "darkColor": "#3D5FDD",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/security",
+              "concepts/groups",
+              "concepts/tasks",
+              "concepts/containers"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/messaging",
+              "features/scheduled-tasks",
+              "features/agent-swarms",
+              "features/customization",
+              "features/web-access"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/overview",
+              "integrations/skills-system",
+              "integrations/whatsapp",
+              "integrations/telegram",
+              "integrations/discord",
+              "integrations/slack",
+              "integrations/gmail"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/security-model",
+              "advanced/ipc-system",
+              "advanced/container-runtime",
+              "advanced/troubleshooting",
+              "advanced/contributing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api/overview",
+              "api/configuration",
+              "api/message-routing",
+              "api/group-management",
+              "api/task-scheduling"
+            ]
+          },
+          {
+            "group": "Skills Development",
+            "pages": [
+              "api/skills/creating-skills",
+              "api/skills/skill-structure",
+              "api/skills/examples"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Container-isolated agent execution with filesystem sandboxing",
+    "WhatsApp, Telegram, Discord, Slack, and Gmail support",
+    "Per-group isolated context and memory (CLAUDE.md)",
+    "Scheduled tasks with cron expressions",
+    "Agent Swarms - collaborative multi-agent teams",
+    "Skills-based customization system",
+    "Web search and content fetching",
+    "Read-only project root mounting for security",
+    "IPC-based message routing and task management",
+    "SQLite-based state and message storage"
+  ],
+  "publicApiSurface": [
+    "WhatsAppChannel.connect()",
+    "WhatsAppChannel.sendMessage(jid, text)",
+    "runContainerAgent(group, config, registerProcess, onOutput)",
+    "startSchedulerLoop(config)",
+    "startIpcWatcher(callbacks)",
+    "registerGroup(jid, group)",
+    "getAvailableGroups()",
+    "getAllTasks()",
+    "storeMessage(message)",
+    "formatMessages(messages)",
+    "GroupQueue.enqueueMessageCheck(chatJid)",
+    "GroupQueue.sendMessage(chatJid, formatted)",
+    "resolveGroupFolderPath(folder)",
+    "validateMountSecurity(mounts, isMainGroup)"
+  ]
+}

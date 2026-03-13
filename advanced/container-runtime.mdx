@@ -1,0 +1,429 @@
+---
+title: Container runtime
+description: Container execution architecture and runtime details
+---
+
+NanoClaw runs agents in isolated Linux containers to provide security through OS-level process and filesystem isolation. The container runtime is abstracted to support multiple backends.
+
+## Runtime abstraction
+
+All runtime-specific logic lives in `src/container-runtime.ts`, making it easy to swap runtimes. Currently supported:
+
+- **Docker** (default) - Cross-platform support (macOS, Linux, Windows via WSL2)
+- **Apple Container** (macOS only) - Lightweight native runtime
+
+The runtime binary is specified by `CONTAINER_RUNTIME_BIN` in `src/container-runtime.ts:10`:
+
+```typescript
+/** The container runtime binary name. */
+export const CONTAINER_RUNTIME_BIN = 'docker';
+```
+
+## Container image
+
+The agent container is built from `container/Dockerfile` and includes:
+
+- **Node.js 22** - Runtime for the agent runner
+- **Chromium** - Browser automation via agent-browser
+- **Claude Code SDK** - Installed globally as `@anthropic-ai/claude-code`
+- **System fonts** - Emoji and international character support
+
+### Dockerfile breakdown
+
+<Accordion title="Base image and system dependencies">
+  ```dockerfile
+  FROM node:22-slim
+
+  # Install system dependencies for Chromium
+  RUN apt-get update && apt-get install -y \
+      chromium \
+      fonts-liberation \
+      fonts-noto-color-emoji \
+      libgbm1 \
+      libnss3 \
+      # ... additional libraries
+      && rm -rf /var/lib/apt/lists/*
+  ```
+  
+  The slim Node.js base keeps the image small while providing the necessary runtime.
+</Accordion>
+
+<Accordion title="Browser configuration">
+  ```dockerfile
+  # Set Chromium path for agent-browser
+  ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
+  ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+
+  # Install agent-browser and claude-code globally
+  RUN npm install -g agent-browser @anthropic-ai/claude-code
+  ```
+  
+  Browser automation is available to all agents via the `agent-browser` command.
+</Accordion>
+
+<Accordion title="Agent runner compilation">
+  ```dockerfile
+  # Copy package files first for better caching
+  COPY agent-runner/package*.json ./
+  RUN npm install
+
+  # Copy source code
+  COPY agent-runner/ ./
+  RUN npm run build
+  ```
+  
+  The agent runner is pre-built during image creation for faster startup.
+</Accordion>
+
+<Accordion title="Workspace setup">
+  ```dockerfile
+  # Create workspace directories
+  RUN mkdir -p /workspace/group /workspace/global /workspace/extra \
+               /workspace/ipc/messages /workspace/ipc/tasks /workspace/ipc/input
+
+  # Set ownership to node user (non-root) for writable directories
+  RUN chown -R node:node /workspace && chmod 777 /home/node
+
+  # Switch to non-root user
+  USER node
+
+  # Set working directory to group workspace
+  WORKDIR /workspace/group
+  ```
+  
+  Containers run as the unprivileged `node` user (uid 1000) for security.
+</Accordion>
+
+<Accordion title="Entrypoint script">
+  ```dockerfile
+  # Create entrypoint script
+  RUN printf '#!/bin/bash\nset -e\ncd /app && npx tsc --outDir /tmp/dist 2>&1 >&2\nln -s /app/node_modules /tmp/dist/node_modules\nchmod -R a-w /tmp/dist\ncat > /tmp/input.json\nnode /tmp/dist/index.js < /tmp/input.json\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+  ENTRYPOINT ["/app/entrypoint.sh"]
+  ```
+  
+  The entrypoint:
+  1. Recompiles the agent runner from `/app/src` (allows per-group customization)
+  2. Reads input JSON from stdin
+  3. Executes the agent runner with the input
+</Accordion>
+
+### Building the image
+
+Rebuild the container image after modifying the Dockerfile or agent-runner:
+
+```bash
+./container/build.sh
+```
+
+<Warning>
+The container buildkit caches the build context aggressively. `--no-cache` alone does NOT invalidate COPY steps. To force a clean rebuild, prune the builder:
+
+```bash
+docker builder prune -af
+./container/build.sh
+```
+</Warning>
+
+## Container lifecycle
+
+### Spawning containers
+
+Containers are spawned by `src/container-runner.ts:242` using the `runContainerAgent` function:
+
+```typescript
+export async function runContainerAgent(
+  group: RegisteredGroup,
+  input: ContainerInput,
+  onProcess: (proc: ChildProcess, containerName: string) => void,
+  onOutput?: (output: ContainerOutput) => Promise<void>,
+): Promise<ContainerOutput>
+```
+
+<Steps>
+  <Step title="Build volume mounts">
+    The host determines which directories to mount based on group privileges (main vs. non-main) and the group's `containerConfig.additionalMounts`.
+  </Step>
+  
+  <Step title="Generate container name">
+    Each container gets a unique name: `nanoclaw-{group}-{timestamp}`
+  </Step>
+  
+  <Step title="Spawn container process">
+    ```typescript
+    const container = spawn(CONTAINER_RUNTIME_BIN, containerArgs, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    ```
+    
+    The container runs with stdin/stdout/stderr piped to the host.
+  </Step>
+  
+  <Step title="Pass input via stdin">
+    ```typescript
+    input.secrets = readSecrets();
+    container.stdin.write(JSON.stringify(input));
+    container.stdin.end();
+    delete input.secrets; // Don't log secrets
+    ```
+    
+    Secrets are passed via stdin (never written to disk or mounted as files).
+  </Step>
+  
+  <Step title="Stream output">
+    The host parses output markers (`---NANOCLAW_OUTPUT_START---` and `---NANOCLAW_OUTPUT_END---`) from stdout and calls the `onOutput` callback for each complete message.
+  </Step>
+  
+  <Step title="Handle completion">
+    When the container exits, logs are written to `groups/{name}/logs/container-{timestamp}.log` and the promise resolves with the final output.
+  </Step>
+</Steps>
+
+### Container arguments
+
+From `src/container-runner.ts:210`:
+
+```typescript
+function buildContainerArgs(
+  mounts: VolumeMount[],
+  containerName: string,
+): string[] {
+  const args: string[] = ['run', '-i', '--rm', '--name', containerName];
+
+  // Pass host timezone so container's local time matches the user's
+  args.push('-e', `TZ=${TIMEZONE}`);
+
+  // Run as host user so bind-mounted files are accessible
+  const hostUid = process.getuid?.();
+  const hostGid = process.getgid?.();
+  if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
+    args.push('--user', `${hostUid}:${hostGid}`);
+    args.push('-e', 'HOME=/home/node');
+  }
+
+  for (const mount of mounts) {
+    if (mount.readonly) {
+      args.push(...readonlyMountArgs(mount.hostPath, mount.containerPath));
+    } else {
+      args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
+    }
+  }
+
+  args.push(CONTAINER_IMAGE);
+  return args;
+}
+```
+
+**Key flags:**
+- `-i` - Interactive (keeps stdin open)
+- `--rm` - Remove container after exit (ephemeral)
+- `--name` - Unique container name for management
+- `--user` - Run as host UID/GID for file permissions
+
+### Volume mounts
+
+Mounts are built per-group in `src/container-runner.ts:57`:
+
+| Path | Main Group | Non-Main Group | Mode |
+|------|------------|----------------|------|
+| Project root | `/workspace/project` | Not mounted | Read-only |
+| Group folder | `/workspace/group` | `/workspace/group` | Read-write |
+| Global memory | Implicit (in project) | `/workspace/global` | Read-only |
+| Claude sessions | `/home/node/.claude` | `/home/node/.claude` | Read-write |
+| IPC namespace | `/workspace/ipc` | `/workspace/ipc` | Read-write |
+| Agent runner src | `/app/src` | `/app/src` | Read-write |
+| Additional mounts | Configurable | Configurable | Per-config |
+
+<Tip>
+Each group gets its own copy of the agent-runner source in `data/sessions/{group}/agent-runner-src/`, allowing per-group customization without affecting other groups.
+</Tip>
+
+### Timeouts
+
+Containers have two timeout mechanisms:
+
+1. **Hard timeout** - Maximum runtime before force kill (default: 30 minutes)
+2. **Idle timeout** - Graceful shutdown after period of inactivity (default: 30 minutes)
+
+From `src/container-runner.ts:383`:
+
+```typescript
+const configTimeout = group.containerConfig?.timeout || CONTAINER_TIMEOUT;
+const timeoutMs = Math.max(configTimeout, IDLE_TIMEOUT + 30_000);
+
+const killOnTimeout = () => {
+  timedOut = true;
+  logger.error(
+    { group: group.name, containerName },
+    'Container timeout, stopping gracefully',
+  );
+  exec(stopContainer(containerName), { timeout: 15000 }, (err) => {
+    if (err) {
+      container.kill('SIGKILL');
+    }
+  });
+};
+
+let timeout = setTimeout(killOnTimeout, timeoutMs);
+
+// Reset timeout on activity (streaming output)
+const resetTimeout = () => {
+  clearTimeout(timeout);
+  timeout = setTimeout(killOnTimeout, timeoutMs);
+};
+```
+
+<Note>
+The idle timeout is currently set equal to the hard timeout (both 30 minutes), causing containers to always exit via SIGKILL instead of graceful shutdown. This is a known issue tracked in `docs/DEBUG_CHECKLIST.md:8`.
+</Note>
+
+## Runtime management
+
+### Ensuring runtime is available
+
+On startup, NanoClaw verifies the container runtime is accessible via `src/container-runtime.ts:26`:
+
+```typescript
+export function ensureContainerRuntimeRunning(): void {
+  try {
+    execSync(`${CONTAINER_RUNTIME_BIN} info`, {
+      stdio: 'pipe',
+      timeout: 10000,
+    });
+    logger.debug('Container runtime already running');
+  } catch (err) {
+    logger.error({ err }, 'Failed to reach container runtime');
+    // Display error banner
+    throw new Error('Container runtime is required but failed to start');
+  }
+}
+```
+
+### Cleaning up orphans
+
+Orphaned containers from previous runs are cleaned up at startup via `src/container-runtime.ts:64`:
+
+```typescript
+export function cleanupOrphans(): void {
+  try {
+    const output = execSync(
+      `${CONTAINER_RUNTIME_BIN} ps --filter name=nanoclaw- --format '{{.Names}}'`,
+      { stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' },
+    );
+    const orphans = output.trim().split('\n').filter(Boolean);
+    for (const name of orphans) {
+      try {
+        execSync(stopContainer(name), { stdio: 'pipe' });
+      } catch {
+        /* already stopped */
+      }
+    }
+    if (orphans.length > 0) {
+      logger.info(
+        { count: orphans.length, names: orphans },
+        'Stopped orphaned containers',
+      );
+    }
+  } catch (err) {
+    logger.warn({ err }, 'Failed to clean up orphaned containers');
+  }
+}
+```
+
+## Output streaming
+
+Containers use sentinel markers to enable robust streaming output parsing:
+
+- `---NANOCLAW_OUTPUT_START---` - Marks the beginning of a JSON output block
+- `---NANOCLAW_OUTPUT_END---` - Marks the end of a JSON output block
+
+From `src/container-runner.ts:308`:
+
+```typescript
+container.stdout.on('data', (data) => {
+  const chunk = data.toString();
+
+  // Stream-parse for output markers
+  if (onOutput) {
+    parseBuffer += chunk;
+    let startIdx: number;
+    while ((startIdx = parseBuffer.indexOf(OUTPUT_START_MARKER)) !== -1) {
+      const endIdx = parseBuffer.indexOf(OUTPUT_END_MARKER, startIdx);
+      if (endIdx === -1) break; // Incomplete pair, wait for more data
+
+      const jsonStr = parseBuffer
+        .slice(startIdx + OUTPUT_START_MARKER.length, endIdx)
+        .trim();
+      parseBuffer = parseBuffer.slice(endIdx + OUTPUT_END_MARKER.length);
+
+      try {
+        const parsed: ContainerOutput = JSON.parse(jsonStr);
+        if (parsed.newSessionId) {
+          newSessionId = parsed.newSessionId;
+        }
+        hadStreamingOutput = true;
+        resetTimeout(); // Reset timeout on activity
+        outputChain = outputChain.then(() => onOutput(parsed));
+      } catch (err) {
+        logger.warn(
+          { group: group.name, error: err },
+          'Failed to parse streamed output chunk',
+        );
+      }
+    }
+  }
+});
+```
+
+This allows the host to receive and act on agent output in real-time, rather than waiting for the container to exit.
+
+## Debugging containers
+
+<Accordion title="List running containers">
+  ```bash
+  docker ps --filter name=nanoclaw-
+  ```
+</Accordion>
+
+<Accordion title="View container logs">
+  ```bash
+  docker logs nanoclaw-main-1234567890
+  ```
+</Accordion>
+
+<Accordion title="Inspect container mounts">
+  ```bash
+  docker inspect nanoclaw-main-1234567890 | jq '.[0].Mounts'
+  ```
+</Accordion>
+
+<Accordion title="Execute commands in running container">
+  ```bash
+  docker exec -it nanoclaw-main-1234567890 /bin/bash
+  ```
+</Accordion>
+
+<Accordion title="Stop a running container">
+  ```bash
+  docker stop nanoclaw-main-1234567890
+  ```
+</Accordion>
+
+<Accordion title="Review container run logs">
+  ```bash
+  cat groups/main/logs/container-2026-02-28T12-00-00-000Z.log
+  ```
+  
+  Logs include:
+  - Input prompt
+  - Container arguments
+  - Volume mounts
+  - Stdout/stderr (when verbose logging is enabled)
+  - Exit code and duration
+</Accordion>
+
+## Related pages
+
+- [Security model](/advanced/security-model) - Container isolation and security boundaries
+- [IPC system](/advanced/ipc-system) - How agents communicate with the host
+- [Troubleshooting](/advanced/troubleshooting) - Common container issues

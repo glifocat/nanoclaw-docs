@@ -1,0 +1,225 @@
+---
+title: Security model
+description: Deep dive into NanoClaw's security architecture and trust boundaries
+---
+
+NanoClaw's security model is built on OS-level isolation rather than application-level permission checks. Agents run in isolated Linux containers with explicit filesystem mounts, creating a security boundary that's enforced by the kernel.
+
+## Trust model
+
+NanoClaw operates with different trust levels for different entities:
+
+| Entity | Trust Level | Rationale |
+|--------|-------------|-----------||
+| Main group | Trusted | Private self-chat, admin control |
+| Non-main groups | Untrusted | Other users may be malicious |
+| Container agents | Sandboxed | Isolated execution environment |
+| WhatsApp messages | User input | Potential prompt injection |
+
+## Security boundaries
+
+### Container isolation (primary boundary)
+
+Agents execute in containers (lightweight Linux VMs), providing:
+
+- **Process isolation** - Container processes cannot affect the host
+- **Filesystem isolation** - Only explicitly mounted directories are visible
+- **Non-root execution** - Runs as unprivileged `node` user (uid 1000)
+- **Ephemeral containers** - Fresh environment per invocation (`--rm`)
+
+This is the primary security boundary. Rather than relying on application-level permission checks, the attack surface is limited by what's mounted.
+
+<Note>
+The container runtime is abstracted through `src/container-runtime.ts`, making it easy to swap runtimes. Docker is the default, but you can switch to Apple Container on macOS for a lighter-weight native runtime.
+</Note>
+
+### Mount security
+
+**External allowlist**
+
+Mount permissions are stored at `~/.config/nanoclaw/mount-allowlist.json`, which is:
+- Outside the project root
+- Never mounted into containers
+- Cannot be modified by agents
+
+**Default blocked patterns:**
+
+```json
+[
+  ".ssh", ".gnupg", ".aws", ".azure", ".gcloud", ".kube", ".docker",
+  "credentials", ".env", ".netrc", ".npmrc", "id_rsa", "id_ed25519",
+  "private_key", ".secret"
+]
+```
+
+**Protections:**
+
+- Symlink resolution before validation (prevents traversal attacks)
+- Container path validation (rejects `..` and absolute paths)
+- `nonMainReadOnly` option forces read-only for non-main groups
+
+See `src/mount-security.ts:1` for the validation implementation.
+
+**Read-only project root**
+
+The main group's project root is mounted read-only. Writable paths the agent needs (group folder, IPC, `.claude/`) are mounted separately. This prevents the agent from modifying host application code (`src/`, `dist/`, `package.json`, etc.) which would bypass the sandbox entirely on next restart.
+
+From `src/container-runner.ts:66`:
+
+```typescript
+if (isMain) {
+  // Main gets the project root read-only. Writable paths the agent needs
+  // (group folder, IPC, .claude/) are mounted separately below.
+  // Read-only prevents the agent from modifying host application code
+  // (src/, dist/, package.json, etc.) which would bypass the sandbox
+  // entirely on next restart.
+  mounts.push({
+    hostPath: projectRoot,
+    containerPath: '/workspace/project',
+    readonly: true,
+  });
+}
+```
+
+### Session isolation
+
+Each group has isolated Claude sessions at `data/sessions/{group}/.claude/`:
+
+- Groups cannot see other groups' conversation history
+- Session data includes full message history and file contents read
+- Prevents cross-group information disclosure
+
+Sessions are mounted per-group in `src/container-runner.ts:103`:
+
+```typescript
+const groupSessionsDir = path.join(
+  DATA_DIR,
+  'sessions',
+  group.folder,
+  '.claude',
+);
+fs.mkdirSync(groupSessionsDir, { recursive: true });
+```
+
+### IPC authorization
+
+Messages and task operations are verified against group identity. The IPC system uses per-group namespaces in `data/ipc/{group}/` to prevent privilege escalation.
+
+| Operation | Main Group | Non-Main Group |
+|-----------|------------|----------------|
+| Send message to own chat | ✓ | ✓ |
+| Send message to other chats | ✓ | ✗ |
+| Schedule task for self | ✓ | ✓ |
+| Schedule task for others | ✓ | ✗ |
+| View all tasks | ✓ | Own only |
+| Manage other groups | ✓ | ✗ |
+
+Authorization is enforced in `src/ipc.ts:76`:
+
+```typescript
+// Authorization: verify this group can send to this chatJid
+const targetGroup = registeredGroups[data.chatJid];
+if (
+  isMain ||
+  (targetGroup && targetGroup.folder === sourceGroup)
+) {
+  await deps.sendMessage(data.chatJid, data.text);
+  logger.info(
+    { chatJid: data.chatJid, sourceGroup },
+    'IPC message sent',
+  );
+} else {
+  logger.warn(
+    { chatJid: data.chatJid, sourceGroup },
+    'Unauthorized IPC message attempt blocked',
+  );
+}
+```
+
+### Credential handling
+
+**Mounted credentials:**
+- Claude auth tokens (filtered from `.env`, read-only)
+
+**NOT mounted:**
+- WhatsApp session (`store/auth/`) - host only
+- Mount allowlist - external, never mounted
+- Any credentials matching blocked patterns
+
+**Credential filtering:**
+
+Only these environment variables are exposed to containers (from `src/container-runner.ts:206`):
+
+```typescript
+function readSecrets(): Record<string, string> {
+  return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
+}
+```
+
+<Warning>
+Anthropic credentials are mounted so that Claude Code can authenticate when the agent runs. However, this means the agent itself can discover these credentials via Bash or file operations. Ideally, Claude Code would authenticate without exposing credentials to the agent's execution environment.
+</Warning>
+
+## Privilege comparison
+
+| Capability | Main Group | Non-Main Group |
+|------------|------------|----------------|
+| Project root access | `/workspace/project` (ro) | None |
+| Group folder | `/workspace/group` (rw) | `/workspace/group` (rw) |
+| Global memory | Implicit via project | `/workspace/global` (ro) |
+| Additional mounts | Configurable | Read-only unless allowed |
+| Network access | Unrestricted | Unrestricted |
+| MCP tools | All | All |
+
+## Security architecture diagram
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        UNTRUSTED ZONE                             │
+│  WhatsApp Messages (potentially malicious)                        │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 │
+                                 ▼ Trigger check, input escaping
+┌──────────────────────────────────────────────────────────────────┐
+│                     HOST PROCESS (TRUSTED)                        │
+│  • Message routing                                                │
+│  • IPC authorization                                              │
+│  • Mount validation (external allowlist)                          │
+│  • Container lifecycle                                            │
+│  • Credential filtering                                           │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 │
+                                 ▼ Explicit mounts only
+┌──────────────────────────────────────────────────────────────────┐
+│                CONTAINER (ISOLATED/SANDBOXED)                     │
+│  • Agent execution                                                │
+│  • Bash commands (sandboxed)                                      │
+│  • File operations (limited to mounts)                            │
+│  • Network access (unrestricted)                                  │
+│  • Cannot modify security config                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+## Best practices
+
+<Accordion title="Review mount allowlist regularly">
+  Check `~/.config/nanoclaw/mount-allowlist.json` to ensure only necessary directories are mounted. Remove entries you no longer need.
+</Accordion>
+
+<Accordion title="Use read-only mounts for sensitive data">
+  When mounting directories containing sensitive data, use the `readonly` option in `containerConfig.additionalMounts` to prevent modifications.
+</Accordion>
+
+<Accordion title="Keep secrets out of mounted directories">
+  Never place API keys, passwords, or other secrets in directories that are mounted to non-main groups.
+</Accordion>
+
+<Accordion title="Monitor container logs">
+  Check `groups/{name}/logs/container-*.log` files to review what agents are doing. Enable verbose logging with `LOG_LEVEL=debug` for detailed output.
+</Accordion>
+
+## Related pages
+
+- [IPC system](/advanced/ipc-system) - Inter-process communication and authorization
+- [Container runtime](/advanced/container-runtime) - Container execution details
+- [Troubleshooting](/advanced/troubleshooting) - Common security-related issues

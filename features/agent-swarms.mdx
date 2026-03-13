@@ -1,0 +1,313 @@
+---
+title: Agent Swarms
+description: Spin up teams of specialized Claude agents that collaborate on complex tasks in your chat
+---
+
+## Overview
+
+NanoClaw is the first personal AI assistant to support **Agent Swarms** - teams of specialized agents that collaborate on complex tasks. This feature is powered by Claude Code's experimental agent teams functionality.
+
+<Note>
+Agent Swarms is an experimental feature from Claude Code. NanoClaw enables it by default in all agent containers.
+</Note>
+
+## What are Agent Swarms?
+
+Agent Swarms allow a single Claude agent to orchestrate multiple sub-agents, each specialized for different tasks. The main agent coordinates the team, delegates work, and synthesizes results.
+
+### Use cases
+
+- **Research projects**: One agent searches the web, another analyzes data, a third writes the report
+- **Code reviews**: One agent checks style, another tests functionality, a third reviews security
+- **Content creation**: One agent researches topics, another drafts content, a third edits and refines
+- **Data processing**: Multiple agents process different data sources in parallel
+
+## How it works
+
+When you give NanoClaw a complex task, the main agent can spawn sub-agents automatically:
+
+```
+@Andy research AI developments this week, analyze trends, and write a detailed report
+```
+
+The main agent might:
+1. Spawn a research agent to search and gather information
+2. Spawn an analysis agent to identify patterns and trends
+3. Spawn a writing agent to compile the final report
+4. Coordinate between them and synthesize the results
+
+## Enabling Agent Swarms
+
+Agent Swarms are enabled automatically in NanoClaw through the container configuration:
+
+```typescript
+// From src/container-runner.ts:119-122
+env: {
+  // Enable agent swarms (subagent orchestration)
+  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
+  // ... other settings
+}
+```
+
+This environment variable is set in each group's `.claude/settings.json`:
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1",
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "0"
+  }
+}
+```
+
+<Warning>
+This is an experimental Claude Code feature. Behavior may change in future releases.
+</Warning>
+
+## Agent team architecture
+
+Each sub-agent runs in its own Claude Code session with:
+
+- Independent context and memory
+- Access to the same mounted filesystems as the parent
+- Ability to use all available tools (Bash, browser automation, etc.)
+- Communication channel back to the main orchestrator agent
+
+### Session isolation
+
+Sub-agents are isolated from each other but coordinated by the main agent:
+
+```
+┌─────────────────────────────────────┐
+│  Main Agent (orchestrator)          │
+│  - Delegates tasks to sub-agents    │
+│  - Coordinates results               │
+│  - Responds to user                  │
+└──────────┬──────────────────────────┘
+           │
+           ├─────────────┬─────────────┬──────────────
+           │             │             │
+    ┌──────▼──────┐ ┌───▼──────┐ ┌────▼─────────┐
+    │ Sub-Agent 1 │ │Sub-Agent2│ │ Sub-Agent 3  │
+    │ (Research)  │ │(Analysis)│ │  (Writing)   │
+    └─────────────┘ └──────────┘ └──────────────┘
+```
+
+## Example interactions
+
+### Research and analysis
+
+```
+@Andy analyze the top 10 posts on Hacker News today, categorize by topic, 
+and identify emerging trends
+```
+
+The agent might spawn:
+- A web scraping agent to fetch HN posts
+- Multiple analysis agents to categorize in parallel
+- A synthesis agent to compile trends
+
+### Multi-source data aggregation
+
+```
+@Andy compile a weekly report from:
+- Recent commits in the GitHub repo
+- Updates in the Slack #engineering channel  
+- Tickets closed in Linear
+```
+
+The agent might spawn:
+- A GitHub agent to analyze commit history
+- A Slack agent to summarize channel activity
+- A Linear agent to fetch closed tickets
+- A reporting agent to compile everything
+
+### Parallel document processing
+
+```
+@Andy summarize all the PDFs in the research folder and create 
+a comparison table
+```
+
+The agent might spawn:
+- Multiple document reading agents (one per PDF)
+- A synthesis agent to create the comparison table
+
+## Memory and context sharing
+
+All agents in a swarm have access to:
+
+- **Group memory**: The `CLAUDE.md` file in the group folder
+- **Mounted directories**: Same filesystem access as the main agent
+- **Additional memory directories**: Via `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD`
+
+```typescript
+// From src/container-runner.ts:122-124
+env: {
+  // Load CLAUDE.md from additional mounted directories
+  CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
+}
+```
+
+This allows sub-agents to read context from:
+- `/workspace/group/CLAUDE.md` (main group memory)
+- `/workspace/project/CLAUDE.md` (for main channel only)
+- `/workspace/global/CLAUDE.md` (read-only shared memory)
+
+## Coordination patterns
+
+The main agent coordinates sub-agents through various patterns:
+
+### Sequential workflow
+
+```
+Main agent:
+1. Spawn research agent → wait for results
+2. Spawn analysis agent with research results → wait
+3. Spawn writing agent with analysis → wait
+4. Return final report to user
+```
+
+### Parallel execution
+
+```
+Main agent:
+1. Spawn 3 research agents in parallel
+2. Wait for all to complete
+3. Synthesize results
+4. Return summary to user
+```
+
+### Hierarchical delegation
+
+```
+Main agent:
+1. Spawn coordinator agent for web research
+   → Coordinator spawns multiple scraper agents
+2. Spawn coordinator agent for data analysis  
+   → Coordinator spawns multiple analysis agents
+3. Synthesize both coordinators' results
+4. Return to user
+```
+
+## Performance considerations
+
+### Container limits
+
+Agent Swarms respect the global concurrent container limit:
+
+```typescript
+// From src/config.ts
+export const MAX_CONCURRENT_CONTAINERS = Math.max(
+  1,
+  parseInt(process.env.MAX_CONCURRENT_CONTAINERS || '5', 10) || 5,
+);
+```
+
+If you use Agent Swarms heavily, consider increasing this limit:
+
+```bash
+export MAX_CONCURRENT_CONTAINERS=10
+```
+
+### Resource usage
+
+Each sub-agent:
+- Runs in its own Claude Code session (API calls)
+- May spawn its own container processes
+- Shares CPU/memory with other containers
+
+For complex swarms, monitor system resources:
+
+```bash
+# Check running containers
+docker ps | grep nanoclaw
+
+# Monitor resource usage
+docker stats
+```
+
+## Debugging Agent Swarms
+
+To see what's happening inside agent swarms:
+
+### Check container logs
+
+```bash
+# View logs for a specific group
+tail -f groups/{group-name}/logs/agent.log
+```
+
+### Ask the agent
+
+```
+@Andy what sub-agents did you spawn for that task?
+@Andy show me the breakdown of how you delegated the work
+```
+
+### Check session files
+
+Each sub-agent creates session files in `.claude/sessions/`:
+
+```bash
+ls -la data/sessions/{group-folder}/.claude/sessions/
+```
+
+## Limitations
+
+<Warning>
+Agent Swarms has some current limitations:
+
+- **Experimental**: The feature may change as Claude Code evolves
+- **Resource intensive**: Multiple agents consume more API calls and system resources
+- **No direct control**: You can't manually spawn specific sub-agents (orchestration is automatic)
+- **Coordination overhead**: The main agent needs to coordinate, which adds latency
+</Warning>
+
+## Best practices
+
+### When to use Agent Swarms
+
+✅ **Good use cases:**
+- Complex multi-step tasks with clear delegation opportunities
+- Parallel data processing across multiple sources
+- Tasks requiring different specialized skills
+- Research projects with distinct gathering/analysis/writing phases
+
+❌ **Avoid for:**
+- Simple single-step queries
+- Highly interactive conversations (stick to single agent)
+- Time-sensitive requests (coordination adds latency)
+- Tasks with strict resource constraints
+
+### Optimize swarm performance
+
+1. **Be explicit about delegation**: Help the agent understand when to spawn sub-agents
+   ```
+   @Andy research X using multiple agents in parallel, then synthesize results
+   ```
+
+2. **Provide clear sub-tasks**: Break down your request to guide delegation
+   ```
+   @Andy:
+   1. Fetch data from sources A, B, and C (parallel)
+   2. Analyze each dataset
+   3. Create comparison report
+   ```
+
+3. **Monitor resource usage**: Check if swarms are worth the overhead
+   ```
+   @Andy how many sub-agents did that task require?
+   ```
+
+## Related documentation
+
+- [Scheduled tasks](/features/scheduled-tasks) - Run agent swarms on a schedule
+- [Customization](/features/customization) - Adjust container limits and behavior
+- [Web access](/features/web-access) - Sub-agents can use browser automation
+
+## External resources
+
+- [Claude Code Agent Teams documentation](https://code.claude.com/docs/en/agent-teams)
+- [Agent orchestration patterns](https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions)

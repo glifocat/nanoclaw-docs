@@ -1,0 +1,448 @@
+---
+title: Troubleshooting
+description: Common issues and solutions for NanoClaw
+---
+
+This guide covers common issues you may encounter when running NanoClaw and how to resolve them.
+
+## Quick status check
+
+Run these commands to get a quick overview of system health:
+
+```bash
+# 1. Is the service running?
+launchctl list | grep nanoclaw
+# Expected: PID  0  com.nanoclaw (PID = running, "-" = not running, non-zero exit = crashed)
+
+# 2. Any running containers?
+docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
+
+# 3. Any stopped/orphaned containers?
+docker ps -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
+
+# 4. Recent errors in service log?
+grep -E 'ERROR|WARN' logs/nanoclaw.log | tail -20
+
+# 5. Is WhatsApp connected? (look for last connection event)
+grep -E 'Connected to WhatsApp|Connection closed|connection.*close' logs/nanoclaw.log | tail -5
+
+# 6. Are groups loaded?
+grep 'groupCount' logs/nanoclaw.log | tail -3
+```
+
+## Agent not responding
+
+### Symptoms
+Messages sent to the agent receive no response.
+
+### Diagnosis
+
+<Steps>
+  <Step title="Check if messages are being received">
+    ```bash
+    grep 'New messages' logs/nanoclaw.log | tail -10
+    ```
+    
+    If no messages appear, the issue is with WhatsApp connectivity.
+  </Step>
+  
+  <Step title="Check if containers are being spawned">
+    ```bash
+    grep -E 'Processing messages|Spawning container' logs/nanoclaw.log | tail -10
+    ```
+    
+    If messages are received but no containers spawn, check trigger patterns.
+  </Step>
+  
+  <Step title="Check for active containers">
+    ```bash
+    docker ps --filter name=nanoclaw-
+    ```
+    
+    If containers are stuck running, they may have hit an infinite loop.
+  </Step>
+  
+  <Step title="Check container logs">
+    ```bash
+    docker logs nanoclaw-{group}-{timestamp}
+    ```
+    
+    Look for errors in the agent execution.
+  </Step>
+</Steps>
+
+### Solutions
+
+<Accordion title="Trigger word not matching">
+  Verify the trigger word in your message matches the configured trigger:
+  
+  ```bash
+  sqlite3 store/messages.db "SELECT name, trigger FROM registered_groups;"
+  ```
+  
+  The trigger is case-sensitive and must appear at the start of the message.
+</Accordion>
+
+<Accordion title="Container runtime not available">
+  Ensure Docker is running:
+  
+  ```bash
+  docker info
+  ```
+  
+  If Docker is not running, start it:
+  - macOS: Open Docker Desktop
+  - Linux: `sudo systemctl start docker`
+</Accordion>
+
+<Accordion title="Queue at concurrency limit">
+  Check if the queue is blocked:
+  
+  ```bash
+  grep 'concurrency limit' logs/nanoclaw.log | tail -5
+  ```
+  
+  Stop stuck containers:
+  
+  ```bash
+  docker stop $(docker ps -q --filter name=nanoclaw-)
+  ```
+</Accordion>
+
+## Container timeout
+
+### Symptoms
+- Logs show `Container timeout` or `timed out`
+- Exit code 137 (SIGKILL) in container logs
+- Messages are lost after timeout
+
+### Diagnosis
+
+```bash
+# Check for recent timeouts
+grep -E 'Container timeout|timed out' logs/nanoclaw.log | tail -10
+
+# Check container log files
+ls -lt groups/*/logs/container-*.log | head -10
+
+# Read the most recent container log
+cat groups/{group}/logs/container-{timestamp}.log
+```
+
+### Solutions
+
+<Accordion title="Increase timeout for specific group">
+  Modify the group's `containerConfig` in the database:
+  
+  ```bash
+  sqlite3 store/messages.db
+  ```
+  
+  ```sql
+  UPDATE registered_groups 
+  SET container_config = json_set(
+    COALESCE(container_config, '{}'),
+    '$.timeout',
+    3600000  -- 1 hour in milliseconds
+  )
+  WHERE name = 'Family Chat';
+  ```
+</Accordion>
+
+<Accordion title="Check for infinite loops">
+  Review the container log to see if the agent is stuck:
+  
+  ```bash
+  cat groups/{group}/logs/container-{timestamp}.log
+  ```
+  
+  Look for repeated patterns or lack of progress. If the agent is stuck, consider:
+  - Simplifying the prompt
+  - Adding constraints to the task
+  - Reviewing recent changes to `CLAUDE.md`
+</Accordion>
+
+<Accordion title="Adjust idle timeout">
+  The idle timeout (for graceful shutdown between messages) is currently equal to the hard timeout. This is a known issue. To fix:
+  
+  Edit `src/config.ts` and set:
+  ```typescript
+  export const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+  export const CONTAINER_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+  ```
+  
+  Then rebuild:
+  ```bash
+  npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+  ```
+</Accordion>
+
+## Known issues
+
+### Cursor advanced before agent succeeds
+
+**Issue:** `processGroupMessages` advances `lastAgentTimestamp` before the agent runs. If the container times out, retries find no messages (cursor already past them). Messages are permanently lost on timeout.
+
+**Workaround:** Monitor `lastAgentTimestamp` in the database and manually reset if needed:
+
+```sql
+UPDATE state 
+SET value = '{timestamp}' 
+WHERE key = 'lastAgentTimestamp:{jid}';
+```
+
+### IDLE_TIMEOUT == CONTAINER_TIMEOUT
+
+**Issue:** Both timers fire at the same time, so containers always exit via hard SIGKILL (code 137) instead of graceful `_close` sentinel shutdown.
+
+**Fix:** Set `IDLE_TIMEOUT` to a lower value (e.g., 5 minutes) in `src/config.ts`.
+
+### Resume branches from stale tree position
+
+**Issue:** When agent teams spawns subagent CLI processes, they write to the same session JSONL. On subsequent `query()` resumes, the CLI reads the JSONL but may pick a stale branch tip, causing responses to land on a branch the host never receives.
+
+**Fix:** Already fixed. The agent runner now passes `resumeSessionAt` with the last assistant message UUID to explicitly anchor each resume.
+
+## WhatsApp authentication issues
+
+### Symptoms
+- Logs show "QR" or "authentication required"
+- No messages are being received
+- Connection repeatedly drops
+
+### Diagnosis
+
+```bash
+# Check for QR code requests
+grep 'QR\|authentication required\|qr' logs/nanoclaw.log | tail -5
+
+# Check auth files exist
+ls -la store/auth/
+```
+
+### Solution
+
+Re-authenticate with WhatsApp:
+
+```bash
+npm run auth
+```
+
+Scan the QR code with your phone, then restart the service:
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+```
+
+## Container mount issues
+
+### Symptoms
+- Agent cannot access expected files or directories
+- Logs show "Mount validated" or "Mount REJECTED"
+- Permission errors in container logs
+
+### Diagnosis
+
+```bash
+# Check mount validation logs
+grep -E 'Mount validated|Mount.*REJECTED|mount' logs/nanoclaw.log | tail -10
+
+# Verify the mount allowlist is readable
+cat ~/.config/nanoclaw/mount-allowlist.json
+
+# Check group's container_config in DB
+sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;"
+```
+
+### Solutions
+
+<Accordion title="Add path to mount allowlist">
+  Edit `~/.config/nanoclaw/mount-allowlist.json`:
+  
+  ```json
+  {
+    "allowedPaths": [
+      {
+        "hostPath": "/Users/you/Documents/project",
+        "containerPath": "/workspace/extra/project",
+        "readonly": false,
+        "nonMainReadOnly": true
+      }
+    ]
+  }
+  ```
+  
+  Then restart the service.
+</Accordion>
+
+<Accordion title="Check for symlinks">
+  The mount security system resolves symlinks before validation. If you're mounting a symlink, ensure the resolved path is in the allowlist:
+  
+  ```bash
+  readlink -f /path/to/symlink
+  ```
+</Accordion>
+
+<Accordion title="Verify file permissions">
+  Containers run as the host user (or uid 1000 on some systems). Ensure the host user can read the mounted directories:
+  
+  ```bash
+  ls -la /path/to/mount
+  ```
+</Accordion>
+
+<Accordion title="Test mount manually">
+  Run a test container to verify mounts:
+  
+  ```bash
+  docker run -i --rm \
+    -v /path/to/host:/workspace/test:ro \
+    nanoclaw-agent:latest \
+    ls -la /workspace/test
+  ```
+</Accordion>
+
+## IPC issues
+
+### Symptoms
+- Messages sent via IPC don't appear in WhatsApp
+- Tasks don't get scheduled
+- IPC files accumulate in `data/ipc/{group}/`
+
+### Diagnosis
+
+```bash
+# Check for failed IPC operations
+ls -la data/ipc/errors/
+cat data/ipc/errors/main-message-*.json
+
+# Monitor IPC activity
+grep 'IPC' logs/nanoclaw.log | tail -20
+
+# Verify IPC directory permissions
+ls -la data/ipc/main/
+ls -la data/ipc/family-chat/
+```
+
+### Solutions
+
+<Accordion title="Check IPC authorization">
+  Non-main groups can only send messages to their own chat. Verify the `chatJid` in the IPC file matches the group's registered JID:
+  
+  ```bash
+  sqlite3 store/messages.db "SELECT jid, name, folder FROM registered_groups;"
+  ```
+</Accordion>
+
+<Accordion title="Verify JSON format">
+  IPC files must be valid JSON. Check for syntax errors:
+  
+  ```bash
+  cat data/ipc/errors/{group}-message-*.json | jq .
+  ```
+</Accordion>
+
+<Accordion title="Test IPC manually">
+  Write a test message:
+  
+  ```bash
+  echo '{"type":"message","chatJid":"me","text":"test"}' > \
+    data/ipc/main/messages/test.json
+  
+  # Watch logs for processing
+  tail -f logs/nanoclaw.log | grep IPC
+  ```
+</Accordion>
+
+## Session branching issues
+
+### Symptoms
+- Agent responses don't appear in the conversation
+- Session transcript shows multiple branches
+- Concurrent CLI processes in session debug logs
+
+### Diagnosis
+
+```bash
+# Check for concurrent CLI processes
+ls -la data/sessions/{group}/.claude/debug/
+
+# Count unique SDK processes (each .txt file = one CLI subprocess)
+# Multiple files = concurrent queries
+
+# Check parentUuid branching in transcript
+python3 -c "
+import json, sys
+lines = open('data/sessions/{group}/.claude/projects/-workspace-group/{session}.jsonl').read().strip().split('\n')
+for i, line in enumerate(lines):
+  try:
+    d = json.loads(line)
+    if d.get('type') == 'user' and d.get('message'):
+      parent = d.get('parentUuid', 'ROOT')[:8]
+      content = str(d['message'].get('content', ''))[:60]
+      print(f'L{i+1} parent={parent} {content}')
+  except: pass
+"
+```
+
+### Solution
+
+This issue was fixed by passing `resumeSessionAt` with the last assistant message UUID. If you're still experiencing it, ensure you're running the latest version of the agent runner.
+
+## Service management
+
+### Restart the service
+
+```bash
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+```
+
+### View live logs
+
+```bash
+tail -f logs/nanoclaw.log
+```
+
+### Stop the service
+
+<Warning>
+Stopping the service does NOT kill running containers. They will continue running as orphaned processes.
+</Warning>
+
+```bash
+launchctl bootout gui/$(id -u)/com.nanoclaw
+```
+
+### Start the service
+
+```bash
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw.plist
+```
+
+### Rebuild after code changes
+
+```bash
+npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+```
+
+## Getting help
+
+If you're still experiencing issues:
+
+1. **Ask Claude Code directly:** Run `claude` and describe the problem. Claude can read logs, check database state, and diagnose issues.
+
+2. **Run the debug skill:** `claude` → `/debug` for guided troubleshooting.
+
+3. **Check the Discord:** [Join the community](https://discord.gg/VDdww8qS42) for help from other users.
+
+4. **Review recent changes:** If the issue started after a customization, review what changed:
+   ```bash
+   git diff
+   git log --oneline -10
+   ```
+
+## Related pages
+
+- [Security model](/advanced/security-model) - Authorization and isolation
+- [IPC system](/advanced/ipc-system) - Inter-process communication
+- [Container runtime](/advanced/container-runtime) - Container execution details

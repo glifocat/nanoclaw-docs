@@ -1,0 +1,506 @@
+---
+title: Gmail integration
+description: Add Gmail support using the /add-gmail skill
+---
+
+Add Gmail to NanoClaw as a tool (read, send, search, draft) or as a full channel that monitors your inbox and triggers the agent on new emails.
+
+## Overview
+
+The Gmail integration uses [@gongrzhe/server-gmail-autoauth-mcp](https://github.com/gongrzhe/server-gmail-autoauth-mcp) as an MCP server, providing Gmail tools to your agent. It can operate in two modes:
+
+### Tool-only mode
+
+The agent gets Gmail tools but doesn't monitor the inbox:
+
+- `mcp__gmail__send_email` - Send emails
+- `mcp__gmail__read_email` - Read specific emails by ID
+- `mcp__gmail__search_emails` - Search with Gmail query syntax
+- `mcp__gmail__create_draft` - Create draft emails
+- `mcp__gmail__list_labels` - List Gmail labels
+
+### Channel mode
+
+Everything from tool-only mode, plus:
+
+- Polls inbox for new emails (every 60 seconds)
+- Triggers agent on matching emails
+- Notifies via your main channel (e.g., WhatsApp)
+- Filters: Primary inbox only by default (excludes Promotions, Social, etc.)
+
+## Adding Gmail
+
+Use the `/add-gmail` skill:
+
+<Steps>
+  <Step title="Run the skill">
+    ```bash
+    claude
+    /add-gmail
+    ```
+  </Step>
+  
+  <Step title="Choose mode">
+    - **Tool-only** - Agent can use Gmail tools when triggered from other channels
+    - **Channel mode** - Agent monitors inbox and triggers on new emails
+  </Step>
+  
+  <Step title="Apply code changes">
+    The skill applies different changes depending on mode:
+    
+    **Tool-only:**
+    - Mounts `~/.gmail-mcp` in container
+    - Adds Gmail MCP server to agent runner
+    
+    **Channel mode:**
+    - All of the above, plus:
+    - Adds `src/channels/gmail.ts` (GmailChannel implementation)
+    - Adds `src/channels/gmail.test.ts` (unit tests)
+    - Merges Gmail channel into `src/index.ts`
+    - Installs `googleapis` NPM package
+  </Step>
+  
+  <Step title="Set up OAuth">
+    Create GCP OAuth credentials and authorize Gmail access
+  </Step>
+  
+  <Step title="Build container">
+    Rebuild the agent container to include Gmail MCP server
+  </Step>
+  
+  <Step title="Test">
+    Verify Gmail tools work via your main channel
+  </Step>
+</Steps>
+
+## GCP OAuth setup
+
+Gmail integration requires Google Cloud OAuth credentials.
+
+<Steps>
+  <Step title="Create GCP project">
+    1. Open [console.cloud.google.com](https://console.cloud.google.com)
+    2. Create a new project or select existing
+  </Step>
+  
+  <Step title="Enable Gmail API">
+    1. Go to **APIs & Services** → **Library**
+    2. Search "Gmail API"
+    3. Click **Enable**
+  </Step>
+  
+  <Step title="Create OAuth credentials">
+    1. Go to **APIs & Services** → **Credentials**
+    2. Click **+ CREATE CREDENTIALS** → **OAuth client ID**
+    3. If prompted for consent screen:
+       - Choose **External**
+       - Fill in app name and email
+       - Save
+    4. Application type: **Desktop app**
+    5. Name: anything (e.g., "NanoClaw Gmail")
+  </Step>
+  
+  <Step title="Download credentials">
+    1. Click **DOWNLOAD JSON**
+    2. Save as `gcp-oauth.keys.json`
+  </Step>
+  
+  <Step title="Move to config directory">
+    ```bash
+    mkdir -p ~/.gmail-mcp
+    cp /path/to/gcp-oauth.keys.json ~/.gmail-mcp/gcp-oauth.keys.json
+    ```
+  </Step>
+</Steps>
+
+## Authorization
+
+After placing the OAuth credentials file, authorize Gmail access:
+
+```bash
+npx -y @gongrzhe/server-gmail-autoauth-mcp auth
+```
+
+A browser window will open:
+
+1. Sign in to your Google account
+2. If you see "app isn't verified" warning:
+   - Click **Advanced**
+   - Click **Go to [app name] (unsafe)**
+   - This is normal for personal OAuth apps
+3. Grant the requested permissions
+
+Credentials are saved to `~/.gmail-mcp/credentials.json`.
+
+<Note>
+  The MCP server automatically refreshes OAuth tokens. You only need to authorize once unless you revoke access.
+</Note>
+
+## Build and restart
+
+After authorization:
+
+<Steps>
+  <Step title="Clear stale agent runners">
+    ```bash
+    rm -r data/sessions/*/agent-runner-src 2>/dev/null || true
+    ```
+    
+    This ensures new group agents get the updated runner with Gmail support.
+  </Step>
+  
+  <Step title="Rebuild container">
+    ```bash
+    cd container && ./build.sh
+    ```
+  </Step>
+  
+  <Step title="Rebuild and restart">
+    ```bash
+    npm run build
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
+    # or: systemctl --user restart nanoclaw (Linux)
+    ```
+  </Step>
+</Steps>
+
+## Testing Gmail tools
+
+Send a message in your main channel:
+
+```
+@Andy check my recent emails
+```
+
+or
+
+```
+@Andy list my Gmail labels
+```
+
+The agent should use the Gmail MCP tools to respond.
+
+### Check MCP server
+
+Test the MCP server directly:
+
+```bash
+npx -y @gongrzhe/server-gmail-autoauth-mcp
+```
+
+If working, you'll see the MCP server protocol handshake. Press Ctrl+C to exit.
+
+## Channel mode setup
+
+If you chose channel mode, the agent monitors your inbox for new emails.
+
+### Default filter
+
+By default, only emails in the **Primary** inbox trigger the agent:
+
+```typescript
+const query = 'is:unread category:primary';
+```
+
+This excludes:
+
+- Promotions
+- Social
+- Updates
+- Forums
+
+### Custom filters
+
+Edit `src/channels/gmail.ts` to customize the filter:
+
+```typescript
+// Only from specific sender
+const query = 'is:unread from:boss@company.com';
+
+// Only with specific label
+const query = 'is:unread label:important';
+
+// Only matching keywords
+const query = 'is:unread (urgent OR asap)';
+```
+
+See [Gmail search operators](https://support.google.com/mail/answer/7190) for full query syntax.
+
+### Email notifications
+
+When an email triggers the agent, it notifies via your main channel:
+
+```
+[Email from: sender@example.com]
+Subject: Meeting tomorrow
+
+Body preview (first 500 chars)...
+```
+
+The agent sees this notification but **does not reply to the email** unless you explicitly ask it to.
+
+### CLAUDE.md instructions
+
+The skill adds these instructions to `groups/main/CLAUDE.md`:
+
+```markdown
+## Email Notifications
+
+When you receive an email notification (messages starting with `[Email from ...`),
+inform the user about it but do NOT reply to the email unless specifically asked.
+You have Gmail tools available—use them only when the user explicitly asks you to
+reply, forward, or take action on an email.
+```
+
+This prevents the agent from auto-replying to every email.
+
+## JID format
+
+In channel mode, emails use the `gmail:` prefix:
+
+- **Email:** `gmail:<message-id>`
+
+Example: `gmail:18d4a2f8e6c9b1a3`
+
+## Implementation details
+
+### Tool-only mode
+
+The agent runner includes the Gmail MCP server:
+
+```typescript
+const mcpServers = {
+  gmail: {
+    command: 'npx',
+    args: ['-y', '@gongrzhe/server-gmail-autoauth-mcp'],
+  },
+};
+```
+
+The `~/.gmail-mcp` directory is mounted read-write into the container:
+
+```typescript
+const volumes = [
+  `${os.homedir()}/.gmail-mcp:/home/node/.gmail-mcp:rw`,
+];
+```
+
+### Channel mode
+
+The Gmail channel polls for unread emails every 60 seconds:
+
+```typescript
+export class GmailChannel implements Channel {
+  name = 'gmail';
+  
+  async connect(): Promise<void> {
+    this.auth = await this.authorize();
+    this.gmail = google.gmail({ version: 'v1', auth: this.auth });
+    
+    // Poll every 60 seconds
+    setInterval(() => this.checkInbox(), 60000);
+  }
+  
+  private async checkInbox() {
+    const res = await this.gmail.users.messages.list({
+      userId: 'me',
+      q: 'is:unread category:primary',
+    });
+    
+    for (const message of res.data.messages || []) {
+      const msg = await this.gmail.users.messages.get({
+        userId: 'me',
+        id: message.id!,
+      });
+      
+      // Notify via main channel
+      this.opts.onMessage(`gmail:${message.id}`, {
+        id: message.id!,
+        chat_jid: `gmail:${message.id}`,
+        sender: this.getHeader(msg, 'From'),
+        sender_name: this.getHeader(msg, 'From'),
+        content: this.formatEmailNotification(msg),
+        timestamp: new Date().toISOString(),
+        is_from_me: false,
+        is_bot_message: false,
+      });
+      
+      // Mark as read
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: message.id!,
+        requestBody: { removeLabelIds: ['UNREAD'] },
+      });
+    }
+  }
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="OAuth token expired">
+    Re-authorize:
+    
+    ```bash
+    rm ~/.gmail-mcp/credentials.json
+    npx -y @gongrzhe/server-gmail-autoauth-mcp
+    ```
+    
+    Then rebuild and restart.
+  </Accordion>
+  
+  <Accordion title="Container can't access Gmail">
+    Verify the mount in `src/container-runner.ts`:
+    
+    ```typescript
+    `${os.homedir()}/.gmail-mcp:/home/node/.gmail-mcp:rw`
+    ```
+    
+    Check container logs:
+    
+    ```bash
+    cat groups/main/logs/container-*.log | tail -50
+    ```
+  </Accordion>
+  
+  <Accordion title="Emails not being detected (channel mode)">
+    Check the filter query in `src/channels/gmail.ts`. The default is:
+    
+    ```typescript
+    q: 'is:unread category:primary'
+    ```
+    
+    Check logs for Gmail polling errors:
+    
+    ```bash
+    tail -f logs/nanoclaw.log | grep -i gmail
+    ```
+  </Accordion>
+  
+  <Accordion title="Gmail connection not working">
+    Test the MCP server directly:
+    
+    ```bash
+    npx -y @gongrzhe/server-gmail-autoauth-mcp
+    ```
+    
+    Should show MCP protocol handshake. If it errors, check:
+    
+    - `~/.gmail-mcp/gcp-oauth.keys.json` exists
+    - `~/.gmail-mcp/credentials.json` exists (run auth if missing)
+  </Accordion>
+</AccordionGroup>
+
+## Available Gmail tools
+
+The MCP server provides these tools to your agent:
+
+| Tool | Description |
+|------|-------------|
+| `mcp__gmail__send_email` | Send an email (to, subject, body) |
+| `mcp__gmail__read_email` | Read a specific email by message ID |
+| `mcp__gmail__search_emails` | Search emails using Gmail query syntax |
+| `mcp__gmail__create_draft` | Create a draft email |
+| `mcp__gmail__list_labels` | List all Gmail labels |
+
+### Example usage
+
+Ask your agent:
+
+```
+@Andy search my emails for "project alpha" from last week
+```
+
+```
+@Andy send an email to team@company.com with subject "Weekly update" and body "Here's the update..."
+```
+
+```
+@Andy create a draft reply to the email from John about the meeting
+```
+
+## Removing Gmail
+
+### Tool-only mode
+
+<Steps>
+  <Step title="Remove mount">
+    Delete the `~/.gmail-mcp` mount from `src/container-runner.ts`
+  </Step>
+  
+  <Step title="Remove MCP server">
+    Delete `gmail` from MCP servers and `mcp__gmail__*` from allowed tools in `container/agent-runner/src/index.ts`
+  </Step>
+  
+  <Step title="Update state">
+    Remove `gmail` from `.nanoclaw/state.yaml`
+  </Step>
+  
+  <Step title="Clear agent runners">
+    ```bash
+    rm -r data/sessions/*/agent-runner-src 2>/dev/null || true
+    ```
+  </Step>
+  
+  <Step title="Rebuild">
+    ```bash
+    cd container && ./build.sh && cd ..
+    npm run build
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    ```
+  </Step>
+</Steps>
+
+### Channel mode
+
+<Steps>
+  <Step title="Delete channel files">
+    ```bash
+    rm src/channels/gmail.ts
+    rm src/channels/gmail.test.ts
+    ```
+  </Step>
+  
+  <Step title="Revert code changes">
+    - Remove `GmailChannel` import and creation from `src/index.ts`
+    - Remove mount from `src/container-runner.ts`
+    - Remove MCP server from `container/agent-runner/src/index.ts`
+    - Remove Gmail JID tests from `src/routing.test.ts`
+  </Step>
+  
+  <Step title="Uninstall dependency">
+    ```bash
+    npm uninstall googleapis
+    ```
+  </Step>
+  
+  <Step title="Update state">
+    Remove `gmail` from `.nanoclaw/state.yaml`
+  </Step>
+  
+  <Step title="Clear and rebuild">
+    ```bash
+    rm -r data/sessions/*/agent-runner-src 2>/dev/null || true
+    cd container && ./build.sh && cd ..
+    npm run build
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    ```
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Skills system" icon="puzzle-piece" href="/integrations/skills-system">
+    Learn more about how skills work
+  </Card>
+  
+  <Card title="Add Telegram" icon="telegram" href="/integrations/telegram">
+    Add Telegram support to your installation
+  </Card>
+  
+  <Card title="Add Discord" icon="discord" href="/integrations/discord">
+    Add Discord support to your installation
+  </Card>
+</CardGroup>
