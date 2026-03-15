@@ -69,6 +69,8 @@
               "advanced/security-model",
               "advanced/ipc-system",
               "advanced/container-runtime",
+              "advanced/docker-sandboxes",
+              "advanced/remote-control",
               "advanced/troubleshooting",
               "advanced/contributing"
             ]

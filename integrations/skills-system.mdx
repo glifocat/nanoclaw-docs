@@ -1,9 +1,9 @@
 ---
 title: Skills system
-description: How NanoClaw uses skills to add integrations without bloating the codebase
+description: How NanoClaw uses git branches and a plugin marketplace to add integrations without bloating the codebase
 ---
 
-NanoClaw's skills system allows you to add integrations and features by applying deterministic code transformations to your fork. This keeps the base codebase minimal while enabling powerful customization.
+NanoClaw's skills system lets you add integrations and features by merging git branches into your fork. This keeps the base codebase minimal while enabling powerful customization — all using standard git operations.
 
 ## Philosophy: Skills over features
 
@@ -20,184 +20,216 @@ This approach means:
 
 ## How skills work
 
-Skills are located in `.claude/skills/` and consist of:
+Skills are distributed as **git branches** on the upstream repository. Applying a skill is a `git merge`. Updating core is a `git merge`. Everything is standard git.
 
-1. **SKILL.md** - Instructions for Claude Code on how to apply the skill
-2. **Code packages** - New files to add (e.g., `add/src/channels/telegram.ts`)
-3. **Intent files** - Descriptions of how to merge changes into existing files (e.g., `modify/src/index.ts.intent.md`)
-4. **Dependencies** - NPM packages to install
+### Repository structure
 
-When you run a skill like `/add-telegram`, Claude Code:
+The upstream repo (`qwibitai/nanoclaw`) maintains:
+
+| Branch | Description |
+|--------|-------------|
+| `main` | Core NanoClaw — no skill code |
+| `skill/discord` | main + Discord integration |
+| `skill/telegram` | main + Telegram integration |
+| `skill/slack` | main + Slack integration |
+| `skill/gmail` | main + Gmail integration |
+| `skill/voice-transcription` | WhatsApp voice transcription (depends on `skill/whatsapp`) |
+| `skill/image-vision` | Image attachment processing |
+| `skill/ollama-tool` | Ollama MCP server for local models |
+| ... | And more |
+
+Each skill branch contains **all** the code changes for that skill: new files, modified source files, updated `package.json` dependencies, `.env.example` additions — everything.
+
+### Two categories of skills
+
+**Operational skills** (on `main`, always available):
+- `/setup`, `/debug`, `/update-nanoclaw`, `/customize`, `/update-skills`
+- Instruction-only `SKILL.md` files — no code changes, just workflows
+- Live in `.claude/skills/` on `main`
+
+**Feature skills** (in marketplace, installed on demand):
+- `/add-discord`, `/add-telegram`, `/add-slack`, `/add-gmail`, etc.
+- Each has a `SKILL.md` with setup instructions and a corresponding `skill/*` branch with code
+- Discovered through Claude Code's plugin marketplace
+
+## Applying a skill
+
+### Via Claude Code (recommended)
+
+Run the skill command in Claude Code. For example, `/add-discord` triggers Claude to:
 
 <Steps>
-  <Step title="Checks if already applied">
-    Reads `.nanoclaw/state.yaml` to see if the skill is already installed
+  <Step title="Merge the skill branch">
+    ```bash
+    git fetch upstream skill/discord
+    git merge upstream/skill/discord
+    ```
   </Step>
-  
-  <Step title="Asks configuration questions">
-    Collects information like "Should Telegram replace WhatsApp or run alongside it?"
+
+  <Step title="Interactive setup">
+    Walks you through creating the bot, getting tokens, configuring environment variables, and registering chats.
   </Step>
-  
-  <Step title="Applies code changes">
-    Runs the skills engine via `npx tsx scripts/apply-skill.ts .claude/skills/add-telegram`
-  </Step>
-  
-  <Step title="Validates changes">
-    Runs `npm test` and `npm run build` to ensure everything still works
-  </Step>
-  
-  <Step title="Guides setup">
-    Walks you through platform-specific configuration (creating bot tokens, registering chats, etc.)
-  </Step>
-  
-  <Step title="Records application">
-    Updates `.nanoclaw/state.yaml` to track that the skill was applied
+
+  <Step title="Verify">
+    Runs build and tests to confirm everything works.
   </Step>
 </Steps>
 
-## The skills engine
-
-The skills engine performs deterministic code transformations:
+### Manually
 
 ```bash
-npx tsx scripts/apply-skill.ts .claude/skills/add-telegram
+git fetch upstream skill/discord
+git merge upstream/skill/discord
+# Follow the setup instructions for your channel
 ```
 
-This command:
+### Applying multiple skills
 
-- Adds new files from the `add/` directory
-- Three-way merges changes into existing files using intent descriptions
-- Installs NPM dependencies
-- Updates configuration files
-- Records the application in state
+```bash
+git merge upstream/skill/discord
+git merge upstream/skill/telegram
+```
 
-The engine ensures that skills can be applied idempotently and that conflicts are detected and reported.
+Git handles the composition. If both skills modify the same lines, it's a real conflict — Claude resolves it automatically.
+
+## Skill discovery
+
+Skills are available through Claude Code's **plugin marketplace**. NanoClaw's `.claude/settings.json` registers the official marketplace:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "nanoclaw-skills": {
+      "source": {
+        "source": "github",
+        "repo": "qwibitai/nanoclaw-skills"
+      }
+    }
+  }
+}
+```
+
+During `/setup`, the marketplace plugin is installed automatically:
+
+```bash
+claude plugin install nanoclaw-skills@nanoclaw-skills --scope project
+```
+
+Skills are **hot-loaded** after installation — no restart needed. This means `/setup` can install the marketplace plugin, then immediately run any feature skill, all in one session.
+
+## Skill dependencies
+
+Some skills depend on others. For example, `skill/telegram-swarm` requires `skill/telegram`. Dependent skill branches are branched from their parent, not from `main`.
+
+This means `skill/telegram-swarm` includes all of Telegram's changes plus its own additions. When you merge `skill/telegram-swarm`, you get both — no need to merge Telegram separately.
+
+Dependencies are implicit in git history — no separate dependency file is needed.
 
 ## Available integration skills
 
 ### Messaging platforms
 
-- **`/add-telegram`** - Adds Telegram support via the grammy library
-- **`/add-discord`** - Adds Discord support via discord.js
-- **`/add-slack`** - Adds Slack support via @slack/bolt with Socket Mode
+| Skill | Command | Library |
+|-------|---------|---------|
+| Discord | `/add-discord` | discord.js |
+| Telegram | `/add-telegram` | grammy |
+| Slack | `/add-slack` | @slack/bolt (Socket Mode) |
+| WhatsApp | Built-in on `main` | whatsapp-web.js |
 
 ### Services
 
-- **`/add-gmail`** - Adds Gmail integration (as a tool or full channel)
+- **`/add-gmail`** — Gmail integration (as a tool or full channel)
 
 ### System
 
-- **`/convert-to-apple-container`** - Switches from Docker to Apple Container on macOS
-- **`/add-voice-transcription`** - Adds voice message transcription for WhatsApp
-- **`/add-telegram-swarm`** - Adds Agent Swarm support for Telegram teams
+- **`/convert-to-apple-container`** — Switch from Docker to Apple Container on macOS
+- **`/add-voice-transcription`** — Voice message transcription (WhatsApp)
+- **`/add-telegram-swarm`** — Agent Swarm support for Telegram teams
+- **`/add-ollama-tool`** — Ollama MCP server for local models
 
-## Managing skills
+## Updating
 
-### Check applied skills
-
-View which skills have been applied to your installation:
+### Updating core
 
 ```bash
-cat .nanoclaw/state.yaml
+git fetch upstream main
+git merge upstream/main
+git push origin main
 ```
 
-Example output:
+Skill changes are already in your git history, so `git merge upstream/main` just works. No skill replay step needed.
 
-```yaml
-applied_skills:
-  - telegram
-  - discord
-  - gmail
-```
+### Checking for skill updates
 
-### Removing a skill
-
-Skills document their removal process in the SKILL.md file. For example, to remove Telegram:
-
-<Steps>
-  <Step title="Delete added files">
-    ```bash
-    rm src/channels/telegram.ts
-    rm src/channels/telegram.test.ts
-    ```
-  </Step>
-  
-  <Step title="Revert code changes">
-    Remove TelegramChannel imports and creation from `src/index.ts`, revert config changes, etc.
-  </Step>
-  
-  <Step title="Remove dependencies">
-    ```bash
-    npm uninstall grammy
-    ```
-  </Step>
-  
-  <Step title="Update state">
-    Remove the skill from `.nanoclaw/state.yaml`
-  </Step>
-  
-  <Step title="Rebuild">
-    ```bash
-    npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-    ```
-  </Step>
-</Steps>
+Run `/update-skills` or let `/update-nanoclaw` check after a core update. For each previously-merged skill branch that has new commits, Claude offers to merge the updates.
 
 <Note>
-  Each skill's SKILL.md includes detailed removal instructions. Check the specific skill documentation for exact steps.
+  This requires no state files — it uses git history to determine which skills were previously merged and whether they have new commits.
 </Note>
 
-## Creating your own skills
+## Removing a skill
 
-Skills are just directories in `.claude/skills/` with a specific structure:
+```bash
+# Find the merge commit
+git log --merges --oneline | grep discord
 
-```
-.claude/skills/add-example/
-├── SKILL.md                    # Instructions for Claude Code
-├── add/                        # New files to create
-│   └── src/channels/example.ts
-└── modify/                     # Intent files for existing files
-    └── src/index.ts.intent.md
+# Revert it
+git revert -m 1 <merge-commit>
 ```
 
-### Skill structure
+This creates a new commit that undoes the skill's changes. If you've modified the skill's code since merging, the revert might conflict — Claude resolves it.
 
-**SKILL.md** contains phases:
+<Warning>
+  If you later want to re-apply a reverted skill, you must revert the revert first (git treats reverted changes as "already applied and undone"). Claude handles this automatically.
+</Warning>
 
-- **Phase 1: Pre-flight** - Checks and questions
-- **Phase 2: Apply Code Changes** - Run the skills engine
-- **Phase 3: Setup** - Platform-specific configuration
-- **Phase 4: Registration** - Register chats/channels
-- **Phase 5: Verify** - Test the integration
+## Community marketplaces
 
-**Intent files** describe what changed and why:
+Anyone can maintain their own fork with skill branches and their own marketplace repo. This enables a community-driven skill ecosystem.
 
-```markdown
-# Intent: Add ExampleChannel to multi-channel array
+A community contributor:
 
-## What Changed
+1. Maintains a fork with `skill/*` branches
+2. Creates a marketplace repo with a `.claude-plugin/marketplace.json`
+3. Opens a PR to add their marketplace to NanoClaw's `.claude/settings.json`
 
-Added ExampleChannel creation to the channels array in index.ts.
+Users can also add marketplaces manually:
 
-## Invariants
-
-- WhatsAppChannel is always created (unless EXAMPLE_ONLY=true)
-- Channel creation order doesn't matter
-- Each channel implements the Channel interface
+```bash
+/plugin marketplace add alice/nanoclaw-skills
 ```
 
-### Contributing skills
+## CI: Keeping skill branches current
 
-The NanoClaw philosophy: **Don't add features, add skills.**
+A GitHub Action runs on every push to `main`:
 
-If you want to contribute Slack support, don't create a PR that adds Slack to the base codebase. Instead:
+1. Lists all `skill/*` branches
+2. Merges `main` into each skill branch (merge-forward, not rebase)
+3. Runs build and tests on the merged result
+4. Pushes the updated skill branch if tests pass
+5. Opens a GitHub issue for any skill that fails
 
-1. Create `.claude/skills/add-slack/SKILL.md`
-2. Include all code packages and intent files
-3. Submit a PR with just the skill directory
+<Note>
+  Merge-forward (not rebase) preserves history for users who already merged the skill. No force-push needed.
+</Note>
 
-Users can then run `/add-slack` to get clean Slack integration code in their fork.
+## Contributing a skill
+
+### As a contributor
+
+1. Fork `qwibitai/nanoclaw`
+2. Branch from `main` and make your code changes
+3. Open a regular PR
+
+That's it. The maintainers create a `skill/<name>` branch from your PR and add the `SKILL.md` to the marketplace.
+
+### As a maintainer
+
+When a skill PR is approved:
+
+1. Create a `skill/<name>` branch from the PR's commits
+2. Add the skill's `SKILL.md` to the marketplace repo (`qwibitai/nanoclaw-skills`)
+3. The contributor is added to `CONTRIBUTORS.md`
 
 ## Skills vs configuration files
 
@@ -205,20 +237,7 @@ NanoClaw deliberately avoids configuration files. From the README:
 
 > **Customization = code changes.** No configuration sprawl. Want different behavior? Modify the code. The codebase is small enough that it's safe to make changes.
 
-Skills extend this philosophy: instead of a config file with `integrations: [telegram, discord, slack]`, you apply skills that modify the source code directly. You end up with code that does exactly what you need, nothing more.
-
-## Skill state tracking
-
-The `.nanoclaw/state.yaml` file tracks applied skills:
-
-```yaml
-applied_skills:
-  - telegram
-  - discord
-last_migration: 2026-02-28T10:30:00Z
-```
-
-This prevents double-application and helps with updates. When you run `/update`, the update process respects your applied skills and attempts to preserve your customizations.
+Skills extend this philosophy: instead of a config file with `integrations: [telegram, discord, slack]`, you merge skill branches that modify the source code directly. You end up with code that does exactly what you need, nothing more.
 
 ## Best practices
 
@@ -227,32 +246,32 @@ This prevents double-application and helps with updates. When you run `/update`,
 </Tip>
 
 <Tip>
-  **Keep your fork up to date.** Run `/update` periodically to pull upstream changes and run migrations.
+  **Keep your fork up to date.** Run `/update-nanoclaw` periodically to pull upstream changes, then optionally run `/update-skills` to pick up skill improvements.
 </Tip>
 
 <Tip>
-  **Read the SKILL.md before applying.** Each skill documents prerequisites, configuration options, and troubleshooting steps.
+  **Commit before applying a skill.** Since skills are git merges, having a clean working tree makes it easy to revert if needed.
 </Tip>
 
 <Warning>
-  Skills modify your source code. Commit your changes before applying a new skill so you can easily revert if needed.
+  Skills modify your source code via git merge. Always ensure your working tree is clean before applying a new skill.
 </Warning>
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Add Telegram" icon="telegram" href="/integrations/telegram">
+  <Card title="Add Telegram" icon="paper-plane" href="/integrations/telegram">
     Add Telegram support to your installation
   </Card>
-  
-  <Card title="Add Discord" icon="discord" href="/integrations/discord">
+
+  <Card title="Add Discord" icon="comments" href="/integrations/discord">
     Add Discord support to your installation
   </Card>
-  
-  <Card title="Add Slack" icon="slack" href="/integrations/slack">
+
+  <Card title="Add Slack" icon="hashtag" href="/integrations/slack">
     Add Slack support to your installation
   </Card>
-  
+
   <Card title="Add Gmail" icon="envelope" href="/integrations/gmail">
     Add Gmail integration to your installation
   </Card>
