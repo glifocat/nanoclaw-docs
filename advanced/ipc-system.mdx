@@ -16,7 +16,7 @@ The IPC system is built on three core components:
 ```
 data/ipc/
 ├── main/                    # Main group IPC namespace
-│   ├── messages/            # Outbound messages to WhatsApp
+│   ├── messages/            # Outbound messages to channels
 │   ├── tasks/               # Task management operations
 │   └── input/               # Inbound messages from host
 ├── family-chat/             # Non-main group namespace
@@ -79,6 +79,10 @@ export function startIpcWatcher(deps: IpcDeps): void {
       "text": "Hello from the agent!"
     }
     ```
+
+    <Note>
+    The `chatJid` format varies by channel: `1234567890@s.whatsapp.net` for WhatsApp, `tg:12345` for Telegram, `discord:12345` for Discord, etc.
+    </Note>
   </Step>
   
   <Step title="Host polls IPC directory">
@@ -119,7 +123,7 @@ export function startIpcWatcher(deps: IpcDeps): void {
 
 ### Send message
 
-Allows agents to send messages to WhatsApp chats.
+Allows agents to send messages to chats.
 
 **File location:** `data/ipc/{group}/messages/message-{timestamp}.json`
 
@@ -215,7 +219,7 @@ Deletes a task permanently.
 
 ### Refresh groups
 
-Forces a refresh of WhatsApp group metadata. **Main group only.**
+Forces a refresh of group metadata. **Main group only.**
 
 **Format:**
 ```json
@@ -246,7 +250,7 @@ case 'refresh_groups':
 
 ### Register group
 
-Registers a new WhatsApp group for agent access. **Main group only.**
+Registers a new group for agent access. **Main group only.**
 
 **Format:**
 ```json
