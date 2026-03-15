@@ -69,65 +69,78 @@ A [skill](https://code.claude.com/docs/en/skills) is a markdown file in `.claude
 
 ### Skill structure
 
-Skills should be self-contained directories under `.claude/skills/{skill-name}/`:
+Skills are either **operational** (instruction-only SKILL.md files on `main`) or **feature** (code changes on a `skill/*` branch with a SKILL.md in the marketplace repo).
+
+**Operational skills** live in `.claude/skills/` on `main`:
 
 ```
 .claude/skills/
-└── add-telegram/
-    ├── SKILL.md          # Main instructions
-    ├── package.json      # Optional: dependencies to install
-    └── templates/        # Optional: code templates
-        └── telegram.ts.template
+└── debug/
+    └── SKILL.md          # Instructions for Claude Code
+```
+
+**Feature skills** are `skill/*` branches containing all code changes:
+
+```
+skill/telegram branch (diff from main):
+├── src/channels/telegram.ts        # New files
+├── src/index.ts                    # Modified files
+├── package.json                    # Updated dependencies
+└── .env.example                    # New env vars
 ```
 
 ### Writing a skill
 
 <Steps>
-  <Step title="Provide clear instructions">
-    The skill should contain **instructions** Claude follows to add the feature, not pre-built code.
-    
-    Good example from `/add-telegram`:
+  <Step title="For operational skills: write SKILL.md">
+    Create a `SKILL.md` in `.claude/skills/{name}/` on `main`. The skill should contain **instructions** Claude follows to execute a workflow.
+
     ```markdown
-    ## Instructions
-    
-    1. Install the Telegram bot library:
-       ```bash
-       npm install node-telegram-bot-api
-       ```
-    
-    2. Create `src/channels/telegram.ts` with the following structure:
-       - Export a `connectToTelegram()` function
-       - Handle incoming messages
-       - Export a `sendTelegramMessage()` function
-    
-    3. Modify `src/index.ts` to import and call `connectToTelegram()`
+    ---
+    name: debug
+    description: Troubleshoot NanoClaw issues
+    ---
+
+    # Debug
+
+    ## 1. Check service status
+    ...
     ```
   </Step>
-  
+
+  <Step title="For feature skills: make code changes on a branch">
+    Branch from `main` and make your code changes directly:
+
+    ```bash
+    git checkout -b skill/my-integration main
+    # Add new files, modify source, update package.json
+    git commit -m "Add my-integration support"
+    ```
+
+    The branch should contain all the code needed for the integration — new files, modified source files, updated dependencies, `.env.example` additions.
+  </Step>
+
   <Step title="Include context and rationale">
-    Explain **why** certain decisions are made, so Claude understands the reasoning.
-    
+    For feature skills, write a SKILL.md for the marketplace that explains setup steps and design decisions.
+
     ```markdown
     ## Design decisions
-    
+
     - Use polling instead of webhooks for simplicity
     - Store Telegram credentials in the `.env` file
     - Reuse the existing message queue system
     ```
   </Step>
-  
-  <Step title="Provide templates if needed">
-    If the skill requires boilerplate code, include it in a `templates/` directory.
-    
-    ```markdown
-    ## Implementation
-    
-    Create `src/channels/telegram.ts` using the template in `templates/telegram.ts.template`.
-    ```
-  </Step>
-  
+
   <Step title="Test on a fresh clone">
-    Before submitting, test your skill on a fresh NanoClaw installation to ensure it works without manual intervention.
+    Before submitting, test your skill on a fresh NanoClaw fork:
+
+    ```bash
+    git clone https://github.com/qwibitai/NanoClaw.git test-nanoclaw
+    cd test-nanoclaw
+    git merge origin/skill/my-integration
+    npm install && npm test && npm run build
+    ```
   </Step>
 </Steps>
 
@@ -144,13 +157,12 @@ Skills let users selectively add features to their fork without inheriting code 
     git clone nanoclaw
     claude /setup
     # Clean codebase, no Telegram code
-    
-    # User B wants Telegram only
+
+    # User B wants Telegram
     git clone nanoclaw
     claude /setup
     claude /add-telegram
-    claude /remove-whatsapp
-    # Clean codebase, no WhatsApp code
+    # Merges skill/telegram branch — clean code with Telegram support
     ```
   </Tab>
   
@@ -168,10 +180,10 @@ Skills let users selectively add features to their fork without inheriting code 
 
 ### Skill guidelines
 
-<Accordion title="Skills should not modify source files">
-  A PR that contributes a skill should not touch `src/`, `container/`, or other core files. The skill's instructions tell Claude how to make those changes.
-  
-  **Exception:** If the skill requires changes to the skill system itself (e.g., new skill loading behavior), those can be source changes.
+<Accordion title="Feature skills contain source changes">
+  Feature skills are `skill/*` branches that contain all code changes for the integration — including modifications to `src/`, `container/`, `package.json`, etc. This is by design: the skill branch is the complete diff from `main`.
+
+  Operational skills (SKILL.md files on `main`) should not modify source files — they are instruction-only.
 </Accordion>
 
 <Accordion title="Skills should be reversible">
@@ -231,36 +243,43 @@ Skills we'd like to see contributed:
     git checkout -b my-contribution
     ```
   </Step>
-  
+
   <Step title="Make your changes">
-    For skills:
+    For operational skills:
     ```bash
     mkdir -p .claude/skills/my-skill
-    # Write SKILL.md and any templates
+    # Write SKILL.md
     ```
-    
-    For source changes:
+
+    For feature skills:
+    ```bash
+    # Branch from main and make code changes
+    # Add new files, modify source, update package.json, etc.
+    npm run build
+    npm test
+    ```
+
+    For source changes (bug fixes, simplifications):
     ```bash
     # Edit files in src/, container/, etc.
     npm run build
     npm test
     ```
   </Step>
-  
+
   <Step title="Test thoroughly">
-    For skills:
+    For feature skills:
     ```bash
-    # Test on a fresh clone
+    # Test merging into a fresh clone
     cd /tmp
     git clone https://github.com/qwibitai/NanoClaw.git test-nanoclaw
     cd test-nanoclaw
-    # Copy your skill
-    cp -r /path/to/your/skill .claude/skills/
-    # Run the skill
-    claude
-    # Then run: /my-skill
+    git remote add fork /path/to/your/fork
+    git fetch fork my-contribution
+    git merge fork/my-contribution
+    npm install && npm test && npm run build
     ```
-    
+
     For source changes:
     ```bash
     npm test
@@ -268,18 +287,20 @@ Skills we'd like to see contributed:
     # Manual testing
     ```
   </Step>
-  
+
   <Step title="Create a pull request">
     ```bash
     git add .
     git commit -m "Add /my-skill for X functionality"
     git push origin my-contribution
     ```
-    
+
     Then open a PR on GitHub with:
     - Clear description of what the contribution does
     - Why it should be accepted (follows contribution guidelines)
     - Testing notes
+
+    For feature skills, maintainers will create a `skill/<name>` branch from your PR and add the SKILL.md to the marketplace.
   </Step>
 </Steps>
 

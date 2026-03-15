@@ -402,7 +402,7 @@ if (runtime === 'orb') {
 
 Skills synced to each container:
 
-1. **Copy from shared**: `container/skills/{skill-name}/` → `data/sessions/{group}/.claude/skills/{skill-name}/`
+1. **Copy from project**: Operational skills from `container/skills/` are synced to `data/sessions/{group}/.claude/skills/` for each container session
 2. **Available to agent**: Claude Agent SDK loads from `.claude/skills/`
 3. **Per-group customization**: Each group gets a copy, can modify independently
 

@@ -433,16 +433,12 @@ Ask your agent:
     Delete `gmail` from MCP servers and `mcp__gmail__*` from allowed tools in `container/agent-runner/src/index.ts`
   </Step>
   
-  <Step title="Update state">
-    Remove `gmail` from `.nanoclaw/state.yaml`
-  </Step>
-  
   <Step title="Clear agent runners">
     ```bash
     rm -r data/sessions/*/agent-runner-src 2>/dev/null || true
     ```
   </Step>
-  
+
   <Step title="Rebuild">
     ```bash
     cd container && ./build.sh && cd ..
@@ -461,24 +457,20 @@ Ask your agent:
     rm src/channels/gmail.test.ts
     ```
   </Step>
-  
+
   <Step title="Revert code changes">
     - Remove `GmailChannel` import and creation from `src/index.ts`
     - Remove mount from `src/container-runner.ts`
     - Remove MCP server from `container/agent-runner/src/index.ts`
     - Remove Gmail JID tests from `src/routing.test.ts`
   </Step>
-  
+
   <Step title="Uninstall dependency">
     ```bash
     npm uninstall googleapis
     ```
   </Step>
-  
-  <Step title="Update state">
-    Remove `gmail` from `.nanoclaw/state.yaml`
-  </Step>
-  
+
   <Step title="Clear and rebuild">
     ```bash
     rm -r data/sessions/*/agent-runner-src 2>/dev/null || true

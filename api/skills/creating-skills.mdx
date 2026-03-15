@@ -1,6 +1,6 @@
 ---
 title: Creating skills
-description: Learn how to create custom NanoClaw skills that transform the codebase to add new capabilities
+description: Learn how to create custom NanoClaw skills — operational skills on main or feature skills as git branches
 ---
 
 Skills are NanoClaw's approach to extending functionality. Instead of adding features to the core codebase, you create skills that teach Claude Code how to transform a user's fork to add exactly what they need.
@@ -15,68 +15,30 @@ From the [NanoClaw README](https://github.com/qwibitai/NanoClaw):
 
 ## How skills work
 
-Skills are stored in `.claude/skills/` and consist of:
+There are two types of skills:
 
-1. **SKILL.md** - Instructions for Claude Code on how to execute the skill
-2. **Code packages** - Files to add or modify (for deterministic skills)
-3. **Intent files** - Describe what changed and why (for merge operations)
-4. **Tests** - Validation that the skill was applied correctly
-
-## Skill types
-
-There are two main types of skills:
-
-### Interactive skills
-
-Skills that guide Claude Code through a multi-step process with user interaction.
-
-**Example:** `/setup` - Runs installation, asks questions, handles errors
-
-**Characteristics:**
-- Heavy use of `AskUserQuestion` for user input
-- Multi-phase execution (preflight, setup, validation)
-- Error recovery and troubleshooting
-- No deterministic code changes
-
-### Deterministic skills
-
-Skills that use the skills engine to make reproducible code changes, then guide setup.
-
-**Example:** `/add-telegram` - Applies code package, then configures Telegram
-
-**Characteristics:**
-- Phase 1: Check if already applied
-- Phase 2: Apply code changes via skills engine
-- Phase 3: Interactive setup and configuration
-- Phase 4: Validation and testing
-- Tracked in `.nanoclaw/state.yaml`
+1. **Operational skills** — `SKILL.md` files in `.claude/skills/` on `main`. These are instruction-only: they guide Claude Code through workflows like setup, debugging, and updates. No code changes.
+2. **Feature skills** — git branches (`skill/*`) containing all code changes for an integration, plus a `SKILL.md` in the marketplace repo. Applying a feature skill is a `git merge`.
 
 ## Creating your first skill
 
 <Steps>
 
-<Step title="Choose a skill name">
+<Step title="Choose a skill type">
 
-Skill names should be descriptive and use kebab-case:
+**Operational skill** — if your skill is a workflow or guide (setup, debug, customize):
+- Lives in `.claude/skills/{name}/SKILL.md` on `main`
+- No code changes, just instructions
 
-- `add-telegram` - Adds Telegram channel support
-- `add-slack` - Adds Slack channel support
-- `customize` - Interactive customization guide
-- `debug` - Troubleshooting helper
-
-</Step>
-
-<Step title="Create the skill directory">
-
-```bash
-mkdir -p .claude/skills/your-skill-name
-```
+**Feature skill** — if your skill adds code (new channel, integration, tool):
+- Code changes live on a `skill/*` branch
+- SKILL.md with setup instructions goes in the marketplace repo
 
 </Step>
 
-<Step title="Write SKILL.md">
+<Step title="For operational skills: write SKILL.md">
 
-Create `.claude/skills/your-skill-name/SKILL.md` with frontmatter:
+Create `.claude/skills/your-skill-name/SKILL.md`:
 
 ```markdown
 ---
@@ -92,6 +54,20 @@ Detailed instructions for Claude Code...
 **Frontmatter fields:**
 - `name` (required) - The skill command name
 - `description` (required) - When to invoke this skill
+
+</Step>
+
+<Step title="For feature skills: create a branch with code changes">
+
+Branch from `main` and make your code changes directly:
+
+```bash
+git checkout -b skill/my-integration main
+# Add new files, modify source, update package.json, etc.
+git commit -m "Add my-integration support"
+```
+
+Your branch should contain all the code changes needed for the integration.
 
 </Step>
 
@@ -131,30 +107,9 @@ Use `AskUserQuestion` for user input.
 
 </Step>
 
-<Step title="Add code packages (optional)">
-
-For deterministic skills, create a package structure:
-
-```
-.claude/skills/your-skill-name/
-├── SKILL.md
-├── manifest.yaml
-├── add/
-│   └── src/
-│       └── new-file.ts
-└── modify/
-    └── src/
-        ├── existing-file.ts
-        └── existing-file.ts.intent.md
-```
-
-See [Skill structure](/api/skills/skill-structure) for details.
-
-</Step>
-
 <Step title="Test the skill">
 
-Run the skill command in Claude Code:
+For operational skills, run the skill command in Claude Code:
 
 ```bash
 cd NanoClaw
@@ -162,6 +117,15 @@ claude
 ```
 
 Then run `/your-skill-name` and verify it works as expected.
+
+For feature skills, test merging the branch into a fresh fork:
+
+```bash
+git fetch origin skill/my-integration
+git merge origin/skill/my-integration
+npm test
+npm run build
+```
 
 </Step>
 
@@ -187,13 +151,13 @@ Always use `AskUserQuestion` instead of asking in prose:
 <CodeGroup>
 
 ```markdown Good
-AskUserQuestion: Should Telegram replace WhatsApp or run alongside it?
-- **Replace WhatsApp** - Telegram will be the only channel
+AskUserQuestion: Should this channel replace existing channels or run alongside them?
+- **Replace existing channels** - New channel will be the only one
 - **Alongside** - Both channels active
 ```
 
 ```markdown Bad
-Do you want Telegram to replace WhatsApp or run alongside it?
+Do you want this to replace existing channels or run alongside them?
 ```
 
 </CodeGroup>
@@ -254,17 +218,21 @@ tail -f logs/nanoclaw.log
 
 ## Next steps
 
-- Learn about [Skill structure](/api/skills/skill-structure) for deterministic skills
+- Learn about [Skill structure](/api/skills/skill-structure) for both skill types
 - See [Examples](/api/skills/examples) of real skills from the repository
-- Contribute your skill via pull request
+- Read the [Skills system overview](/integrations/skills-system) for the full architecture
 
 ## Contributing skills
 
 When you're ready to contribute:
 
-1. Test your skill on a fresh NanoClaw installation
-2. Verify it works on both macOS and Linux (if applicable)
-3. Include comprehensive troubleshooting steps
-4. Submit a PR to the [NanoClaw repository](https://github.com/qwibitai/NanoClaw)
+1. Fork `qwibitai/nanoclaw`
+2. For operational skills: add your `SKILL.md` to `.claude/skills/` on `main` and open a PR
+3. For feature skills: branch from `main`, make your code changes, and open a PR
+4. Test your skill on a fresh NanoClaw installation
+5. Verify it works on both macOS and Linux (if applicable)
+6. Include comprehensive troubleshooting steps
+
+The maintainers will create a `skill/<name>` branch from your PR and add the `SKILL.md` to the marketplace.
 
 **Remember:** Don't add features. Add skills. Users run `/your-skill` on their fork and get clean code that does exactly what they need.
