@@ -224,11 +224,17 @@ NanoClaw uses `better-sqlite3`, which requires native compilation.
 Once all prerequisites are installed:
 
 <Steps>
-  <Step title="Clone the repository">
+  <Step title="Fork and clone the repository">
+    Fork [qwibitai/nanoclaw](https://github.com/qwibitai/nanoclaw) on GitHub, then clone your fork:
+
     ```bash
-    git clone https://github.com/qwibitai/NanoClaw.git
-    cd NanoClaw
+    git clone https://github.com/<you>/nanoclaw.git
+    cd nanoclaw
     ```
+
+    <Info>
+    Forking gives you a remote to push your customizations to. A plain `git clone` works for trying things out — you can migrate to a fork later.
+    </Info>
   </Step>
 
   <Step title="Launch Claude Code">
@@ -243,7 +249,7 @@ Once all prerequisites are installed:
     /setup
     ```
 
-    Claude will handle the rest automatically.
+    Claude will handle dependencies, container setup, marketplace plugin installation, and channel configuration automatically.
   </Step>
 </Steps>
 
@@ -256,18 +262,19 @@ NanoClaw uses these core dependencies (from `package.json`):
 ```json
 {
   "dependencies": {
-    "@whiskeysockets/baileys": "^7.0.0-rc.9",  // WhatsApp Web API
-    "better-sqlite3": "^11.8.1",                // SQLite database
-    "cron-parser": "^5.5.0",                    // Task scheduling
-    "pino": "^9.6.0",                           // Logging
-    "pino-pretty": "^13.0.0",                   // Log formatting
-    "qrcode": "^1.5.4",                         // QR code generation
-    "qrcode-terminal": "^0.12.0",               // Terminal QR codes
-    "yaml": "^2.8.2",                           // YAML parsing
-    "zod": "^4.3.6"                             // Schema validation
+    "better-sqlite3": "^11.8.1",   // SQLite database
+    "cron-parser": "^5.5.0",       // Task scheduling
+    "pino": "^9.6.0",              // Logging
+    "pino-pretty": "^13.0.0",      // Log formatting
+    "yaml": "^2.8.2",              // YAML parsing
+    "zod": "^4.3.6"                // Schema validation
   }
 }
 ```
+
+<Note>
+Channel-specific dependencies (e.g., `@whiskeysockets/baileys` for WhatsApp, `grammy` for Telegram) are added when you install a channel skill. Only core dependencies ship on `main`.
+</Note>
 
 <Info>
 All dependencies are installed automatically by `/setup` via `npm install`.
@@ -303,7 +310,7 @@ NanoClaw/
 │   └── main/              # Main channel
 │       ├── CLAUDE.md      # Group memory
 │       └── logs/          # Container logs
-├── store/                  # WhatsApp session
+├── store/                  # Channel sessions
 │   └── auth/              # Authentication data
 ├── data/                   # SQLite database
 │   ├── nanoclaw.db        # Messages, groups, tasks

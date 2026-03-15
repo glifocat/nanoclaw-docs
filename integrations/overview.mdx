@@ -5,33 +5,29 @@ description: Connect NanoClaw to your favorite messaging platforms and services
 
 NanoClaw supports multiple communication channels and integrations, allowing you to interact with your AI assistant wherever you work.
 
-## Built-in integration
+## Available channels
 
-NanoClaw comes with WhatsApp support out of the box:
-
-<Card title="WhatsApp" icon="whatsapp" href="/integrations/whatsapp">
-  Built-in messaging channel using the Baileys library. No additional setup required after initial authentication.
-</Card>
-
-## Available integration skills
-
-Add additional integrations using the skills system. Each skill transforms your NanoClaw installation to support a new platform:
+All channels are installed via the [skills system](/integrations/skills-system). During `/setup`, you choose which platforms to connect — pick one or many:
 
 <CardGroup cols={2}>
-  <Card title="Telegram" icon="telegram" href="/integrations/telegram">
-    Add Telegram as a channel using `/add-telegram`. Can replace WhatsApp or run alongside it.
+  <Card title="WhatsApp" icon="message" href="/integrations/whatsapp">
+    Add WhatsApp with `/add-whatsapp`. Uses the Baileys library for WhatsApp Web API.
   </Card>
-  
-  <Card title="Discord" icon="discord" href="/integrations/discord">
-    Add Discord support with `/add-discord`. Perfect for team collaboration and community management.
+
+  <Card title="Telegram" icon="paper-plane" href="/integrations/telegram">
+    Add Telegram with `/add-telegram`. Uses the grammy framework.
   </Card>
-  
-  <Card title="Slack" icon="slack" href="/integrations/slack">
-    Connect to Slack workspaces using `/add-slack`. Uses Socket Mode—no public URL needed.
+
+  <Card title="Discord" icon="comments" href="/integrations/discord">
+    Add Discord with `/add-discord`. Perfect for team collaboration and community management.
   </Card>
-  
+
+  <Card title="Slack" icon="hashtag" href="/integrations/slack">
+    Connect to Slack workspaces with `/add-slack`. Uses Socket Mode — no public URL needed.
+  </Card>
+
   <Card title="Gmail" icon="envelope" href="/integrations/gmail">
-    Add Gmail integration with `/add-gmail`. Use as a tool or full channel for email monitoring.
+    Add Gmail with `/add-gmail`. Use as a tool or full channel for email monitoring.
   </Card>
 </CardGroup>
 
@@ -61,6 +57,7 @@ All channel integrations support:
 To add an integration, use the corresponding skill command in Claude Code:
 
 ```bash
+/add-whatsapp    # Add WhatsApp
 /add-telegram    # Add Telegram
 /add-discord     # Add Discord
 /add-slack       # Add Slack
@@ -69,7 +66,7 @@ To add an integration, use the corresponding skill command in Claude Code:
 
 Each skill will:
 
-1. Apply code changes using the skills engine
+1. Merge the skill's git branch into your fork
 2. Guide you through platform-specific setup
 3. Help you configure authentication
 4. Register your first chat/channel
@@ -79,14 +76,9 @@ Each skill will:
   Skills can be combined. For example, you can run WhatsApp, Telegram, and Discord simultaneously, each with its own registered chats.
 </Tip>
 
-## Choosing your primary channel
+## Choosing your channels
 
-You can either:
-
-- **Keep WhatsApp** and add channels alongside it (default)
-- **Replace WhatsApp** entirely with a different channel
-
-When adding a skill, you'll be asked which mode you prefer. You can set `TELEGRAM_ONLY=true`, `DISCORD_ONLY=true`, or `SLACK_ONLY=true` to disable WhatsApp.
+There is no default channel — you choose what you need during `/setup`. You can run a single platform or combine several simultaneously. All channels are peers; none is privileged over the others.
 
 ## Next steps
 
@@ -95,7 +87,7 @@ When adding a skill, you'll be asked which mode you prefer. You can set `TELEGRA
     Learn how the skills system works and how to manage installed skills
   </Card>
   
-  <Card title="WhatsApp setup" icon="whatsapp" href="/integrations/whatsapp">
-    Set up the built-in WhatsApp integration
+  <Card title="WhatsApp" icon="message" href="/integrations/whatsapp">
+    Set up WhatsApp integration
   </Card>
 </CardGroup>
