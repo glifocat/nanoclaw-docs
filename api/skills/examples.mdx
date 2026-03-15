@@ -3,11 +3,11 @@ title: Examples
 description: Real skill examples from the NanoClaw repository showing different patterns and techniques
 ---
 
-Learn from actual skills in the NanoClaw repository. These examples show different patterns for interactive and deterministic skills.
+Learn from actual skills in the NanoClaw repository. These examples show different patterns for operational and feature skills.
 
 ## Interactive skill: setup
 
-The `/setup` skill guides users through initial NanoClaw installation. It's a pure interactive skill with no code packages.
+The `/setup` skill guides users through initial NanoClaw installation. It's an operational skill — a `SKILL.md` on `main` with no code changes.
 
 ### Key characteristics
 
@@ -22,7 +22,7 @@ The `/setup` skill guides users through initial NanoClaw installation. It's a pu
 ```markdown
 ---
 name: setup
-description: Run initial NanoClaw setup. Use when user wants to install dependencies, authenticate WhatsApp, register their main channel, or start the background services.
+description: Run initial NanoClaw setup. Use when user wants to install dependencies, authenticate messaging channels, register their main channel, or start the background services.
 ---
 
 # NanoClaw Setup
@@ -94,53 +94,29 @@ Comprehensive troubleshooting for each failure mode:
 - Wait a moment and retry the test
 ```
 
-## Deterministic skill: add-telegram
+## Feature skill: add-telegram
 
-The `/add-telegram` skill adds Telegram channel support using the skills engine for code changes.
+The `/add-telegram` skill adds Telegram channel support by merging the `skill/telegram` branch.
 
-### Package structure
+### What the skill branch contains
+
+The `skill/telegram` branch contains all code changes needed for Telegram support:
 
 ```
-.claude/skills/add-telegram/
-├── SKILL.md
-├── manifest.yaml
-├── add/
-│   └── src/channels/
-│       ├── telegram.ts        # Complete implementation
-│       └── telegram.test.ts   # 46 unit tests
-├── modify/
-│   └── src/
-│       ├── index.ts           # Multi-channel support
-│       ├── index.ts.intent.md
-│       ├── config.ts          # Telegram config
-│       └── config.ts.intent.md
-└── tests/
-    └── telegram.test.ts       # Integration tests
+skill/telegram branch (diff from main):
+├── src/channels/telegram.ts        # New: TelegramChannel implementation
+├── src/channels/telegram.test.ts   # New: 46 unit tests
+├── src/index.ts                    # Modified: multi-channel support
+├── src/config.ts                   # Modified: Telegram config vars
+├── src/routing.test.ts             # Modified: Telegram JID tests
+├── package.json                    # Modified: grammy dependency
+└── .env.example                    # Modified: TELEGRAM_BOT_TOKEN
 ```
 
-### manifest.yaml
+You can inspect the full diff before applying:
 
-```yaml
-skill: telegram
-version: 1.0.0
-description: "Telegram Bot API integration via Grammy"
-core_version: 0.1.0
-adds:
-  - src/channels/telegram.ts
-  - src/channels/telegram.test.ts
-modifies:
-  - src/index.ts
-  - src/config.ts
-  - src/routing.test.ts
-structured:
-  npm_dependencies:
-    grammy: "^1.39.3"
-  env_additions:
-    - TELEGRAM_BOT_TOKEN
-    - TELEGRAM_ONLY
-conflicts: []
-depends: []
-test: "npx vitest run src/channels/telegram.test.ts"
+```bash
+git diff main...upstream/skill/telegram
 ```
 
 ### SKILL.md phases
@@ -154,48 +130,38 @@ test: "npx vitest run src/channels/telegram.test.ts"
 
 ### Check if already applied
 
-Read `.nanoclaw/state.yaml`. If `telegram` is in `applied_skills`, 
-skip to Phase 3 (Setup).
+Check git history for a previous merge of skill/telegram.
 
 ### Ask the user
 
-AskUserQuestion: Should Telegram replace WhatsApp or run alongside it?
-- **Replace WhatsApp** - sets TELEGRAM_ONLY=true
+AskUserQuestion: Should Telegram replace existing channels or run alongside them?
+- **Replace existing channels** - sets TELEGRAM_ONLY=true
 - **Alongside** - both channels active
 
-AskUserQuestion: Do you have a Telegram bot token, or do you need to 
+AskUserQuestion: Do you have a Telegram bot token, or do you need to
 create one?
 ```
 
 </Step>
 
-<Step title="Phase 2: Apply code changes">
-
-The skill applies deterministic code changes:
-
-Initialize skills system (if needed):
+<Step title="Phase 2: Merge the skill branch">
 
 ```bash
-npx tsx scripts/apply-skill.ts --init
+git fetch upstream skill/telegram
+git merge upstream/skill/telegram
 ```
 
-Apply the skill:
+This adds:
+- `src/channels/telegram.ts` (TelegramChannel class)
+- `src/channels/telegram.test.ts` (46 unit tests)
+- Multi-channel support in `src/index.ts`
+- Telegram config in `src/config.ts`
+- The `grammy` npm dependency
+
+Validate:
 
 ```bash
-npx tsx scripts/apply-skill.ts .claude/skills/add-telegram
-```
-
-This deterministically:
-- Adds `src/channels/telegram.ts` (TelegramChannel class)
-- Adds `src/channels/telegram.test.ts` (46 unit tests)
-- Three-way merges Telegram support into `src/index.ts`
-- Three-way merges Telegram config into `src/config.ts`
-- Installs the `grammy` npm dependency
-- Records application in `.nanoclaw/state.yaml`
-
-Validate code changes:
-
-```bash
+npm install
 npm test
 npm run build
 ```
@@ -267,50 +233,6 @@ tail -f logs/nanoclaw.log
 </Step>
 
 </Steps>
-
-### Intent file example
-
-From `modify/src/index.ts.intent.md`:
-
-```markdown
-# Intent: src/index.ts modifications
-
-## What changed
-Refactored from single WhatsApp channel to multi-channel architecture 
-using the `Channel` interface.
-
-## Key sections
-
-### Imports (top of file)
-- Added: `TelegramChannel` from `./channels/telegram.js`
-- Added: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ONLY` from `./config.js`
-- Added: `findChannel` from `./router.js`
-- Added: `Channel` type from `./types.js`
-
-### Module-level state
-- Added: `const channels: Channel[] = []` — array of all active channels
-- Kept: `let whatsapp: WhatsAppChannel` — still needed for 
-  `syncGroupMetadata` reference
-
-### processGroupMessages()
-- Added: `findChannel(channels, chatJid)` lookup at the start
-- Changed: `whatsapp.setTyping()` → `channel.setTyping?.()` 
-  (optional chaining)
-- Changed: `whatsapp.sendMessage()` → `channel.sendMessage()` in 
-  output callback
-
-## Invariants
-- All existing message processing logic (triggers, cursors, idle timers) 
-  is preserved
-- The `runAgent` function is completely unchanged
-- State management (loadState/saveState) is unchanged
-- Recovery logic is unchanged
-
-## Must-keep
-- The `escapeXml` and `formatMessages` re-exports
-- The `_setRegisteredGroups` test helper
-- All error handling and cursor rollback logic
-```
 
 ## Interactive skill: customize
 
@@ -399,22 +321,13 @@ Implementation:
 
 </CodeGroup>
 
-## Deterministic skill: add-slack
+## Feature skill: add-slack
 
 The `/add-slack` skill shows a complete channel integration with detailed setup documentation.
 
 ### Supplementary documentation
 
-The skill includes a separate `SLACK_SETUP.md` file:
-
-```
-.claude/skills/add-slack/
-├── SKILL.md
-├── SLACK_SETUP.md        # Step-by-step setup guide
-├── manifest.yaml
-├── add/
-└── modify/
-```
+The skill's SKILL.md in the marketplace includes a reference to a setup guide:
 
 From `SKILL.md`:
 
@@ -584,8 +497,7 @@ All skills follow these principles from the NanoClaw philosophy:
 | Pattern | Used in | Purpose |
 |---------|---------|----------|
 | Status block parsing | `/setup` | Parse structured command output |
-| Three-way merge | `/add-telegram`, `/add-slack` | Apply code changes preserving customizations |
-| Intent files | All deterministic skills | Document merge strategy |
+| Git branch merge | `/add-telegram`, `/add-slack` | Apply code changes via `git merge` |
 | AskUserQuestion | All skills | Get user input consistently |
 | Multi-phase structure | Most skills | Organize complex workflows |
 | Platform detection | `/setup` | Handle macOS/Linux differences |

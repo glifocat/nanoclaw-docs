@@ -385,9 +385,8 @@ Claude will:
 
 If your customization would benefit others, contribute it as a skill:
 
-1. Create `.claude/skills/{skill-name}/SKILL.md`
-2. Document the transformation steps
-3. Submit a PR with just the skill file
+- **Operational skills** (workflows, guides): Create `.claude/skills/{name}/SKILL.md` and submit a PR to `main`
+- **Feature skills** (code changes): Branch from `main`, make your code changes, and submit a PR. Maintainers will create a `skill/<name>` branch and add the SKILL.md to the marketplace.
 
 **Don't submit PRs that add features to the core codebase.** Only bug fixes, security fixes, and clear improvements are accepted.
 

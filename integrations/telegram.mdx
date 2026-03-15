@@ -3,7 +3,7 @@ title: Telegram integration
 description: Add Telegram support using the /add-telegram skill
 ---
 
-Add Telegram as a messaging channel for NanoClaw. Telegram can run alongside WhatsApp or replace it entirely.
+Add Telegram as a messaging channel for NanoClaw. Telegram can run alongside existing channels or replace them entirely.
 
 ## Overview
 
@@ -15,7 +15,7 @@ The Telegram integration uses the [grammy](https://grammy.dev/) library to conne
 - **Bot commands** - Built-in `/chatid` command for registration
 - **Typing indicators** - Shows when the assistant is working
 - **Concurrent chats** - Handle multiple conversations simultaneously
-- **Flexible deployment** - Run alongside WhatsApp or as the only channel
+- **Flexible deployment** - Run alongside existing channels or as the only channel
 
 ## Adding Telegram
 
@@ -30,17 +30,17 @@ Use the `/add-telegram` skill to add Telegram support:
   </Step>
   
   <Step title="Choose deployment mode">
-    - **Replace WhatsApp** - Telegram becomes the only channel
-    - **Alongside** - Both WhatsApp and Telegram run simultaneously
+    - **Replace existing channels** - Telegram becomes the only channel
+    - **Alongside** - Add Telegram alongside existing channels
   </Step>
   
   <Step title="Apply code changes">
-    The skill runs `npx tsx scripts/apply-skill.ts .claude/skills/add-telegram` which:
-    - Adds `src/channels/telegram.ts` (TelegramChannel implementation)
-    - Adds `src/channels/telegram.test.ts` (46 unit tests)
-    - Merges multi-channel support into `src/index.ts`
-    - Adds Telegram config to `src/config.ts`
-    - Installs the `grammy` NPM package
+    The skill merges the `skill/telegram` branch which adds:
+    - `src/channels/telegram.ts` (TelegramChannel implementation)
+    - `src/channels/telegram.test.ts` (46 unit tests)
+    - Multi-channel support in `src/index.ts`
+    - Telegram config in `src/config.ts`
+    - The `grammy` NPM package
   </Step>
   
   <Step title="Create Telegram bot">
@@ -89,7 +89,7 @@ Add to `.env`:
 TELEGRAM_BOT_TOKEN=<your-bot-token>
 ```
 
-If you chose to replace WhatsApp:
+If you chose to replace existing channels:
 
 ```bash
 TELEGRAM_ONLY=true
@@ -338,42 +338,44 @@ This allows you to see which agent is speaking and have interactive team session
 
 ## Removing Telegram
 
-To remove the Telegram integration:
+Since Telegram was added via a git merge, you remove it by reverting the merge commit:
 
 <Steps>
-  <Step title="Delete channel files">
+  <Step title="Find the merge commit">
     ```bash
-    rm src/channels/telegram.ts
-    rm src/channels/telegram.test.ts
+    git log --merges --oneline | grep telegram
     ```
+
+    Look for a commit like `abc1234 Merge remote-tracking branch 'upstream/skill/telegram'`.
   </Step>
-  
-  <Step title="Revert code changes">
-    - Remove `TelegramChannel` import and creation from `src/index.ts`
-    - Remove `channels` array, revert to using `whatsapp` directly
-    - Remove Telegram config from `src/config.ts`
+
+  <Step title="Revert the merge">
+    ```bash
+    git revert -m 1 <merge-commit>
+    ```
+
+    This creates a new commit that undoes all of Telegram's code changes.
   </Step>
-  
+
   <Step title="Remove registrations">
     ```bash
     sqlite3 store/messages.db "DELETE FROM registered_groups WHERE jid LIKE 'tg:%'"
     ```
   </Step>
-  
-  <Step title="Uninstall dependency">
-    ```bash
-    npm uninstall grammy
-    ```
-  </Step>
-  
+
   <Step title="Rebuild and restart">
     ```bash
+    npm install
     npm run build
     launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
     # or: systemctl --user restart nanoclaw (Linux)
     ```
   </Step>
 </Steps>
+
+<Warning>
+  If you later want to re-apply Telegram after reverting, you must revert the revert first — git treats reverted changes as "already applied and undone". Claude handles this automatically when you run `/add-telegram` again.
+</Warning>
 
 ## Next steps
 

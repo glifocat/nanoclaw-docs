@@ -31,17 +31,17 @@ Use the `/add-slack` skill to add Slack support:
   </Step>
   
   <Step title="Choose deployment mode">
-    - **Replace WhatsApp** - Slack becomes the only channel
-    - **Alongside** - Both WhatsApp and Slack run simultaneously
+    - **Replace existing channels** - Slack becomes the only channel
+    - **Alongside** - Add Slack alongside existing channels
   </Step>
   
   <Step title="Apply code changes">
-    The skill runs the skills engine which:
-    - Adds `src/channels/slack.ts` (SlackChannel implementation)
-    - Adds `src/channels/slack.test.ts` (46 unit tests)
-    - Merges multi-channel support into `src/index.ts`
-    - Adds Slack config to `src/config.ts`
-    - Installs the `@slack/bolt` NPM package
+    The skill merges the `skill/slack` branch which adds:
+    - `src/channels/slack.ts` (SlackChannel implementation)
+    - `src/channels/slack.test.ts` (46 unit tests)
+    - Multi-channel support in `src/index.ts`
+    - Slack config in `src/config.ts`
+    - The `@slack/bolt` NPM package
   </Step>
   
   <Step title="Create Slack app">
@@ -122,7 +122,7 @@ SLACK_BOT_TOKEN=xoxb-your-bot-token-here
 SLACK_APP_TOKEN=xapp-your-app-token-here
 ```
 
-If you chose to replace WhatsApp:
+If you chose to replace existing channels:
 
 ```bash
 SLACK_ONLY=true
@@ -364,41 +364,44 @@ export class SlackChannel implements Channel {
 
 ## Removing Slack
 
-To remove the Slack integration:
+Since Slack was added via a git merge, you remove it by reverting the merge commit:
 
 <Steps>
-  <Step title="Delete channel files">
+  <Step title="Find the merge commit">
     ```bash
-    rm src/channels/slack.ts
-    rm src/channels/slack.test.ts
+    git log --merges --oneline | grep slack
     ```
+
+    Look for a commit like `abc1234 Merge remote-tracking branch 'upstream/skill/slack'`.
   </Step>
-  
-  <Step title="Revert code changes">
-    - Remove `SlackChannel` import and creation from `src/index.ts`
-    - Remove Slack config from `src/config.ts`
-    - Remove Slack JID tests from `src/routing.test.ts`
+
+  <Step title="Revert the merge">
+    ```bash
+    git revert -m 1 <merge-commit>
+    ```
+
+    This creates a new commit that undoes all of Slack's code changes.
   </Step>
-  
+
   <Step title="Remove registrations">
     ```bash
     sqlite3 store/messages.db "DELETE FROM registered_groups WHERE jid LIKE 'slack:%'"
     ```
   </Step>
-  
-  <Step title="Uninstall dependency">
-    ```bash
-    npm uninstall @slack/bolt
-    ```
-  </Step>
-  
+
   <Step title="Rebuild and restart">
     ```bash
+    npm install
     npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
+    # or: systemctl --user restart nanoclaw (Linux)
     ```
   </Step>
 </Steps>
+
+<Warning>
+  If you later want to re-apply Slack after reverting, you must revert the revert first — git treats reverted changes as "already applied and undone". Claude handles this automatically when you run `/add-slack` again.
+</Warning>
 
 ## Next steps
 

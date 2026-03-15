@@ -31,17 +31,17 @@ Use the `/add-discord` skill to add Discord support:
   </Step>
   
   <Step title="Choose deployment mode">
-    - **Replace WhatsApp** - Discord becomes the only channel
-    - **Alongside** - Both WhatsApp and Discord run simultaneously
+    - **Replace existing channels** - Discord becomes the only channel
+    - **Alongside** - Add Discord alongside existing channels
   </Step>
   
   <Step title="Apply code changes">
-    The skill runs the skills engine which:
-    - Adds `src/channels/discord.ts` (DiscordChannel implementation)
-    - Adds `src/channels/discord.test.ts` (unit tests)
-    - Merges multi-channel support into `src/index.ts`
-    - Adds Discord config to `src/config.ts`
-    - Installs the `discord.js` NPM package
+    The skill merges the `skill/discord` branch which adds:
+    - `src/channels/discord.ts` (DiscordChannel implementation)
+    - `src/channels/discord.test.ts` (unit tests)
+    - Multi-channel support in `src/index.ts`
+    - Discord config in `src/config.ts`
+    - The `discord.js` NPM package
   </Step>
   
   <Step title="Create Discord bot">
@@ -111,7 +111,7 @@ Add to `.env`:
 DISCORD_BOT_TOKEN=<your-bot-token>
 ```
 
-If you chose to replace WhatsApp:
+If you chose to replace existing channels:
 
 ```bash
 DISCORD_ONLY=true
@@ -362,41 +362,44 @@ export class DiscordChannel implements Channel {
 
 ## Removing Discord
 
-To remove the Discord integration:
+Since Discord was added via a git merge, you remove it by reverting the merge commit:
 
 <Steps>
-  <Step title="Delete channel files">
+  <Step title="Find the merge commit">
     ```bash
-    rm src/channels/discord.ts
-    rm src/channels/discord.test.ts
+    git log --merges --oneline | grep discord
     ```
+
+    Look for a commit like `abc1234 Merge remote-tracking branch 'upstream/skill/discord'`.
   </Step>
-  
-  <Step title="Revert code changes">
-    - Remove `DiscordChannel` import and creation from `src/index.ts`
-    - Remove Discord config from `src/config.ts`
-    - Remove Discord JID tests from `src/routing.test.ts`
+
+  <Step title="Revert the merge">
+    ```bash
+    git revert -m 1 <merge-commit>
+    ```
+
+    This creates a new commit that undoes all of Discord's code changes.
   </Step>
-  
+
   <Step title="Remove registrations">
     ```bash
     sqlite3 store/messages.db "DELETE FROM registered_groups WHERE jid LIKE 'dc:%'"
     ```
   </Step>
-  
-  <Step title="Uninstall dependency">
-    ```bash
-    npm uninstall discord.js
-    ```
-  </Step>
-  
+
   <Step title="Rebuild and restart">
     ```bash
+    npm install
     npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
+    # or: systemctl --user restart nanoclaw (Linux)
     ```
   </Step>
 </Steps>
+
+<Warning>
+  If you later want to re-apply Discord after reverting, you must revert the revert first — git treats reverted changes as "already applied and undone". Claude handles this automatically when you run `/add-discord` again.
+</Warning>
 
 ## Next steps
 
