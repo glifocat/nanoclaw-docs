@@ -48,11 +48,17 @@ Preview at `http://localhost:3000`.
 
 ## AI-assisted writing
 
+This repo includes the [Mintlify skill](https://mintlify.com/docs) pre-installed for AI coding assistants. It provides component references, configuration guides, and navigation helpers so your AI tool can write and edit documentation pages correctly.
+
+**Supported tools:** Claude Code, Cursor, Cline, Codex, Gemini CLI, GitHub Copilot, and others.
+
+In Claude Code, invoke it with `/mintlify` before creating or editing pages. Other tools pick it up automatically.
+
+To update the skill to the latest version:
+
 ```bash
 npx skills add https://mintlify.com/docs
 ```
-
-Installs Mintlify's documentation skill for Claude Code, Cursor, Windsurf, and other AI tools.
 
 ## Publishing
 
