@@ -11,24 +11,36 @@ NanoClaw consists of a single Node.js process that orchestrates everything:
 
 ```mermaid
 graph TB
-    WA[WhatsApp Messages] --> Router[Message Router]
+    WA[WhatsApp] --> CF[Channel Factory]
+    TG[Telegram] --> CF
+    DC[Discord] --> CF
+    SL[Slack] --> CF
+    GM[Gmail] --> CF
+    CF --> Router[Message Router]
     Router --> Queue[Group Queue]
     Queue --> Container[Isolated Container]
     Container --> Agent[Claude Agent SDK]
     Agent --> Response[Response]
-    Response --> WA
-    
+    Response --> CF
+
     Scheduler[Task Scheduler] --> Queue
     IPC[IPC Watcher] --> Queue
-    
+
     DB[(SQLite Database)] --> Router
     DB --> Scheduler
-    
+
     style Container fill:#e1f5ff
     style Agent fill:#d4edff
+    style CF fill:#f0f4ff
 ```
 
 ## Core components
+
+### Channel factory
+
+NanoClaw uses a factory registry pattern for messaging channels. Each channel (WhatsApp, Telegram, Discord, Slack, Gmail) self-registers at startup. Channels with missing credentials emit a warning and are skipped — no configuration file is needed to enable or disable channels.
+
+All channels implement a common `Channel` interface for message handling and sending, allowing the rest of the system to be channel-agnostic.
 
 ### Message router
 
@@ -148,15 +160,15 @@ The database is the source of truth for message history. If you delete it, agent
 
 ```mermaid
 sequenceDiagram
-    participant WA as WhatsApp
-    participant CH as Channel
+    participant PL as Platform (WA/TG/DC/...)
+    participant CH as Channel Adapter
     participant DB as Database
     participant RT as Router
     participant GQ as GroupQueue
     participant CR as ContainerRunner
     participant AG as Agent
-    
-    WA->>CH: New message
+
+    PL->>CH: New message
     CH->>DB: storeMessage()
     RT->>DB: getNewMessages()
     DB-->>RT: messages
@@ -169,7 +181,7 @@ sequenceDiagram
     AG-->>CR: Stream output
     CR->>GQ: onOutput callback
     GQ->>CH: sendMessage()
-    CH->>WA: Send response
+    CH->>PL: Send response
 ```
 
 ### Follow-up message flow (piped to active container)
