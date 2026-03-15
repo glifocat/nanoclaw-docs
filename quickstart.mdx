@@ -14,13 +14,17 @@ This guide assumes you have Node.js 20+ and Claude Code installed. See [Installa
 ## Setup process
 
 <Steps>
-  <Step title="Clone the repository">
-    Clone NanoClaw to your local machine:
+  <Step title="Fork and clone the repository">
+    Fork [qwibitai/nanoclaw](https://github.com/qwibitai/nanoclaw) on GitHub, then clone your fork:
 
     ```bash
-    git clone https://github.com/qwibitai/NanoClaw.git
-    cd NanoClaw
+    git clone https://github.com/<you>/nanoclaw.git
+    cd nanoclaw
     ```
+
+    <Info>
+    Forking gives you a remote to push your customizations to. If you just want to try things out, `git clone https://github.com/qwibitai/nanoclaw.git` works too — you can migrate to a fork later.
+    </Info>
   </Step>
 
   <Step title="Launch Claude Code">
@@ -45,8 +49,9 @@ This guide assumes you have Node.js 20+ and Claude Code installed. See [Installa
     - Setting up your container runtime (Apple Container or Docker)
     - Building the agent container image
     - Authenticating with Claude
-    - Connecting to WhatsApp
-    - Configuring your main channel
+    - Installing the skills marketplace plugin
+    - Asking which messaging channels you want
+    - Running the setup skill for each selected channel
     - Starting the background service
 
     <Info>
@@ -54,26 +59,20 @@ This guide assumes you have Node.js 20+ and Claude Code installed. See [Installa
     </Info>
   </Step>
 
-  <Step title="Authenticate with WhatsApp">
-    During setup, you'll be prompted to authenticate with WhatsApp. Choose one of three methods:
+  <Step title="Choose your messaging channels">
+    Claude will ask which platforms you want to connect:
 
-    **QR code in browser** (recommended for desktop)
-    - A browser window opens with a QR code
-    - Scan it with WhatsApp on your phone
-    - Go to **Settings → Linked Devices → Link a Device**
+    - **WhatsApp** — via whatsapp-web.js (QR code or pairing code auth)
+    - **Telegram** — via grammy (BotFather token)
+    - **Discord** — via discord.js (bot application token)
+    - **Slack** — via @slack/bolt (Socket Mode app)
+    - **Gmail** — via Google API (OAuth credentials)
 
-    **Pairing code** (recommended for headless servers)
-    - Enter your phone number
-    - Receive a pairing code
-    - Enter it in WhatsApp on your phone
+    Pick one or more. Claude runs the corresponding `/add-*` skill for each selection, walking you through platform-specific authentication and configuration.
 
-    **QR code in terminal**
-    - QR code prints in your terminal
-    - Scan it with WhatsApp
-
-    <Warning>
-    WhatsApp only allows linking to one device at a time in self-chat mode. If you're already using WhatsApp Web, consider using a dedicated number or group-based setup.
-    </Warning>
+    <Note>
+    You can always add more channels later with `/customize` or by running individual skills like `/add-telegram`.
+    </Note>
   </Step>
 
   <Step title="Configure your main channel">
@@ -81,15 +80,15 @@ This guide assumes you have Node.js 20+ and Claude Code installed. See [Installa
 
     **Trigger word**: The word that activates NanoClaw (default: `@Andy`)
 
-    **Channel type**: Choose one:
-    - **Self-chat** (recommended): Message yourself on WhatsApp
-    - **Solo group**: Create a group with just you
-    - **DM with bot**: Use a dedicated phone number
+    **Main channel**: The chat where you have full admin control over all groups. Depending on your platform this might be:
+    - A self-chat or DM with the bot
+    - A private group or channel
+    - A dedicated conversation
 
     **Mount allowlist** (optional): Allow agents to access external directories
 
     <Info>
-    Self-chat is the most private option. Your main channel has full admin control over all groups.
+    Your main channel has admin privileges. Other groups get standard access.
     </Info>
   </Step>
 
@@ -98,7 +97,7 @@ This guide assumes you have Node.js 20+ and Claude Code installed. See [Installa
 
     ✓ Service running
     ✓ Credentials configured
-    ✓ WhatsApp authenticated
+    ✓ Messaging channel(s) authenticated
     ✓ Main channel registered
     ✓ Container runtime ready
 
@@ -106,7 +105,7 @@ This guide assumes you have Node.js 20+ and Claude Code installed. See [Installa
   </Step>
 
   <Step title="Send your first message">
-    Open WhatsApp and message your main channel:
+    Open your connected messaging platform and send a message to your main channel:
 
     ```
     @Andy hello!
@@ -115,7 +114,7 @@ This guide assumes you have Node.js 20+ and Claude Code installed. See [Installa
     NanoClaw should respond. You're all set!
 
     <Tip>
-    In self-chat mode, the trigger word is optional. Just send any message and NanoClaw will respond.
+    In self-chat or DM mode, the trigger word is optional. Just send any message and NanoClaw will respond.
     </Tip>
   </Step>
 </Steps>
@@ -147,22 +146,28 @@ Here's what Claude Code does when you run `/setup`:
   - These credentials allow agents to authenticate with Claude Code
 </Accordion>
 
-<Accordion title="4. WhatsApp authentication">
-  - Chooses the best authentication method for your environment
-  - Handles QR code display or pairing code generation
-  - Saves authentication session to `store/auth/`
-  - Verifies connection is stable
+<Accordion title="4. Upstream remote and marketplace">
+  - Checks if the `upstream` remote exists; adds it if not: `git remote add upstream https://github.com/qwibitai/nanoclaw.git`
+  - Verifies `origin` points to your fork (not `qwibitai`)
+  - Installs the skills marketplace plugin so feature skills are available
 </Accordion>
 
-<Accordion title="5. Channel configuration">
-  - Syncs WhatsApp groups from your account
+<Accordion title="5. Channel installation">
+  - Asks which messaging channels you want (WhatsApp, Telegram, Discord, Slack, Gmail)
+  - Runs the corresponding `/add-*` skill for each selected channel
+  - Each skill merges its `skill/*` branch and walks you through platform-specific auth
+  - After a channel is set up, offers relevant add-ons (e.g., Agent Swarm, voice transcription)
+</Accordion>
+
+<Accordion title="6. Channel configuration">
+  - Syncs groups/chats from your connected platforms
   - Registers your main channel in the database
   - Creates the main group folder at `groups/main/`
   - Sets up the `CLAUDE.md` memory file
   - Creates mount allowlist at `~/.config/nanoclaw/mount-allowlist.json`
 </Accordion>
 
-<Accordion title="6. Service installation">
+<Accordion title="7. Service installation">
   - **macOS**: Creates launchd service at `~/Library/LaunchAgents/com.nanoclaw.plist`
   - **Linux**: Creates systemd service (user or system level)
   - **WSL without systemd**: Creates `start-nanoclaw.sh` wrapper script
@@ -172,7 +177,7 @@ Here's what Claude Code does when you run `/setup`:
 
 ## Usage examples
 
-Once setup is complete, you can start using NanoClaw:
+Once setup is complete, you can start using NanoClaw from any connected channel:
 
 <CodeGroup>
 ```text Basic conversation
@@ -245,12 +250,13 @@ That's the AI-native approach: no monitoring dashboard, just ask Claude what's h
 To pull upstream changes and merge with your customizations:
 
 ```
-/update
+/update-nanoclaw
 ```
 
 Claude Code will:
-- Pull the latest changes from GitHub
+- Fetch the latest changes from upstream
 - Merge with your local modifications
 - Run any database migrations
 - Rebuild the container if needed
 - Restart the service
+- Optionally check for skill updates

@@ -3,13 +3,13 @@ title: Group isolation
 description: How NanoClaw isolates groups and manages per-group contexts
 ---
 
-Groups in NanoClaw represent isolated contexts, typically corresponding to WhatsApp group chats or individual conversations. Each group has its own filesystem, memory, and session.
+Groups in NanoClaw represent isolated contexts, typically corresponding to group chats or individual conversations on any connected messaging platform. Each group has its own filesystem, memory, and session.
 
 ## What is a group?
 
 A group is:
 
-- A WhatsApp group chat or individual conversation (identified by `jid`)
+- A group chat or individual conversation on any channel (identified by `jid`)
 - A dedicated folder under `groups/{name}/`
 - An isolated Claude conversation session
 - A set of permissions and mount configurations
@@ -25,7 +25,7 @@ Groups are the fundamental isolation boundary in NanoClaw. Each group operates i
 
 The main group is special:
 
-- Typically your WhatsApp self-chat
+- Typically a self-chat or DM with the bot on your primary platform
 - Has full administrative privileges
 - Can manage other groups
 - Can schedule tasks for any group
@@ -42,7 +42,7 @@ const isMain = group.folder === 'main';
 
 All other groups:
 
-- One per WhatsApp group chat or conversation
+- One per group chat or conversation across any connected channel
 - Limited to their own context and operations
 - Cannot access other groups' data
 - Cannot send messages to other chats
@@ -310,13 +310,13 @@ Additional mounts bypass group isolation. Only mount directories that are safe f
 
 ### Active operation
 
-1. Messages arrive via WhatsApp
+1. Messages arrive via a connected channel (WhatsApp, Telegram, Discord, etc.)
 2. Stored in database with chat JID
 3. Router checks for trigger (if required)
 4. GroupQueue spawns container or pipes to active one
 5. Container mounts group folder and session
 6. Agent processes messages and generates response
-7. Response sent back via WhatsApp channel
+7. Response routed back via the originating channel
 
 ### Deactivation
 

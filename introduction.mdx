@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: A lightweight, secure AI assistant that runs agents in isolated containers and connects to WhatsApp
+description: A lightweight, secure AI assistant that runs agents in isolated containers and connects to your messaging platforms
 ---
 
 # Welcome to NanoClaw
@@ -28,9 +28,6 @@ NanoClaw provides the core functionality of complex AI assistants, but in a code
   <Card title="Architecture" icon="diagram-project" href="/concepts/architecture">
     Understand how NanoClaw works under the hood
   </Card>
-  <Card title="Architecture" icon="diagram-project" href="/architecture">
-    Understand how NanoClaw works under the hood
-  </Card>
 </CardGroup>
 
 ## Key features
@@ -40,17 +37,19 @@ NanoClaw provides the core functionality of complex AI assistants, but in a code
 Agents run in Linux containers (Apple Container on macOS, or Docker) with true filesystem isolation. They can only see what's explicitly mounted.
 
 ```bash
-WhatsApp (baileys) → SQLite → Polling loop → Container (Claude Agent SDK) → Response
+Channel (WA/TG/DC/Slack/Gmail) → SQLite → Polling loop → Container (Claude Agent SDK) → Response
 ```
 
 ### Multi-messenger support
 
-Message NanoClaw from your phone via:
-- **WhatsApp** (default)
+Message NanoClaw from any connected platform:
+- **WhatsApp** (via `/add-whatsapp`)
 - **Telegram** (via `/add-telegram`)
 - **Discord** (via `/add-discord`)
 - **Slack** (via `/add-slack`)
 - **Gmail** (via `/add-gmail`)
+
+All channels are installed via [skills](/integrations/skills-system) — pick the ones you need during `/setup`.
 
 ### Isolated group context
 
@@ -122,7 +121,7 @@ NanoClaw is built with simplicity in mind:
 | File | Purpose |
 |------|----------|
 | `src/index.ts` | Orchestrator: state, message loop, agent invocation |
-| `src/channels/whatsapp.ts` | WhatsApp connection, auth, send/receive |
+| `src/channels/*.ts` | Channel adapters (WhatsApp, Telegram, etc.) |
 | `src/ipc.ts` | IPC watcher and task processing |
 | `src/router.ts` | Message formatting and outbound routing |
 | `src/group-queue.ts` | Per-group queue with global concurrency limit |
