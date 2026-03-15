@@ -12,10 +12,10 @@ NanoClaw's security model is built on **true isolation** at the OS level rather 
 | Main group | Trusted | Private self-chat, admin control |
 | Non-main groups | Untrusted | Other users may be malicious |
 | Container agents | Sandboxed | Isolated execution environment |
-| WhatsApp messages | User input | Potential prompt injection |
+| Incoming messages | User input | Potential prompt injection |
 
 <Info>
-The main group is typically your WhatsApp self-chat. It has full administrative privileges and can manage all other groups.
+The main group is typically your private self-chat. It has full administrative privileges and can manage all other groups.
 </Info>
 
 ## Security boundaries
@@ -34,31 +34,31 @@ This is the primary security boundary. Rather than relying on application-level 
 ```mermaid
 graph TB
     subgraph "Untrusted Zone"
-        WA[WhatsApp Messages]
+        MSG[Incoming Messages]
     end
-    
+
     subgraph "Host Process (Trusted)"
         RT[Message Router]
         IPC[IPC Authorization]
         MV[Mount Validation]
         CF[Credential Filtering]
     end
-    
+
     subgraph "Container (Isolated/Sandboxed)"
         AG[Agent Execution]
         BA[Bash Commands]
         FO[File Operations]
     end
-    
-    WA -->|Trigger check, escaping| RT
+
+    MSG -->|Trigger check, escaping| RT
     RT -->|Explicit mounts only| MV
     MV --> AG
     AG -.->|IPC operations| IPC
     IPC -.->|Validated| RT
     AG --> BA
     AG --> FO
-    
-    style WA fill:#ffe6e6
+
+    style MSG fill:#ffe6e6
     style AG fill:#e1f5ff
     style BA fill:#e1f5ff
     style FO fill:#e1f5ff
@@ -179,7 +179,7 @@ IPC operations from non-main groups are silently rejected if unauthorized. This 
 
 #### NOT mounted
 
-- WhatsApp session (`store/auth/`) - host only
+- Channel sessions (e.g., `store/auth/` for WhatsApp) - host only
 - Mount allowlist - external, never mounted
 - Any credentials matching blocked patterns
 
@@ -228,7 +228,7 @@ The main group (typically your self-chat) is **trusted** because:
 
 Non-main groups are **untrusted** because:
 
-1. Other WhatsApp users may attempt prompt injection
+1. Other users may attempt prompt injection
 2. Malicious users could try to escalate privileges
 3. Groups should only affect their own context, not others
 4. Defense in depth: even if prompt injection succeeds, damage is limited
@@ -242,7 +242,7 @@ Even with restrictions, non-main groups have full agent capabilities (MCP tools,
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                        UNTRUSTED ZONE                             │
-│  WhatsApp Messages (potentially malicious)                        │
+│  Incoming Messages (potentially malicious)                         │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │
                                  ▼ Trigger check, input escaping
@@ -275,7 +275,7 @@ Even with restrictions, non-main groups have full agent capabilities (MCP tools,
 **Mitigation**:
 - Agent only has access to its own group's session
 - Cannot send messages to other groups (IPC authorization)
-- Cannot access WhatsApp credentials (not mounted)
+- Cannot access channel credentials (not mounted)
 - Cannot modify mount allowlist (external, never mounted)
 
 **Worst case**: Agent sends its own group's messages to attacker (group context is compromised, but other groups remain isolated)

@@ -142,7 +142,7 @@ The IPC watcher (`src/ipc.ts`) enables container-to-host communication:
 
 SQLite database (`data/nanoclaw.db`) stores:
 
-- **messages**: All WhatsApp messages with timestamps
+- **messages**: All messages with timestamps
 - **chats**: Chat metadata (name, last activity, is_group)
 - **sessions**: Claude session IDs per group folder
 - **registered_groups**: Active groups configuration
@@ -228,7 +228,7 @@ nanoclaw/
 │           ├── tasks/      # Task operation queue
 │           └── input/      # Container input (follow-ups)
 └── store/
-    └── auth/               # WhatsApp session (not mounted)
+    └── auth/               # Channel sessions (not mounted)
 ```
 
 ## Container image
@@ -286,7 +286,7 @@ The agent runner is the TypeScript code that wraps Claude Agent SDK. It handles 
 1. **Container system check**: Ensure Docker is running, clean up orphaned containers
 2. **Database initialization**: Create tables if needed, load schema
 3. **State loading**: Restore message cursors, sessions, registered groups
-4. **Channel connection**: Connect to WhatsApp, authenticate if needed
+4. **Channel connection**: Connect to messaging channels, authenticate if needed
 5. **Subsystem startup**: 
    - Task scheduler loop (60s interval)
    - IPC watcher (1s poll interval)
@@ -304,7 +304,7 @@ On `SIGTERM` or `SIGINT`:
 4. Process exits with code 0
 
 <Warning>
-Containers are intentionally not killed during shutdown to prevent data loss from WhatsApp reconnection restarts. They'll finish on their own via idle timeout or container timeout.
+Containers are intentionally not killed during shutdown to prevent data loss from channel reconnection restarts. They'll finish on their own via idle timeout or container timeout.
 </Warning>
 
 ## Related topics

@@ -3,7 +3,7 @@ title: API overview
 description: Core API reference for NanoClaw architecture and data flow
 ---
 
-NanoClaw is a single Node.js process that connects to messaging channels (WhatsApp, etc.) and routes messages to Claude Agent SDK instances running in isolated containers. Each group has its own filesystem and memory.
+NanoClaw is a single Node.js process that connects to messaging channels (WhatsApp, Telegram, Discord, Slack, Gmail) and routes messages to Claude Agent SDK instances running in isolated containers. Each group has its own filesystem and memory.
 
 ## Architecture
 
@@ -14,7 +14,7 @@ NanoClaw is a single Node.js process that connects to messaging channels (WhatsA
 - **Container Runner** (`src/container-runner.ts`) - Spawns agent containers with mounts
 - **Task Scheduler** (`src/task-scheduler.ts`) - Runs scheduled tasks
 - **Database** (`src/db.ts`) - SQLite operations for messages, groups, and tasks
-- **Channels** (`src/channels/whatsapp.ts`) - Channel connections and message delivery
+- **Channels** (`src/channels/`) - Channel connections and message delivery
 
 ### Key concepts
 
