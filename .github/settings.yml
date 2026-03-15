@@ -1,0 +1,17 @@
+repository:
+  description: "Documentation for NanoClaw — a lightweight, secure AI assistant that runs Claude agents in isolated containers with multi-messenger support"
+  homepage: https://nanoclaw.dev
+  topics:
+    - documentation
+    - mintlify
+    - nanoclaw
+    - ai-assistant
+    - claude
+    - docker
+    - docker-sandboxes
+    - whatsapp
+    - telegram
+    - discord
+    - slack
+    - container-isolation
+    - agent-sdk

@@ -1,0 +1,32 @@
+name: Documentation issue
+description: Report incorrect, unclear, or missing documentation
+labels: ["documentation"]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page URL or path
+      description: Which page has the issue?
+      placeholder: e.g. /quickstart or concepts/security
+    validations:
+      required: true
+  - type: dropdown
+    id: type
+    attributes:
+      label: Issue type
+      options:
+        - Incorrect information
+        - Unclear or confusing
+        - Missing information
+        - Broken link
+        - Typo
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What's wrong and what should it say instead?
+    validations:
+      required: true

@@ -1,7 +1,7 @@
 {
   "projectType": "saas",
   "projectName": "NanoClaw",
-  "projectDescription": "A lightweight, secure AI assistant that runs agents in isolated containers and connects to WhatsApp.",
+  "projectDescription": "A lightweight, secure AI assistant that runs agents in isolated containers and connects to messaging platforms (WhatsApp, Telegram, Discord, Slack, Gmail).",
   "theme": "aspen",
   "primaryColor": "#5B7FFF",
   "lightColor": "#7B9CFF",
@@ -57,6 +57,8 @@
               "advanced/security-model",
               "advanced/ipc-system",
               "advanced/container-runtime",
+              "advanced/docker-sandboxes",
+              "advanced/remote-control",
               "advanced/troubleshooting",
               "advanced/contributing"
             ]

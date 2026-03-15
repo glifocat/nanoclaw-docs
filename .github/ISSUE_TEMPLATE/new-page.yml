@@ -1,0 +1,30 @@
+name: New page request
+description: Suggest a new documentation page or section
+labels: ["enhancement"]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: Suggested page title
+      placeholder: e.g. "MCP Server Integration"
+    validations:
+      required: true
+  - type: dropdown
+    id: section
+    attributes:
+      label: Section
+      options:
+        - Get Started
+        - Core Concepts
+        - Features
+        - Integrations
+        - Advanced
+        - API Reference
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What should this page cover?
+    validations:
+      required: true
