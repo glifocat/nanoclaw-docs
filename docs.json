@@ -36,9 +36,9 @@
             "pages": [
               "concepts/architecture",
               "concepts/security",
+              "concepts/containers",
               "concepts/groups",
-              "concepts/tasks",
-              "concepts/containers"
+              "concepts/tasks"
             ]
           },
           {
@@ -67,9 +67,9 @@
             "group": "Advanced",
             "pages": [
               "advanced/security-model",
-              "advanced/ipc-system",
               "advanced/container-runtime",
               "advanced/docker-sandboxes",
+              "advanced/ipc-system",
               "advanced/remote-control",
               "advanced/troubleshooting",
               "advanced/contributing"
