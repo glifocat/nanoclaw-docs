@@ -14,7 +14,7 @@ NanoClaw operates with different trust levels for different entities:
 | Main group | Trusted | Private self-chat, admin control |
 | Non-main groups | Untrusted | Other users may be malicious |
 | Container agents | Sandboxed | Isolated execution environment |
-| WhatsApp messages | User input | Potential prompt injection |
+| Incoming messages | User input | Potential prompt injection |
 
 ## Security boundaries
 
@@ -142,7 +142,7 @@ if (
 - Claude auth tokens (filtered from `.env`, read-only)
 
 **NOT mounted:**
-- WhatsApp session (`store/auth/`) - host only
+- Channel sessions (e.g., `store/auth/` for WhatsApp) - host only
 - Mount allowlist - external, never mounted
 - Any credentials matching blocked patterns
 
@@ -176,7 +176,7 @@ Anthropic credentials are mounted so that Claude Code can authenticate when the 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                        UNTRUSTED ZONE                             │
-│  WhatsApp Messages (potentially malicious)                        │
+│  Incoming Messages (potentially malicious)                         │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │
                                  ▼ Trigger check, input escaping
