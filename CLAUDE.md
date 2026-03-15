@@ -26,6 +26,20 @@ mint update                     # Update the CLI to the latest version
 
 Deployment is automatic after merge to `main` (via Mintlify GitHub app).
 
+## NanoClaw Architecture Context
+
+When editing docs, keep these architectural facts current:
+- **Multi-channel:** NanoClaw supports WhatsApp, Telegram, Discord, Slack, and Gmail as equal channels. No channel is the "default" — avoid WhatsApp-centric language in non-WhatsApp pages.
+- **Skills as git branches:** Skills are `skill/*` branches merged via `git merge`, not a custom engine. No manifest.yaml, no .nanoclaw/state.yaml, no apply-skill.ts. See `integrations/skills-system.mdx` as source of truth.
+- **Removing a skill:** `git revert -m 1 <merge-commit>`, not manual file deletion.
+- **Source of truth for NanoClaw code:** https://github.com/qwibitai/nanoclaw
+
+## PR Workflow
+
+- Always run `mint validate` before creating PRs
+- Run `mint broken-links` when adding or changing internal links
+- GitHub labels in `.github/labels.yml` may not exist on remote — don't use `--label` with `gh pr create` unless verified
+
 ## Architecture
 
 All content is `.mdx` (Markdown + JSX components). Navigation and site config live in `docs.json`.
