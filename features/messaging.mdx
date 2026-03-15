@@ -5,7 +5,7 @@ description: Learn how NanoClaw processes messages, triggers agent responses, an
 
 ## Overview
 
-NanoClaw processes messages through a polling-based architecture that connects messaging channels (like WhatsApp) to isolated Claude agent containers. Each group has its own message queue, session state, and isolated filesystem.
+NanoClaw processes messages through a polling-based architecture that connects messaging channels to isolated Claude agent containers. Each group has its own message queue, session state, and isolated filesystem.
 
 ## Message flow
 
@@ -167,7 +167,7 @@ export function routeOutbound(
 
 ### Supported channels
 
-- WhatsApp (built-in)
+- WhatsApp (via `/add-whatsapp` skill)
 - Telegram (via `/add-telegram` skill)
 - Discord (via `/add-discord` skill)
 - Slack (via `/add-slack` skill)
