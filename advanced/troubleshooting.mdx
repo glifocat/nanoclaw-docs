@@ -262,14 +262,15 @@ sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;
   
   ```json
   {
-    "allowedPaths": [
+    "allowedRoots": [
       {
-        "hostPath": "/Users/you/Documents/project",
-        "containerPath": "/workspace/extra/project",
-        "readonly": false,
-        "nonMainReadOnly": true
+        "path": "/Users/you/Documents/project",
+        "allowReadWrite": true,
+        "description": "Project files"
       }
-    ]
+    ],
+    "blockedPatterns": [".ssh", ".gnupg", ".aws", ".env", "credentials"],
+    "nonMainReadOnly": true
   }
   ```
   
