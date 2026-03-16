@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "name": "NanoClaw",
-  "theme": "aspen",
+  "theme": "mint",
   "logo": {
     "light": "/images/nanoclaw-logotype-dark.svg",
     "dark": "/images/nanoclaw-logotype-dark.svg",
