@@ -1,0 +1,11 @@
+<CodeGroup>
+```bash macOS
+npm run build
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+```
+
+```bash Linux
+npm run build
+systemctl --user restart nanoclaw
+```
+</CodeGroup>

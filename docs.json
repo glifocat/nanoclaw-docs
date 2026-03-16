@@ -2,10 +2,36 @@
   "$schema": "https://mintlify.com/docs.json",
   "name": "NanoClaw",
   "theme": "aspen",
+  "logo": {
+    "light": "/images/nanoclaw-logotype-dark.svg",
+    "dark": "/images/nanoclaw-logotype-dark.svg",
+    "href": "https://nanoclaw.dev"
+  },
+  "favicon": "/images/favicon.svg",
   "colors": {
-    "primary": "#5B7FFF",
-    "light": "#7B9CFF",
-    "dark": "#3D5FDD"
+    "primary": "#2DD4BF",
+    "light": "#5EEAD4",
+    "dark": "#14B8A6"
+  },
+  "fonts": {
+    "heading": {
+      "family": "Inter",
+      "weight": 600
+    },
+    "body": {
+      "family": "Inter",
+      "weight": 400
+    }
+  },
+  "appearance": {
+    "default": "dark",
+    "strict": true
+  },
+  "background": {
+    "decoration": "gradient"
+  },
+  "styling": {
+    "eyebrows": "breadcrumbs"
   },
   "navbar": {
     "primary": {
@@ -15,9 +41,44 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/qwibitai/nanoclaw"
-    }
+      "github": "https://github.com/qwibitai/nanoclaw",
+      "discord": "https://discord.gg/VDdww8qS42",
+      "x": "https://x.com/Gavriel_Cohen",
+      "youtube": "https://www.youtube.com/@NanoClaw",
+      "website": "https://nanoclaw.dev"
+    },
+    "links": [
+      {
+        "header": "NanoClaw",
+        "items": [
+          { "label": "Official NanoClaw Documentation", "href": "https://nanoclaw.dev" },
+          { "label": "MIT License", "href": "https://github.com/qwibitai/nanoclaw/blob/main/LICENSE" }
+        ]
+      }
+    ]
   },
+  "seo": {
+    "indexing": "navigable"
+  },
+  "search": {
+    "prompt": "Search NanoClaw docs..."
+  },
+  "metadata": {
+    "og:site_name": "NanoClaw Docs",
+    "og:image": "/images/social-preview.jpg",
+    "twitter:site": "@Gavriel_Cohen",
+    "timestamp": true
+  },
+  "feedback": {
+    "thumbsRating": true
+  },
+  "contextual": {
+    "options": ["copy", "view", "chatgpt", "claude", "cursor"]
+  },
+  "anchors": [
+    { "anchor": "GitHub", "href": "https://github.com/qwibitai/nanoclaw", "icon": "github" },
+    { "anchor": "Discord", "href": "https://discord.gg/VDdww8qS42", "icon": "discord" }
+  ],
   "navigation": {
     "tabs": [
       {
@@ -25,6 +86,7 @@
         "groups": [
           {
             "group": "Get Started",
+            "icon": "rocket",
             "pages": [
               "introduction",
               "quickstart",
@@ -33,6 +95,7 @@
           },
           {
             "group": "Core Concepts",
+            "icon": "lightbulb",
             "pages": [
               "concepts/architecture",
               "concepts/security",
@@ -43,6 +106,7 @@
           },
           {
             "group": "Features",
+            "icon": "sparkles",
             "pages": [
               "features/messaging",
               "features/scheduled-tasks",
@@ -53,6 +117,7 @@
           },
           {
             "group": "Integrations",
+            "icon": "plug",
             "pages": [
               "integrations/overview",
               "integrations/skills-system",
@@ -65,6 +130,7 @@
           },
           {
             "group": "Advanced",
+            "icon": "gear",
             "pages": [
               "advanced/security-model",
               "advanced/container-runtime",

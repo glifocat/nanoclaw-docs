@@ -3,9 +3,9 @@
   "projectName": "NanoClaw",
   "projectDescription": "A lightweight, secure AI assistant that runs agents in isolated containers and connects to messaging platforms (WhatsApp, Telegram, Discord, Slack, Gmail).",
   "theme": "aspen",
-  "primaryColor": "#5B7FFF",
-  "lightColor": "#7B9CFF",
-  "darkColor": "#3D5FDD",
+  "primaryColor": "#2DD4BF",
+  "lightColor": "#5EEAD4",
+  "darkColor": "#14B8A6",
   "navigation": {
     "tabs": [
       {

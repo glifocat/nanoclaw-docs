@@ -1,6 +1,7 @@
 ---
 title: System architecture
 description: Understanding NanoClaw's design and how the components work together
+keywords: ["architecture", "system design", "single process"]
 ---
 
 NanoClaw is a lightweight AI assistant that runs Claude Agent SDK in isolated containers. The architecture prioritizes simplicity, security through true isolation, and being small enough to understand completely.
@@ -29,9 +30,9 @@ graph TB
     DB[(SQLite Database)] --> Router
     DB --> Scheduler
 
-    style Container fill:#e1f5ff
-    style Agent fill:#d4edff
-    style CF fill:#f0f4ff
+    style Container fill:#ccfbf1
+    style Agent fill:#99f6e4
+    style CF fill:#f0fdfa
 ```
 
 ## Core components

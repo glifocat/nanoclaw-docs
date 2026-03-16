@@ -3,6 +3,8 @@ title: Discord integration
 description: Add Discord support using the /add-discord skill
 ---
 
+import RestartService from "/snippets/restart-service.mdx";
+
 Add Discord as a messaging channel for NanoClaw. Perfect for team collaboration and community management.
 
 ## Overview
@@ -125,17 +127,7 @@ cp .env data/env/env
 
 ## Build and restart
 
-<CodeGroup>
-```bash macOS
-npm run build
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-```
-
-```bash Linux
-npm run build
-systemctl --user restart nanoclaw
-```
-</CodeGroup>
+<RestartService />
 
 ## Registering channels
 
