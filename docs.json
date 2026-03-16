@@ -49,9 +49,8 @@
     },
     "links": [
       {
-        "header": "NanoClaw",
+        "header": "Legal",
         "items": [
-          { "label": "Official NanoClaw Documentation", "href": "https://nanoclaw.dev" },
           { "label": "MIT License", "href": "https://github.com/qwibitai/nanoclaw/blob/main/LICENSE" }
         ]
       }
