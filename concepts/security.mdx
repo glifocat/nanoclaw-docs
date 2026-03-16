@@ -184,25 +184,20 @@ IPC operations from non-main groups are silently rejected if unauthorized. This 
 - Mount allowlist - external, never mounted
 - Any credentials matching blocked patterns
 
-#### Credential filtering
+#### Credential proxy
 
-Only these environment variables are exposed to containers:
-
-```typescript
-const allowedVars = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'];
-```
-
-Credentials are passed via stdin JSON (never written to disk or mounted as files):
+Containers never see real credentials. A credential proxy (`src/credential-proxy.ts`) runs on the host and injects authentication on every outbound API request:
 
 ```typescript
-// Secrets passed on container startup, then deleted
-container.stdin.write(JSON.stringify({ ...input, secrets }));
-container.stdin.end();
-delete input.secrets; // Remove from memory immediately
+// Container has a placeholder token — real credentials injected by proxy
+ANTHROPIC_BASE_URL=http://host.docker.internal:3001  // → proxy
+CLAUDE_CODE_OAUTH_TOKEN=placeholder                   // → replaced by proxy
 ```
+
+The proxy reads credentials from `.env` on each request (supports hot-swapping between API key and OAuth modes without restart). For OAuth, it auto-refreshes tokens from `~/.claude/.credentials.json`.
 
 <Warning>
-Anthropic credentials are mounted so that Claude Code can authenticate when the agent runs. However, this means the agent itself can discover these credentials via Bash or file operations. Ideally, Claude Code would authenticate without exposing credentials to the agent's execution environment.
+The credential proxy prevents credential exposure to containers. However, the proxy URL is accessible from within the container's network. The container cannot extract the real credentials, but it can make authenticated API requests through the proxy.
 </Warning>
 
 ## Privilege comparison
