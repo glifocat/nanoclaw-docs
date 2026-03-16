@@ -379,17 +379,16 @@ The `/add-parallel` skill adds an MCP integration with non-blocking async operat
 <Tab title="Environment passing">
 
 ```markdown
-### 3. Update Container Runner
+### 3. Configure Environment
 
-Add `PARALLEL_API_KEY` to allowed environment variables:
+Add `PARALLEL_API_KEY` to `.env` so the credential proxy and MCP env resolution can access it:
 
-```typescript
-const allowedVars = [
-  'CLAUDE_CODE_OAUTH_TOKEN', 
-  'ANTHROPIC_API_KEY', 
-  'PARALLEL_API_KEY'
-];
+```bash
+# .env
+PARALLEL_API_KEY=your-api-key-here
 ```
+
+The `readMcpEnvVars()` function in `container-runner.ts` automatically extracts `${VAR}` references from `.mcp.json` and resolves them from `.env`.
 ```
 
 </Tab>

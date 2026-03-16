@@ -138,27 +138,30 @@ if (
 
 ### Credential handling
 
-**Mounted credentials:**
-- Claude auth tokens (filtered from `.env`, read-only)
+**Credential proxy** (`src/credential-proxy.ts`):
+- Runs on the host as an HTTP proxy (default port 3001)
+- Containers send API requests to the proxy with a placeholder token
+- Proxy injects real credentials (API key or OAuth token) on every outbound request
+- Supports hot-swapping between API key and OAuth modes (reads `.env` per request)
+- For OAuth, auto-refreshes tokens from `~/.claude/.credentials.json`
 
 **NOT mounted:**
 - Channel sessions (e.g., `store/auth/` for WhatsApp) - host only
 - Mount allowlist - external, never mounted
+- Real API keys or OAuth tokens - injected by proxy, never in containers
 - Any credentials matching blocked patterns
 
-**Credential filtering:**
-
-Only these environment variables are exposed to containers (from `src/container-runner.ts:206`):
+**Container environment** (from `src/container-runner.ts`):
 
 ```typescript
-function readSecrets(): Record<string, string> {
-  return readEnvFile(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY']);
-}
+// Containers get a placeholder token and proxy URL — never real credentials
+ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}
+CLAUDE_CODE_OAUTH_TOKEN=placeholder
 ```
 
-<Warning>
-Anthropic credentials are mounted so that Claude Code can authenticate when the agent runs. However, this means the agent itself can discover these credentials via Bash or file operations. Ideally, Claude Code would authenticate without exposing credentials to the agent's execution environment.
-</Warning>
+<Note>
+Containers cannot extract real credentials. The credential proxy intercepts all API requests and replaces the placeholder token with real authentication before forwarding to `api.anthropic.com`.
+</Note>
 
 ## Privilege comparison
 
