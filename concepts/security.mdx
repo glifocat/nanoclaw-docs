@@ -1,6 +1,7 @@
 ---
 title: Security overview
 description: Understanding NanoClaw's security boundaries and trust model
+keywords: ["security", "container isolation", "trust model"]
 ---
 
 NanoClaw's security model is built on **true isolation** at the OS level rather than application-level permission checks. Agents run in actual Linux containers and can only access what's explicitly mounted.
@@ -59,9 +60,9 @@ graph TB
     AG --> FO
 
     style MSG fill:#ffe6e6
-    style AG fill:#e1f5ff
-    style BA fill:#e1f5ff
-    style FO fill:#e1f5ff
+    style AG fill:#ccfbf1
+    style BA fill:#ccfbf1
+    style FO fill:#ccfbf1
 ```
 
 <Note>

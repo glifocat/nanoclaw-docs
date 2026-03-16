@@ -1,0 +1,13 @@
+/* Override Mintlify's blue Note callouts to match teal branding */
+.callout.border-blue-200 {
+  border-color: rgb(153, 246, 228) !important; /* teal-200 */
+}
+.callout.dark\:border-blue-900:is(.dark *) {
+  border-color: rgb(19, 78, 74) !important; /* teal-900 */
+}
+.callout.dark\:bg-blue-600\/20:is(.dark *) {
+  background-color: rgba(20, 184, 166, 0.2) !important; /* teal-500/20 */
+}
+.callout.bg-blue-50 {
+  background-color: rgb(240, 253, 250) !important; /* teal-50 */
+}

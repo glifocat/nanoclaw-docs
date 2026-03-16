@@ -3,6 +3,9 @@ title: Telegram integration
 description: Add Telegram support using the /add-telegram skill
 ---
 
+import SyncEnv from "/snippets/sync-env.mdx";
+import RestartService from "/snippets/restart-service.mdx";
+
 Add Telegram as a messaging channel for NanoClaw. Telegram can run alongside existing channels or replace them entirely.
 
 ## Overview
@@ -99,9 +102,7 @@ TELEGRAM_ONLY=true
 
 The container reads environment from `data/env/env`:
 
-```bash
-mkdir -p data/env && cp .env data/env/env
-```
+<SyncEnv />
 
 ### Group privacy settings
 
@@ -131,17 +132,7 @@ To let the bot see all messages in groups:
 
 After configuration:
 
-<CodeGroup>
-```bash macOS
-npm run build
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-```
-
-```bash Linux
-npm run build
-systemctl --user restart nanoclaw
-```
-</CodeGroup>
+<RestartService />
 
 ## Registering chats
 

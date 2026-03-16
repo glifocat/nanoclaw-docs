@@ -3,6 +3,9 @@ title: Slack integration
 description: Add Slack support using the /add-slack skill
 ---
 
+import SyncEnv from "/snippets/sync-env.mdx";
+import RestartService from "/snippets/restart-service.mdx";
+
 Add Slack as a messaging channel for NanoClaw. Perfect for team workspaces and professional communication.
 
 ## Overview
@@ -137,23 +140,11 @@ SLACK_ONLY=true
 
 ### Sync to container
 
-```bash
-mkdir -p data/env && cp .env data/env/env
-```
+<SyncEnv />
 
 ## Build and restart
 
-<CodeGroup>
-```bash macOS
-npm run build
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-```
-
-```bash Linux
-npm run build
-systemctl --user restart nanoclaw
-```
-</CodeGroup>
+<RestartService />
 
 ## Adding bot to channels
 
