@@ -87,7 +87,7 @@ Only the main channel can create tasks for other groups. Non-main groups can onl
 The scheduler runs as a background loop:
 
 ```typescript
-// From src/task-scheduler.ts:217-250
+// From src/task-scheduler.ts — startSchedulerLoop
 export function startSchedulerLoop(deps: SchedulerDependencies): void {
   schedulerRunning = true;
   logger.info('Scheduler loop started');
@@ -176,7 +176,7 @@ context_mode: 'group'
 ### Next run calculation
 
 ```typescript
-// From src/task-scheduler.ts:196-205
+// From src/task-scheduler.ts — computeNextRun function
 let nextRun: string | null = null;
 if (task.schedule_type === 'cron') {
   const interval = CronExpressionParser.parse(task.schedule_value, {
@@ -185,7 +185,12 @@ if (task.schedule_type === 'cron') {
   nextRun = interval.next().toISOString();
 } else if (task.schedule_type === 'interval') {
   const ms = parseInt(task.schedule_value, 10);
-  nextRun = new Date(Date.now() + ms).toISOString();
+  // Anchor to the scheduled time, not now, to prevent drift
+  let next = new Date(task.next_run).getTime() + ms;
+  while (next <= Date.now()) {
+    next += ms;
+  }
+  nextRun = new Date(next).toISOString();
 }
 // 'once' tasks have no next run
 ```
@@ -279,7 +284,7 @@ Each task runs in its own container with:
 - A 10-second close delay after completion (vs 30-minute idle timeout for conversations)
 
 ```typescript
-// From src/task-scheduler.ts:124-133
+// From src/task-scheduler.ts — task close delay
 const TASK_CLOSE_DELAY_MS = 10000;
 let closeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -297,7 +302,7 @@ const scheduleClose = () => {
 All task runs are logged in SQLite:
 
 ```typescript
-// From src/task-scheduler.ts:186-193
+// From src/task-scheduler.ts — run logging
 logTaskRun({
   task_id: task.id,
   run_at: new Date().toISOString(),
@@ -360,7 +365,7 @@ If a task fails:
 4. If a group folder is invalid, the task is automatically paused to prevent retry churn
 
 ```typescript
-// From src/task-scheduler.ts:48-66
+// From src/task-scheduler.ts — invalid group folder handling
 try {
   groupDir = resolveGroupFolderPath(task.group_folder);
 } catch (err) {

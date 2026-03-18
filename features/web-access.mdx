@@ -368,7 +368,7 @@ The scheduled task can:
 The `agent-browser` skill is loaded automatically for all agents:
 
 ```typescript
-// From src/container-runner.ts:136-146
+// From src/container-runner.ts — skills sync
 const skillsSrc = path.join(process.cwd(), 'container', 'skills');
 const skillsDst = path.join(groupSessionsDir, 'skills');
 if (fs.existsSync(skillsSrc)) {
