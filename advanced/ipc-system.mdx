@@ -13,18 +13,21 @@ The IPC system is built on three core components:
 2. **File-based message passing** - JSON files are written to subdirectories and polled by the host
 3. **Authorization checks** - The directory name determines the source group identity
 
-```
-data/ipc/
-├── main/                    # Main group IPC namespace
-│   ├── messages/            # Outbound messages to channels
-│   ├── tasks/               # Task management operations
-│   └── input/               # Inbound messages from host
-├── family-chat/             # Non-main group namespace
-│   ├── messages/
-│   ├── tasks/
-│   └── input/
-└── errors/                  # Failed IPC operations
-```
+<Tree>
+  <Tree.Folder name="data/ipc" defaultOpen>
+    <Tree.Folder name="main" defaultOpen>
+      <Tree.Folder name="messages" />
+      <Tree.Folder name="tasks" />
+      <Tree.Folder name="input" />
+    </Tree.Folder>
+    <Tree.Folder name="family-chat" defaultOpen>
+      <Tree.Folder name="messages" />
+      <Tree.Folder name="tasks" />
+      <Tree.Folder name="input" />
+    </Tree.Folder>
+    <Tree.Folder name="errors" />
+  </Tree.Folder>
+</Tree>
 
 ## How it works
 
