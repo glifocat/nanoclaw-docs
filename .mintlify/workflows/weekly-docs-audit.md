@@ -35,9 +35,17 @@ Verify all `.mdx` files have:
 - A `title` field
 - A `description` field with at least 50 characters
 
-### 5. Report and fix
+### 5. Clean up stale sidebar tags
+
+Check all `.mdx` files for `tag` frontmatter fields. Remove tags that are no longer relevant:
+- Remove `tag: "NEW"` from pages that were created more than 2 weeks ago (check git log for the file's first commit date)
+- Remove `tag: "UPDATED"` from pages that were last modified more than 2 weeks ago (check git log for the file's last commit date)
+- Leave other tags (e.g., `BETA`, `DEPRECATED`) untouched — these are intentional and long-lived
+
+### 6. Report and fix
 
 - For broken links and stale references: fix them directly
 - For missing documentation: add stub sections with TODO markers
 - For frontmatter issues: add missing fields
+- For stale tags: remove them
 - If everything is healthy, do not open a PR
