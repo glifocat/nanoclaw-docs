@@ -217,6 +217,27 @@ Deletes a task permanently.
 }
 ```
 
+### Update task
+
+Modifies an existing task's prompt or schedule. If the schedule type or value changes, `next_run` is automatically recalculated.
+
+**Format:**
+```json
+{
+  "type": "update_task",
+  "taskId": "task-1234567890-abc123",
+  "prompt": "Updated prompt text",
+  "schedule_type": "interval",
+  "schedule_value": "7200000"
+}
+```
+
+All fields except `taskId` are optional — only include the fields you want to change.
+
+**Authorization:**
+- Main group can update any task
+- Non-main groups can only update their own tasks
+
 ### Refresh groups
 
 Forces a refresh of group metadata. **Main group only.**
@@ -267,6 +288,12 @@ Registers a new group for agent access. **Main group only.**
   }
 }
 ```
+
+## Task snapshot refresh
+
+When a task mutation succeeds (`schedule_task`, `pause_task`, `resume_task`, `cancel_task`, or `update_task`), the host immediately refreshes the `current_tasks.json` snapshot for all registered groups. This ensures that a subsequent `list_tasks` call within the same agent session sees the updated task list without waiting for a container restart.
+
+The refresh is implemented via an `onTasksChanged` callback in `IpcDeps`, keeping `ipc.ts` decoupled from the container and snapshot layers.
 
 ## Security model
 

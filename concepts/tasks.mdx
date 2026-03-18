@@ -243,6 +243,8 @@ const tasks = await claudeCode.tools.list_tasks();
 // Non-main groups: only see own tasks
 ```
 
+Task snapshots are refreshed immediately after any IPC task mutation (`schedule_task`, `pause_task`, `resume_task`, `cancel_task`, `update_task`), so `list_tasks` always reflects the latest state — even within the same agent session that made the change.
+
 ### pause_task
 
 Temporarily disable a task:
@@ -259,6 +261,21 @@ Re-enable a paused task:
 ```typescript
 await claudeCode.tools.resume_task({ task_id: "abc123" });
 // Sets status to 'active', task runs on next schedule
+```
+
+### update_task
+
+Modify an existing task's prompt or schedule:
+
+```typescript
+await claudeCode.tools.update_task({
+  task_id: "abc123",
+  prompt: "Updated prompt text",
+  schedule_type: "interval",
+  schedule_value: "7200000"
+});
+// Only include the fields you want to change
+// next_run is automatically recalculated if schedule changes
 ```
 
 ### cancel_task

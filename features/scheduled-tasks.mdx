@@ -253,7 +253,21 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
   "taskId": "task-1234567890-abc123"
 }
 ```
+
+```json update_task
+{
+  "type": "update_task",
+  "taskId": "task-1234567890-abc123",
+  "prompt": "Updated prompt",
+  "schedule_type": "interval",
+  "schedule_value": "7200000"
+}
+```
 </CodeGroup>
+
+<Info>
+After any task mutation via IPC, the `current_tasks.json` snapshot is refreshed immediately for all groups. This means `list_tasks` always returns up-to-date results, even within the same agent session.
+</Info>
 
 ## Task isolation
 
