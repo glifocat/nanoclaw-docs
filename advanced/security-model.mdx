@@ -1,6 +1,7 @@
 ---
 title: Security deep dive
 description: Deep dive into NanoClaw's security architecture and trust boundaries
+tag: "UPDATED"
 ---
 
 NanoClaw's security model is built on OS-level isolation rather than application-level permission checks. Agents run in isolated Linux containers with explicit filesystem mounts, creating a security boundary that's enforced by the kernel.
