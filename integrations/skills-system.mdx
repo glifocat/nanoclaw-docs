@@ -42,7 +42,7 @@ The upstream repo (`qwibitai/nanoclaw`) maintains:
 
 Each skill branch contains **all** the code changes for that skill: new files, modified source files, updated `package.json` dependencies, `.env.example` additions — everything.
 
-### Two categories of skills
+### Three categories of skills
 
 **Operational skills** (on `main`, always available):
 - `/setup`, `/debug`, `/update-nanoclaw`, `/customize`, `/update-skills`
@@ -53,6 +53,12 @@ Each skill branch contains **all** the code changes for that skill: new files, m
 - `/add-discord`, `/add-telegram`, `/add-slack`, `/add-gmail`, etc.
 - Each has a `SKILL.md` with setup instructions and a corresponding `skill/*` branch with code
 - Discovered through Claude Code's plugin marketplace
+
+**Container-agent skills** (synced into every container):
+- `/agent-browser`, `/capabilities`, `/status`
+- Live in `container/skills/` and are synced to each group's `.claude/skills/` directory
+- Available to the agent running inside the container
+- Some are restricted to the main channel (e.g., `/capabilities` and `/status` check for the `/workspace/project` mount)
 
 ## Applying a skill
 
