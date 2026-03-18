@@ -98,16 +98,19 @@ The mount allowlist is the security control that prevents agents from accessing 
 - **Container path validation** (rejects `..` and absolute paths)
 - **`nonMainReadOnly` option** forces read-only for non-main groups
 
-Example allowlist entry:
+Example allowlist:
 
 ```json
 {
-  "/Users/you/projects/website": {
-    "reason": "Website deployment tasks",
-    "addedBy": "main",
-    "addedAt": "2026-02-28T10:30:00Z",
-    "nonMainReadOnly": true
-  }
+  "allowedRoots": [
+    {
+      "path": "~/projects",
+      "allowReadWrite": true,
+      "description": "Development projects"
+    }
+  ],
+  "blockedPatterns": ["password", "secret", "token"],
+  "nonMainReadOnly": true
 }
 ```
 

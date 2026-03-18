@@ -21,7 +21,7 @@ NanoClaw connects to WhatsApp using the [Baileys](https://github.com/WhiskeySock
 
 ## How it works
 
-The WhatsApp channel implementation is in `src/channels/whatsapp.ts` (src/channels/whatsapp.ts:1):
+The WhatsApp channel implementation is in `src/channels/whatsapp.ts`:
 
 ```typescript
 export class WhatsAppChannel implements Channel {
@@ -97,7 +97,7 @@ The setup process will:
 
 ### Assistant has own number
 
-Set this in `src/config.ts` (src/config.ts:1):
+Set this in `src/config.ts`:
 
 ```typescript
 export const ASSISTANT_HAS_OWN_NUMBER = false; // Default: shared number
@@ -129,7 +129,7 @@ Andy: Your scheduled task completed successfully.
 
 ### Connection settings
 
-Connection logic is in `src/channels/whatsapp.ts` (src/channels/whatsapp.ts:52):
+Connection logic is in `src/channels/whatsapp.ts`:
 
 ```typescript
 const { version } = await fetchLatestWaWebVersion({});
@@ -146,7 +146,7 @@ this.sock = makeWASocket({
 
 ### Bot message detection
 
-The channel determines if a message came from the bot (src/channels/whatsapp.ts:216):
+The channel determines if a message came from the bot:
 
 ```typescript
 const isBotMessage = ASSISTANT_HAS_OWN_NUMBER
@@ -158,7 +158,7 @@ This prevents the bot from responding to its own messages.
 
 ### Message prefix
 
-Outgoing messages are prefixed unless using a dedicated number (src/channels/whatsapp.ts:240):
+Outgoing messages are prefixed unless using a dedicated number:
 
 ```typescript
 const prefixed = ASSISTANT_HAS_OWN_NUMBER
@@ -168,7 +168,7 @@ const prefixed = ASSISTANT_HAS_OWN_NUMBER
 
 ### Group metadata sync
 
-Group names are synced from WhatsApp every 24 hours (src/channels/whatsapp.ts:293):
+Group names are synced from WhatsApp every 24 hours:
 
 ```typescript
 async syncGroupMetadata(force = false): Promise<void> {
@@ -191,7 +191,7 @@ WhatsApp uses JIDs (Jabber IDs) to identify chats:
 - **Group:** `120363012345678901@g.us`
 - **LID (newer format):** `123456:78@lid`
 
-The channel translates LID JIDs to phone JIDs automatically (src/channels/whatsapp.ts:324).
+The channel translates LID JIDs to phone JIDs automatically.
 
 ## Registering chats
 
@@ -244,7 +244,7 @@ Follow the QR code authentication flow again.
 
 ### Connection issues
 
-The channel automatically reconnects on disconnection (src/channels/whatsapp.ts:95):
+The channel automatically reconnects on disconnection:
 
 ```typescript
 if (connection === 'close') {
@@ -299,7 +299,7 @@ This disables WhatsApp channel creation while keeping the implementation availab
 
 ### Message queue
 
-Messages sent while disconnected are queued and flushed on reconnect (src/channels/whatsapp.ts:357):
+Messages sent while disconnected are queued and flushed on reconnect:
 
 ```typescript
 private async flushOutgoingQueue(): Promise<void> {
@@ -312,13 +312,13 @@ private async flushOutgoingQueue(): Promise<void> {
 
 ### Presence updates
 
-The channel announces availability on connection (src/channels/whatsapp.ts:129):
+The channel announces availability on connection:
 
 ```typescript
 this.sock.sendPresenceUpdate('available').catch(...);
 ```
 
-And sends typing indicators per chat (src/channels/whatsapp.ts:278):
+And sends typing indicators per chat:
 
 ```typescript
 async setTyping(jid: string, isTyping: boolean): Promise<void> {

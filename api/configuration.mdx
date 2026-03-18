@@ -33,6 +33,10 @@ Configuration is read from `.env` file or `process.env`.
   How long to keep container alive after last result in milliseconds (default: 30 minutes).
 </ParamField>
 
+<ParamField path="CREDENTIAL_PROXY_PORT" type="number" default="3001">
+  Port for the credential proxy that containers route API calls through.
+</ParamField>
+
 <ParamField path="MAX_CONCURRENT_CONTAINERS" type="number" default="5">
   Maximum number of concurrent agent containers.
 </ParamField>
@@ -71,8 +75,8 @@ All paths are absolute and resolved from the project root:
   `~/.config/nanoclaw/mount-allowlist.json` - Mount security allowlist (never mounted into containers)
 </ResponseField>
 
-<ResponseField name="MAIN_GROUP_FOLDER" type="string">
-  `"main"` - Folder name for the main group
+<ResponseField name="SENDER_ALLOWLIST_PATH" type="string">
+  `~/.config/nanoclaw/sender-allowlist.json` - Sender allowlist for filtering who can trigger the agent
 </ResponseField>
 
 ## Trigger pattern
@@ -112,6 +116,6 @@ TZ=America/Los_Angeles
 ## Security notes
 
 - **Secrets** (API keys, credentials) are NOT read in `config.ts`
-- Secrets stay on disk and are loaded only where needed (`container-runner.ts`)
+- Secrets are loaded only by the credential proxy (`credential-proxy.ts`), never exposed to containers
 - This prevents leaking secrets to child processes
 - Mount allowlist is stored OUTSIDE project root and never mounted into containers
