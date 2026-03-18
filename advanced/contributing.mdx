@@ -73,21 +73,24 @@ Skills are either **operational** (instruction-only SKILL.md files on `main`) or
 
 **Operational skills** live in `.claude/skills/` on `main`:
 
-```
-.claude/skills/
-└── debug/
-    └── SKILL.md          # Instructions for Claude Code
-```
+<Tree>
+  <Tree.Folder name=".claude/skills" defaultOpen>
+    <Tree.Folder name="debug" defaultOpen>
+      <Tree.File name="SKILL.md" />
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
 
 **Feature skills** are `skill/*` branches containing all code changes:
 
-```
-skill/telegram branch (diff from main):
-├── src/channels/telegram.ts        # New files
-├── src/index.ts                    # Modified files
-├── package.json                    # Updated dependencies
-└── .env.example                    # New env vars
-```
+<Tree>
+  <Tree.Folder name="skill/telegram branch" defaultOpen>
+    <Tree.File name="src/channels/telegram.ts" />
+    <Tree.File name="src/index.ts" />
+    <Tree.File name="package.json" />
+    <Tree.File name=".env.example" />
+  </Tree.Folder>
+</Tree>
 
 ### Writing a skill
 
