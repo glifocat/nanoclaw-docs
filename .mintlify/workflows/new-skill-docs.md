@@ -46,7 +46,20 @@ If this is a new integration, add it to `integrations/overview.mdx` in the chann
 
 If this is a new page, add it to the navigation in `docs.json` under the Integrations group.
 
-### 6. Style guidelines
+### 6. Tag new pages
+
+Add `tag: "NEW"` in the frontmatter of any newly created page:
+```yaml
+---
+title: "Telegram integration"
+description: "..."
+tag: "NEW"
+---
+```
+
+If you are updating an existing integration page instead of creating one, use `tag: "UPDATED"` instead.
+
+### 7. Style guidelines
 
 - Match the existing tone and structure of other integration pages
 - Use Mintlify components (Tabs, Accordions, CodeGroups) where appropriate
