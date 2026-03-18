@@ -58,13 +58,13 @@ Mount permissions are stored at `~/.config/nanoclaw/mount-allowlist.json`, which
 - Container path validation (rejects `..` and absolute paths)
 - `nonMainReadOnly` option forces read-only for non-main groups
 
-See `src/mount-security.ts:1` for the validation implementation.
+See `src/mount-security.ts` for the validation implementation.
 
 **Read-only project root**
 
 The main group's project root is mounted read-only. Writable paths the agent needs (group folder, IPC, `.claude/`) are mounted separately. This prevents the agent from modifying host application code (`src/`, `dist/`, `package.json`, etc.) which would bypass the sandbox entirely on next restart.
 
-From `src/container-runner.ts:66`:
+From `src/container-runner.ts`:
 
 ```typescript
 if (isMain) {
@@ -89,7 +89,7 @@ Each group has isolated Claude sessions at `data/sessions/{group}/.claude/`:
 - Session data includes full message history and file contents read
 - Prevents cross-group information disclosure
 
-Sessions are mounted per-group in `src/container-runner.ts:103`:
+Sessions are mounted per-group in `src/container-runner.ts`:
 
 ```typescript
 const groupSessionsDir = path.join(
@@ -114,7 +114,7 @@ Messages and task operations are verified against group identity. The IPC system
 | View all tasks | ✓ | Own only |
 | Manage other groups | ✓ | ✗ |
 
-Authorization is enforced in `src/ipc.ts:76`:
+Authorization is enforced in `src/ipc.ts`:
 
 ```typescript
 // Authorization: verify this group can send to this chatJid

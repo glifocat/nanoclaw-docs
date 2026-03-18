@@ -126,7 +126,7 @@ export const MAX_CONCURRENT_CONTAINERS = Math.max(
 When an agent container is already running and idle, NanoClaw can pipe new messages directly to its stdin instead of spawning a new container:
 
 ```typescript
-// From src/index.ts:398-411
+// From the message loop in src/index.ts
 if (queue.sendMessage(chatJid, formatted)) {
   logger.debug(
     { chatJid, count: messagesToSend.length },
@@ -179,15 +179,15 @@ Channels are added via skills, not configuration files. Use `/add-telegram` or s
 
 ## Message persistence
 
-All messages are stored in SQLite (`data/nanoclaw.db`) with full history:
+All messages are stored in SQLite (`store/messages.db`) with full history:
 
 ```typescript
 // From src/db.ts
 function storeMessage(msg: NewMessage): void {
   db.prepare(
-    `INSERT INTO messages (chat_jid, sender_jid, sender_name, content, timestamp)
-     VALUES (?, ?, ?, ?, ?)`
-  ).run(msg.chat_jid, msg.sender_jid, msg.sender_name, msg.content, msg.timestamp);
+    `INSERT OR REPLACE INTO messages (id, chat_jid, sender, sender_name, content, timestamp, is_from_me, is_bot_message)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(msg.id, msg.chat_jid, msg.sender, msg.sender_name, msg.content, msg.timestamp, msg.is_from_me ? 1 : 0, msg.is_bot_message ? 1 : 0);
 }
 ```
 
@@ -228,7 +228,7 @@ This updates `ASSISTANT_NAME` in `src/config.ts` and `.env`.
 Groups must be registered before the agent can respond. The main channel can register groups via IPC:
 
 ```typescript
-// From src/ipc.ts:351-382
+// From src/ipc.ts — register_group handler
 case 'register_group':
   if (!isMain) {
     logger.warn(
