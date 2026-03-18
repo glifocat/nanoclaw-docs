@@ -402,9 +402,21 @@ if (runtime === 'orb') {
 
 Skills synced to each container:
 
-1. **Copy from project**: Operational skills from `container/skills/` are synced to `data/sessions/{group}/.claude/skills/` for each container session
+1. **Copy from project**: Skills from `container/skills/` are synced to `data/sessions/{group}/.claude/skills/` for each container session
 2. **Available to agent**: Claude Agent SDK loads from `.claude/skills/`
 3. **Per-group customization**: Each group gets a copy, can modify independently
+
+### Built-in container skills
+
+| Skill | Description | Access |
+|-------|-------------|--------|
+| `/agent-browser` | Browse the web, fill forms, extract data | All groups |
+| `/capabilities` | Report installed skills, available tools, MCP tools, container utilities, and group info | Main channel only |
+| `/status` | Quick health check — session context, workspace mounts, tool availability, and scheduled task snapshot | Main channel only |
+
+<Note>
+`/capabilities` and `/status` are restricted to the main channel. They detect this by checking for the `/workspace/project` mount, which is only present for main groups. Non-main groups receive a redirect message.
+</Note>
 
 **MCP servers:**
 
