@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Mintlify-powered documentation site for **NanoClaw** — a lightweight, secure AI assistant that runs Claude agents in isolated Docker containers with multi-messenger support. The main NanoClaw repo is at https://github.com/qwibitai/nanoclaw; this repo is the docs site deployed to https://nanoclaw.dev.
 
+**GitHub:** `glifocat/nanoclaw-docs` (not `qwibitai` — that's the upstream NanoClaw source repo)
+
 ## Mintlify CLI
 
 Install: `npm i -g mint` (one-time). No authentication required — runs locally.
@@ -31,6 +33,7 @@ Deployment is automatic after merge to `main` (via Mintlify GitHub app).
 When editing docs, keep these architectural facts current:
 - **Multi-channel:** NanoClaw supports WhatsApp, Telegram, Discord, Slack, and Gmail as equal channels. No channel is the "default" — avoid WhatsApp-centric language in non-WhatsApp pages.
 - **Skills as git branches:** Skills are `skill/*` branches merged via `git merge`, not a custom engine. No manifest.yaml, no .nanoclaw/state.yaml, no apply-skill.ts. See `integrations/skills-system.mdx` as source of truth.
+- **Channel forks:** Channels live in separate fork repos (`nanoclaw-whatsapp`, `nanoclaw-telegram`, etc.). Channel-specific skills (image-vision, voice-transcription, reactions, pdf-reader) live on the channel fork, not upstream.
 - **Removing a skill:** `git revert -m 1 <merge-commit>`, not manual file deletion.
 - **Source of truth for NanoClaw code:** https://github.com/qwibitai/nanoclaw
 
@@ -38,7 +41,9 @@ When editing docs, keep these architectural facts current:
 
 - Always run `mint validate` before creating PRs
 - Run `mint broken-links` when adding or changing internal links
-- GitHub labels in `.github/labels.yml` may not exist on remote — don't use `--label` with `gh pr create` unless verified
+- Available labels: `content-gap`, `new-page`, `update-existing`, `high-priority`, `medium-priority`, plus GitHub defaults
+- For auto-closing issues, put each `Closes #N` on its own line in the PR body
+- For multi-concern changes, split into stacked PRs (base each on the previous branch). After merging, retarget the next PR to `main` and rebase.
 
 ## Architecture
 
@@ -85,6 +90,16 @@ keywords: ["relevant", "search", "terms"]
 **Images:** Store in `images/`, reference with root-relative paths, always include descriptive alt text.
 
 **Components available:** `<Note>`, `<Info>`, `<Tip>`, `<Warning>`, `<Check>`, `<Danger>`, `<Steps>/<Step>`, `<Tabs>/<Tab>`, `<CodeGroup>`, `<Columns>`, `<Card>`, `<AccordionGroup>/<Accordion>`, Mermaid diagrams, and more (see `/mintlify` skill for full list).
+
+**Directory trees:** Use `<Tree>` component (not ASCII art). See `reference/components.md` for syntax.
+
+## Sidebar Tags
+
+Mintlify workflows in `.mintlify/workflows/` auto-manage `tag` frontmatter:
+- `tag: "UPDATED"` — applied by sync workflow for content changes (not cosmetic)
+- `tag: "NEW"` — applied by skill-docs workflow for new pages
+- Tags are cleaned up after 2 weeks by the weekly audit workflow
+- Do NOT add tags for cosmetic-only changes (formatting, component swaps)
 
 ## Writing Standards
 
