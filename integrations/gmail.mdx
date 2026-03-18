@@ -422,64 +422,44 @@ Ask your agent:
 
 ## Removing Gmail
 
-### Tool-only mode
+To remove the Gmail skill and revert to a Gmail-free setup:
 
 <Steps>
-  <Step title="Remove mount">
-    Delete the `~/.gmail-mcp` mount from `src/container-runner.ts`
-  </Step>
-  
-  <Step title="Remove MCP server">
-    Delete `gmail` from MCP servers and `mcp__gmail__*` from allowed tools in `container/agent-runner/src/index.ts`
-  </Step>
-  
-  <Step title="Clear agent runners">
+  <Step title="Find the merge commit">
     ```bash
-    rm -r data/sessions/*/agent-runner-src 2>/dev/null || true
+    git log --merges --oneline | grep gmail
     ```
+
+    Look for a commit like `abc1234 Merge remote-tracking branch 'upstream/skill/gmail'`.
   </Step>
 
-  <Step title="Rebuild">
+  <Step title="Revert the merge">
     ```bash
-    cd container && ./build.sh && cd ..
+    git revert -m 1 <merge-commit>
+    ```
+
+    This creates a new commit that undoes all of Gmail's code changes.
+  </Step>
+
+  <Step title="Rebuild and restart">
+    ```bash
+    npm install
     npm run build
+    ```
+
+    <CodeGroup>
+    ```bash macOS
     launchctl kickstart -k gui/$(id -u)/com.nanoclaw
     ```
+
+    ```bash Linux
+    systemctl --user restart nanoclaw
+    ```
+    </CodeGroup>
   </Step>
 </Steps>
 
-### Channel mode
-
-<Steps>
-  <Step title="Delete channel files">
-    ```bash
-    rm src/channels/gmail.ts
-    rm src/channels/gmail.test.ts
-    ```
-  </Step>
-
-  <Step title="Revert code changes">
-    - Remove `GmailChannel` import and creation from `src/index.ts`
-    - Remove mount from `src/container-runner.ts`
-    - Remove MCP server from `container/agent-runner/src/index.ts`
-    - Remove Gmail JID tests from `src/routing.test.ts`
-  </Step>
-
-  <Step title="Uninstall dependency">
-    ```bash
-    npm uninstall googleapis
-    ```
-  </Step>
-
-  <Step title="Clear and rebuild">
-    ```bash
-    rm -r data/sessions/*/agent-runner-src 2>/dev/null || true
-    cd container && ./build.sh && cd ..
-    npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-    ```
-  </Step>
-</Steps>
+See [removing a skill](/integrations/skills-system#removing-a-skill) for details.
 
 ## Next steps
 
