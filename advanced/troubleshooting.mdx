@@ -226,14 +226,21 @@ ls -la store/auth/
 Re-authenticate with WhatsApp:
 
 ```bash
-npm run auth
+claude
+/add-whatsapp
 ```
 
 Scan the QR code with your phone, then restart the service:
 
-```bash
+<CodeGroup>
+```bash macOS
 launchctl kickstart -k gui/$(id -u)/com.nanoclaw
 ```
+
+```bash Linux
+systemctl --user restart nanoclaw
+```
+</CodeGroup>
 
 ## Container mount issues
 
