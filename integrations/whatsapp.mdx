@@ -75,14 +75,14 @@ WhatsApp (Baileys) → SQLite → Polling loop → Container (Claude Agent SDK) 
 
 ## Setup
 
-WhatsApp setup is handled by the `/setup` skill when you first install NanoClaw:
+WhatsApp is not bundled with NanoClaw's core install. Add it using the `/add-whatsapp` skill:
 
 ```bash
 claude
-/setup
+/add-whatsapp
 ```
 
-The setup process will:
+This merges the `skill/whatsapp` branch into your fork, adding the WhatsApp channel code and its dependencies (including `@whiskeysockets/baileys`). The skill will then:
 
 1. Generate a QR code for WhatsApp Web authentication
 2. Wait for you to scan it with your phone
@@ -90,7 +90,7 @@ The setup process will:
 4. Connect to WhatsApp and verify the connection
 
 <Note>
-  If authentication fails or expires, run `/setup` again to re-authenticate.
+  If authentication fails or expires, run `/add-whatsapp` again to re-authenticate.
 </Note>
 
 ## Configuration
@@ -275,25 +275,25 @@ Ensure `ASSISTANT_HAS_OWN_NUMBER` is set correctly in `src/config.ts`:
 - If sharing a number, set to `false` (bot messages will have the name prefix)
 - If using a dedicated number, set to `true` (bot messages are identified by `fromMe`)
 
-## Switching to another channel
+## Using other channels
 
-You can add other channels alongside WhatsApp or replace it entirely:
+NanoClaw supports multiple messaging channels as equal options. You can run WhatsApp alongside other channels or use a different channel entirely.
 
-### Add alongside WhatsApp
-
-```bash
-/add-telegram  # Keeps WhatsApp, adds Telegram
-```
-
-### Replace WhatsApp
-
-When adding a new channel, choose "Replace WhatsApp" and set the appropriate flag:
+### Add another channel
 
 ```bash
-TELEGRAM_ONLY=true  # in .env
+/add-telegram  # Adds Telegram alongside WhatsApp
 ```
 
-This disables WhatsApp channel creation while keeping the implementation available.
+### Remove WhatsApp
+
+To remove the WhatsApp skill and revert to a channel-free core:
+
+```bash
+git revert -m 1 <whatsapp-merge-commit>
+```
+
+See [removing a skill](/integrations/skills-system#removing-a-skill) for details.
 
 ## Implementation details
 
@@ -329,11 +329,15 @@ async setTyping(jid: string, isTyping: boolean): Promise<void> {
 
 ## Source code reference
 
-The WhatsApp implementation is fully contained in:
+After installing the WhatsApp skill, the implementation lives in:
 
-- **`src/channels/whatsapp.ts`** - Main WhatsAppChannel class (379 lines)
-- **`src/config.ts`** - Configuration constants
+- **`src/channels/whatsapp.ts`** - Main WhatsAppChannel class
+- **`src/config.ts`** - Configuration constants (extended by the skill)
 - **`src/index.ts`** - Channel initialization and routing
+
+<Note>
+These files are added by the `skill/whatsapp` branch merge. They do not exist in NanoClaw's core install.
+</Note>
 
 ## Next steps
 

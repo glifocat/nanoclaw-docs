@@ -9,7 +9,7 @@ NanoClaw's security model is built on **true isolation** at the OS level rather 
 ## Trust model
 
 | Entity | Trust Level | Rationale |
-|--------|-------------|-----------||
+|--------|-------------|-----------|
 | Main group | Trusted | Private self-chat, admin control |
 | Non-main groups | Untrusted | Other users may be malicious |
 | Container agents | Sandboxed | Isolated execution environment |
@@ -59,10 +59,10 @@ graph TB
     AG --> BA
     AG --> FO
 
-    style MSG fill:#ffe6e6
-    style AG fill:#ccfbf1
-    style BA fill:#ccfbf1
-    style FO fill:#ccfbf1
+    style MSG fill:#fca5a5,color:#1e1e1e
+    style AG fill:#6ee7b7,color:#1e1e1e
+    style BA fill:#6ee7b7,color:#1e1e1e
+    style FO fill:#6ee7b7,color:#1e1e1e
 ```
 
 <Note>
