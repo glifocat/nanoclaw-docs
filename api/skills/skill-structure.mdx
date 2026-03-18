@@ -11,19 +11,25 @@ NanoClaw has three categories of skills, each with a different structure. Operat
 
 Operational skills live in `.claude/skills/` on `main`. They contain only a `SKILL.md` file with instructions for Claude Code — no code changes.
 
-```
-.claude/skills/
-├── setup/
-│   └── SKILL.md          # Installation workflow
-├── debug/
-│   └── SKILL.md          # Troubleshooting helper
-├── customize/
-│   └── SKILL.md          # Guided customization
-├── update-nanoclaw/
-│   └── SKILL.md          # Core update workflow
-└── update-skills/
-    └── SKILL.md          # Skill update checker
-```
+<Tree>
+  <Tree.Folder name=".claude/skills" defaultOpen>
+    <Tree.Folder name="setup" defaultOpen>
+      <Tree.File name="SKILL.md" />
+    </Tree.Folder>
+    <Tree.Folder name="debug" defaultOpen>
+      <Tree.File name="SKILL.md" />
+    </Tree.Folder>
+    <Tree.Folder name="customize" defaultOpen>
+      <Tree.File name="SKILL.md" />
+    </Tree.Folder>
+    <Tree.Folder name="update-nanoclaw" defaultOpen>
+      <Tree.File name="SKILL.md" />
+    </Tree.Folder>
+    <Tree.Folder name="update-skills" defaultOpen>
+      <Tree.File name="SKILL.md" />
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
 
 These skills are always available in your NanoClaw installation. They guide Claude Code through multi-step workflows like setup, debugging, and updates.
 
@@ -53,15 +59,16 @@ Run `bash setup.sh` and parse the status block.
 
 Feature skills are distributed as `skill/*` branches on the upstream repository. Each branch contains **all** the code changes for that integration: new files, modified source files, updated `package.json` dependencies, `.env.example` additions — everything.
 
-```
-skill/telegram branch (diff from main):
-├── src/channels/telegram.ts        # New: TelegramChannel implementation
-├── src/channels/telegram.test.ts   # New: 46 unit tests
-├── src/index.ts                    # Modified: multi-channel support
-├── src/config.ts                   # Modified: Telegram config vars
-├── package.json                    # Modified: grammy dependency added
-└── .env.example                    # Modified: TELEGRAM_BOT_TOKEN added
-```
+<Tree>
+  <Tree.Folder name="skill/telegram branch" defaultOpen>
+    <Tree.File name="src/channels/telegram.ts" />
+    <Tree.File name="src/channels/telegram.test.ts" />
+    <Tree.File name="src/index.ts" />
+    <Tree.File name="src/config.ts" />
+    <Tree.File name="package.json" />
+    <Tree.File name=".env.example" />
+  </Tree.Folder>
+</Tree>
 
 Feature skills also have a `SKILL.md` in the marketplace repo (`qwibitai/nanoclaw-skills`) that provides setup instructions. When you run `/add-telegram`, Claude reads the SKILL.md and merges the skill branch.
 
@@ -69,15 +76,19 @@ Feature skills also have a `SKILL.md` in the marketplace repo (`qwibitai/nanocla
 
 Container-agent skills live in `container/skills/` and are synced into every container's `.claude/skills/` directory. These are available to the agent running inside the container — not to the host-side Claude Code session.
 
-```
-container/skills/
-├── agent-browser/
-│   └── SKILL.md          # Web browsing and automation
-├── capabilities/
-│   └── SKILL.md          # System introspection report
-└── status/
-    └── SKILL.md          # Quick health check
-```
+<Tree>
+  <Tree.Folder name="container/skills" defaultOpen>
+    <Tree.Folder name="agent-browser" defaultOpen>
+      <Tree.File name="SKILL.md" />
+    </Tree.Folder>
+    <Tree.Folder name="capabilities" defaultOpen>
+      <Tree.File name="SKILL.md" />
+    </Tree.Folder>
+    <Tree.Folder name="status" defaultOpen>
+      <Tree.File name="SKILL.md" />
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
 
 Container-agent skills use the same `SKILL.md` frontmatter format as operational skills. Some are restricted to the main channel by checking for the `/workspace/project` mount (only present for main groups).
 
