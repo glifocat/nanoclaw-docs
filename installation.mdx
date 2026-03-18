@@ -303,26 +303,32 @@ This creates the `nanoclaw-agent` image.
 
 After installation, NanoClaw creates:
 
-```text
-NanoClaw/
-├── src/                    # Source code
-├── dist/                   # Compiled JavaScript
-├── container/              # Container build files
-├── groups/                 # Per-group data
-│   └── main/              # Main channel
-│       ├── CLAUDE.md      # Group memory
-│       └── logs/          # Container logs
-├── store/                  # Persistent data
-│   ├── messages.db        # SQLite database (messages, groups, tasks)
-│   └── auth/              # Channel authentication data
-├── data/                   # Runtime data
-│   └── sessions/          # Claude sessions per group
-├── logs/                   # Application logs
-│   ├── nanoclaw.log       # Main log
-│   └── nanoclaw.error.log # Error log
-├── .env                    # Credentials (not in git)
-└── package.json           # Dependencies
-```
+<Tree>
+  <Tree.Folder name="NanoClaw" defaultOpen>
+    <Tree.Folder name="src" />
+    <Tree.Folder name="dist" />
+    <Tree.Folder name="container" />
+    <Tree.Folder name="groups" defaultOpen>
+      <Tree.Folder name="main" defaultOpen>
+        <Tree.File name="CLAUDE.md" />
+        <Tree.Folder name="logs" />
+      </Tree.Folder>
+    </Tree.Folder>
+    <Tree.Folder name="store" defaultOpen>
+      <Tree.File name="messages.db" />
+      <Tree.Folder name="auth" />
+    </Tree.Folder>
+    <Tree.Folder name="data" defaultOpen>
+      <Tree.Folder name="sessions" />
+    </Tree.Folder>
+    <Tree.Folder name="logs" defaultOpen>
+      <Tree.File name="nanoclaw.log" />
+      <Tree.File name="nanoclaw.error.log" />
+    </Tree.Folder>
+    <Tree.File name=".env" />
+    <Tree.File name="package.json" />
+  </Tree.Folder>
+</Tree>
 
 **External files**:
 - `~/.config/nanoclaw/mount-allowlist.json` - Mount permissions

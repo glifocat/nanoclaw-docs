@@ -205,32 +205,42 @@ sequenceDiagram
 
 ## File system layout
 
-```text
-nanoclaw/
-├── src/                    # Host process source code
-├── container/
-│   ├── Dockerfile          # Agent container image
-│   ├── agent-runner/       # Container entrypoint
-│   └── skills/             # Shared agent skills
-├── groups/
-│   ├── main/               # Main group (admin)
-│   │   ├── CLAUDE.md       # Per-group memory
-│   │   └── logs/           # Container logs
-│   └── {group-name}/       # Other registered groups
-├── data/
-│   ├── sessions/
-│   │   └── {group}/
-│   │       ├── .claude/    # Claude session data
-│   │       └── agent-runner-src/  # Per-group agent code
-│   └── ipc/
-│       └── {group}/
-│           ├── messages/   # Outbound message queue
-│           ├── tasks/      # Task operation queue
-│           └── input/      # Container input (follow-ups)
-└── store/
-    ├── messages.db         # SQLite database
-    └── auth/               # Channel sessions (not mounted)
-```
+<Tree>
+  <Tree.Folder name="nanoclaw" defaultOpen>
+    <Tree.Folder name="src" />
+    <Tree.Folder name="container" defaultOpen>
+      <Tree.File name="Dockerfile" />
+      <Tree.Folder name="agent-runner" />
+      <Tree.Folder name="skills" />
+    </Tree.Folder>
+    <Tree.Folder name="groups" defaultOpen>
+      <Tree.Folder name="main" defaultOpen>
+        <Tree.File name="CLAUDE.md" />
+        <Tree.Folder name="logs" />
+      </Tree.Folder>
+      <Tree.Folder name="{group-name}" />
+    </Tree.Folder>
+    <Tree.Folder name="data" defaultOpen>
+      <Tree.Folder name="sessions" defaultOpen>
+        <Tree.Folder name="{group}" defaultOpen>
+          <Tree.Folder name=".claude" />
+          <Tree.Folder name="agent-runner-src" />
+        </Tree.Folder>
+      </Tree.Folder>
+      <Tree.Folder name="ipc" defaultOpen>
+        <Tree.Folder name="{group}" defaultOpen>
+          <Tree.Folder name="messages" />
+          <Tree.Folder name="tasks" />
+          <Tree.Folder name="input" />
+        </Tree.Folder>
+      </Tree.Folder>
+    </Tree.Folder>
+    <Tree.Folder name="store" defaultOpen>
+      <Tree.File name="messages.db" />
+      <Tree.Folder name="auth" />
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
 
 ## Container image
 
