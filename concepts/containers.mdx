@@ -172,12 +172,15 @@ All mounts are validated against the allowlist at `~/.config/nanoclaw/mount-allo
 
 ```json
 {
-  "/Users/you/projects/website": {
-    "reason": "Website deployment tasks",
-    "addedBy": "main",
-    "addedAt": "2026-02-28T10:30:00Z",
-    "nonMainReadOnly": true
-  }
+  "allowedRoots": [
+    {
+      "path": "~/projects",
+      "allowReadWrite": true,
+      "description": "Development projects"
+    }
+  ],
+  "blockedPatterns": ["password", "secret", "token"],
+  "nonMainReadOnly": true
 }
 ```
 
@@ -185,9 +188,10 @@ All mounts are validated against the allowlist at `~/.config/nanoclaw/mount-allo
 
 1. Resolve symlinks to real path
 2. Check against blocked patterns (`.ssh`, `.env`, etc.)
-3. Verify path is in allowlist (for additional mounts)
+3. Verify path is under an allowed root
 4. Enforce `nonMainReadOnly` for non-main groups
-5. Reject container paths with `..` or absolute paths
+5. Enforce per-root `allowReadWrite` setting
+6. Reject container paths with `..` or absolute paths
 
 ## Container lifecycle
 

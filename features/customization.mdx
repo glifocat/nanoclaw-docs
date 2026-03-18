@@ -37,7 +37,7 @@ Change the trigger word to @Bob
 Claude Code will update:
 - `ASSISTANT_NAME` in `src/config.ts`
 - The `.env` file
-- Trigger pattern regex in `src/config.ts:56-59`
+- Trigger pattern regex in `src/config.ts`
 
 ### Adjust response style
 
@@ -135,7 +135,7 @@ CONTAINER_TIMEOUT=1800000
 ### Environment variable precedence
 
 ```typescript
-// From src/config.ts:11-15
+// From src/config.ts
 export const ASSISTANT_NAME =
   process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';
 export const ASSISTANT_HAS_OWN_NUMBER =
@@ -180,7 +180,7 @@ export const MAIN_GROUP_FOLDER = 'main';
 export const TIMEZONE = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
 ```
 
-See the full file at `src/config.ts:1-65`.
+See the full file at `src/config.ts`.
 
 ### groups/main/CLAUDE.md
 
@@ -212,7 +212,7 @@ Per-group Claude Code settings (auto-generated):
 }
 ```
 
-Generated in `src/container-runner.ts:112-134`.
+Generated in `src/container-runner.ts` during the `buildVolumeMounts` function.
 
 ## Customization workflow
 
@@ -298,7 +298,7 @@ Control what directories agents can access:
 Gets read-only access to the project root:
 
 ```typescript
-// From src/container-runner.ts:65-75
+// From src/container-runner.ts — main group mounts
 if (isMain) {
   mounts.push({
     hostPath: projectRoot,
@@ -319,7 +319,7 @@ if (isMain) {
 Only get their own group folder:
 
 ```typescript
-// From src/container-runner.ts:83-89
+// From src/container-runner.ts — non-main group mounts
 mounts.push({
   hostPath: groupDir,
   containerPath: '/workspace/group',

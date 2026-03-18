@@ -12,7 +12,7 @@ All runtime-specific logic lives in `src/container-runtime.ts`, making it easy t
 - **Docker** (default) - Cross-platform support (macOS, Linux, Windows via WSL2)
 - **Apple Container** (macOS only) - Lightweight native runtime
 
-The runtime binary is specified by `CONTAINER_RUNTIME_BIN` in `src/container-runtime.ts:10`:
+The runtime binary is specified by `CONTAINER_RUNTIME_BIN` in `src/container-runtime.ts`:
 
 ```typescript
 /** The container runtime binary name. */
@@ -129,7 +129,7 @@ docker builder prune -af
 
 ### Spawning containers
 
-Containers are spawned by `src/container-runner.ts:242` using the `runContainerAgent` function:
+Containers are spawned by the `runContainerAgent` function in `src/container-runner.ts`:
 
 ```typescript
 export async function runContainerAgent(
@@ -181,7 +181,7 @@ export async function runContainerAgent(
 
 ### Container arguments
 
-From `src/container-runner.ts:210`:
+From the `buildContainerArgs` function in `src/container-runner.ts`:
 
 ```typescript
 function buildContainerArgs(
@@ -192,6 +192,17 @@ function buildContainerArgs(
 
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
+
+  // Route API traffic through the credential proxy
+  args.push('-e', `ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}`);
+
+  // Mirror the host's auth method with a placeholder value
+  const authMode = detectAuthMode();
+  if (authMode === 'api-key') {
+    args.push('-e', 'ANTHROPIC_API_KEY=placeholder');
+  } else {
+    args.push('-e', 'CLAUDE_CODE_OAUTH_TOKEN=placeholder');
+  }
 
   // Run as host user so bind-mounted files are accessible
   const hostUid = process.getuid?.();
@@ -219,10 +230,12 @@ function buildContainerArgs(
 - `--rm` - Remove container after exit (ephemeral)
 - `--name` - Unique container name for management
 - `--user` - Run as host UID/GID for file permissions
+- `-e ANTHROPIC_BASE_URL` - Routes API calls through the credential proxy
+- `-e ANTHROPIC_API_KEY` or `-e CLAUDE_CODE_OAUTH_TOKEN` - Placeholder credential (replaced by proxy)
 
 ### Volume mounts
 
-Mounts are built per-group in `src/container-runner.ts:57`:
+Mounts are built per-group in `src/container-runner.ts`:
 
 | Path | Main Group | Non-Main Group | Mode |
 |------|------------|----------------|------|
@@ -245,7 +258,7 @@ Containers have two timeout mechanisms:
 1. **Hard timeout** - Maximum runtime before force kill (default: 30 minutes)
 2. **Idle timeout** - Graceful shutdown after period of inactivity (default: 30 minutes)
 
-From `src/container-runner.ts:383`:
+From the timeout logic in `src/container-runner.ts`:
 
 ```typescript
 const configTimeout = group.containerConfig?.timeout || CONTAINER_TIMEOUT;
@@ -281,7 +294,7 @@ The idle timeout is currently set equal to the hard timeout (both 30 minutes), c
 
 ### Ensuring runtime is available
 
-On startup, NanoClaw verifies the container runtime is accessible via `src/container-runtime.ts:26`:
+On startup, NanoClaw verifies the container runtime is accessible via `ensureContainerRuntimeRunning` in `src/container-runtime.ts`:
 
 ```typescript
 export function ensureContainerRuntimeRunning(): void {
@@ -301,7 +314,7 @@ export function ensureContainerRuntimeRunning(): void {
 
 ### Cleaning up orphans
 
-Orphaned containers from previous runs are cleaned up at startup via `src/container-runtime.ts:64`:
+Orphaned containers from previous runs are cleaned up at startup via `cleanupOrphans` in `src/container-runtime.ts`:
 
 ```typescript
 export function cleanupOrphans(): void {
@@ -337,7 +350,7 @@ Containers use sentinel markers to enable robust streaming output parsing:
 - `---NANOCLAW_OUTPUT_START---` - Marks the beginning of a JSON output block
 - `---NANOCLAW_OUTPUT_END---` - Marks the end of a JSON output block
 
-From `src/container-runner.ts:308`:
+From the stdout handler in `src/container-runner.ts`:
 
 ```typescript
 container.stdout.on('data', (data) => {

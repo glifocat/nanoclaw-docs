@@ -65,10 +65,16 @@ Repeat every N milliseconds:
 **Next run calculation:**
 
 ```typescript
-const nextRun = new Date(lastRun + intervalMs).toISOString();
+// Anchor to the scheduled time, not now, to prevent drift.
+// Skip past any missed intervals so we always land in the future.
+let next = new Date(task.next_run).getTime() + ms;
+while (next <= now) {
+  next += ms;
+}
+const nextRun = new Date(next).toISOString();
 ```
 
-Intervals are calculated from the **completion time** of the previous run, not the scheduled time. This prevents overlap if a task takes longer than the interval.
+Intervals are anchored to the **scheduled time** of the previous run, not the current time. This prevents cumulative drift. If intervals are missed (e.g., system was down), they are skipped to the next future occurrence.
 
 ### One-time
 

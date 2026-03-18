@@ -42,7 +42,7 @@ The main agent might:
 Agent Swarms are enabled automatically in NanoClaw through the container configuration:
 
 ```typescript
-// From src/container-runner.ts:119-122
+// From src/container-runner.ts — session settings
 env: {
   // Enable agent swarms (subagent orchestration)
   CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
@@ -144,7 +144,7 @@ All agents in a swarm have access to:
 - **Additional memory directories**: Via `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD`
 
 ```typescript
-// From src/container-runner.ts:122-124
+// From src/container-runner.ts — session settings
 env: {
   // Load CLAUDE.md from additional mounted directories
   CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',

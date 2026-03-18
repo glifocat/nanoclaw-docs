@@ -132,6 +132,7 @@ interface RegisteredGroup {
   added_at: string;                // ISO timestamp of registration
   containerConfig?: ContainerConfig; // Optional container configuration
   requiresTrigger?: boolean;       // Whether trigger is required (default: true)
+  isMain?: boolean;                // True for the main control group (elevated privileges)
 }
 ```
 
