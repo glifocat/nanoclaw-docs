@@ -268,6 +268,8 @@ Shared skills in `container/skills/` are synced to each group's `.claude/skills/
 - Skills are available to all agents
 - Per-group copies allow customization without affecting others
 - Changes to shared skills require container restart to sync
+- Built-in container skills include `/agent-browser` (web automation), `/capabilities` (system introspection), and `/status` (health check)
+- `/capabilities` and `/status` are main-channel only — they check for the `/workspace/project` mount to enforce access
 
 ### Agent runner customization
 
