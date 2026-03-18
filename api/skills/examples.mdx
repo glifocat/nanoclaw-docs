@@ -104,16 +104,17 @@ The `/add-telegram` skill adds Telegram channel support by merging the `skill/te
 
 The `skill/telegram` branch contains all code changes needed for Telegram support:
 
-```
-skill/telegram branch (diff from main):
-├── src/channels/telegram.ts        # New: TelegramChannel implementation
-├── src/channels/telegram.test.ts   # New: 46 unit tests
-├── src/index.ts                    # Modified: multi-channel support
-├── src/config.ts                   # Modified: Telegram config vars
-├── src/routing.test.ts             # Modified: Telegram JID tests
-├── package.json                    # Modified: grammy dependency
-└── .env.example                    # Modified: TELEGRAM_BOT_TOKEN
-```
+<Tree>
+  <Tree.Folder name="skill/telegram branch" defaultOpen>
+    <Tree.File name="src/channels/telegram.ts" />
+    <Tree.File name="src/channels/telegram.test.ts" />
+    <Tree.File name="src/index.ts" />
+    <Tree.File name="src/config.ts" />
+    <Tree.File name="src/routing.test.ts" />
+    <Tree.File name="package.json" />
+    <Tree.File name=".env.example" />
+  </Tree.Folder>
+</Tree>
 
 You can inspect the full diff before applying:
 

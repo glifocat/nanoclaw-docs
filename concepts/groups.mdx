@@ -94,13 +94,14 @@ Folder names cannot be changed after registration. The folder name becomes the g
 
 Each group has a dedicated directory structure:
 
-```
-groups/
-└── {group-folder}/
-    ├── CLAUDE.md           # Per-group memory
-    ├── logs/               # Container execution logs
-    └── ...                 # Any files created by the agent
-```
+<Tree>
+  <Tree.Folder name="groups" defaultOpen>
+    <Tree.Folder name="{group-folder}" defaultOpen>
+      <Tree.File name="CLAUDE.md" />
+      <Tree.Folder name="logs" />
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
 
 **What groups can access:**
 
@@ -120,15 +121,17 @@ Main group can technically access other groups' folders via the project root mou
 
 Each group maintains a separate Claude conversation session:
 
-```
-data/sessions/
-└── {group-folder}/
-    ├── .claude/            # Claude session data
-    │   ├── settings.json   # Per-group settings
-    │   ├── skills/         # Synced from container/skills/
-    │   └── ...             # Session database
-    └── agent-runner-src/   # Per-group agent runner code
-```
+<Tree>
+  <Tree.Folder name="data/sessions" defaultOpen>
+    <Tree.Folder name="{group-folder}" defaultOpen>
+      <Tree.Folder name=".claude" defaultOpen>
+        <Tree.File name="settings.json" />
+        <Tree.Folder name="skills" />
+      </Tree.Folder>
+      <Tree.Folder name="agent-runner-src" />
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
 
 **Session isolation ensures:**
 
@@ -141,15 +144,17 @@ data/sessions/
 
 Each group has its own IPC directory:
 
-```
-data/ipc/
-└── {group-folder}/
-    ├── messages/       # Outbound messages queue
-    ├── tasks/          # Task operations queue
-    ├── input/          # Follow-up messages from router
-    ├── current_tasks.json      # Filtered task list
-    └── available_groups.json   # Filtered group list
-```
+<Tree>
+  <Tree.Folder name="data/ipc" defaultOpen>
+    <Tree.Folder name="{group-folder}" defaultOpen>
+      <Tree.Folder name="messages" />
+      <Tree.Folder name="tasks" />
+      <Tree.Folder name="input" />
+      <Tree.File name="current_tasks.json" />
+      <Tree.File name="available_groups.json" />
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
 
 **IPC isolation prevents:**
 
