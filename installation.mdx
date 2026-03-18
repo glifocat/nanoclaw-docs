@@ -303,7 +303,7 @@ This creates the `nanoclaw-agent` image.
 
 After installation, NanoClaw creates:
 
-```
+```text
 NanoClaw/
 ├── src/                    # Source code
 ├── dist/                   # Compiled JavaScript
@@ -312,10 +312,10 @@ NanoClaw/
 │   └── main/              # Main channel
 │       ├── CLAUDE.md      # Group memory
 │       └── logs/          # Container logs
-├── store/                  # Channel sessions
-│   └── auth/              # Authentication data
-├── data/                   # SQLite database
-│   ├── nanoclaw.db        # Messages, groups, tasks
+├── store/                  # Persistent data
+│   ├── messages.db        # SQLite database (messages, groups, tasks)
+│   └── auth/              # Channel authentication data
+├── data/                   # Runtime data
 │   └── sessions/          # Claude sessions per group
 ├── logs/                   # Application logs
 │   ├── nanoclaw.log       # Main log
