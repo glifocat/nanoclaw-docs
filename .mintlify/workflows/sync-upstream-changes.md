@@ -41,7 +41,7 @@ A push was made to the NanoClaw source repository. Review the changes and update
 5. If a change doesn't affect documentation, skip it.
 6. Do NOT update code snippets with line number references (e.g., `src/file.ts:123`) — these drift constantly. Use descriptive references instead.
 7. Keep documentation concise. Match the existing style of each page.
-8. For every page you update, add or keep `tag: "UPDATED"` in the frontmatter. If the page already has a different tag (e.g., `NEW`), replace it with `UPDATED`. Example:
+8. For every page where you make a **content change** (corrected facts, new sections, changed behavior), add or keep `tag: "UPDATED"` in the frontmatter. Do NOT add the tag for cosmetic-only changes (formatting, component swaps, whitespace). If the page already has a different tag (e.g., `NEW`), replace it with `UPDATED`. Example:
    ```yaml
    ---
    title: "Container runtime"
