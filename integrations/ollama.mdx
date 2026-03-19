@@ -1,0 +1,133 @@
+---
+title: Ollama integration
+description: Use local LLMs alongside Claude via the Ollama MCP server
+tag: "NEW"
+keywords: ["ollama", "local models", "llm", "mcp", "self-hosted"]
+---
+
+NanoClaw can delegate tasks to local models running on [Ollama](https://ollama.com), while Claude remains the orchestrator. This lets you offload cheaper tasks (summarization, translation, general queries) to local models and reduce API costs.
+
+## How it works
+
+The `/add-ollama-tool` skill adds a stdio-based MCP server inside the agent container. The MCP server exposes two tools:
+
+| Tool | Description |
+|------|-------------|
+| `ollama_list_models` | Lists all locally installed Ollama models |
+| `ollama_generate` | Sends a prompt to a specified model and returns the response |
+
+The container agent reaches Ollama on the host via `host.docker.internal:11434`. Claude decides when to use local models based on task complexity — you don't need to configure routing rules.
+
+```mermaid
+graph TB
+    subgraph "Agent Container"
+        CL[Claude<br/>orchestrator]
+        MCP[Ollama MCP Server<br/>stdio transport]
+    end
+
+    subgraph "Host"
+        OL[Ollama<br/>llama3.2, gemma3, etc.]
+    end
+
+    CL -->|tool call| MCP
+    MCP -->|host.docker.internal:11434| OL
+
+    style CL fill:#6ee7b7,color:#1e1e1e
+    style MCP fill:#93c5fd,color:#1e1e1e
+    style OL fill:#fde68a,color:#1e1e1e
+```
+
+## Prerequisites
+
+Install Ollama and pull at least one model:
+
+```bash
+# Install Ollama (macOS/Linux)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull a model
+ollama pull llama3.2        # Good general purpose (2GB)
+ollama pull gemma3:1b       # Small and fast (1GB)
+ollama pull qwen3-coder:30b # Best for code tasks (18GB)
+```
+
+Verify Ollama is running:
+
+```bash
+ollama list
+```
+
+## Installation
+
+Apply the skill in Claude Code:
+
+```
+/add-ollama-tool
+```
+
+Or manually:
+
+```bash
+git fetch upstream skill/ollama-tool
+git merge upstream/skill/ollama-tool
+```
+
+This adds:
+- `container/agent-runner/src/ollama-mcp-stdio.ts` — MCP server that bridges to Ollama
+- `scripts/ollama-watch.sh` — macOS notification watcher for Ollama status
+- Ollama MCP configuration in the agent runner
+- `[OLLAMA]` log surfacing in container output
+
+After merging, rebuild the container:
+
+```bash
+./container/build.sh
+```
+
+## Configuration
+
+Set `OLLAMA_HOST` in `.env` if Ollama runs on a non-default address:
+
+```bash
+# Default (usually correct — no need to set)
+OLLAMA_HOST=http://host.docker.internal:11434
+```
+
+The MCP server automatically falls back to `localhost` if `host.docker.internal` fails.
+
+<Note>
+Ollama must be running on the host before starting NanoClaw. The MCP server writes status to `/workspace/ipc/ollama_status.json` so the host process can surface connection issues in logs.
+</Note>
+
+## Usage
+
+Once installed, Claude can use local models transparently. For example:
+
+> "Summarize this document using a local model"
+
+Claude will call `ollama_list_models` to see available models, then `ollama_generate` with the appropriate prompt. You can also be explicit about which model to use:
+
+> "Use llama3.2 to translate this to Spanish"
+
+## Third-party model endpoints
+
+Independently of Ollama, NanoClaw supports any Anthropic API-compatible endpoint. Set these in `.env`:
+
+```bash
+ANTHROPIC_BASE_URL=https://your-api-endpoint.com
+ANTHROPIC_AUTH_TOKEN=your-token-here
+```
+
+This allows you to use:
+- Open-source models on [Together AI](https://together.ai), [Fireworks](https://fireworks.ai), etc.
+- Custom model deployments with Anthropic-compatible APIs
+
+<Warning>
+When using `ANTHROPIC_BASE_URL`, the credential proxy still intercepts container API requests. Make sure the proxy can reach your custom endpoint.
+</Warning>
+
+## Related pages
+
+- [Skills system](/integrations/skills-system) — How skills work
+- [Configuration](/api/configuration) — Environment variables reference
+- [Container runtime](/advanced/container-runtime) — How agent containers work
