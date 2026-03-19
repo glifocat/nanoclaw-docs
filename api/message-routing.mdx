@@ -37,23 +37,28 @@ const escaped = escapeXml('Hello <world> & "friends"');
 Formats an array of messages as XML for agent consumption.
 
 ```typescript
-function formatMessages(messages: NewMessage[]): string
+function formatMessages(messages: NewMessage[], timezone: string): string
 ```
 
 <ParamField path="messages" type="NewMessage[]" required>
   Array of messages to format
 </ParamField>
 
+<ParamField path="timezone" type="string" required>
+  IANA timezone identifier (e.g., `"America/New_York"`). Used to format timestamps in local time and included in the output `<context>` header.
+</ParamField>
+
 <ResponseField name="return" type="string">
-  XML-formatted messages wrapped in `<messages>` tags
+  A `<context>` header followed by XML-formatted messages wrapped in `<messages>` tags
 </ResponseField>
 
-**Message format:**
+**Output format:**
 
 ```xml
+<context timezone="America/New_York" />
 <messages>
-<message sender="John Doe" time="2026-02-28T12:34:56.789Z">Hello!</message>
-<message sender="Jane Smith" time="2026-02-28T12:35:01.234Z">Hi there!</message>
+<message sender="John Doe" time="2:34 PM">Hello!</message>
+<message sender="Jane Smith" time="2:35 PM">Hi there!</message>
 </messages>
 ```
 
@@ -73,7 +78,7 @@ const messages = [
   },
 ];
 
-const formatted = formatMessages(messages);
+const formatted = formatMessages(messages, 'America/New_York');
 ```
 
 ### stripInternalTags
