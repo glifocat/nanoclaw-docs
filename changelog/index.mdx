@@ -4,28 +4,215 @@ description: "NanoClaw release history and changelog."
 icon: "tag"
 ---
 
+<Update label="2026-03-19" description="v1.2.19" tags={["Fix"]}>
+  ## NanoClaw v1.2.19
+
+  - Reduced `docker stop` timeout for faster container restarts (`-t 1` flag — containers are stateless)
+</Update>
+
+<Update label="2026-03-19" description="v1.2.18" tags={["Security", "Channel"]}>
+  ## NanoClaw v1.2.18
+
+  - **Security**: User prompt content is no longer logged on container errors — only input metadata (prompt length, session ID)
+  - Added Japanese README translation
+</Update>
+
+<Update label="2026-03-18" description="v1.2.17" tags={["Feature"]}>
+  ## NanoClaw v1.2.17
+
+  - Added read-only `/capabilities` and `/status` container-agent skills
+  - Formatted remote-control files with Prettier
+</Update>
+
+<Update label="2026-03-18" description="v1.2.16" tags={["Fix"]}>
+  ## NanoClaw v1.2.16
+
+  - Tasks snapshot now refreshes immediately after IPC task mutations (contributed by @mbravorus)
+</Update>
+
+<Update label="2026-03-16" description="v1.2.15" tags={["Fix"]}>
+  ## NanoClaw v1.2.15
+
+  - Fixed remote-control prompt auto-accept to prevent immediate exit
+  - Added `KillMode=process` so remote-control survives service restarts (contributed by @gabi-simons)
+</Update>
+
+<Update label="2026-03-14" description="v1.2.14" tags={["Feature"]}>
+  ## NanoClaw v1.2.14
+
+  - **Remote control**: Added `/remote-control` command for host-level Claude Code access from within containers
+</Update>
+
+<Update label="2026-03-14" description="v1.2.13" tags={["Feature", "Breaking"]}>
+  ## NanoClaw v1.2.13
+
+  Major architecture change: skills are now git branches, channels are separate fork repos.
+
+  - **Skills as branches**: Skills live as `skill/*` git branches merged via `git merge` — no more marketplace or plugin system
+  - **Docker Sandboxes**: Added Docker Sandboxes announcement and manual setup guide
+  - **Fork dispatch**: Added `nanoclaw-docker-sandboxes` to fork dispatch list
+  - Fixed setup registration to use `initDatabase`/`setRegisteredGroup` with correct CLI commands
+  - Auto-resolve `package-lock` conflicts when merging forks
+  - Bumped `claude-agent-sdk` to ^0.2.76
+</Update>
+
+<Update label="2026-03-08" description="v1.2.12" tags={["Feature", "Security"]}>
+  ## NanoClaw v1.2.12
+
+  - Added `/compact` skill for manual context compaction
+  - **Credential proxy**: Enhanced container environment isolation — API keys injected at runtime via local proxy instead of environment variables
+</Update>
+
+<Update label="2026-03-08" description="v1.2.11" tags={["Feature", "Channel", "Fix"]}>
+  ## NanoClaw v1.2.11
+
+  - **PDF reader skill**: Read and analyze PDF attachments
+  - **Image vision skill**: Image analysis for WhatsApp
+  - **WhatsApp reactions skill**: Emoji reactions and status tracker
+  - Fixed task container to close promptly when agent uses IPC-only messaging
+  - Fixed WhatsApp pairing code written to file for immediate access
+  - Fixed WhatsApp DM-with-bot registration to use sender's JID
+</Update>
+
+<Update label="2026-03-06" description="v1.2.10" tags={["Fix", "Performance"]}>
+  ## NanoClaw v1.2.10
+
+  - **Database**: Added `LIMIT` to unbounded message history queries for better performance
+</Update>
+
+<Update label="2026-03-06" description="v1.2.9" tags={["Feature", "Fix", "Channel"]}>
+  ## NanoClaw v1.2.9
+
+  - **Timezone-aware prompts**: Agent prompts now include timezone context for accurate time references
+  - Fixed voice-transcription skill dropping WhatsApp `registerChannel` call
+</Update>
+
+<Update label="2026-03-06" description="v1.2.8" tags={["Fix"]}>
+  ## NanoClaw v1.2.8
+
+  - Fixed misleading `send_message` tool description for scheduled tasks
+</Update>
+
+<Update label="2026-03-06" description="v1.2.7" tags={["Feature"]}>
+  ## NanoClaw v1.2.7
+
+  - **Ollama skill**: Added `/add-ollama` for local model inference
+  - **Task management**: Added `update_task` tool and return task ID from `schedule_task`
+</Update>
+
+<Update label="2026-03-04" description="v1.2.6" tags={["Fix"]}>
+  ## NanoClaw v1.2.6
+
+  - Updated `claude-agent-sdk` to 0.2.68
+</Update>
+
+<Update label="2026-03-04" description="v1.2.5" tags={["Fix"]}>
+  ## NanoClaw v1.2.5
+
+  - CI formatting fix
+</Update>
+
+<Update label="2026-03-04" description="v1.2.4" tags={["Fix"]}>
+  ## NanoClaw v1.2.4
+
+  - Fixed `_chatJid` rename to `chatJid` in `onMessage` callback
+</Update>
+
+<Update label="2026-03-04" description="v1.2.3" tags={["Feature", "Security"]}>
+  ## NanoClaw v1.2.3
+
+  - **Sender allowlist**: Per-chat access control to restrict who can interact with the agent
+</Update>
+
+<Update label="2026-03-04" description="v1.2.2" tags={["Feature", "Fix", "Channel"]}>
+  ## NanoClaw v1.2.2
+
+  - **Local Whisper skill**: Added `/use-local-whisper` for local voice transcription
+  - **Atomic task claims**: Prevents scheduled tasks from executing twice
+  - Fixed WhatsApp `messages.upsert` error handling
+</Update>
+
+<Update label="2026-03-02" description="v1.2.1" tags={["Fix"]}>
+  ## NanoClaw v1.2.1
+
+  - Version bump (no functional changes)
+</Update>
+
 <Update label="2026-03-02" description="v1.2.0" tags={["Feature", "Breaking", "Channel"]}>
   ## NanoClaw v1.2.0
 
-  Major release introducing pluggable multi-channel architecture. WhatsApp is no longer hardcoded — all channels (WhatsApp, Telegram, Discord, Slack, Gmail) now self-register via a channel registry.
+  Major release introducing multi-channel architecture. WhatsApp is no longer hardcoded — all channels self-register via a channel registry.
 
   ### Features
   - **Channel registry**: Channels self-register at module load time via `registerChannel()` factory pattern
   - **`isMain` flag**: Explicit boolean replaces folder-name-based main group detection
-  - **Channel-prefixed group folders**: Groups now use `whatsapp_main`, `telegram_family-chat` convention to prevent cross-channel collisions
-  - **Unconfigured channel warnings**: Channels with missing credentials emit WARN logs naming the exact missing variable instead of being silently skipped
+  - **Channel-prefixed group folders**: Groups use `whatsapp_main`, `telegram_family-chat` convention to prevent cross-channel collisions
+  - **Unconfigured channel warnings**: Missing credentials emit WARN logs naming the exact missing variable
 
   ### Breaking changes
-  - **WhatsApp moved to skill**: WhatsApp is no longer part of core — apply it with `/add-whatsapp`
-  - **`ENABLED_CHANNELS` removed**: The orchestrator now uses `getRegisteredChannelNames()` from the channel registry; channels are detected by credential presence
-  - **All channel skills simplified**: Discord, Slack, Gmail, Telegram skills now use the same self-registration pattern — no more `*_ONLY` flags
+  - **WhatsApp moved to skill**: No longer part of core — apply with `/add-whatsapp`
+  - **`ENABLED_CHANNELS` removed**: Orchestrator uses `getRegisteredChannelNames()`; channels detected by credential presence
+  - **All channel skills simplified**: No more `*_ONLY` flags — all use self-registration pattern
 
   ### Migration
-  Existing WhatsApp users: run `/add-whatsapp` in Claude Code CLI after updating to re-apply the WhatsApp channel as a skill.
+  Existing WhatsApp users: run `/add-whatsapp` in Claude Code CLI after updating.
 </Update>
 
-<Update label="2026-03-02" description="v1.1.6" tags={["Feature"]}>
+<Update label="2026-03-01" description="v1.1.6" tags={["Fix"]}>
   ## NanoClaw v1.1.6
 
-  - **Breaking change detection on update**: The `update-nanoclaw` skill now diffs `CHANGELOG.md` against the backup tag to detect `[BREAKING]` entries after validation, showing each breaking change and offering to run the referenced migration skill
+  - Added CJK font support (`fonts-noto-cjk`) for Chromium screenshots (contributed by @neocode24)
+</Update>
+
+<Update label="2026-03-01" description="v1.1.5" tags={["Fix", "Channel"]}>
+  ## NanoClaw v1.1.5
+
+  - Fixed wrapped WhatsApp message normalization before reading content
+</Update>
+
+<Update label="2026-03-01" description="v1.1.4" tags={["Feature"]}>
+  ## NanoClaw v1.1.4
+
+  - **Third-party model support**: Use models beyond Claude
+  - **`/update-nanoclaw` skill**: New skill for syncing customized installs with upstream (replaces old `/update`)
+  - Added Husky and `format:fix` script for consistent formatting
+</Update>
+
+<Update label="2026-02-25" description="v1.1.3" tags={["Feature", "Channel"]}>
+  ## NanoClaw v1.1.3
+
+  Biggest pre-1.2 release — added Slack channel, refactored Gmail, and improved CI.
+
+  - **Slack channel**: Added `/add-slack` skill
+  - **Gmail refactor**: Restructured add-gmail skill for new architecture, graceful startup when credentials missing
+  - Removed deterministic caching from skills engine
+  - Rebased core skills (Telegram, Discord, voice) to latest main
+  - Fixed WhatsApp QR data handling
+  - Added `.nvmrc` specifying Node 22
+  - CI optimization, logging improvements, and codebase formatting
+  - Added CONTRIBUTORS.md and CODEOWNERS
+</Update>
+
+<Update label="2026-02-24" description="v1.1.2" tags={["Fix"]}>
+  ## NanoClaw v1.1.2
+
+  - Improved error handling for WhatsApp Web version fetch (follow-up to v1.1.1)
+</Update>
+
+<Update label="2026-02-24" description="v1.1.1" tags={["Feature", "Fix"]}>
+  ## NanoClaw v1.1.1
+
+  - **Qodo skills**: Added official Qodo skills and codebase intelligence
+  - Rewrote README for broader audience
+  - Fixed WhatsApp 405 connection failures via `fetchLatestWaWebVersion`
+</Update>
+
+<Update label="2026-02-23" description="v1.1.0" tags={["Feature", "Security"]}>
+  ## NanoClaw v1.1.0
+
+  - **`/update` skill**: Pull upstream changes from within Claude Code
+  - **Security fix**: Fixed critical skills path-remap root escape (including symlink traversal)
+  - Replaced 'ask the user' with `AskUserQuestion` tool in skills
+  - Fixed empty messages from polling queries
+  - Fixed fallback name from 'AssistantNameMissing' to 'Assistant'
 </Update>
