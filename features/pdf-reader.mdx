@@ -1,0 +1,67 @@
+---
+title: PDF reader
+description: Extract and process text from PDF attachments and URLs
+tag: "NEW"
+keywords: ["pdf", "document", "text extraction", "whatsapp", "poppler"]
+---
+
+NanoClaw can extract text from PDF files sent as attachments, shared via URL, or stored locally. The agent can then read, summarize, or answer questions about the document content.
+
+<Note>
+The PDF reader skill is currently WhatsApp-only. It lives on the `nanoclaw-whatsapp` fork.
+</Note>
+
+## How it works
+
+The skill uses `poppler-utils` (`pdftotext` and `pdfinfo`) for text extraction. It handles three input sources:
+
+| Source | How it works |
+|--------|-------------|
+| WhatsApp attachment | Auto-downloaded by the WhatsApp channel, then extracted |
+| URL | Downloaded via `curl`, then extracted |
+| Local file | Extracted directly from the container filesystem |
+
+The extracted text is added to the agent's context as a tool result, so Claude can reason about the full document content.
+
+## Prerequisites
+
+- WhatsApp channel installed (`/add-whatsapp`)
+- `poppler-utils` (installed inside the container by the skill)
+
+## Installation
+
+```bash
+# On your nanoclaw-whatsapp fork
+git fetch whatsapp skill/pdf-reader
+git merge whatsapp/skill/pdf-reader
+```
+
+Or via Claude Code:
+
+```
+/add-pdf-reader
+```
+
+The skill adds a CLI tool at `container/skills/pdf-reader/` that runs inside the agent container.
+
+After merging, rebuild the container:
+
+```bash
+./container/build.sh
+```
+
+## Usage examples
+
+Send a PDF to a WhatsApp group, then ask:
+
+```
+@Andy summarize this document
+@Andy what are the key findings in this PDF?
+@Andy extract the table from page 3
+```
+
+## Related pages
+
+- [Skills system](/integrations/skills-system) — How skills work
+- [WhatsApp integration](/integrations/whatsapp) — WhatsApp channel setup
+- [Image vision](/features/image-vision) — Another WhatsApp media skill

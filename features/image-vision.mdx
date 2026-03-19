@@ -1,0 +1,63 @@
+---
+title: Image vision
+description: Process image attachments with multimodal AI understanding
+tag: "NEW"
+keywords: ["image", "vision", "multimodal", "whatsapp", "attachments"]
+---
+
+NanoClaw can understand images sent as message attachments using Claude's multimodal capabilities. The agent sees the image content and can describe, analyze, or act on it.
+
+<Note>
+Image vision is currently WhatsApp-only. This skill lives on the `nanoclaw-whatsapp` fork.
+</Note>
+
+## How it works
+
+1. A WhatsApp image attachment arrives
+2. The WhatsApp channel auto-downloads the image
+3. The image is resized using `sharp` (to fit within Claude's input limits)
+4. The image is base64-encoded and passed to the agent as a multimodal content block
+5. Claude sees the image alongside the text message and can reason about it
+
+The agent doesn't need special instructions — it sees the image natively as part of the conversation.
+
+## Prerequisites
+
+- WhatsApp channel installed (`/add-whatsapp`)
+- The `sharp` library (installed automatically by the skill)
+
+## Installation
+
+```bash
+# On your nanoclaw-whatsapp fork
+git fetch whatsapp skill/image-vision
+git merge whatsapp/skill/image-vision
+```
+
+Or via Claude Code:
+
+```
+/add-image-vision
+```
+
+After merging, rebuild:
+
+```bash
+npm run build
+```
+
+## Usage examples
+
+Send an image to a WhatsApp group where the agent is active, then ask:
+
+```
+@Andy what's in this image?
+@Andy extract the text from this screenshot
+@Andy describe this chart
+```
+
+## Related pages
+
+- [Skills system](/integrations/skills-system) — How skills work
+- [WhatsApp integration](/integrations/whatsapp) — WhatsApp channel setup
+- [Voice transcription](/features/voice-transcription) — Another WhatsApp media skill
