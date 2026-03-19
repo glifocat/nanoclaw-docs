@@ -1,6 +1,7 @@
 ---
 title: Ollama integration
 description: Use local LLMs alongside Claude via the Ollama MCP server
+tag: "NEW"
 keywords: ["ollama", "local models", "llm", "mcp", "self-hosted"]
 ---
 
@@ -17,20 +18,23 @@ The `/add-ollama-tool` skill adds a stdio-based MCP server inside the agent cont
 
 The container agent reaches Ollama on the host via `host.docker.internal:11434`. Claude decides when to use local models based on task complexity — you don't need to configure routing rules.
 
-```
-┌─────────────────────────────┐
-│     Agent Container         │
-│                             │
-│  Claude ──► Ollama MCP      │
-│  (orchestrator)  (stdio)    │
-│                  │          │
-└──────────────────┼──────────┘
-                   │ host.docker.internal:11434
-                   ▼
-┌─────────────────────────────┐
-│     Host                    │
-│  Ollama (llama3.2, etc.)    │
-└─────────────────────────────┘
+```mermaid
+graph TB
+    subgraph "Agent Container"
+        CL[Claude<br/>orchestrator]
+        MCP[Ollama MCP Server<br/>stdio transport]
+    end
+
+    subgraph "Host"
+        OL[Ollama<br/>llama3.2, gemma3, etc.]
+    end
+
+    CL -->|tool call| MCP
+    MCP -->|host.docker.internal:11434| OL
+
+    style CL fill:#6ee7b7,color:#1e1e1e
+    style MCP fill:#93c5fd,color:#1e1e1e
+    style OL fill:#fde68a,color:#1e1e1e
 ```
 
 ## Prerequisites
