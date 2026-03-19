@@ -1,6 +1,7 @@
 ---
 title: Group isolation
 description: How NanoClaw isolates groups and manages per-group contexts
+tag: "UPDATED"
 ---
 
 Groups in NanoClaw represent isolated contexts, typically corresponding to group chats or individual conversations on any connected messaging platform. Each group has its own filesystem, memory, and session.
@@ -35,7 +36,7 @@ The main group is special:
 **Identifying main group:**
 
 ```typescript
-const isMain = group.folder === 'main';
+const isMain = group.isMain === true;
 ```
 
 ### Non-main groups
@@ -220,15 +221,16 @@ The GroupQueue manages per-group execution:
 
 ```typescript
 interface GroupState {
-  active: boolean;              // Container currently running?
-  idleWaiting: boolean;         // Container idle, waiting for input?
-  isTaskContainer: boolean;     // Running a task vs. message?
-  pendingMessages: boolean;     // Messages queued?
-  pendingTasks: QueuedTask[];   // Tasks queued
-  process: ChildProcess | null; // Container process
-  containerName: string | null; // Docker container name
-  groupFolder: string | null;   // Group folder identifier
-  retryCount: number;           // Failed run retry counter
+  active: boolean;                // Container currently running?
+  idleWaiting: boolean;           // Container idle, waiting for input?
+  isTaskContainer: boolean;       // Running a task vs. message?
+  runningTaskId: string | null;   // ID of currently running task (for deduplication)
+  pendingMessages: boolean;       // Messages queued?
+  pendingTasks: QueuedTask[];     // Tasks queued
+  process: ChildProcess | null;   // Container process
+  containerName: string | null;   // Docker container name
+  groupFolder: string | null;     // Group folder identifier
+  retryCount: number;             // Failed run retry counter
 }
 ```
 
@@ -269,9 +271,9 @@ Groups can have extra directories mounted via `containerConfig.additionalMounts`
 
 ```typescript
 interface AdditionalMount {
-  hostPath: string;        // Absolute path on host
-  containerPath: string;   // Path inside container (relative, no ..)
-  readonly?: boolean;      // Force read-only (default: false)
+  hostPath: string;         // Absolute path on host
+  containerPath?: string;   // Relative path (mounted at /workspace/extra/{value}). Defaults to basename of hostPath
+  readonly?: boolean;       // Force read-only (default: true)
 }
 ```
 
@@ -285,13 +287,17 @@ interface AdditionalMount {
     "additionalMounts": [
       {
         "hostPath": "/Users/you/projects/website",
-        "containerPath": "/workspace/website",
+        "containerPath": "website",
         "readonly": true
       }
     ]
   }
 }
 ```
+
+<Note>
+The `containerPath` must be relative (no leading `/`). It is automatically prefixed with `/workspace/extra/`, so `"website"` becomes `/workspace/extra/website` inside the container.
+</Note>
 
 **Security validation:**
 

@@ -1,7 +1,6 @@
 ---
 title: Installation
 description: Detailed installation requirements and setup for macOS and Linux
-tag: "UPDATED"
 icon: "download"
 keywords: ["requirements", "docker", "node", "apple container"]
 ---
@@ -287,9 +286,10 @@ All dependencies are installed automatically by `/setup` via `npm install`.
 
 The agent container includes:
 
-- **Base**: Node.js 22 Alpine Linux
-- **Claude Agent SDK**: Pre-installed
-- **Tools**: bash, git, curl, jq
+- **Base**: Node.js 22 (Debian slim)
+- **Browser**: Chromium with CJK and emoji font support
+- **Claude Agent SDK**: `@anthropic-ai/claude-code` (pre-installed)
+- **Tools**: `agent-browser`, bash, git, curl
 - **User**: Non-root `node` user (uid 1000)
 
 The container is built during setup:

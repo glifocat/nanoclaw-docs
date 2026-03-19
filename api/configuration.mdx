@@ -1,6 +1,7 @@
 ---
 title: Configuration
 description: Configuration options for NanoClaw
+tag: "UPDATED"
 ---
 
 NanoClaw configuration is managed through environment variables and the `config.ts` module.
@@ -113,9 +114,29 @@ MAX_CONCURRENT_CONTAINERS=5
 TZ=America/Los_Angeles
 ```
 
+## Credential environment variables
+
+The credential proxy reads these from `.env` at startup (never exposed to containers):
+
+<ParamField path="ANTHROPIC_API_KEY" type="string">
+  Anthropic API key. If set, the proxy uses API key mode.
+</ParamField>
+
+<ParamField path="CLAUDE_CODE_OAUTH_TOKEN" type="string">
+  OAuth token for Claude Code authentication. Used when `ANTHROPIC_API_KEY` is not set.
+</ParamField>
+
+<ParamField path="ANTHROPIC_AUTH_TOKEN" type="string">
+  Fallback OAuth token. Used when neither `ANTHROPIC_API_KEY` nor `CLAUDE_CODE_OAUTH_TOKEN` is set.
+</ParamField>
+
+<ParamField path="ANTHROPIC_BASE_URL" type="string">
+  Upstream API URL for the credential proxy to forward requests to. Defaults to the Anthropic API endpoint.
+</ParamField>
+
 ## Security notes
 
 - **Secrets** (API keys, credentials) are NOT read in `config.ts`
-- Secrets are loaded only by the credential proxy (`credential-proxy.ts`), never exposed to containers
+- Secrets are loaded only by the credential proxy (`credential-proxy.ts`) once at startup, never exposed to containers
 - This prevents leaking secrets to child processes
 - Mount allowlist is stored OUTSIDE project root and never mounted into containers

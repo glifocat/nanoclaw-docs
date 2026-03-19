@@ -1,6 +1,7 @@
 ---
 title: Message handling and routing
 description: Learn how NanoClaw processes messages, triggers agent responses, and routes communication across channels
+tag: "UPDATED"
 ---
 
 ## Overview
@@ -61,22 +62,27 @@ Messages are formatted as XML before being sent to the agent, preserving sender 
 
 ```typescript
 // From src/router.ts
-function formatMessages(messages: NewMessage[]): string {
-  const lines = messages.map(
-    (m) =>
-      `<message sender="${escapeXml(m.sender_name)}" time="${m.timestamp}">${escapeXml(m.content)}</message>`,
-  );
-  return `<messages>\n${lines.join('\n')}\n</messages>`;
+function formatMessages(
+  messages: NewMessage[],
+  timezone: string,
+): string {
+  const lines = messages.map((m) => {
+    const displayTime = formatLocalTime(m.timestamp, timezone);
+    return `<message sender="${escapeXml(m.sender_name)}" time="${escapeXml(displayTime)}">${escapeXml(m.content)}</message>`;
+  });
+  const header = `<context timezone="${escapeXml(timezone)}" />\n`;
+  return `${header}<messages>\n${lines.join('\n')}\n</messages>`;
 }
 ```
 
 ### Example formatted output
 
 ```xml
+<context timezone="America/Los_Angeles" />
 <messages>
-  <message sender="Alice" time="2026-02-28T10:30:00Z">@Andy what's the weather?</message>
-  <message sender="Bob" time="2026-02-28T10:31:15Z">I think it's sunny</message>
-  <message sender="Alice" time="2026-02-28T10:32:00Z">Can you check?</message>
+  <message sender="Alice" time="2026-02-28 10:30 AM">@Andy what's the weather?</message>
+  <message sender="Bob" time="2026-02-28 10:31 AM">I think it's sunny</message>
+  <message sender="Alice" time="2026-02-28 10:32 AM">Can you check?</message>
 </messages>
 ```
 
@@ -119,11 +125,11 @@ export const MAX_CONCURRENT_CONTAINERS = Math.max(
 
 - Each group gets its own message queue
 - Multiple groups can have active containers simultaneously (up to `MAX_CONCURRENT_CONTAINERS`)
-- When a container is idle, new messages can be piped directly to stdin without spawning a new container
+- When a container is idle, new messages are sent via IPC files without spawning a new container
 - Idle timeout: 30 minutes by default (configurable via `IDLE_TIMEOUT`)
 
 <Accordion title="Advanced: Message piping to active containers">
-When an agent container is already running and idle, NanoClaw can pipe new messages directly to its stdin instead of spawning a new container:
+When an agent container is already running and idle, NanoClaw writes follow-up messages as JSON files to the group's IPC input directory instead of spawning a new container:
 
 ```typescript
 // From the message loop in src/index.ts

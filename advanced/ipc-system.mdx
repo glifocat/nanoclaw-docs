@@ -263,7 +263,7 @@ case 'refresh_groups':
       { sourceGroup },
       'Group metadata refresh requested via IPC',
     );
-    await deps.syncGroupMetadata(true);
+    await deps.syncGroups(true);
   } else {
     logger.warn(
       { sourceGroup },
