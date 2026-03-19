@@ -137,7 +137,7 @@ The IPC watcher (`src/ipc.ts`) enables container-to-host communication:
 
 **Available operations:**
 - `send_message`: Send message to group chat (own chat only for non-main)
-- `schedule_task`, `pause_task`, `resume_task`, `cancel_task`: Task management
+- `schedule_task`, `pause_task`, `resume_task`, `cancel_task`, `update_task`: Task management
 - `register_group`, `sync_groups`: Group management (main only)
 
 ### Database
@@ -300,13 +300,14 @@ The agent runner is the TypeScript code that wraps Claude Agent SDK. It handles 
 1. **Container system check**: Ensure Docker is running, clean up orphaned containers
 2. **Database initialization**: Create tables if needed, load schema
 3. **State loading**: Restore message cursors, sessions, registered groups
-4. **Channel connection**: Connect to messaging channels, authenticate if needed
-5. **Subsystem startup**: 
+4. **Remote Control restore**: Re-adopt any surviving Remote Control session from a previous run
+5. **Channel connection**: Connect to messaging channels, authenticate if needed
+6. **Subsystem startup**: 
    - Task scheduler loop (60s interval)
    - IPC watcher (1s poll interval)
    - Message loop (2s poll interval)
-6. **Recovery**: Check for unprocessed messages from previous crash
-7. **Ready**: System begins processing messages and tasks
+7. **Recovery**: Check for unprocessed messages from previous crash
+8. **Ready**: System begins processing messages and tasks
 
 ## Graceful shutdown
 

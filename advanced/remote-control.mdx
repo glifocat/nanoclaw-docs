@@ -1,13 +1,18 @@
 ---
 title: Remote Control
 description: Launch a browser-based Claude Code session linked to your NanoClaw instance
+tag: "UPDATED"
 ---
 
 <Note>
   Remote Control was added in **v1.2.14** ([PR #1072](https://github.com/qwibitai/nanoclaw/pull/1072)).
 </Note>
 
-Remote Control lets you open a full Claude Code session in your browser that runs inside your NanoClaw project directory. The session is managed by the host process — start it from any connected chat, share the URL, and stop it when you're done.
+Remote Control lets you open a full Claude Code session in your browser that runs inside your NanoClaw project directory. The session is managed by the host process — start it from the main group's chat on any connected channel, share the URL, and stop it when you're done.
+
+<Warning>
+  Remote Control is restricted to the **main group only**. Commands sent from non-main groups are silently rejected. This is because the session has full host-level access to the NanoClaw project directory.
+</Warning>
 
 ## How it works
 
@@ -48,7 +53,7 @@ sequenceDiagram
   </Step>
 
   <Step title="Stop">
-    Send `/remote-control stop` to terminate the session. The host sends `SIGTERM` to the process and removes the state file.
+    Send `/remote-control-end` to terminate the session. The host sends `SIGTERM` to the process and removes the state file.
   </Step>
 </Steps>
 
@@ -56,7 +61,7 @@ sequenceDiagram
 
 ### Starting a session
 
-From any connected chat (Telegram, WhatsApp, Discord, etc.):
+From the main group's chat on any connected channel (Telegram, WhatsApp, Discord, etc.):
 
 ```
 /remote-control
@@ -76,7 +81,7 @@ If a session is already running, calling `/remote-control` again returns the exi
 ### Stopping a session
 
 ```
-/remote-control stop
+/remote-control-end
 ```
 
 This sends `SIGTERM` to the running process and cleans up state.
