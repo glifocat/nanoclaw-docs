@@ -1,6 +1,7 @@
 ---
 title: Message routing
 description: Message formatting and routing API
+tag: "UPDATED"
 ---
 
 The message router handles formatting messages for agents and routing outbound messages to the correct channel.
@@ -37,23 +38,28 @@ const escaped = escapeXml('Hello <world> & "friends"');
 Formats an array of messages as XML for agent consumption.
 
 ```typescript
-function formatMessages(messages: NewMessage[]): string
+function formatMessages(messages: NewMessage[], timezone: string): string
 ```
 
 <ParamField path="messages" type="NewMessage[]" required>
   Array of messages to format
 </ParamField>
 
+<ParamField path="timezone" type="string" required>
+  IANA timezone string (e.g., `"America/Los_Angeles"`) used to format message timestamps in local time
+</ParamField>
+
 <ResponseField name="return" type="string">
-  XML-formatted messages wrapped in `<messages>` tags
+  XML-formatted messages with a `<context>` header and `<messages>` block
 </ResponseField>
 
 **Message format:**
 
 ```xml
+<context timezone="America/Los_Angeles" />
 <messages>
-<message sender="John Doe" time="2026-02-28T12:34:56.789Z">Hello!</message>
-<message sender="Jane Smith" time="2026-02-28T12:35:01.234Z">Hi there!</message>
+<message sender="John Doe" time="Feb 28, 2:34 PM">Hello!</message>
+<message sender="Jane Smith" time="Feb 28, 2:35 PM">Hi there!</message>
 </messages>
 ```
 
@@ -73,7 +79,7 @@ const messages = [
   },
 ];
 
-const formatted = formatMessages(messages);
+const formatted = formatMessages(messages, 'America/Los_Angeles');
 ```
 
 ### stripInternalTags
@@ -227,6 +233,7 @@ interface Channel {
   isConnected(): boolean;
   ownsJid(jid: string): boolean;
   disconnect(): Promise<void>;
-  setTyping?(jid: string, isTyping: boolean): Promise<void>; // Optional
+  setTyping?(jid: string, isTyping: boolean): Promise<void>;   // Optional
+  syncGroups?(force: boolean): Promise<void>;                   // Optional
 }
 ```

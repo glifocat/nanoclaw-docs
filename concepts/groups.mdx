@@ -1,6 +1,7 @@
 ---
 title: Group isolation
 description: How NanoClaw isolates groups and manages per-group contexts
+tag: "UPDATED"
 ---
 
 Groups in NanoClaw represent isolated contexts, typically corresponding to group chats or individual conversations on any connected messaging platform. Each group has its own filesystem, memory, and session.
@@ -30,12 +31,12 @@ The main group is special:
 - Can manage other groups
 - Can schedule tasks for any group
 - Has read-write access to project root (read-only mount)
-- Folder is always `main`
+- Identified by `isMain: true` flag in the database
 
 **Identifying main group:**
 
 ```typescript
-const isMain = group.folder === 'main';
+const isMain = group.isMain === true;
 ```
 
 ### Non-main groups
@@ -269,9 +270,9 @@ Groups can have extra directories mounted via `containerConfig.additionalMounts`
 
 ```typescript
 interface AdditionalMount {
-  hostPath: string;        // Absolute path on host
-  containerPath: string;   // Path inside container (relative, no ..)
-  readonly?: boolean;      // Force read-only (default: false)
+  hostPath: string;         // Absolute path on host (supports ~ for home)
+  containerPath?: string;   // Optional — defaults to basename of hostPath. Mounted at /workspace/extra/{value}
+  readonly?: boolean;       // Default: true for safety
 }
 ```
 

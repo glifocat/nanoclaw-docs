@@ -180,12 +180,13 @@ IPC operations from non-main groups are silently rejected if unauthorized. This 
 
 ### 5. Credential handling
 
-#### Mounted credentials
+#### Shadow-mounted `.env`
 
-- Claude auth tokens (filtered from `.env`, read-only)
+The main group's project root is mounted read-only, but the `.env` file is shadow-mounted to `/dev/null` so the agent cannot read secrets from it. Credentials are injected exclusively by the credential proxy.
 
 #### NOT mounted
 
+- Real API keys or OAuth tokens - injected by the credential proxy, never in containers
 - Channel sessions (e.g., `store/auth/` for WhatsApp) - host only
 - Mount allowlist - external, never mounted
 - Any credentials matching blocked patterns

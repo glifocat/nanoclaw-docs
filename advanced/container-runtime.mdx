@@ -1,6 +1,7 @@
 ---
 title: Container runtime
 description: Container execution architecture and runtime details
+tag: "UPDATED"
 ---
 
 NanoClaw runs agents in isolated Linux containers to provide security through OS-level process and filesystem isolation. The container runtime is abstracted to support multiple backends.
@@ -161,13 +162,11 @@ export async function runContainerAgent(
   
   <Step title="Pass input via stdin">
     ```typescript
-    input.secrets = readSecrets();
     container.stdin.write(JSON.stringify(input));
     container.stdin.end();
-    delete input.secrets; // Don't log secrets
     ```
     
-    Secrets are passed via stdin (never written to disk or mounted as files).
+    The `ContainerInput` JSON (prompt, session ID, group folder, flags) is written to stdin. Credentials are never passed to the container — they are injected by the credential proxy on outbound API requests.
   </Step>
   
   <Step title="Stream output">

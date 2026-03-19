@@ -1,6 +1,7 @@
 ---
 title: Task scheduling concepts
 description: How NanoClaw's task scheduler works and how tasks are executed
+tag: "UPDATED"
 ---
 
 NanoClaw includes a built-in task scheduler that runs Claude agents on a schedule. Tasks have full agent capabilities and can optionally send results to group chats.
@@ -86,11 +87,11 @@ Run once at a specific ISO 8601 timestamp:
 **After execution:**
 
 - `next_run` set to `null`
-- Task remains in database with `status: active`
-- Will not run again unless `next_run` is manually updated
+- Status automatically set to `completed`
+- Task remains in database for reference and history
 
-<Accordion title="Why not auto-pause one-time tasks?">
-One-time tasks remain `active` after running so they appear in task lists with their execution history. You can manually pause them if desired, or leave them for reference.
+<Accordion title="How one-time task completion works">
+When `computeNextRun` returns `null` (as it does for `once` tasks), `updateTaskAfterRun` sets the status to `completed`. The task stays in the database with its run history intact.
 </Accordion>
 
 ## Task lifecycle
@@ -152,8 +153,8 @@ After a task completes:
 1. **Run logged**: Duration, result summary, error (if any) written to `task_runs` table
 2. **Next run calculated**: 
    - Cron: Next matching time according to cron expression
-   - Interval: Current time + interval milliseconds
-   - Once: Set to `null`
+   - Interval: Anchored to previous scheduled time + interval (prevents drift)
+   - Once: Set to `null`, status set to `completed`
 3. **Last result updated**: First 200 chars of result stored in `tasks.last_result`
 4. **Container closes**: 10-second grace period, then stdin closed (container exits)
 
@@ -333,8 +334,8 @@ All task executions are logged to `task_runs` table:
 
 ```typescript
 interface TaskRun {
-  id: string;         // Auto-generated UUID
-  task_id: string;    // References tasks.id
+  id: number;          // Auto-incrementing integer
+  task_id: string;     // References tasks.id
   run_at: string;     // ISO timestamp
   duration_ms: number; // Execution time
   status: 'success' | 'error';

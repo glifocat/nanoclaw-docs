@@ -1,6 +1,7 @@
 ---
 title: Container isolation
 description: How containers provide security isolation for agent execution
+tag: "UPDATED"
 ---
 
 NanoClaw runs all agents inside containers (lightweight Linux VMs) to provide true OS-level isolation. This is the primary security boundary that makes Bash access and code execution safe.
@@ -83,8 +84,7 @@ The entrypoint script (`/app/entrypoint.sh`):
    - Allows per-group customization of agent runner code
    - Compiled output is read-only to prevent runtime tampering
 2. **Read input from stdin**: `cat > /tmp/input.json`
-   - Secrets passed via stdin (never written to disk)
-   - Input file deleted immediately after read
+   - Input JSON received via stdin, written to a temp file
 3. **Execute agent**: `node /tmp/dist/index.js < /tmp/input.json`
    - Runs agent-runner with input
    - Outputs JSON results to stdout
@@ -105,6 +105,12 @@ mounts = [
   {
     hostPath: '/path/to/nanoclaw',
     containerPath: '/workspace/project',
+    readonly: true
+  },
+  {
+    // Shadow .env so the agent cannot read secrets from the mounted project root
+    hostPath: '/dev/null',
+    containerPath: '/workspace/project/.env',
     readonly: true
   },
   {
@@ -129,6 +135,10 @@ mounts = [
   }
 ]
 ```
+
+<Note>
+The `.env` file is shadow-mounted to `/dev/null` so the agent cannot read secrets from the project root. Credentials are injected by the credential proxy, never exposed to containers.
+</Note>
 
 ### Non-main group mounts
 
@@ -186,12 +196,15 @@ All mounts are validated against the allowlist at `~/.config/nanoclaw/mount-allo
 
 **Validation steps:**
 
-1. Resolve symlinks to real path
-2. Check against blocked patterns (`.ssh`, `.env`, etc.)
-3. Verify path is under an allowed root
-4. Enforce `nonMainReadOnly` for non-main groups
-5. Enforce per-root `allowReadWrite` setting
-6. Reject container paths with `..` or absolute paths
+1. Derive `containerPath` from `hostPath` basename if not specified
+2. Reject container paths with `..` or absolute paths
+3. Resolve symlinks to real path on host
+4. Check against blocked patterns (`.ssh`, `.env`, etc.)
+5. Verify path is under an allowed root
+6. Enforce `nonMainReadOnly` for non-main groups
+7. Enforce per-root `allowReadWrite` setting
+
+Validated mounts are placed at `/workspace/extra/{containerPath}` inside the container.
 
 ## Container lifecycle
 
@@ -380,27 +393,15 @@ NanoClaw detects and uses the available container runtime:
 
 ```typescript
 // src/container-runtime.ts
-export const CONTAINER_RUNTIME_BIN = 
-  fs.existsSync('/usr/local/bin/orb') ? 'orb' :  // Apple Container
-  fs.existsSync('/usr/local/bin/docker') ? 'docker' :  // Docker (macOS)
-  'docker';  // Default (Linux, Windows)
+export const CONTAINER_RUNTIME_BIN = 'docker';
 ```
 
 **Supported runtimes:**
 
 - **Docker** (default): Cross-platform, well-tested
-- **Apple Container** (macOS): Lightweight, native virtualization
+- **Apple Container** (macOS): Available via the `/convert-to-apple-container` skill, which modifies the runtime binary
 
-**Runtime-specific commands:**
-
-```typescript
-// Read-only mount args
-if (runtime === 'orb') {
-  return ['-v', `${hostPath}:${containerPath}:ro`];
-} else {
-  return ['-v', `${hostPath}:${containerPath}:ro`];
-}
-```
+The runtime is abstracted through `src/container-runtime.ts`, so all runtime-specific logic (host gateway, read-only mounts, stop commands) lives in one file.
 
 ## Skills and MCP servers
 

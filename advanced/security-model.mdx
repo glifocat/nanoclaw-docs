@@ -148,6 +148,19 @@ if (
 - Supports hot-swapping between API key and OAuth modes (reads `.env` per request)
 - For OAuth, auto-refreshes tokens from `~/.claude/.credentials.json`
 
+**`.env` shadow mount:**
+
+For main groups, the project root is mounted read-only, but `.env` is shadow-mounted to `/dev/null` so agents cannot read secrets from it:
+
+```typescript
+// Shadow .env so the agent cannot read secrets from the mounted project root
+mounts.push({
+  hostPath: '/dev/null',
+  containerPath: '/workspace/project/.env',
+  readonly: true,
+});
+```
+
 **NOT mounted:**
 - Channel sessions (e.g., `store/auth/` for WhatsApp) - host only
 - Mount allowlist - external, never mounted
