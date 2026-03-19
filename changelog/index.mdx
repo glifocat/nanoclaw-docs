@@ -5,46 +5,46 @@ icon: "tag"
 ---
 
 <Update label="2026-03-19" description="v1.2.19" tags={["Fix"]}>
-  ## NanoClaw v1.2.19
+  <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge>
 
   - Reduced `docker stop` timeout for faster container restarts (`-t 1` flag — containers are stateless)
 </Update>
 
 <Update label="2026-03-19" description="v1.2.18" tags={["Security", "Channel"]}>
-  ## NanoClaw v1.2.18
+  <Badge color="purple" size="sm" shape="pill" icon="shield">Security</Badge> <Badge color="yellow" size="sm" shape="pill" icon="plug">Channel</Badge>
 
   - **Security**: User prompt content is no longer logged on container errors — only input metadata (prompt length, session ID)
   - Added Japanese README translation
 </Update>
 
 <Update label="2026-03-18" description="v1.2.17" tags={["Feature"]}>
-  ## NanoClaw v1.2.17
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge>
 
   - Added read-only `/capabilities` and `/status` container-agent skills
   - Formatted remote-control files with Prettier
 </Update>
 
 <Update label="2026-03-18" description="v1.2.16" tags={["Fix"]}>
-  ## NanoClaw v1.2.16
+  <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge>
 
   - Tasks snapshot now refreshes immediately after IPC task mutations (contributed by @mbravorus)
 </Update>
 
 <Update label="2026-03-16" description="v1.2.15" tags={["Fix"]}>
-  ## NanoClaw v1.2.15
+  <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge>
 
   - Fixed remote-control prompt auto-accept to prevent immediate exit
   - Added `KillMode=process` so remote-control survives service restarts (contributed by @gabi-simons)
 </Update>
 
 <Update label="2026-03-14" description="v1.2.14" tags={["Feature"]}>
-  ## NanoClaw v1.2.14
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge>
 
   - **Remote control**: Added `/remote-control` command for host-level Claude Code access from within containers
 </Update>
 
 <Update label="2026-03-14" description="v1.2.13" tags={["Feature", "Breaking"]}>
-  ## NanoClaw v1.2.13
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge> <Badge color="red" size="sm" shape="pill" icon="triangle-exclamation">Breaking</Badge>
 
   Major architecture change: skills are now git branches, channels are separate fork repos.
 
@@ -57,14 +57,14 @@ icon: "tag"
 </Update>
 
 <Update label="2026-03-08" description="v1.2.12" tags={["Feature", "Security"]}>
-  ## NanoClaw v1.2.12
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge> <Badge color="purple" size="sm" shape="pill" icon="shield">Security</Badge>
 
   - Added `/compact` skill for manual context compaction
   - **Credential proxy**: Enhanced container environment isolation — API keys injected at runtime via local proxy instead of environment variables
 </Update>
 
 <Update label="2026-03-08" description="v1.2.11" tags={["Feature", "Channel", "Fix"]}>
-  ## NanoClaw v1.2.11
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge> <Badge color="yellow" size="sm" shape="pill" icon="plug">Channel</Badge> <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge>
 
   - **PDF reader skill**: Read and analyze PDF attachments
   - **Image vision skill**: Image analysis for WhatsApp
@@ -75,57 +75,57 @@ icon: "tag"
 </Update>
 
 <Update label="2026-03-06" description="v1.2.10" tags={["Fix", "Performance"]}>
-  ## NanoClaw v1.2.10
+  <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge> <Badge color="green" size="sm" shape="pill" icon="gauge-high">Performance</Badge>
 
   - **Database**: Added `LIMIT` to unbounded message history queries for better performance
 </Update>
 
 <Update label="2026-03-06" description="v1.2.9" tags={["Feature", "Fix", "Channel"]}>
-  ## NanoClaw v1.2.9
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge> <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge> <Badge color="yellow" size="sm" shape="pill" icon="plug">Channel</Badge>
 
   - **Timezone-aware prompts**: Agent prompts now include timezone context for accurate time references
   - Fixed voice-transcription skill dropping WhatsApp `registerChannel` call
 </Update>
 
 <Update label="2026-03-06" description="v1.2.8" tags={["Fix"]}>
-  ## NanoClaw v1.2.8
+  <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge>
 
   - Fixed misleading `send_message` tool description for scheduled tasks
 </Update>
 
 <Update label="2026-03-06" description="v1.2.7" tags={["Feature"]}>
-  ## NanoClaw v1.2.7
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge>
 
   - **Ollama skill**: Added `/add-ollama` for local model inference
   - **Task management**: Added `update_task` tool and return task ID from `schedule_task`
 </Update>
 
 <Update label="2026-03-04" description="v1.2.6" tags={["Fix"]}>
-  ## NanoClaw v1.2.6
+  <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge>
 
   - Updated `claude-agent-sdk` to 0.2.68
 </Update>
 
 <Update label="2026-03-04" description="v1.2.5" tags={["Fix"]}>
-  ## NanoClaw v1.2.5
+  <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge>
 
   - CI formatting fix
 </Update>
 
 <Update label="2026-03-04" description="v1.2.4" tags={["Fix"]}>
-  ## NanoClaw v1.2.4
+  <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge>
 
   - Fixed `_chatJid` rename to `chatJid` in `onMessage` callback
 </Update>
 
 <Update label="2026-03-04" description="v1.2.3" tags={["Feature", "Security"]}>
-  ## NanoClaw v1.2.3
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge> <Badge color="purple" size="sm" shape="pill" icon="shield">Security</Badge>
 
   - **Sender allowlist**: Per-chat access control to restrict who can interact with the agent
 </Update>
 
 <Update label="2026-03-04" description="v1.2.2" tags={["Feature", "Fix", "Channel"]}>
-  ## NanoClaw v1.2.2
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge> <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge> <Badge color="yellow" size="sm" shape="pill" icon="plug">Channel</Badge>
 
   - **Local Whisper skill**: Added `/use-local-whisper` for local voice transcription
   - **Atomic task claims**: Prevents scheduled tasks from executing twice
@@ -133,13 +133,13 @@ icon: "tag"
 </Update>
 
 <Update label="2026-03-02" description="v1.2.1" tags={["Fix"]}>
-  ## NanoClaw v1.2.1
+  <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge>
 
   - Version bump (no functional changes)
 </Update>
 
 <Update label="2026-03-02" description="v1.2.0" tags={["Feature", "Breaking", "Channel"]}>
-  ## NanoClaw v1.2.0
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge> <Badge color="red" size="sm" shape="pill" icon="triangle-exclamation">Breaking</Badge> <Badge color="yellow" size="sm" shape="pill" icon="plug">Channel</Badge>
 
   Major release introducing multi-channel architecture. WhatsApp is no longer hardcoded — all channels self-register via a channel registry.
 
@@ -159,19 +159,19 @@ icon: "tag"
 </Update>
 
 <Update label="2026-03-01" description="v1.1.6" tags={["Fix"]}>
-  ## NanoClaw v1.1.6
+  <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge>
 
   - Added CJK font support (`fonts-noto-cjk`) for Chromium screenshots (contributed by @neocode24)
 </Update>
 
 <Update label="2026-03-01" description="v1.1.5" tags={["Fix", "Channel"]}>
-  ## NanoClaw v1.1.5
+  <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge> <Badge color="yellow" size="sm" shape="pill" icon="plug">Channel</Badge>
 
   - Fixed wrapped WhatsApp message normalization before reading content
 </Update>
 
 <Update label="2026-03-01" description="v1.1.4" tags={["Feature"]}>
-  ## NanoClaw v1.1.4
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge>
 
   - **Third-party model support**: Use models beyond Claude
   - **`/update-nanoclaw` skill**: New skill for syncing customized installs with upstream (replaces old `/update`)
@@ -179,7 +179,7 @@ icon: "tag"
 </Update>
 
 <Update label="2026-02-25" description="v1.1.3" tags={["Feature", "Channel"]}>
-  ## NanoClaw v1.1.3
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge> <Badge color="yellow" size="sm" shape="pill" icon="plug">Channel</Badge>
 
   Biggest pre-1.2 release — added Slack channel, refactored Gmail, and improved CI.
 
@@ -194,13 +194,13 @@ icon: "tag"
 </Update>
 
 <Update label="2026-02-24" description="v1.1.2" tags={["Fix"]}>
-  ## NanoClaw v1.1.2
+  <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge>
 
   - Improved error handling for WhatsApp Web version fetch (follow-up to v1.1.1)
 </Update>
 
 <Update label="2026-02-24" description="v1.1.1" tags={["Feature", "Fix"]}>
-  ## NanoClaw v1.1.1
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge> <Badge color="orange" size="sm" shape="pill" icon="wrench">Fix</Badge>
 
   - **Qodo skills**: Added official Qodo skills and codebase intelligence
   - Rewrote README for broader audience
@@ -208,7 +208,7 @@ icon: "tag"
 </Update>
 
 <Update label="2026-02-23" description="v1.1.0" tags={["Feature", "Security"]}>
-  ## NanoClaw v1.1.0
+  <Badge color="blue" size="sm" shape="pill" icon="sparkles">Feature</Badge> <Badge color="purple" size="sm" shape="pill" icon="shield">Security</Badge>
 
   - **`/update` skill**: Pull upstream changes from within Claude Code
   - **Security fix**: Fixed critical skills path-remap root escape (including symlink traversal)
