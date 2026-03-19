@@ -131,7 +131,11 @@ The credential proxy reads these from `.env` at startup (never exposed to contai
 </ParamField>
 
 <ParamField path="ANTHROPIC_BASE_URL" type="string">
-  Upstream API URL for the credential proxy to forward requests to. Defaults to the Anthropic API endpoint.
+  Upstream API URL for the credential proxy to forward requests to. Defaults to the Anthropic API endpoint. Set this to use third-party Anthropic-compatible endpoints (Together AI, Fireworks, custom deployments). See [Ollama integration](/integrations/ollama#third-party-model-endpoints).
+</ParamField>
+
+<ParamField path="OLLAMA_HOST" type="string" default="http://host.docker.internal:11434">
+  Ollama API endpoint. Only used when the `/add-ollama-tool` skill is installed. The MCP server inside the container uses this to reach the host's Ollama instance. Falls back to `localhost` if `host.docker.internal` fails.
 </ParamField>
 
 ## Security notes

@@ -124,7 +124,8 @@
               "integrations/telegram",
               "integrations/discord",
               "integrations/slack",
-              "integrations/gmail"
+              "integrations/gmail",
+              "integrations/ollama"
             ]
           },
           {
