@@ -1,6 +1,7 @@
 ---
 title: Container runtime
 description: Container execution architecture and runtime details
+tag: "UPDATED"
 ---
 
 NanoClaw runs agents in isolated Linux containers to provide security through OS-level process and filesystem isolation. The container runtime is abstracted to support multiple backends.
@@ -167,7 +168,7 @@ export async function runContainerAgent(
     delete input.secrets; // Don't log secrets
     ```
     
-    Secrets are passed via stdin (never written to disk or mounted as files).
+    Secrets are passed via stdin (never written to disk or mounted as files). After sending, secrets are deleted from the input object to prevent logging.
   </Step>
   
   <Step title="Stream output">
@@ -175,7 +176,7 @@ export async function runContainerAgent(
   </Step>
   
   <Step title="Handle completion">
-    When the container exits, logs are written to `groups/{name}/logs/container-{timestamp}.log` and the promise resolves with the final output.
+    When the container exits, logs are written to `groups/{name}/logs/container-{timestamp}.log` and the promise resolves with the final output. Error logs include only input metadata (prompt length and session ID) rather than the full prompt to avoid persisting user conversation content on disk.
   </Step>
 </Steps>
 
@@ -428,7 +429,7 @@ This allows the host to receive and act on agent output in real-time, rather tha
   ```
   
   Logs include:
-  - Input prompt
+  - Input summary (prompt length and session ID) — full prompt only at verbose level
   - Container arguments
   - Volume mounts
   - Stdout/stderr (when verbose logging is enabled)

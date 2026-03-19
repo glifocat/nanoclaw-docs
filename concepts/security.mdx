@@ -206,6 +206,17 @@ The proxy reads credentials from `.env` on each request (supports hot-swapping b
 The credential proxy prevents credential exposure to containers. However, the proxy URL is accessible from within the container's network. The container cannot extract the real credentials, but it can make authenticated API requests through the proxy.
 </Warning>
 
+### 6. Log privacy
+
+Container run logs avoid persisting user conversation content:
+
+- **Secrets** are stripped from the input object before logging
+- **User prompts** are redacted from error logs — only prompt length and session ID are recorded
+- **Agent output** is logged by length, not content
+- **Full input/output** is only included when verbose logging (`LOG_LEVEL=debug`) is explicitly enabled
+
+This ensures that container error logs stored at `groups/{name}/logs/` do not contain sensitive conversation data.
+
 ## Privilege comparison
 
 | Capability | Main Group | Non-Main Group |

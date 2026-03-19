@@ -100,7 +100,7 @@ The container runner (`src/container-runner.ts`) spawns and manages isolated age
 **Logging:**
 - All container runs logged to `groups/{name}/logs/container-{timestamp}.log`
 - Verbose mode (`LOG_LEVEL=debug`) logs full input/output
-- Error runs always log full details
+- Error runs log input metadata (prompt length, session ID) and full stderr — prompt content is not included
 
 ### Task scheduler
 

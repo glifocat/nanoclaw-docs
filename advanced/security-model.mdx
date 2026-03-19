@@ -221,7 +221,7 @@ Containers cannot extract real credentials. The credential proxy intercepts all 
 </Accordion>
 
 <Accordion title="Monitor container logs">
-  Check `groups/{name}/logs/container-*.log` files to review what agents are doing. Enable verbose logging with `LOG_LEVEL=debug` for detailed output.
+  Check `groups/{name}/logs/container-*.log` files to review what agents are doing. Enable verbose logging with `LOG_LEVEL=debug` for detailed output. Note that error logs only include input metadata (prompt length and session ID) rather than full prompt content.
 </Accordion>
 
 ## Related pages

@@ -1,6 +1,7 @@
 ---
 title: Container isolation
 description: How containers provide security isolation for agent execution
+tag: "UPDATED"
 ---
 
 NanoClaw runs all agents inside containers (lightweight Linux VMs) to provide true OS-level isolation. This is the primary security boundary that makes Bash access and code execution safe.
@@ -344,8 +345,9 @@ Exit Code: 0
 Stdout Truncated: false
 Stderr Truncated: false
 
-=== Input ===
-{ prompt: "...", sessionId: "...", ... }
+=== Input Summary ===
+Prompt length: 142 chars
+Session ID: abc123
 
 === Container Args ===
 docker run -i --rm --name nanoclaw-family-chat-1234567890 ...
@@ -367,8 +369,12 @@ docker run -i --rm --name nanoclaw-family-chat-1234567890 ...
 **Log verbosity:**
 
 - **Success + non-verbose**: Summary only (input length, mount count)
-- **Success + verbose** (`LOG_LEVEL=debug`): Full input/output
-- **Error**: Always full input/output/stderr
+- **Success + verbose** (`LOG_LEVEL=debug`): Full input/output including prompt content
+- **Error**: Input metadata only (prompt length and session ID), plus full stderr/stdout
+
+<Info>
+User prompt content is never written to error logs. Only verbose mode (`LOG_LEVEL=debug`) includes the full prompt. This prevents sensitive conversation content from persisting on disk during normal error handling.
+</Info>
 
 <Info>
 Set `LOG_LEVEL=debug` in `.env` to enable verbose logging for all container runs.
