@@ -265,6 +265,44 @@ From the main channel:
 
 The agent will discover available groups and register to the one you specify.
 
+## Session commands
+
+Session commands are slash commands sent as messages that the host process intercepts before the agent sees them. They control the agent session itself rather than asking the agent to do something.
+
+### /compact
+
+The `/compact` command triggers manual context compaction to fight "context rot" in long-running sessions. When an agent has been active for a while, its context window fills up with old messages that may no longer be relevant.
+
+**How to use it:**
+
+```
+@Andy /compact
+```
+
+**What happens:**
+
+1. The full session transcript is archived (non-destructive — nothing is lost)
+2. Claude Agent SDK's built-in `/compact` command runs, summarizing the conversation context
+3. The session continues with a condensed context, freeing space for new messages
+
+**Authorization:**
+
+| Sender | Allowed? |
+|--------|----------|
+| Main group (any sender) | Yes |
+| Admin/trusted sender (`is_from_me`) in any group | Yes |
+| Other senders in non-main groups | No — receives "Session commands require admin access" |
+
+<Note>
+The `/compact` command is installed via the `skill/compact` branch. It's not available on `main` by default. Apply it with:
+```bash
+git fetch upstream skill/compact
+git merge upstream/skill/compact
+```
+</Note>
+
+The implementation lives in `src/session-commands.ts`, which extracts commands from messages, validates authorization, and coordinates with the container runner.
+
 ## Related documentation
 
 - [Scheduled tasks](/features/scheduled-tasks) - Automate recurring agent tasks
