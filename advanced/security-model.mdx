@@ -139,6 +139,54 @@ if (
 }
 ```
 
+### Sender allowlist
+
+The sender allowlist (`~/.config/nanoclaw/sender-allowlist.json`) filters who can interact with the agent on a per-chat basis. Like the mount allowlist, it lives outside the project root and cannot be modified by agents.
+
+**File format** (`SenderAllowlistConfig`):
+
+```typescript
+interface ChatAllowlistEntry {
+  allow: '*' | string[];  // '*' = everyone, or array of sender JIDs
+  mode: 'trigger' | 'drop';
+}
+
+interface SenderAllowlistConfig {
+  default: ChatAllowlistEntry;
+  chats: Record<string, ChatAllowlistEntry>;  // Per-chat overrides, keyed by JID
+  logDenied: boolean;  // Default: true
+}
+```
+
+**How it works:**
+
+1. On every message cycle, the file is read from disk (hot-reloaded, no restart needed)
+2. For each incoming message, the system checks `chats[chatJid]` first, then falls back to `default`
+3. If the sender is not in the `allow` list:
+   - **`trigger` mode**: the message is stored in the database but cannot activate the agent
+   - **`drop` mode**: the message is silently discarded before reaching the database
+4. If `logDenied` is `true`, denied attempts are logged at debug level
+
+**Fallback behavior**: if the file is missing, unreadable, or contains invalid JSON, the system defaults to `{ allow: "*", mode: "trigger" }` — all senders permitted. Invalid per-chat entries are skipped with a warning; valid entries are still applied.
+
+From `src/sender-allowlist.ts`:
+
+```typescript
+export function isSenderAllowed(
+  chatJid: string,
+  sender: string,
+  cfg: SenderAllowlistConfig,
+): boolean {
+  const entry = cfg.chats[chatJid] ?? cfg.default;
+  if (entry.allow === '*') return true;
+  return entry.allow.includes(sender);
+}
+```
+
+<Note>
+The sender allowlist complements container isolation. Containers protect against what an agent *can do*; the allowlist controls who *can invoke* an agent. Both are enforced on the host, outside the agent's reach.
+</Note>
+
 ### Credential handling
 
 **Credential proxy** (`src/credential-proxy.ts`):

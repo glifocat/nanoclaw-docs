@@ -178,7 +178,55 @@ if (!isMain && targetJid !== groupJid) {
 IPC operations from non-main groups are silently rejected if unauthorized. This prevents privilege escalation attempts from affecting the system.
 </Info>
 
-### 5. Credential handling
+### 5. Sender allowlist
+
+The sender allowlist controls which users can interact with the agent. It operates at the message level, before any container is spawned.
+
+Configuration file: `~/.config/nanoclaw/sender-allowlist.json`
+
+```json
+{
+  "default": {
+    "allow": "*",
+    "mode": "trigger"
+  },
+  "chats": {
+    "120363001234567890@g.us": {
+      "allow": ["5511999887766@s.whatsapp.net", "5511888776655@s.whatsapp.net"],
+      "mode": "trigger"
+    },
+    "120363009876543210@g.us": {
+      "allow": ["5511999887766@s.whatsapp.net"],
+      "mode": "drop"
+    }
+  },
+  "logDenied": true
+}
+```
+
+**Two denial modes:**
+
+| Mode | Behavior | Use case |
+|------|----------|----------|
+| `trigger` | Messages are stored but cannot activate the agent | Monitoring — you keep the messages for context |
+| `drop` | Messages are silently discarded before reaching the database | Strict isolation — denied messages leave no trace |
+
+**Key behaviors:**
+
+- `allow: "*"` permits all senders (the default when no file exists)
+- `allow: ["sender1", "sender2"]` restricts to specific sender IDs
+- Per-chat entries in `chats` override the `default` entry
+- `logDenied` (default `true`) logs denied attempts at debug level
+- The file is reloaded on every message cycle — no restart needed
+- If the file is missing or contains invalid JSON, all senders are allowed
+
+<Info>
+The sender allowlist file is stored outside the project root at `~/.config/nanoclaw/` alongside the mount allowlist, so agents cannot modify it.
+</Info>
+
+For the full file format and API details, see the [security deep dive](/advanced/security-model#sender-allowlist).
+
+### 6. Credential handling
 
 #### Credential proxy
 
@@ -207,7 +255,7 @@ The proxy reads credentials from `.env` once at startup and injects them into ev
 The credential proxy prevents credential exposure to containers. However, the proxy URL is accessible from within the container's network. The container cannot extract the real credentials, but it can make authenticated API requests through the proxy.
 </Warning>
 
-### 6. Log privacy
+### 7. Log privacy
 
 Container run logs avoid persisting user conversation content:
 
