@@ -26,21 +26,46 @@ Skills are distributed as **git branches** on the upstream repository. Applying 
 
 ### Repository structure
 
-The upstream repo (`qwibitai/nanoclaw`) maintains:
+The upstream repo (`qwibitai/nanoclaw`) maintains skill branches for features that extend core functionality:
 
 | Branch | Description |
 |--------|-------------|
-| `main` | Core NanoClaw — no skill code |
-| `skill/discord` | main + Discord integration |
-| `skill/telegram` | main + Telegram integration |
-| `skill/slack` | main + Slack integration |
-| `skill/gmail` | main + Gmail integration |
-| `skill/voice-transcription` | WhatsApp voice transcription (depends on `skill/whatsapp`) |
-| `skill/image-vision` | Image attachment processing |
+| `main` | Core NanoClaw — no channel or skill code |
 | `skill/ollama-tool` | Ollama MCP server for local models |
+| `skill/compact` | `/compact` session command |
+| `skill/apple-container` | Apple Container runtime (macOS) |
 | ... | And more |
 
 Each skill branch contains **all** the code changes for that skill: new files, modified source files, updated `package.json` dependencies, `.env.example` additions — everything.
+
+### Channel fork architecture
+
+Channels (WhatsApp, Telegram, Discord, Slack, Gmail) live in **separate fork repositories**, not as skill branches on upstream. Each channel fork is a complete NanoClaw installation with the channel code already merged in.
+
+| Fork repo | Channel | Library |
+|-----------|---------|---------|
+| `qwibitai/nanoclaw-whatsapp` | WhatsApp | @whiskeysockets/baileys |
+| `qwibitai/nanoclaw-telegram` | Telegram | grammy |
+| `qwibitai/nanoclaw-discord` | Discord | discord.js |
+| `qwibitai/nanoclaw-slack` | Slack | @slack/bolt (Socket Mode) |
+| `qwibitai/nanoclaw-gmail` | Gmail | googleapis |
+
+Channels self-register at startup using the channel registry (`src/channels/registry.ts`). Each channel module calls `registerChannel()` with a factory function — the host process discovers available channels dynamically via `getRegisteredChannelNames()`.
+
+**Channel-specific skills** also live on the channel fork, not upstream:
+
+| Skill | Channel fork | What it does |
+|-------|-------------|--------------|
+| `/add-voice-transcription` | nanoclaw-whatsapp | Whisper API voice transcription |
+| `/use-local-whisper` | nanoclaw-whatsapp | Local whisper.cpp transcription |
+| `/add-image-vision` | nanoclaw-whatsapp | Image attachment processing |
+| `/add-reactions` | nanoclaw-whatsapp | Emoji reaction support |
+| `/add-pdf-reader` | nanoclaw-whatsapp | PDF text extraction |
+| `/add-telegram-swarm` | nanoclaw-telegram | Agent swarm for Telegram |
+
+<Info>
+The channel fork architecture keeps the upstream `main` branch minimal. Core NanoClaw has no channel code at all — you add exactly the channels you need by merging from the appropriate fork.
+</Info>
 
 ### Three categories of skills
 
@@ -67,10 +92,18 @@ Each skill branch contains **all** the code changes for that skill: new files, m
 Run the skill command in Claude Code. For example, `/add-discord` triggers Claude to:
 
 <Steps>
-  <Step title="Merge the skill branch">
+  <Step title="Merge the channel or skill">
+    For a channel fork:
     ```bash
-    git fetch upstream skill/discord
-    git merge upstream/skill/discord
+    git remote add discord https://github.com/qwibitai/nanoclaw-discord.git
+    git fetch discord main
+    git merge discord/main
+    ```
+
+    For an upstream skill branch:
+    ```bash
+    git fetch upstream skill/ollama-tool
+    git merge upstream/skill/ollama-tool
     ```
   </Step>
 
@@ -85,20 +118,31 @@ Run the skill command in Claude Code. For example, `/add-discord` triggers Claud
 
 ### Manually
 
+<Tabs>
+  <Tab title="Channel (from fork repo)">
+    ```bash
+    git remote add discord https://github.com/qwibitai/nanoclaw-discord.git
+    git fetch discord main
+    git merge discord/main
+    ```
+  </Tab>
+  <Tab title="Skill (from upstream branch)">
+    ```bash
+    git fetch upstream skill/ollama-tool
+    git merge upstream/skill/ollama-tool
+    ```
+  </Tab>
+</Tabs>
+
+### Applying multiple channels
+
 ```bash
-git fetch upstream skill/discord
-git merge upstream/skill/discord
-# Follow the setup instructions for your channel
+git merge discord/main
+git merge telegram/main
+git merge upstream/skill/ollama-tool
 ```
 
-### Applying multiple skills
-
-```bash
-git merge upstream/skill/discord
-git merge upstream/skill/telegram
-```
-
-Git handles the composition. If both skills modify the same lines, it's a real conflict — Claude resolves it automatically.
+Git handles the composition. If multiple merges modify the same lines, it's a real conflict — Claude resolves it automatically.
 
 ## Skill discovery
 
@@ -135,25 +179,28 @@ Dependencies are implicit in git history — no separate dependency file is need
 
 ## Available integration skills
 
-### Messaging platforms
+### Channels (from fork repos)
 
-| Skill | Command | Library |
-|-------|---------|---------|
-| Discord | `/add-discord` | discord.js |
-| Telegram | `/add-telegram` | grammy |
-| Slack | `/add-slack` | @slack/bolt (Socket Mode) |
-| WhatsApp | `/add-whatsapp` | @whiskeysockets/baileys |
+| Channel | Command | Fork repo | Library |
+|---------|---------|-----------|---------|
+| WhatsApp | `/add-whatsapp` | `nanoclaw-whatsapp` | @whiskeysockets/baileys |
+| Telegram | `/add-telegram` | `nanoclaw-telegram` | grammy |
+| Discord | `/add-discord` | `nanoclaw-discord` | discord.js |
+| Slack | `/add-slack` | `nanoclaw-slack` | @slack/bolt (Socket Mode) |
+| Gmail | `/add-gmail` | `nanoclaw-gmail` | googleapis |
 
-### Services
+### Upstream skills (from skill branches)
 
-- **`/add-gmail`** — Gmail integration (as a tool or full channel)
-
-### System
-
-- **`/convert-to-apple-container`** — Switch from Docker to Apple Container on macOS
-- **`/add-voice-transcription`** — Voice message transcription (WhatsApp)
-- **`/add-telegram-swarm`** — Agent Swarm support for Telegram teams
 - **`/add-ollama-tool`** — Ollama MCP server for local models
+- **`/convert-to-apple-container`** — Switch from Docker to Apple Container on macOS
+
+### Channel-specific skills (from channel fork branches)
+
+- **`/add-voice-transcription`** — Voice message transcription (on `nanoclaw-whatsapp`)
+- **`/add-image-vision`** — Image attachment processing (on `nanoclaw-whatsapp`)
+- **`/add-reactions`** — Emoji reaction support (on `nanoclaw-whatsapp`)
+- **`/add-pdf-reader`** — PDF text extraction (on `nanoclaw-whatsapp`)
+- **`/add-telegram-swarm`** — Agent swarm support (on `nanoclaw-telegram`)
 
 ## Updating
 
@@ -165,11 +212,20 @@ git merge upstream/main
 git push origin main
 ```
 
-Skill changes are already in your git history, so `git merge upstream/main` just works. No skill replay step needed.
+Skill and channel changes are already in your git history, so `git merge upstream/main` just works. No skill replay step needed.
+
+### Updating channels
+
+Channel forks track upstream, so pulling from a channel fork also brings in the latest core changes:
+
+```bash
+git fetch discord main
+git merge discord/main
+```
 
 ### Checking for skill updates
 
-Run `/update-skills` or let `/update-nanoclaw` check after a core update. For each previously-merged skill branch that has new commits, Claude offers to merge the updates.
+Run `/update-skills` or let `/update-nanoclaw` check after a core update. For each previously-merged skill branch or channel fork that has new commits, Claude offers to merge the updates.
 
 <Note>
   This requires no state files — it uses git history to determine which skills were previously merged and whether they have new commits.
