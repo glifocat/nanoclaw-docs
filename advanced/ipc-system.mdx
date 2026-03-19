@@ -1,6 +1,7 @@
 ---
 title: IPC system
 description: Inter-process communication architecture and implementation
+tag: "UPDATED"
 ---
 
 NanoClaw uses a filesystem-based IPC system to enable communication between the host process and containerized agents. This design avoids network sockets while maintaining security boundaries.
@@ -223,6 +224,8 @@ Updates an existing task's prompt, schedule type, or schedule value. The next ru
 }
 ```
 
+All fields except `taskId` are optional — only include the fields you want to change.
+
 **Authorization:**
 - Main group can update any task
 - Non-main groups can only update their own tasks
@@ -238,27 +241,6 @@ Deletes a task permanently.
   "taskId": "task-1234567890-abc123"
 }
 ```
-
-### Update task
-
-Modifies an existing task's prompt or schedule. If the schedule type or value changes, `next_run` is automatically recalculated.
-
-**Format:**
-```json
-{
-  "type": "update_task",
-  "taskId": "task-1234567890-abc123",
-  "prompt": "Updated prompt text",
-  "schedule_type": "interval",
-  "schedule_value": "7200000"
-}
-```
-
-All fields except `taskId` are optional — only include the fields you want to change.
-
-**Authorization:**
-- Main group can update any task
-- Non-main groups can only update their own tasks
 
 ### Refresh groups
 
