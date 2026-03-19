@@ -47,8 +47,8 @@ Mount permissions are stored at `~/.config/nanoclaw/mount-allowlist.json`, which
 
 ```json
 [
-  ".ssh", ".gnupg", ".aws", ".azure", ".gcloud", ".kube", ".docker",
-  "credentials", ".env", ".netrc", ".npmrc", "id_rsa", "id_ed25519",
+  ".ssh", ".gnupg", ".gpg", ".aws", ".azure", ".gcloud", ".kube", ".docker",
+  "credentials", ".env", ".netrc", ".npmrc", ".pypirc", "id_rsa", "id_ed25519",
   "private_key", ".secret"
 ]
 ```
@@ -145,8 +145,8 @@ if (
 - Runs on the host as an HTTP proxy (default port 3001)
 - Containers send API requests to the proxy with a placeholder token
 - Proxy injects real credentials (API key or OAuth token) on every outbound request
-- Supports hot-swapping between API key and OAuth modes (reads `.env` per request)
-- For OAuth, auto-refreshes tokens from `~/.claude/.credentials.json`
+- Reads credentials from `.env` once at startup
+- Supports API key mode (`ANTHROPIC_API_KEY`) and OAuth mode (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN`)
 
 **NOT mounted:**
 - Channel sessions (e.g., `store/auth/` for WhatsApp) - host only
@@ -175,7 +175,7 @@ Containers cannot extract real credentials. The credential proxy intercepts all 
 | Global memory | Implicit via project | `/workspace/global` (ro) |
 | Additional mounts | Configurable | Read-only unless allowed |
 | Network access | Unrestricted | Unrestricted |
-| MCP tools | All | All |
+| MCP tools | Allowlisted | Allowlisted |
 
 ## Security architecture diagram
 

@@ -33,6 +33,7 @@ FROM node:22-slim
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
+    fonts-noto-cjk \
     fonts-noto-color-emoji \
     # ... other dependencies
     && rm -rf /var/lib/apt/lists/*
@@ -84,10 +85,11 @@ The entrypoint script (`/app/entrypoint.sh`):
    - Allows per-group customization of agent runner code
    - Compiled output is read-only to prevent runtime tampering
 2. **Read input from stdin**: `cat > /tmp/input.json`
-   - Secrets passed via stdin (never written to disk)
-   - Input file deleted immediately after read
+   - Input contains prompt, session ID, and group metadata (not secrets)
+   - Input file deleted after read
 3. **Execute agent**: `node /tmp/dist/index.js < /tmp/input.json`
    - Runs agent-runner with input
+   - Credentials handled by the credential proxy, never passed via stdin
    - Outputs JSON results to stdout
 4. **Container exits**: Cleaned up automatically via `--rm` flag
 
@@ -129,6 +131,13 @@ mounts = [
     readonly: false
   }
 ]
+```
+
+When the project root is mounted for the main group, the `.env` file is shadowed with `/dev/null` to prevent agents from reading secrets:
+
+```typescript
+// Shadow .env so the agent cannot read secrets from the mounted project root
+{ host: '/dev/null', container: '/workspace/project/.env', readonly: true }
 ```
 
 ### Non-main group mounts
@@ -222,7 +231,7 @@ This ensures bind-mounted files are accessible (same uid on both sides).
 
 ### Execute
 
-1. **Secrets passed**: Via stdin JSON, never written to disk
+1. **Input passed**: Prompt and group metadata via stdin JSON
 2. **Stdout streaming**: Parsed for output markers in real-time
 3. **Stderr logging**: Logged at debug level (SDK writes lots of debug info)
 4. **Timeout tracking**: Hard timeout with activity-based reset
@@ -386,27 +395,15 @@ NanoClaw detects and uses the available container runtime:
 
 ```typescript
 // src/container-runtime.ts
-export const CONTAINER_RUNTIME_BIN = 
-  fs.existsSync('/usr/local/bin/orb') ? 'orb' :  // Apple Container
-  fs.existsSync('/usr/local/bin/docker') ? 'docker' :  // Docker (macOS)
-  'docker';  // Default (Linux, Windows)
+export const CONTAINER_RUNTIME_BIN = 'docker';
 ```
+
+The runtime binary is a constant. To switch to Apple Container on macOS, use the `/convert-to-apple-container` skill.
 
 **Supported runtimes:**
 
 - **Docker** (default): Cross-platform, well-tested
 - **Apple Container** (macOS): Lightweight, native virtualization
-
-**Runtime-specific commands:**
-
-```typescript
-// Read-only mount args
-if (runtime === 'orb') {
-  return ['-v', `${hostPath}:${containerPath}:ro`];
-} else {
-  return ['-v', `${hostPath}:${containerPath}:ro`];
-}
-```
 
 ## Skills and MCP servers
 

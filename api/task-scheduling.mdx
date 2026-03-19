@@ -1,6 +1,7 @@
 ---
 title: Task scheduling
 description: Task scheduling API for automated agent execution
+tag: "UPDATED"
 ---
 
 The task scheduler enables automated execution of agent prompts on a schedule (cron, interval, or one-time).
@@ -298,7 +299,7 @@ schedule_type: 'interval'
 schedule_value: '3600000'  // Milliseconds
 ```
 
-Runs every N milliseconds from the last run time.
+Runs every N milliseconds, anchored to the scheduled time (not the actual run time) to prevent cumulative drift.
 
 **Examples:**
 
@@ -310,10 +311,10 @@ Runs every N milliseconds from the last run time.
 
 ```typescript
 schedule_type: 'once'
-schedule_value: ''  // Ignored
+schedule_value: '2026-03-01T14:30:00Z'  // ISO timestamp
 ```
 
-Runs once and then sets `status = 'completed'`.
+The `schedule_value` must be a valid ISO 8601 timestamp. Runs once at the specified time, then sets `status = 'completed'`.
 
 ## Context modes
 

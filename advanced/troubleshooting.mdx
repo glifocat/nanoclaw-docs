@@ -82,7 +82,7 @@ Messages sent to the agent receive no response.
   sqlite3 store/messages.db "SELECT name, trigger FROM registered_groups;"
   ```
   
-  The trigger is case-sensitive and must appear at the start of the message.
+  The trigger is case-insensitive and must appear at the start of the message.
 </Accordion>
 
 <Accordion title="Container runtime not available">
@@ -181,23 +181,22 @@ cat groups/{group}/logs/container-{timestamp}.log
 
 ## Known issues
 
-### Cursor advanced before agent succeeds
+### Cursor rollback on error
 
-**Issue:** `processGroupMessages` advances `lastAgentTimestamp` before the agent runs. If the container times out, retries find no messages (cursor already past them). Messages are permanently lost on timeout.
+The message cursor (`lastAgentTimestamp`) is now rolled back on container errors, provided no output was already sent to the user. If the agent fails after sending partial output, the cursor is not rolled back to prevent duplicate messages.
 
-**Workaround:** Monitor `lastAgentTimestamp` in the database and manually reset if needed:
+If you need to manually reset the cursor, update it in `router_state`:
 
 ```sql
-UPDATE state 
-SET value = '{timestamp}' 
-WHERE key = 'lastAgentTimestamp:{jid}';
+-- The cursor is stored as a JSON object mapping JIDs to timestamps
+SELECT value FROM router_state WHERE key = 'last_agent_timestamp';
 ```
 
-### IDLE_TIMEOUT == CONTAINER_TIMEOUT
+### IDLE_TIMEOUT and CONTAINER_TIMEOUT
 
-**Issue:** Both timers fire at the same time, so containers always exit via hard SIGKILL (code 137) instead of graceful `_close` sentinel shutdown.
+The hard timeout is calculated as `Math.max(configTimeout, IDLE_TIMEOUT + 30_000)`, ensuring a 30-second gap for graceful `_close` sentinel shutdown before the hard kill fires. With default settings (both 30 minutes), the hard timeout is 30 minutes 30 seconds.
 
-**Fix:** Set `IDLE_TIMEOUT` to a lower value (e.g., 5 minutes) in `src/config.ts`.
+If containers are consistently hitting the hard timeout, consider lowering `IDLE_TIMEOUT` in `src/config.ts` to a shorter value (e.g., 5 minutes) so idle containers exit more promptly.
 
 ### Resume branches from stale tree position
 

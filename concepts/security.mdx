@@ -83,8 +83,8 @@ Mount permissions stored at `~/.config/nanoclaw/mount-allowlist.json`, which is:
 **Default blocked patterns:**
 ```json
 [
-  ".ssh", ".gnupg", ".aws", ".azure", ".gcloud", ".kube", ".docker",
-  "credentials", ".env", ".netrc", ".npmrc", "id_rsa", "id_ed25519",
+  ".ssh", ".gnupg", ".gpg", ".aws", ".azure", ".gcloud", ".kube", ".docker",
+  "credentials", ".env", ".netrc", ".npmrc", ".pypirc", "id_rsa", "id_ed25519",
   "private_key", ".secret"
 ]
 ```
@@ -180,9 +180,10 @@ IPC operations from non-main groups are silently rejected if unauthorized. This 
 
 ### 5. Credential handling
 
-#### Mounted credentials
+#### Credential proxy
 
-- Claude auth tokens (filtered from `.env`, read-only)
+- Containers receive a placeholder token and a proxy URL — never real credentials
+- The host's `.env` file is shadowed with `/dev/null` when the project root is mounted, preventing containers from reading secrets
 
 #### NOT mounted
 
@@ -200,7 +201,7 @@ ANTHROPIC_BASE_URL=http://host.docker.internal:3001  // → proxy
 CLAUDE_CODE_OAUTH_TOKEN=placeholder                   // → replaced by proxy
 ```
 
-The proxy reads credentials from `.env` on each request (supports hot-swapping between API key and OAuth modes without restart). For OAuth, it auto-refreshes tokens from `~/.claude/.credentials.json`.
+The proxy reads credentials from `.env` once at startup and injects them into every outbound request. It supports both API key mode (`ANTHROPIC_API_KEY`) and OAuth mode (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN`).
 
 <Warning>
 The credential proxy prevents credential exposure to containers. However, the proxy URL is accessible from within the container's network. The container cannot extract the real credentials, but it can make authenticated API requests through the proxy.
@@ -226,7 +227,7 @@ This ensures that container error logs stored at `groups/{name}/logs/` do not co
 | Global memory | Implicit via project | `/workspace/global` (ro) |
 | Additional mounts | Configurable | Read-only unless allowed |
 | Network access | Unrestricted | Unrestricted |
-| MCP tools | All | All |
+| MCP tools | Allowlisted | Allowlisted |
 
 ### Why main group is different
 

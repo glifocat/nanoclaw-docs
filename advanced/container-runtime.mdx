@@ -162,13 +162,11 @@ export async function runContainerAgent(
   
   <Step title="Pass input via stdin">
     ```typescript
-    input.secrets = readSecrets();
     container.stdin.write(JSON.stringify(input));
     container.stdin.end();
-    delete input.secrets; // Don't log secrets
     ```
     
-    Secrets are passed via stdin (never written to disk or mounted as files). After sending, secrets are deleted from the input object to prevent logging.
+    The input JSON contains the prompt, session ID, group folder, and metadata. Credentials are handled by the credential proxy — never passed via stdin or mounted as files.
   </Step>
   
   <Step title="Stream output">
@@ -288,7 +286,7 @@ const resetTimeout = () => {
 ```
 
 <Note>
-The idle timeout is currently set equal to the hard timeout (both 30 minutes), causing containers to always exit via SIGKILL instead of graceful shutdown. This is a known issue tracked in `docs/DEBUG_CHECKLIST.md:8`.
+The hard timeout is calculated as `Math.max(configTimeout, IDLE_TIMEOUT + 30_000)`, ensuring a 30-second gap between idle shutdown and the hard kill. With default settings (both 30 minutes), the hard timeout is 30 minutes 30 seconds, giving the `_close` sentinel time to trigger graceful shutdown before the hard kill fires.
 </Note>
 
 ## Runtime management
