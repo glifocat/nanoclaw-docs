@@ -1,6 +1,7 @@
 ---
 title: Container isolation
 description: How containers provide security isolation for agent execution
+tag: "UPDATED"
 ---
 
 NanoClaw runs all agents inside containers (lightweight Linux VMs) to provide true OS-level isolation. This is the primary security boundary that makes Bash access and code execution safe.
@@ -225,7 +226,7 @@ This ensures bind-mounted files are accessible (same uid on both sides).
 2. **Stdout streaming**: Parsed for output markers in real-time
 3. **Stderr logging**: Logged at debug level (SDK writes lots of debug info)
 4. **Timeout tracking**: Hard timeout with activity-based reset
-5. **Graceful shutdown**: `docker stop` (SIGTERM) before `SIGKILL`
+5. **Graceful shutdown**: `docker stop -t 1` (SIGTERM, then SIGKILL after 1 second)
 
 ### Cleanup
 
@@ -285,7 +286,7 @@ Two timeout mechanisms:
 - **Configurable**: Per-group via `containerConfig.timeout`
 - **Grace period**: At least `IDLE_TIMEOUT + 30s`
 - **Reset on activity**: Resets whenever output markers are parsed
-- **Enforcement**: `docker stop` (SIGTERM), then `SIGKILL` after 15s
+- **Enforcement**: `docker stop -t 1` (SIGTERM), then `SIGKILL` after 1 second
 
 **Timeout after output:**
 

@@ -1,6 +1,7 @@
 ---
 title: Container runtime
 description: Container execution architecture and runtime details
+tag: "UPDATED"
 ---
 
 NanoClaw runs agents in isolated Linux containers to provide security through OS-level process and filesystem isolation. The container runtime is abstracted to support multiple backends.
@@ -418,7 +419,7 @@ This allows the host to receive and act on agent output in real-time, rather tha
 
 <Accordion title="Stop a running container">
   ```bash
-  docker stop nanoclaw-main-1234567890
+  docker stop -t 1 nanoclaw-main-1234567890
   ```
 </Accordion>
 

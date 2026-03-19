@@ -2,6 +2,7 @@
 title: Troubleshooting
 description: Common issues and solutions for NanoClaw
 keywords: ["troubleshooting", "debugging", "common issues"]
+tag: "UPDATED"
 ---
 
 This guide covers common issues you may encounter when running NanoClaw and how to resolve them.
@@ -106,7 +107,7 @@ Messages sent to the agent receive no response.
   Stop stuck containers:
   
   ```bash
-  docker stop $(docker ps -q --filter name=nanoclaw-)
+  docker stop -t 1 $(docker ps -q --filter name=nanoclaw-)
   ```
 </Accordion>
 
