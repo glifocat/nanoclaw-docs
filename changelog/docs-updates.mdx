@@ -1,0 +1,25 @@
+---
+title: "Docs updates"
+description: "Notable changes and improvements to the NanoClaw documentation."
+icon: "file-pen"
+---
+
+<Update label="2026-03-19" description="Source code accuracy audit" tags={["Fixed"]}>
+  ## Documentation accuracy audit
+
+  Corrected 30+ inaccuracies across 12 documentation pages by auditing against the NanoClaw source code.
+
+  - Fixed credential proxy documentation — removed incorrect claims about hot-swapping and auto-refresh
+  - Corrected container runtime detection, base image references, and stdin secrets pattern
+  - Updated task scheduling docs with correct table names and interfaces
+  - Added missing `.env` shadow mount and `CREDENTIAL_PROXY_HOST` documentation
+  - Fixed `syncGroupMetadata` → `syncGroups` across IPC docs
+</Update>
+
+<Update label="2026-03-19" description="Logging and container docs" tags={["Updated"]}>
+  ## Logging and container updates
+
+  - Updated error log examples to show prompt redaction (input metadata only)
+  - Added log privacy section to security docs
+  - Corrected `docker stop` grace period from 15s to 1 second across all references
+</Update>

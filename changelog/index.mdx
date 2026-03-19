@@ -1,0 +1,27 @@
+---
+title: "Releases"
+description: "NanoClaw release history and changelog."
+icon: "tag"
+---
+
+<Update label="2026-03-02" description="v1.2.0" tags={["Feature", "Breaking"]}>
+  ## NanoClaw v1.2.0
+
+  Major release introducing credential proxy architecture and container security improvements.
+
+  - **Credential proxy**: API keys are injected at runtime via a local proxy instead of being passed through stdin or environment variables
+  - **Prompt redaction**: Error logs now include only input metadata (prompt length and session ID), not full prompt content
+  - **Docker stop timeout**: Reduced from 10s to 1s (`-t 1` flag) since containers are stateless
+  - **.env shadow mount**: Project root `.env` is shadowed with `/dev/null` inside containers to prevent accidental credential exposure
+  - **Breaking**: Containers no longer receive secrets via stdin — channels must use the credential proxy
+</Update>
+
+<Update label="2026-03-02" description="v1.1.6" tags={["Fix", "Performance"]}>
+  ## NanoClaw v1.1.6
+
+  Stability and performance improvements.
+
+  - Bug fixes for container lifecycle management
+  - Improved IPC reliability between host and containers
+  - `syncGroups` method replaces deprecated `syncGroupMetadata`
+</Update>
