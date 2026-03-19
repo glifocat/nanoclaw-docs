@@ -1,0 +1,70 @@
+---
+title: "Docs updates"
+description: "Notable changes and improvements to the NanoClaw documentation."
+icon: "file-pen"
+rss: true
+---
+
+<Update label="Source code accuracy audit" description="2026-03-19" tags={["Fixed"]}>
+  Corrected 30+ inaccuracies across 12 documentation pages by auditing against the NanoClaw source code.
+
+  - Fixed credential proxy documentation — removed incorrect claims about hot-swapping and auto-refresh
+  - Corrected container runtime detection, base image references, and stdin secrets pattern
+  - Updated task scheduling docs with correct table names and interfaces
+  - Added missing `.env` shadow mount and `CREDENTIAL_PROXY_HOST` documentation
+  - Fixed `syncGroupMetadata` → `syncGroups` across IPC docs
+</Update>
+
+<Update label="Logging and container docs" description="2026-03-19" tags={["Updated"]}>
+  - Updated error log examples to show prompt redaction — input metadata only, no full prompt content
+  - Added log privacy section to security docs
+  - Corrected `docker stop` grace period from 15s to 1 second across all references
+</Update>
+
+<Update label="Source sync and remote control" description="2026-03-19" tags={["Updated"]}>
+  - Fixed remote-control commands documentation
+  - Deduplicated IPC docs
+  - Added `update_task` to auth tables in API reference
+</Update>
+
+<Update label="Sidebar tags and Tree components" description="2026-03-18" tags={["New", "Updated"]}>
+  - Added automatic sidebar tag management via Mintlify workflows (`UPDATED` and `NEW` tags)
+  - Replaced all ASCII directory trees with Mintlify `<Tree>` component across the site
+  - Tags auto-clean after 2 weeks via weekly audit workflow
+</Update>
+
+<Update label="Rendering fixes" description="2026-03-18" tags={["Fixed"]}>
+  Fixed rendering issues and remaining WhatsApp-as-default framing reported in issues #14–#18.
+</Update>
+
+<Update label="v1.2.17 source sync" description="2026-03-18" tags={["New", "Updated"]}>
+  - Documented `/capabilities` and `/status` container-agent skills as new pages
+  - Synced docs with source code v1.2.17 — corrected mount allowlist format, interval drift handling, credential proxy behavior, and IPC config
+  - Documented IPC task snapshot refresh and `update_task` operation
+</Update>
+
+<Update label="Credential proxy and task lifecycle" description="2026-03-16" tags={["Fixed"]}>
+  Fixed stale documentation for credential proxy, database path, mount allowlist, and task lifecycle to match current source code.
+</Update>
+
+<Update label="Automation workflows" description="2026-03-16" tags={["New"]}>
+  - Added Mintlify workflow to sync docs automatically on upstream code changes
+  - Added weekly docs audit and skill branch documentation workflows
+</Update>
+
+<Update label="Portal branding and UX" description="2026-03-16" tags={["Updated"]}>
+  - Applied NanoClaw branding with custom theme colors, fonts, and SEO metadata
+  - Switched theme from Aspen to Mint for better sidebar typography
+  - Cleaned up introduction page, footer, and removed callout CSS override
+</Update>
+
+<Update label="Portal launch" description="2026-03-15" tags={["New"]}>
+  Launched docs.nanoclaw.dev — the NanoClaw documentation site built with Mintlify.
+
+  - Audited all content against v1.2.14 codebase
+  - Added Remote Control and Docker Sandboxes pages
+  - Made quickstart channel-agnostic (removed WhatsApp-as-default bias)
+  - Updated skills documentation to reflect git-branch architecture
+  - Fixed navigation structure with logical page ordering
+  - Added Mintlify skill for consistent docs development
+</Update>
