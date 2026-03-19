@@ -139,6 +139,14 @@
               "advanced/troubleshooting",
               "advanced/contributing"
             ]
+          },
+          {
+            "group": "Changelog",
+            "icon": "clock-rotate-left",
+            "pages": [
+              "changelog/index",
+              "changelog/docs-updates"
+            ]
           }
         ]
       },
