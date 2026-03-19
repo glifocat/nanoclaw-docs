@@ -1,0 +1,100 @@
+---
+title: Voice transcription
+description: Transcribe voice messages using OpenAI Whisper API or local whisper.cpp
+tag: "NEW"
+keywords: ["voice", "transcription", "whisper", "speech-to-text", "whatsapp"]
+---
+
+NanoClaw can transcribe voice messages so the agent understands audio content. Two options are available: cloud-based (OpenAI Whisper API) and fully local (whisper.cpp).
+
+<Note>
+Voice transcription is currently WhatsApp-only. Both skills live on the `nanoclaw-whatsapp` fork.
+</Note>
+
+## Cloud transcription (Whisper API)
+
+The `/add-voice-transcription` skill uses OpenAI's Whisper API for transcription.
+
+**Cost**: ~$0.006 per minute of audio.
+
+### Prerequisites
+
+- An [OpenAI API key](https://platform.openai.com/api-keys)
+- WhatsApp channel installed (`/add-whatsapp`)
+
+### Installation
+
+```bash
+# On your nanoclaw-whatsapp fork
+git fetch whatsapp skill/voice-transcription
+git merge whatsapp/skill/voice-transcription
+```
+
+Or via Claude Code:
+
+```
+/add-voice-transcription
+```
+
+### Configuration
+
+Add your OpenAI API key to `.env`:
+
+```bash
+OPENAI_API_KEY=sk-...
+```
+
+### How it works
+
+1. A WhatsApp voice note arrives
+2. The WhatsApp channel auto-downloads the audio file
+3. The audio is sent to OpenAI's Whisper API
+4. The transcription is injected into the message content before the agent sees it
+
+The agent receives the transcribed text as if the user had typed it — no special handling needed.
+
+## Local transcription (whisper.cpp)
+
+The `/use-local-whisper` skill switches from the cloud API to on-device transcription using [whisper.cpp](https://github.com/ggerganov/whisper.cpp). No API key needed, no cost, fully offline.
+
+### Prerequisites
+
+- Apple Silicon Mac (recommended for performance)
+- Homebrew packages:
+  ```bash
+  brew install whisper-cpp ffmpeg
+  ```
+- A GGML model file (downloaded during setup)
+
+### Installation
+
+```bash
+# On your nanoclaw-whatsapp fork (requires voice-transcription first)
+git fetch whatsapp skill/use-local-whisper
+git merge whatsapp/skill/use-local-whisper
+```
+
+Or via Claude Code:
+
+```
+/use-local-whisper
+```
+
+### How it works
+
+Same flow as cloud transcription, but audio is processed locally using the whisper.cpp CLI instead of the OpenAI API. The tradeoff is speed — local transcription is slower than the API, especially on longer voice notes, but it's free and private.
+
+## Comparison
+
+| | Whisper API | Local whisper.cpp |
+|---|---|---|
+| **Cost** | ~$0.006/min | Free |
+| **Speed** | Fast (cloud) | Slower (on-device) |
+| **Privacy** | Audio sent to OpenAI | Fully local |
+| **Requirements** | `OPENAI_API_KEY` | Apple Silicon, whisper-cpp, ffmpeg |
+| **Offline** | No | Yes |
+
+## Related pages
+
+- [Skills system](/integrations/skills-system) — How skills work
+- [WhatsApp integration](/integrations/whatsapp) — WhatsApp channel setup

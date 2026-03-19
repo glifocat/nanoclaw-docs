@@ -111,7 +111,10 @@
               "features/scheduled-tasks",
               "features/agent-swarms",
               "features/customization",
-              "features/web-access"
+              "features/web-access",
+              "features/voice-transcription",
+              "features/image-vision",
+              "features/pdf-reader"
             ]
           },
           {
