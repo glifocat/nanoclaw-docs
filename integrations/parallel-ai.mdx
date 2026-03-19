@@ -1,0 +1,73 @@
+---
+title: Parallel AI integration
+description: Add web research capabilities via Parallel AI MCP servers
+tag: "NEW"
+keywords: ["parallel", "web search", "research", "mcp", "deep research"]
+---
+
+The `/add-parallel` skill adds web research capabilities to NanoClaw through [Parallel AI](https://platform.parallel.ai) MCP servers. The agent can perform quick web lookups or in-depth research without leaving the conversation.
+
+## Tools
+
+The skill adds two MCP servers:
+
+| MCP Server | Tool | Cost | Description |
+|------------|------|------|-------------|
+| `parallel-search` | Quick search | Free | Fast web lookups for simple queries |
+| `parallel-task` | Deep research | Paid (asks permission) | Comprehensive multi-source analysis |
+
+<Note>
+Deep research costs money per query. The agent asks for confirmation before running a deep research task, so you won't be charged unexpectedly.
+</Note>
+
+## Non-blocking design
+
+Deep research tasks can take time. The skill uses NanoClaw's scheduler to poll for results instead of blocking the agent:
+
+1. Agent submits a deep research task
+2. Task ID is stored and the agent continues with other work
+3. NanoClaw's scheduler periodically checks for results
+4. When results arrive, the agent is notified and can respond
+
+This means the agent stays responsive during long-running research.
+
+## Prerequisites
+
+- A [Parallel AI API key](https://platform.parallel.ai)
+- NanoClaw with at least one channel installed
+
+## Installation
+
+Via Claude Code:
+
+```
+/add-parallel
+```
+
+Or manually:
+
+```bash
+git fetch upstream skill/add-parallel
+git merge upstream/skill/add-parallel
+```
+
+## Configuration
+
+Add your Parallel AI API key to `.env`:
+
+```bash
+PARALLEL_API_KEY=your-api-key
+```
+
+## Usage examples
+
+```
+@Andy search the web for NanoClaw reviews
+@Andy do a deep research on Claude Agent SDK best practices
+```
+
+## Related pages
+
+- [Ollama integration](/integrations/ollama) — Another AI model integration
+- [Skills system](/integrations/skills-system) — How skills work
+- [Scheduled tasks](/features/scheduled-tasks) — How the scheduler works

@@ -128,7 +128,9 @@
               "integrations/discord",
               "integrations/slack",
               "integrations/gmail",
-              "integrations/ollama"
+              "integrations/ollama",
+              "integrations/x-twitter",
+              "integrations/parallel-ai"
             ]
           },
           {

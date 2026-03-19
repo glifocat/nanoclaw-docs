@@ -319,13 +319,45 @@ If `/chatid` doesn't work:
 
 ## Agent swarms (teams)
 
-For advanced team collaboration, you can add Agent Swarm support where each subagent appears as a different bot in the Telegram group:
+The `/add-telegram-swarm` skill extends the Telegram integration with specialized agent swarm support. Each subagent appears as a different Telegram bot in the group, making it clear which agent is speaking.
+
+### How it works
+
+- Each swarm agent gets its own Telegram bot token and identity
+- When the orchestrator delegates to a subagent, that agent's responses come from its own bot
+- Users can see which agent is working on what, and interact with specific agents directly
+- The orchestrator coordinates the team and routes tasks
+
+### Installation
+
+The swarm skill depends on the base Telegram integration. If you already have `/add-telegram` applied:
 
 ```bash
+# On your nanoclaw-telegram fork
+git fetch telegram skill/telegram-swarm
+git merge telegram/skill/telegram-swarm
+```
+
+Or via Claude Code:
+
+```
 /add-telegram-swarm
 ```
 
-This allows you to see which agent is speaking and have interactive team sessions.
+### Configuration
+
+Each swarm agent needs its own bot token. Create additional bots via @BotFather and add their tokens to `.env`:
+
+```bash
+TELEGRAM_BOT_TOKEN=<orchestrator-bot-token>
+TELEGRAM_SWARM_BOT_TOKENS=<agent1-token>,<agent2-token>,<agent3-token>
+```
+
+<Note>
+The swarm skill has a 14KB SKILL.md with detailed setup instructions. Running `/add-telegram-swarm` in Claude Code walks you through the full configuration interactively.
+</Note>
+
+See [Agent swarms](/features/agent-swarms) for general swarm concepts.
 
 ## Removing Telegram
 

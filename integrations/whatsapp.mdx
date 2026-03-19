@@ -230,6 +230,35 @@ registerGroup("<group-jid>@g.us", {
   Use `requiresTrigger: true` for group chats so the assistant only responds when explicitly mentioned.
 </Tip>
 
+## WhatsApp-specific skills
+
+Several skills extend WhatsApp with media handling capabilities. These live on the `nanoclaw-whatsapp` fork as `skill/*` branches.
+
+| Skill | Command | What it does |
+|-------|---------|--------------|
+| Voice transcription | `/add-voice-transcription` | Transcribe voice notes via Whisper API |
+| Local whisper | `/use-local-whisper` | Offline transcription via whisper.cpp |
+| Image vision | `/add-image-vision` | Understand image attachments |
+| PDF reader | `/add-pdf-reader` | Extract text from PDF attachments |
+| Emoji reactions | `/add-reactions` | Send, receive, and search emoji reactions |
+
+See [voice transcription](/features/voice-transcription), [image vision](/features/image-vision), and [PDF reader](/features/pdf-reader) for detailed documentation.
+
+### Emoji reactions
+
+The `/add-reactions` skill adds full emoji reaction support:
+
+- **Receive reactions**: Reactions on messages are stored in a dedicated `reactions` table with a forward-only emoji state machine (sent → delivered → read → reacted)
+- **Send reactions**: A `react_to_message` MCP tool lets the agent react to specific messages
+- **Search reactions**: Query reactions by emoji, sender, or message
+- **Database migration**: Adds a `reactions` table automatically on first run
+
+```bash
+# Install on your nanoclaw-whatsapp fork
+git fetch whatsapp skill/add-reactions
+git merge whatsapp/skill/add-reactions
+```
+
 ## Troubleshooting
 
 ### Authentication expired

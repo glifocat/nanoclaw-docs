@@ -1,0 +1,64 @@
+---
+title: X (Twitter) integration
+description: Connect NanoClaw to X (Twitter) for automated posting and interaction
+tag: "NEW"
+keywords: ["x", "twitter", "social media", "posting", "integration"]
+---
+
+NanoClaw can connect to X (formerly Twitter) as a channel, allowing the agent to post tweets, respond to mentions, and interact with the platform.
+
+## Architecture
+
+The X integration includes both agent-side and host-side components:
+
+- **Host-side**: Monitors for mentions and DMs, routes them to the agent as messages
+- **Agent-side**: Provides tools for posting, replying, and searching
+- **Library code**: X API client with OAuth 1.0a authentication
+- **Setup scripts**: Automated credential configuration
+
+## Prerequisites
+
+- An [X Developer account](https://developer.x.com) with API access
+- API key, API secret, access token, and access token secret
+- WhatsApp or another primary channel already installed
+
+## Installation
+
+Apply the skill via Claude Code:
+
+```
+/x-integration
+```
+
+Or manually from the upstream skill branch:
+
+```bash
+git fetch upstream skill/x-integration
+git merge upstream/skill/x-integration
+```
+
+## Configuration
+
+Add your X API credentials to `.env`:
+
+```bash
+X_API_KEY=your-api-key
+X_API_SECRET=your-api-secret
+X_ACCESS_TOKEN=your-access-token
+X_ACCESS_TOKEN_SECRET=your-access-token-secret
+```
+
+## Usage examples
+
+From any channel where the agent is active:
+
+```
+@Andy post a tweet about our latest release
+@Andy check my recent mentions on X
+@Andy reply to that tweet thread
+```
+
+## Related pages
+
+- [Skills system](/integrations/skills-system) — How skills work
+- [Integrations overview](/integrations/overview) — All available integrations
