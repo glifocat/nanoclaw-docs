@@ -77,7 +77,7 @@ All paths are absolute and resolved from the project root:
 </ResponseField>
 
 <ResponseField name="SENDER_ALLOWLIST_PATH" type="string">
-  `~/.config/nanoclaw/sender-allowlist.json` - Sender allowlist for filtering who can trigger the agent
+  `~/.config/nanoclaw/sender-allowlist.json` - Sender-based access control. JSON file with a `default` entry and optional per-chat overrides in `chats`. Each entry specifies `allow` (`"*"` or array of sender JIDs) and `mode` (`"trigger"` to store but block activation, or `"drop"` to discard silently). Reloaded on every message cycle. See [security overview](/concepts/security#5-sender-allowlist).
 </ResponseField>
 
 ## Trigger pattern
