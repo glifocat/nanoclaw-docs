@@ -5,6 +5,32 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Content gap sweep — 12 issues resolved" description="2026-03-20" tags={["New", "Updated"]}>
+  Ran a full docs-gap analysis against the upstream codebase and resolved all 12 open content-gap issues plus 3 newly discovered gaps.
+
+  ## New pages
+  - **Ollama integration** (`integrations/ollama`) — MCP server architecture, local model setup, third-party endpoints
+  - **Voice transcription** (`features/voice-transcription`) — Whisper API (cloud) and whisper.cpp (local) with comparison table
+  - **Image vision** (`features/image-vision`) — Multimodal image understanding for WhatsApp
+  - **PDF reader** (`features/pdf-reader`) — Text extraction via poppler-utils
+  - **X (Twitter) integration** (`integrations/x-twitter`) — Host+agent architecture, OAuth setup
+  - **Parallel AI** (`integrations/parallel-ai`) — Web research MCP servers (quick search + deep research)
+
+  ## Updated pages
+  - **Skills system** — Documented channel fork architecture (5 fork repos), updated merge workflows, separated upstream vs fork skills
+  - **Installation** — Added Windows (WSL) support across all sections: prerequisites, Docker Desktop WSL 2 backend, troubleshooting
+  - **Security** — Documented sender allowlist: trigger/drop modes, per-chat overrides, file format
+  - **Messaging** — Added `/compact` session command and authorization rules
+  - **Telegram** — Expanded agent swarm section with installation and per-bot config
+  - **WhatsApp** — Added skills summary table and emoji reactions section
+  - **API reference** — Fixed `formatMessages` signature (added `timezone` param and `<context>` header)
+  - **Configuration** — Added `OLLAMA_HOST`, expanded `ANTHROPIC_BASE_URL` and `SENDER_ALLOWLIST_PATH` docs
+
+  ## Housekeeping
+  - Deleted 6 stale `mintlify/*` branches
+  - Created tracking issues for 3 remaining low-priority gaps (#49, #50)
+</Update>
+
 <Update label="Source code accuracy audit" description="2026-03-19" tags={["Fixed"]}>
   Corrected 30+ inaccuracies across 12 documentation pages by auditing against the NanoClaw source code.
 
