@@ -44,9 +44,9 @@ startSchedulerLoop({
 });
 ```
 
-### runTask
+### runTask (internal)
 
-Executes a scheduled task.
+Executes a scheduled task. This function is module-private and called internally by `startSchedulerLoop` — it is not exported.
 
 ```typescript
 async function runTask(

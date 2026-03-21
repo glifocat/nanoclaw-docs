@@ -61,6 +61,10 @@ Mount permissions are stored at `~/.config/nanoclaw/mount-allowlist.json`, which
 
 See `src/mount-security.ts` for the validation implementation.
 
+<Warning>
+The mount allowlist is cached in memory for the lifetime of the host process. Changes to `mount-allowlist.json` require a restart to take effect. This is different from the sender allowlist, which is reloaded on every message cycle.
+</Warning>
+
 **Read-only project root**
 
 The main group's project root is mounted read-only. Writable paths the agent needs (group folder, IPC, `.claude/`) are mounted separately. This prevents the agent from modifying host application code (`src/`, `dist/`, `package.json`, etc.) which would bypass the sandbox entirely on next restart.
@@ -190,11 +194,14 @@ The sender allowlist complements container isolation. Containers protect against
 ### Credential handling
 
 **Credential proxy** (`src/credential-proxy.ts`):
-- Runs on the host as an HTTP proxy (default port 3001)
+- Runs on the host as an HTTP proxy (default port 3001, configurable via `CREDENTIAL_PROXY_PORT`)
 - Containers send API requests to the proxy with a placeholder token
-- Proxy injects real credentials (API key or OAuth token) on every outbound request
 - Reads credentials from `.env` once at startup
 - Supports API key mode (`ANTHROPIC_API_KEY`) and OAuth mode (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN`)
+
+**Credential injection behavior differs by auth mode:**
+- **API key mode**: The proxy replaces the `x-api-key` header on every outbound request
+- **OAuth mode**: The proxy replaces the `Authorization` header only on requests that include one (during the initial token exchange). The Claude CLI exchanges the placeholder token for a temporary API key, and subsequent requests use that key directly without further injection
 
 **NOT mounted:**
 - Channel sessions (e.g., `store/auth/` for WhatsApp) - host only
@@ -220,7 +227,7 @@ Containers cannot extract real credentials. The credential proxy intercepts all 
 |------------|------------|----------------|
 | Project root access | `/workspace/project` (ro) | None |
 | Group folder | `/workspace/group` (rw) | `/workspace/group` (rw) |
-| Global memory | Implicit via project | `/workspace/global` (ro) |
+| Global memory | Via project mount | `/workspace/global` (ro, if exists) |
 | Additional mounts | Configurable | Read-only unless allowed |
 | Network access | Unrestricted | Unrestricted |
 | MCP tools | Allowlisted | Allowlisted |
@@ -240,7 +247,7 @@ Containers cannot extract real credentials. The credential proxy intercepts all 
 │  • IPC authorization                                              │
 │  • Mount validation (external allowlist)                          │
 │  • Container lifecycle                                            │
-│  • Credential filtering                                           │
+│  • Credential proxy                                                │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │
                                  ▼ Explicit mounts only

@@ -110,7 +110,7 @@ Each group has a dedicated directory structure:
 |------|------------|----------------|
 | Own group folder | Read-write | Read-write |
 | Project root | Read-only | Not mounted |
-| Global memory (`groups/global/`) | Implicit via project | Read-only mount |
+| Global memory (`groups/global/`) | Via project mount | Read-only mount (if exists) |
 | Other groups' folders | Via project root (ro) | Not accessible |
 | Additional mounts | Configurable | Read-only unless allowed |
 
@@ -262,7 +262,7 @@ Non-main groups require a trigger pattern to activate:
 - Accumulate between triggered responses
 
 <Note>
-Triggers only check the message content, not the sender. Anyone in the group can trigger the agent with `@{ASSISTANT_NAME}`.
+Triggers check both message content and sender authorization. A message must match the trigger pattern **and** the sender must be allowed by the [sender allowlist](/concepts/security#5-sender-allowlist) (specifically, `isTriggerAllowed` checks against the allowlist configuration). Messages from the bot itself (`is_from_me`) always pass the sender check.
 </Note>
 
 ## Additional mounts

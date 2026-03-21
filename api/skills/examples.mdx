@@ -1,6 +1,7 @@
 ---
 title: Examples
 description: Real skill examples from the NanoClaw repository showing different patterns and techniques
+tag: "UPDATED"
 ---
 
 import SyncEnv from "/snippets/sync-env.mdx";
@@ -437,10 +438,10 @@ if (parallelApiKey) {
    Prompt: "Check Parallel AI task run [run_id] and send results 
    when ready.
    
-   1. Use the Parallel Task MCP to check the task status
-   2. If status is 'completed', extract the results
-   3. Send results with mcp__nanoclaw__send_message
-   4. Use mcp__nanoclaw__complete_scheduled_task
+    1. Use the Parallel Task MCP to check the task status
+    2. If status is 'completed', extract the results
+    3. Send results with mcp__nanoclaw__send_message
+    4. Use mcp__nanoclaw__cancel_task to remove the polling task
    
    If status is still 'running', do nothing (task will run again 
    in 30s)."
