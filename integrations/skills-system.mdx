@@ -80,10 +80,11 @@ The channel fork architecture keeps the upstream `main` branch minimal. Core Nan
 - Discovered through Claude Code's plugin marketplace
 
 **Container-agent skills** (synced into every container):
-- `/agent-browser`, `/capabilities`, `/status`
+- `/agent-browser`, `/capabilities`, `/slack-formatting`, `/status`
 - Live in `container/skills/` and are synced to each group's `.claude/skills/` directory
 - Available to the agent running inside the container
 - Some are restricted to the main channel (e.g., `/capabilities` and `/status` check for the `/workspace/project` mount)
+- Some are context-dependent (e.g., `/slack-formatting` activates when the group folder starts with `slack_`)
 
 ## Applying a skill
 

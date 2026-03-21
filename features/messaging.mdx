@@ -86,6 +86,23 @@ function formatMessages(
 </messages>
 ```
 
+## Platform-specific response formatting
+
+Agents format their responses based on the channel they are responding to. The group folder name prefix tells the agent which platform's formatting rules to follow:
+
+| Folder prefix | Platform | Formatting |
+|---------------|----------|------------|
+| `slack_` | Slack | Slack mrkdwn — `*bold*`, `<url\|text>` links, `•` bullets, no headings |
+| `whatsapp_` | WhatsApp | `*bold*`, `_italic_`, `•` bullets, no Markdown headings or links |
+| `telegram_` | Telegram | Same as WhatsApp |
+| `discord_` | Discord | Standard Markdown — `**bold**`, `[links](url)`, `# headings` |
+
+For Slack channels, the `/slack-formatting` container skill provides a complete mrkdwn syntax reference that agents can invoke. Key differences from standard Markdown include `*single asterisks*` for bold (not double), `<url|text>` for links (not `[text](url)`), and no heading or numbered list support.
+
+<Note>
+These formatting rules are defined in the group's `CLAUDE.md` files (`groups/global/CLAUDE.md` and `groups/main/CLAUDE.md`) and are loaded automatically by the agent at startup.
+</Note>
+
 ## Internal tags
 
 Agents can use `<internal>...</internal>` tags for reasoning that won't be sent to users:

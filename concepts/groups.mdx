@@ -83,7 +83,8 @@ interface RegisteredGroup {
 - Must be alphanumeric with dashes/underscores only
 - Cannot contain `..` or `/`
 - Main group always uses `main`
-- Typically derived from group name (e.g., "Family Chat" → `family-chat`)
+- Use a channel prefix with underscore separator (e.g., `slack_engineering`, `whatsapp_family-chat`, `discord_general`, `telegram_dev-team`)
+- The channel prefix determines which message formatting rules the agent applies (Slack mrkdwn, WhatsApp plain text, Discord Markdown, etc.)
 
 <Warning>
 Folder names cannot be changed after registration. The folder name becomes the group's stable identifier across sessions.

@@ -1,6 +1,7 @@
 ---
 title: Slack integration
 description: Add Slack support using the /add-slack skill
+tag: "UPDATED"
 ---
 
 import SyncEnv from "/snippets/sync-env.mdx";
@@ -344,6 +345,20 @@ export class SlackChannel implements Channel {
     If your token doesn't match, you may have copied the wrong one.
   </Accordion>
 </AccordionGroup>
+
+## Message formatting
+
+Slack uses [mrkdwn](https://api.slack.com/reference/surfaces/formatting) syntax, which differs from standard Markdown. NanoClaw includes a `/slack-formatting` container skill that provides the agent with a complete mrkdwn reference. The skill activates automatically when the group folder starts with `slack_`.
+
+Key differences from standard Markdown:
+
+- `*bold*` instead of `**bold**`
+- `<url|text>` instead of `[text](url)`
+- `•` bullets instead of numbered lists
+- No `##` headings — use `*Bold text*` instead
+- `:emoji:` shortcodes for emoji
+
+The formatting rules are also embedded in the group `CLAUDE.md` files so agents always have access to them, even without invoking the skill directly.
 
 ## Known limitations
 
