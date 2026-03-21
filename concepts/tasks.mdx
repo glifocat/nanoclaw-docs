@@ -117,9 +117,8 @@ sequenceDiagram
     GQ->>CR: runContainerAgent(isScheduledTask: true)
     CR->>AG: Spawn container
     AG->>AG: Execute task prompt
-    AG->>AG: Call send_message tool (optional)
     AG-->>CR: Stream output
-    CR->>CH: Forward to chat (if send_message called)
+    CR->>CH: Auto-forward result to chat (if output present)
     CR->>DB: logTaskRun()
     CR->>DB: updateTaskAfterRun(next_run)
 ```
@@ -133,7 +132,7 @@ sequenceDiagram
 5. GroupQueue respects concurrency limits (tasks and messages share the pool)
 6. Container spawned with `isScheduledTask: true` flag
 7. Agent executes task prompt
-8. Results optionally sent via `send_message` MCP tool
+8. Results automatically forwarded to the group chat when the agent produces output
 9. Run logged to `task_run_logs` table with duration and result
 10. `next_run` recalculated based on schedule type
 11. Container closes after 10-second grace period

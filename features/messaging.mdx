@@ -80,9 +80,9 @@ function formatMessages(
 ```xml
 <context timezone="America/Los_Angeles" />
 <messages>
-  <message sender="Alice" time="2026-02-28 10:30 AM">@Andy what's the weather?</message>
-  <message sender="Bob" time="2026-02-28 10:31 AM">I think it's sunny</message>
-  <message sender="Alice" time="2026-02-28 10:32 AM">Can you check?</message>
+<message sender="Alice" time="2026-02-28 10:30 AM">@Andy what's the weather?</message>
+<message sender="Bob" time="2026-02-28 10:31 AM">I think it's sunny</message>
+<message sender="Alice" time="2026-02-28 10:32 AM">Can you check?</message>
 </messages>
 ```
 
@@ -234,16 +234,18 @@ This updates `ASSISTANT_NAME` in `src/config.ts` and `.env`.
 Groups must be registered before the agent can respond. The main channel can register groups via IPC:
 
 ```typescript
-// From src/ipc.ts — register_group handler
+// From src/ipc.ts — register_group handler (simplified)
 case 'register_group':
   if (!isMain) {
-    logger.warn(
-      { sourceGroup },
-      'Unauthorized register_group attempt blocked',
-    );
+    logger.warn({ sourceGroup }, 'Unauthorized register_group attempt blocked');
+    break;
+  }
+  if (!isValidGroupFolder(data.folder)) {
+    logger.warn({ folder: data.folder }, 'Invalid group folder name');
     break;
   }
   if (data.jid && data.name && data.folder && data.trigger) {
+    // Defense in depth: isMain is never set via IPC
     deps.registerGroup(data.jid, {
       name: data.name,
       folder: data.folder,
