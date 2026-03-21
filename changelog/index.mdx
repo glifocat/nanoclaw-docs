@@ -5,6 +5,16 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v1.2.21" description="2026-03-21" tags={["Fix"]}>
+  - Added ESLint configuration with error-handling rules (preserve caught error cause, no unused variables)
+  - Fixed existing linting violations across codebase
+</Update>
+
+<Update label="v1.2.20" description="2026-03-21" tags={["Feature"]}>
+  - Added `/slack-formatting` container-agent skill — teaches agents to use Slack's mrkdwn syntax when responding in Slack channels
+  - Updated global and main `CLAUDE.md` with channel-aware formatting instructions
+</Update>
+
 <Update label="v1.2.19" description="2026-03-19" tags={["Fix"]}>
   - Reduced `docker stop` timeout for faster container restarts (`-t 1` flag — containers are stateless)
 </Update>
