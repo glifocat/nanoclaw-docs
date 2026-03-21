@@ -70,7 +70,7 @@ The channel fork architecture keeps the upstream `main` branch minimal. Core Nan
 ### Three categories of skills
 
 **Operational skills** (on `main`, always available):
-- `/setup`, `/debug`, `/update-nanoclaw`, `/customize`, `/update-skills`
+- `/setup`, `/debug`, `/update-nanoclaw`, `/customize`, `/update-skills`, `/get-qodo-rules`, `/qodo-pr-resolver`, `/x-integration`
 - Instruction-only `SKILL.md` files — no code changes, just workflows
 - Live in `.claude/skills/` on `main`
 
@@ -80,7 +80,7 @@ The channel fork architecture keeps the upstream `main` branch minimal. Core Nan
 - Discovered through Claude Code's plugin marketplace
 
 **Container-agent skills** (synced into every container):
-- `/agent-browser`, `/capabilities`, `/status`
+- `/agent-browser`, `/capabilities`, `/slack-formatting`, `/status`
 - Live in `container/skills/` and are synced to each group's `.claude/skills/` directory
 - Available to the agent running inside the container
 - Some are restricted to the main channel (e.g., `/capabilities` and `/status` check for the `/workspace/project` mount)
@@ -191,7 +191,9 @@ Dependencies are implicit in git history — no separate dependency file is need
 
 ### Upstream skills (from skill branches)
 
+- **`/add-compact`** — Manual context compaction skill
 - **`/add-ollama-tool`** — Ollama MCP server for local models
+- **`/add-parallel`** — Parallel AI MCP servers for web research
 - **`/convert-to-apple-container`** — Switch from Docker to Apple Container on macOS
 
 ### Channel-specific skills (from channel fork branches)
