@@ -476,7 +476,7 @@ agent-browser pdf https://example.com output.pdf
 
 - **Network access**: Agents have full network access (can exfiltrate data)
 - **Mounted directory tampering**: Agents can modify anything in mounted directories
-- **Credential exposure**: Mounted credentials (Claude tokens) are readable
+- **Placeholder tokens**: Containers receive placeholder API keys (the credential proxy injects real credentials at the network level, but the placeholder tokens are visible in the environment)
 - **Resource exhaustion**: No CPU/memory limits (can DoS host)
 
 <Warning>

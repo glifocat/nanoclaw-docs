@@ -118,7 +118,7 @@ The scheduler (`src/task-scheduler.ts`) runs scheduled tasks:
 <Accordion title="Task execution flow">
 1. Scheduler finds due task from database
 2. Enqueues task in GroupQueue (respects concurrency limits)
-3. Spawns container in task mode (`isTaskContainer: true`)
+3. Spawns container in task mode (`isScheduledTask: true`)
 4. Streams output and optionally sends to chat via `send_message` tool
 5. Logs run to database with duration and result
 6. Calculates next run time based on schedule type
@@ -138,7 +138,7 @@ The IPC watcher (`src/ipc.ts`) enables container-to-host communication:
 **Available operations:**
 - `send_message`: Send message to group chat (own chat only for non-main)
 - `schedule_task`, `pause_task`, `resume_task`, `cancel_task`, `update_task`: Task management
-- `register_group`, `sync_groups`: Group management (main only)
+- `register_group`, `refresh_groups`: Group management (main only)
 
 ### Database
 
@@ -301,13 +301,15 @@ The agent runner is the TypeScript code that wraps Claude Agent SDK. It handles 
 2. **Database initialization**: Create tables if needed, load schema
 3. **State loading**: Restore message cursors, sessions, registered groups
 4. **Remote Control restore**: Re-adopt any surviving Remote Control session from a previous run
-5. **Channel connection**: Connect to messaging channels, authenticate if needed
-6. **Subsystem startup**: 
+5. **Credential proxy**: Start the credential proxy on `CREDENTIAL_PROXY_PORT` (containers route API calls through this)
+6. **Shutdown handlers**: Register graceful shutdown on `SIGTERM` and `SIGINT`
+7. **Channel connection**: Connect to messaging channels, authenticate if needed
+8. **Subsystem startup**: 
    - Task scheduler loop (60s interval)
    - IPC watcher (1s poll interval)
    - Message loop (2s poll interval)
-7. **Recovery**: Check for unprocessed messages from previous crash
-8. **Ready**: System begins processing messages and tasks
+9. **Recovery**: Check for unprocessed messages from previous crash
+10. **Ready**: System begins processing messages and tasks
 
 ## Graceful shutdown
 
