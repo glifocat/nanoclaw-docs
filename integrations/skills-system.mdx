@@ -67,19 +67,25 @@ Channels self-register at startup using the channel registry (`src/channels/regi
 The channel fork architecture keeps the upstream `main` branch minimal. Core NanoClaw has no channel code at all — you add exactly the channels you need by merging from the appropriate fork.
 </Info>
 
-### Three categories of skills
+### Four categories of skills
+
+**Feature skills** (branch-based, installed on demand):
+- `/add-discord`, `/add-telegram`, `/add-slack`, `/add-gmail`, etc.
+- Each has a `SKILL.md` with setup instructions and a corresponding `skill/*` branch with code
+- Discovered through Claude Code's plugin marketplace
+
+**Utility skills** (self-contained tools with code files):
+- Ship code files alongside the `SKILL.md` (e.g., scripts in a `scripts/` subfolder)
+- No branch merge needed — the code is self-contained in the skill directory
+- Example: `/claw` (Python CLI in `scripts/claw`)
+- Live in `.claude/skills/<name>/` on `main`
 
 **Operational skills** (on `main`, always available):
 - `/setup`, `/debug`, `/update-nanoclaw`, `/customize`, `/update-skills`
 - Instruction-only `SKILL.md` files — no code changes, just workflows
 - Live in `.claude/skills/` on `main`
 
-**Feature skills** (in marketplace, installed on demand):
-- `/add-discord`, `/add-telegram`, `/add-slack`, `/add-gmail`, etc.
-- Each has a `SKILL.md` with setup instructions and a corresponding `skill/*` branch with code
-- Discovered through Claude Code's plugin marketplace
-
-**Container-agent skills** (synced into every container):
+**Container skills** (synced into every container):
 - `/agent-browser`, `/capabilities`, `/status`
 - Live in `container/skills/` and are synced to each group's `.claude/skills/` directory
 - Available to the agent running inside the container

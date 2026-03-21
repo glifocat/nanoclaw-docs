@@ -1,6 +1,7 @@
 ---
 title: Contributing
 description: How to contribute to NanoClaw
+tag: "UPDATED"
 ---
 
 NanoClaw is designed to stay small and minimal. Contributions should prioritize reducing code, not adding features.
@@ -65,23 +66,11 @@ Instead of adding features to the codebase, we contribute **skills** that teach 
 
 ## Contributing skills
 
-A [skill](https://code.claude.com/docs/en/skills) is a markdown file in `.claude/skills/` that teaches Claude Code how to transform a NanoClaw installation.
+A [skill](https://code.claude.com/docs/en/skills) is a markdown file that teaches Claude Code how to transform or extend a NanoClaw installation. NanoClaw has four types of skills, each serving a different purpose.
 
-### Skill structure
+### Skill types
 
-Skills are either **operational** (instruction-only SKILL.md files on `main`) or **feature** (code changes on a `skill/*` branch with a SKILL.md in the marketplace repo).
-
-**Operational skills** live in `.claude/skills/` on `main`:
-
-<Tree>
-  <Tree.Folder name=".claude/skills" defaultOpen>
-    <Tree.Folder name="debug" defaultOpen>
-      <Tree.File name="SKILL.md" />
-    </Tree.Folder>
-  </Tree.Folder>
-</Tree>
-
-**Feature skills** are `skill/*` branches containing all code changes:
+**Feature skills** — add capabilities by merging a `skill/*` branch. The SKILL.md contains setup instructions; the actual code lives on the branch.
 
 <Tree>
   <Tree.Folder name="skill/telegram branch" defaultOpen>
@@ -92,9 +81,50 @@ Skills are either **operational** (instruction-only SKILL.md files on `main`) or
   </Tree.Folder>
 </Tree>
 
+**Utility skills** — standalone tools that ship code files alongside the SKILL.md. No branch merge needed.
+
+<Tree>
+  <Tree.Folder name=".claude/skills" defaultOpen>
+    <Tree.Folder name="claw" defaultOpen>
+      <Tree.File name="SKILL.md" />
+      <Tree.Folder name="scripts" defaultOpen>
+        <Tree.File name="claw" />
+      </Tree.Folder>
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
+
+**Operational skills** — instruction-only SKILL.md files on `main` with no code changes.
+
+<Tree>
+  <Tree.Folder name=".claude/skills" defaultOpen>
+    <Tree.Folder name="debug" defaultOpen>
+      <Tree.File name="SKILL.md" />
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
+
+**Container skills** — loaded inside agent containers at runtime from `container/skills/`.
+
 ### Writing a skill
 
 <Steps>
+  <Step title="For feature skills: make code changes on a branch">
+    Branch from `main` and make your code changes directly:
+
+    ```bash
+    git checkout -b skill/my-integration main
+    # Add new files, modify source, update package.json
+    git commit -m "Add my-integration support"
+    ```
+
+    The branch should contain all the code needed for the integration — new files, modified source files, updated dependencies, `.env.example` additions.
+  </Step>
+
+  <Step title="For utility skills: create a self-contained directory">
+    Create `.claude/skills/{name}/` with a SKILL.md and supporting code files (e.g., in a `scripts/` subfolder). Use `${CLAUDE_SKILL_DIR}` to reference files in the skill directory. Put code in separate files, not inline in the SKILL.md.
+  </Step>
+
   <Step title="For operational skills: write SKILL.md">
     Create a `SKILL.md` in `.claude/skills/{name}/` on `main`. The skill should contain **instructions** Claude follows to execute a workflow.
 
@@ -111,16 +141,8 @@ Skills are either **operational** (instruction-only SKILL.md files on `main`) or
     ```
   </Step>
 
-  <Step title="For feature skills: make code changes on a branch">
-    Branch from `main` and make your code changes directly:
-
-    ```bash
-    git checkout -b skill/my-integration main
-    # Add new files, modify source, update package.json
-    git commit -m "Add my-integration support"
-    ```
-
-    The branch should contain all the code needed for the integration — new files, modified source files, updated dependencies, `.env.example` additions.
+  <Step title="For container skills: add to container/skills/">
+    Create `container/skills/{name}/SKILL.md`. Use `allowed-tools` frontmatter to scope tool permissions. Keep skills focused — the agent's context window is shared across all container skills.
   </Step>
 
   <Step title="Include context and rationale">
@@ -186,7 +208,7 @@ Skills let users selectively add features to their fork without inheriting code 
 <Accordion title="Feature skills contain source changes">
   Feature skills are `skill/*` branches that contain all code changes for the integration — including modifications to `src/`, `container/`, `package.json`, etc. This is by design: the skill branch is the complete diff from `main`.
 
-  Operational skills (SKILL.md files on `main`) should not modify source files — they are instruction-only.
+  Utility skills ship code alongside the SKILL.md but don't modify source files — the code is self-contained in the skill directory. Operational skills are instruction-only.
 </Accordion>
 
 <Accordion title="Skills should be reversible">
@@ -214,10 +236,6 @@ Skills we'd like to see contributed:
 - `/add-signal` - Add Signal integration
 - `/add-matrix` - Add Matrix integration
 - `/add-whatsapp-cloud-api` - Add WhatsApp Cloud API (for business accounts)
-
-### Session management
-
-- `/clear` - Compact conversation (summarize context while preserving critical information in the same session). Requires figuring out how to trigger compaction programmatically via the Claude Agent SDK.
 
 ### Deployment
 
