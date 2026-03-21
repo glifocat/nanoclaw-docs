@@ -385,8 +385,10 @@ Claude will:
 
 If your customization would benefit others, contribute it as a skill:
 
-- **Operational skills** (workflows, guides): Create `.claude/skills/{name}/SKILL.md` and submit a PR to `main`
 - **Feature skills** (code changes): Branch from `main`, make your code changes, and submit a PR. Maintainers will create a `skill/<name>` branch and add the SKILL.md to the marketplace.
+- **Utility skills** (standalone tools): Create `.claude/skills/{name}/` with a SKILL.md and code files, then submit a PR to `main`.
+- **Operational skills** (workflows, guides): Create `.claude/skills/{name}/SKILL.md` and submit a PR to `main`.
+- **Container skills** (agent runtime): Create `container/skills/{name}/SKILL.md` and submit a PR to `main`.
 
 **Don't submit PRs that add features to the core codebase.** Only bug fixes, security fixes, and clear improvements are accepted.
 

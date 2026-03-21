@@ -1,11 +1,12 @@
 ---
 title: Skill structure
-description: Understanding the structure of NanoClaw skills — operational skills on main and feature skills as git branches
+description: Understanding the structure of NanoClaw skills — four types with different locations and purposes
+tag: "UPDATED"
 ---
 
-NanoClaw has three categories of skills, each with a different structure. Operational skills live on `main` as instruction files. Feature skills are distributed as git branches containing all code changes. Container-agent skills are synced into every container for use by the running agent.
+NanoClaw has four categories of skills, each with a different structure. Feature skills are distributed as git branches containing all code changes. Utility skills ship code files alongside their SKILL.md. Operational skills live on `main` as instruction files. Container skills are synced into every container for use by the running agent.
 
-## Three types of skills
+## Four types of skills
 
 ### Operational skills
 
@@ -55,6 +56,23 @@ Run `bash setup.sh` and parse the status block.
 - `name` (required) — the skill command name (e.g., `setup`, `debug`)
 - `description` (required) — when Claude Code should invoke this skill
 
+### Utility skills
+
+Utility skills are standalone tools that ship code files alongside the `SKILL.md`. The SKILL.md tells Claude how to install the tool; the code lives in the skill directory itself (e.g., in a `scripts/` subfolder).
+
+<Tree>
+  <Tree.Folder name=".claude/skills" defaultOpen>
+    <Tree.Folder name="claw" defaultOpen>
+      <Tree.File name="SKILL.md" />
+      <Tree.Folder name="scripts" defaultOpen>
+        <Tree.File name="claw" />
+      </Tree.Folder>
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
+
+Unlike feature skills, utility skills require no branch merge. The code is self-contained in the skill directory and gets copied into place during installation. Use `${CLAUDE_SKILL_DIR}` in the SKILL.md to reference files in the skill directory.
+
 ### Feature skills
 
 Feature skills are distributed as `skill/*` branches on the upstream repository. Each branch contains **all** the code changes for that integration: new files, modified source files, updated `package.json` dependencies, `.env.example` additions — everything.
@@ -72,9 +90,9 @@ Feature skills are distributed as `skill/*` branches on the upstream repository.
 
 Feature skills also have a `SKILL.md` in the marketplace repo (`qwibitai/nanoclaw-skills`) that provides setup instructions. When you run `/add-telegram`, Claude reads the SKILL.md and merges the skill branch.
 
-### Container-agent skills
+### Container skills
 
-Container-agent skills live in `container/skills/` and are synced into every container's `.claude/skills/` directory. These are available to the agent running inside the container — not to the host-side Claude Code session.
+Container skills live in `container/skills/` and are synced into every container's `.claude/skills/` directory. These run inside the agent container, not on the host. They teach the container agent how to use tools, format output, or perform tasks.
 
 <Tree>
   <Tree.Folder name="container/skills" defaultOpen>
@@ -90,7 +108,7 @@ Container-agent skills live in `container/skills/` and are synced into every con
   </Tree.Folder>
 </Tree>
 
-Container-agent skills use the same `SKILL.md` frontmatter format as operational skills. Some are restricted to the main channel by checking for the `/workspace/project` mount (only present for main groups).
+Container skills use the same `SKILL.md` frontmatter format as operational skills. Use `allowed-tools` frontmatter to scope tool permissions. Some are restricted to the main channel by checking for the `/workspace/project` mount (only present for main groups).
 
 | Skill | Description | Access |
 |-------|-------------|--------|
