@@ -111,6 +111,7 @@
               "features/scheduled-tasks",
               "features/agent-swarms",
               "features/customization",
+              "features/cli",
               "features/web-access",
               "features/voice-transcription",
               "features/image-vision",
