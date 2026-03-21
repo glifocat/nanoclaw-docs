@@ -1,6 +1,7 @@
 ---
 title: Message routing
 description: Message formatting and routing API
+tag: "UPDATED"
 ---
 
 The message router handles formatting messages for agents and routing outbound messages to the correct channel.
@@ -232,6 +233,7 @@ interface Channel {
   isConnected(): boolean;
   ownsJid(jid: string): boolean;
   disconnect(): Promise<void>;
-  setTyping?(jid: string, isTyping: boolean): Promise<void>; // Optional
+  setTyping?(jid: string, isTyping: boolean): Promise<void>;  // Optional
+  syncGroups?(force: boolean): Promise<void>;                  // Optional
 }
 ```
