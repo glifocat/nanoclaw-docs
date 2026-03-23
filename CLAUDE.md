@@ -81,6 +81,14 @@ keywords: ["relevant", "search", "terms"]
 
 **Common frontmatter fields:** `title` (required), `description`, `sidebarTitle`, `icon`, `tag`, `hidden`, `mode`, `keywords`, `api`, `openapi`.
 
+**New pages**: Always add `tag: "NEW"` to frontmatter — triggers the sidebar badge (auto-clears after 2 weeks).
+
+**Diagrams**: Use Mermaid (`` ```mermaid ``), never ASCII art in plain code blocks — box characters don't render correctly.
+
+**`mint validate`**: Must be run from the directory containing `docs.json` — fails otherwise.
+
+**Multi-issue PRs**: When closing multiple issues, put each `Closes #N` on its own line AND add matching labels via `gh pr edit --add-label`.
+
 **Navigation:** When adding or moving pages, update the `navigation` array in `docs.json`. The site has two tabs: "Documentation" (5 groups) and "API Reference" (2 groups). New pages not added to `docs.json` won't appear in the sidebar.
 
 **File naming:** Use kebab-case (e.g., `agent-swarms.mdx`). Match existing patterns in the directory.
