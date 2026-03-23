@@ -37,7 +37,7 @@ sequenceDiagram
 
 <Steps>
   <Step title="Start">
-    A user sends `/remote-control` in any connected chat. NanoClaw spawns `claude remote-control --name "NanoClaw Remote"` as a detached child process with its working directory set to the project root.
+    A user sends `/remote-control` in the **main group's** chat. NanoClaw spawns `claude remote-control --name "NanoClaw Remote"` as a detached child process with its working directory set to the project root.
   </Step>
 
   <Step title="URL detection">
@@ -70,13 +70,12 @@ From the main group's chat on any connected channel (Telegram, WhatsApp, Discord
 NanoClaw responds with the session URL:
 
 ```
-Remote Control session started.
-Open in browser: https://claude.ai/code?bridge=env_abc123
+https://claude.ai/code?bridge=env_abc123
 ```
 
 ### Checking status
 
-If a session is already running, calling `/remote-control` again returns the existing URL without spawning a new process.
+If a session is already running and the process is still alive, calling `/remote-control` again returns the existing URL without spawning a new process. If the process has died, NanoClaw automatically clears the stale session and starts a new one.
 
 ### Stopping a session
 

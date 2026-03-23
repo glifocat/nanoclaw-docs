@@ -136,9 +136,12 @@ Allows agents to send messages to chats.
 {
   "type": "message",
   "chatJid": "1234567890@s.whatsapp.net",
-  "text": "Message content"
+  "text": "Message content",
+  "sender": "Researcher"
 }
 ```
+
+The `sender` field is optional. When set, messages appear from a dedicated bot identity in Telegram (useful for agent swarms where multiple agents post to the same chat).
 
 **Authorization:**
 - Main group can send to any chat

@@ -39,6 +39,7 @@ The agent container is built from `container/Dockerfile` and includes:
   RUN apt-get update && apt-get install -y \
       chromium \
       fonts-liberation \
+      fonts-noto-cjk \
       fonts-noto-color-emoji \
       libgbm1 \
       libnss3 \
@@ -240,7 +241,7 @@ Mounts are built per-group in `src/container-runner.ts`:
 |------|------------|----------------|------|
 | Project root | `/workspace/project` | Not mounted | Read-only |
 | Group folder | `/workspace/group` | `/workspace/group` | Read-write |
-| Global memory | Implicit (in project) | `/workspace/global` | Read-only |
+| Global memory | Via project mount | `/workspace/global` (if exists) | Read-only |
 | Claude sessions | `/home/node/.claude` | `/home/node/.claude` | Read-write |
 | IPC namespace | `/workspace/ipc` | `/workspace/ipc` | Read-write |
 | Agent runner src | `/app/src` | `/app/src` | Read-write |
@@ -254,7 +255,7 @@ Each group gets its own copy of the agent-runner source in `data/sessions/{group
 
 Containers have two timeout mechanisms:
 
-1. **Hard timeout** - Maximum runtime before force kill (default: 30 minutes)
+1. **Hard timeout** - Maximum runtime before force kill (default: 30 minutes 30 seconds with default settings)
 2. **Idle timeout** - Graceful shutdown after period of inactivity (default: 30 minutes)
 
 From the timeout logic in `src/container-runner.ts`:
