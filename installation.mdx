@@ -322,6 +322,8 @@ Once all prerequisites are installed:
     ```
 
     Claude will handle dependencies, container setup, marketplace plugin installation, and channel configuration automatically.
+
+    At the end of setup, you'll be asked about **opt-in diagnostics**. NanoClaw can send anonymized system info (version, OS, architecture, node version, channels selected) to help improve the project. You can choose **Yes**, **No**, or **Never ask again**. No personally identifiable information is collected.
   </Step>
 </Steps>
 
@@ -509,7 +511,7 @@ systemctl --user status nanoclaw
 tail -f logs/nanoclaw.log
 
 # Test database
-node -e "const db=require('./dist/db.js');console.log(db.getGroups())"
+node -e "const db=require('./dist/db.js');console.log(db.getAllRegisteredGroups())"
 ```
 
 Or ask Claude Code:
