@@ -255,7 +255,38 @@ The proxy reads credentials from `.env` once at startup and injects them into ev
 The credential proxy prevents credential exposure to containers. However, the proxy URL is accessible from within the container's network. The container cannot extract the real credentials, but it can make authenticated API requests through the proxy.
 </Warning>
 
-### 7. Log privacy
+### 7. Diagnostics and telemetry
+
+NanoClaw includes opt-in diagnostics that run during `/setup` and `/update-nanoclaw` skill workflows only. There is no runtime telemetry in the application itself.
+
+**What's collected** (anonymous, non-identifying):
+
+| Field | Example | Purpose |
+|-------|---------|---------|
+| `nanoclaw_version` | `1.2.21` | Version distribution |
+| `os_platform` | `darwin` | Platform compatibility |
+| `arch` | `arm64` | Architecture support |
+| `node_major_version` | `22` | Runtime requirements |
+| `channels_selected` | `["telegram"]` | Feature usage (setup only) |
+| `update_method` | `merge` | Update workflow (update only) |
+| `error_count` | `0` | Failure rates |
+
+**What's NOT collected**: paths, usernames, hostnames, IP addresses, message content, or any credentials.
+
+**How it works:**
+
+1. After setup or update completes, the skill writes a JSON payload to a temporary file
+2. The full payload is shown to you before anything is sent
+3. You choose: **Yes** (send once), **No** (skip), or **Never ask again** (permanently disable)
+4. If sent, the payload goes to PostHog's capture API via a single `curl` request, then the temp file is deleted
+
+**Permanent opt-out**: choosing "Never ask again" replaces the diagnostics instruction files with opt-out stubs and removes the diagnostics section from both the `/setup` and `/update-nanoclaw` skills.
+
+<Info>
+Diagnostics are entirely skill-driven — they exist as markdown instructions read by Claude, not as application code. No data is ever sent without explicit user approval.
+</Info>
+
+### 8. Log privacy
 
 Container run logs avoid persisting user conversation content:
 

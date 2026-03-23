@@ -5,6 +5,12 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v1.2.21" description="2026-03-22" tags={["Feature"]}>
+  - Added opt-in diagnostics via PostHog — collects anonymous system info (OS, architecture, version, selected channels) during `/setup` and `/update-nanoclaw` with explicit user consent
+  - Three-option prompt: **Yes** (send once), **No** (skip), **Never ask again** (permanently opt out)
+  - No runtime telemetry — diagnostics run only in skill workflows, not in the application itself
+</Update>
+
 <Update label="v1.2.19" description="2026-03-19" tags={["Fix"]}>
   - Reduced `docker stop` timeout for faster container restarts (`-t 1` flag — containers are stateless)
 </Update>
