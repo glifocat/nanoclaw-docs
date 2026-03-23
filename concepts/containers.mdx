@@ -419,11 +419,38 @@ Skills synced to each container:
 |-------|-------------|--------|
 | `/agent-browser` | Browse the web, fill forms, extract data | All groups |
 | `/capabilities` | Report installed skills, available tools, MCP tools, container utilities, and group info | Main channel only |
+| `/slack-formatting` | Format messages for Slack using mrkdwn syntax | All groups |
 | `/status` | Quick health check — session context, workspace mounts, tool availability, and scheduled task snapshot | Main channel only |
 
 <Note>
 `/capabilities` and `/status` are restricted to the main channel. They detect this by checking for the `/workspace/project` mount, which is only present for main groups. Non-main groups receive a redirect message.
 </Note>
+
+### Allowed tools
+
+The agent runner passes an explicit allowlist to the Claude Agent SDK. Only these tools are available inside containers:
+
+| Category | Tools |
+|----------|-------|
+| File operations | `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep` |
+| Web access | `WebSearch`, `WebFetch` |
+| Agent teams | `Task`, `TaskOutput`, `TaskStop`, `TeamCreate`, `TeamDelete`, `SendMessage` |
+| Utilities | `TodoWrite`, `ToolSearch`, `Skill`, `NotebookEdit` |
+| MCP | `mcp__nanoclaw__*` (all tools from the built-in NanoClaw MCP server) |
+
+The SDK runs with `permissionMode: 'bypassPermissions'` since containers already provide the security boundary.
+
+### Conversation archival
+
+Before the SDK compacts context (when the conversation gets long), a `PreCompact` hook archives the full transcript to `/workspace/group/conversations/` as a markdown file. Files are named `{date}-{summary}.md` where the summary is derived from the session context. This preserves conversation history that would otherwise be lost during compaction.
+
+### Global memory injection
+
+For non-main groups, if `/workspace/global/CLAUDE.md` exists, its contents are appended to the system prompt via `systemPrompt.append`. This lets you define shared instructions in `groups/global/CLAUDE.md` that apply to all non-main groups without duplicating the file.
+
+### Additional directory auto-discovery
+
+Directories mounted at `/workspace/extra/*` (via additional mounts) are automatically passed to the SDK as `additionalDirectories`. This means any `CLAUDE.md` file in those directories is loaded automatically, giving the agent context about the mounted project.
 
 **MCP servers:**
 
