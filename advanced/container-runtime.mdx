@@ -20,6 +20,50 @@ The runtime binary is specified by `CONTAINER_RUNTIME_BIN` in `src/container-run
 export const CONTAINER_RUNTIME_BIN = 'docker';
 ```
 
+## Apple Container vs Docker
+
+Apple Container is Apple's native virtualization framework (macOS 15+). It runs Linux containers without a VM layer like Docker Desktop, making it lighter weight and faster to start.
+
+### When to use Apple Container
+
+- You're on **macOS 15 (Sequoia) or later**
+- You want to **avoid installing Docker Desktop** (and its licensing)
+- You want **faster container startup** — no VM boot overhead
+- You're running NanoClaw on a personal Mac, not a shared server
+
+### When to stick with Docker
+
+- You're on **Linux or Windows (WSL2)** — Apple Container is macOS-only
+- You need **cross-platform parity** — Docker behaves identically across OS
+- You're deploying to a **production server** (Linux VPS, Hetzner, etc.)
+- You rely on Docker-specific tooling (Docker Compose, Portainer, etc.)
+
+### Key differences
+
+| | Docker | Apple Container |
+|---|---|---|
+| Binary | `docker` | `container` |
+| Bind mounts | `-v host:container:ro` | `--mount type=bind,source=...,target=...,readonly` |
+| Stop command | `docker stop -t 1 name` | `container stop name` |
+| Health check | `docker info` | `container system status` |
+| Orphan cleanup | Parses `docker ps --format` JSON | Parses `container ls --format json` |
+| Host gateway | Built-in on macOS, `--add-host` on Linux | Built-in (`host.docker.internal`) |
+| Platform | macOS, Linux, Windows (WSL2) | macOS 15+ only |
+
+### Switching runtimes
+
+Run the `/convert-to-apple-container` skill in Claude Code:
+
+```
+/convert-to-apple-container
+```
+
+The skill modifies `src/container-runtime.ts` to change the binary from `docker` to `container` and adjusts mount syntax, stop commands, and health check commands accordingly. To revert, use `git revert`.
+
+<Warning>
+Apple Container uses the same `container/Dockerfile` to build the agent image. If you switch runtimes, rebuild the image with `container build` instead of `docker build`.
+</Warning>
+
 ## Container image
 
 The agent container is built from `container/Dockerfile` and includes:
