@@ -1,6 +1,7 @@
 ---
 title: Examples
 description: Real skill examples from the NanoClaw repository showing different patterns and techniques
+tag: "UPDATED"
 ---
 
 import SyncEnv from "/snippets/sync-env.mdx";
@@ -368,6 +369,78 @@ The skill documents limitations clearly:
 - **No file/image handling** — The bot only processes text content. File 
   uploads, images, and rich message blocks are not forwarded to the agent.
 ```
+
+## Operational skill with bundled script: claw
+
+The `/claw` skill installs a Python CLI tool that runs NanoClaw agents from the terminal — no chat app required. It's an operational skill on `main` with a bundled script.
+
+### Key characteristics
+
+- Ships a Python script alongside the `SKILL.md`
+- Reads from NanoClaw's SQLite database and `.env` at runtime
+- Auto-detects the container runtime (`docker` or `container`)
+- Parses structured output sentinels from the container
+
+### Structure
+
+<Tree>
+  <Tree.Folder name=".claude/skills/claw" defaultOpen>
+    <Tree.File name="SKILL.md" />
+    <Tree.Folder name="scripts" defaultOpen>
+      <Tree.File name="claw" />
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
+
+### Pattern: Bundled scripts
+
+Unlike instruction-only skills, `/claw` includes a script that Claude copies into the project and symlinks into `PATH`:
+
+```markdown
+### 1. Copy the script
+
+mkdir -p scripts
+cp "${CLAUDE_SKILL_DIR}/scripts/claw" scripts/claw
+chmod +x scripts/claw
+
+### 2. Symlink into PATH
+
+mkdir -p ~/bin
+ln -sf "$(pwd)/scripts/claw" ~/bin/claw
+```
+
+The `CLAUDE_SKILL_DIR` variable resolves to the skill directory at runtime, so the symlink always points to the right place.
+
+### Pattern: Database integration
+
+The script reads registered groups directly from NanoClaw's SQLite database:
+
+```python
+def get_groups(db: Path) -> list[dict]:
+    conn = sqlite3.connect(db)
+    rows = conn.execute(
+        "SELECT jid, name, folder, is_main FROM registered_groups ORDER BY name"
+    ).fetchall()
+    conn.close()
+    return [{"jid": r[0], "name": r[1], "folder": r[2], "is_main": bool(r[3])} for r in rows]
+```
+
+This means `claw` works with any channel — it targets groups by name, folder, or JID without needing to know which messaging platform is connected.
+
+### Pattern: Container output sentinel
+
+The script uses output sentinels to know when the agent has finished:
+
+```python
+if line.strip() == "---NANOCLAW_OUTPUT_END---":
+    dbg("output sentinel found, terminating container")
+    done.set()
+    proc.kill()
+```
+
+This lets the CLI kill the container immediately once output is received, rather than waiting for the Node.js event loop to exit naturally.
+
+Learn more about the claw CLI in the [command-line interface guide](/features/cli).
 
 ## Advanced skill: add-parallel
 

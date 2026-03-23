@@ -1,0 +1,185 @@
+---
+title: Command-line interface
+description: Run NanoClaw agents from the terminal with the claw CLI — send prompts, pipe input, resume sessions, and script agent interactions
+tag: "NEW"
+keywords: ["cli", "claw", "terminal", "command line", "scripting", "automation"]
+---
+
+## Overview
+
+`claw` is a Python CLI that sends prompts directly to a NanoClaw agent container from the terminal. It reads registered groups from the NanoClaw database, picks up secrets from `.env`, and pipes a JSON payload into a container run — no chat app required.
+
+Use cases include:
+
+- **Scripting and automation** — pipe output from one tool into an agent, or pipe the agent's result into another tool
+- **CI/CD hooks** — call an agent from a GitHub Action or git hook
+- **Dev workflow** — stay in the terminal without context-switching to a chat app
+- **Bootstrapping** — use an agent immediately before any messaging channel is set up
+- **Testing** — faster feedback loop than sending a message through a chat app
+
+## Prerequisites
+
+- Python 3.8 or later
+- NanoClaw installed with a built container image (`nanoclaw-agent:latest`)
+- Either `container` (Apple Container, macOS 15+) or `docker` available in `PATH`
+
+## Installation
+
+Run the `/claw` skill in Claude Code from your NanoClaw directory:
+
+```bash
+/claw
+```
+
+The skill copies the script into `scripts/claw` and symlinks it to `~/bin/claw`. Verify with:
+
+```bash
+claw --list-groups
+```
+
+<Note>
+If NanoClaw isn't running or the database doesn't exist yet, the group list will be empty — that's expected.
+</Note>
+
+## Usage
+
+### Send a prompt
+
+```bash
+# Send to the main group (default)
+claw "What's on my calendar today?"
+
+# Send to a specific group by name (fuzzy match)
+claw -g "family" "Remind everyone about dinner at 7"
+
+# Send to a group by exact JID
+claw -j "120363336345536173@g.us" "Hello"
+```
+
+### Resume a session
+
+```bash
+claw -s abc123 "Continue where we left off"
+```
+
+The session ID is printed to stderr after each run. Pass it back with `-s` to continue the conversation.
+
+### Pipe input from stdin
+
+```bash
+# Read prompt from stdin
+echo "Summarize this" | claw --pipe -g dev
+
+# Pipe a file
+cat report.txt | claw --pipe "Summarize this report"
+```
+
+When using `--pipe`, you can combine a positional prompt argument with stdin — the positional argument is prepended to the piped content.
+
+### List registered groups
+
+```bash
+claw --list-groups
+```
+
+Displays all registered groups with their name, folder, and JID.
+
+### Advanced options
+
+```bash
+# Force a specific container runtime
+claw --runtime docker "Hello"
+
+# Use a custom image tag
+claw --image nanoclaw-agent:dev "Hello"
+
+# Custom timeout for long-running tasks (default: 300s)
+claw --timeout 600 "Run the full analysis"
+
+# Verbose mode — shows command, redacted payload, and exit code
+claw -v "Hello"
+```
+
+## How it works
+
+`claw` bypasses the messaging channel layer entirely. It:
+
+1. Reads registered groups from the NanoClaw SQLite database
+2. Resolves the target group (by name, folder, or JID)
+3. Loads secrets from `.env` (API keys, OAuth tokens)
+4. Constructs a JSON payload with the prompt, group context, and secrets
+5. Pipes the payload into a container run (`docker run -i --rm` or `container run -i --rm`)
+6. Streams stderr in real time and waits for the output sentinel
+7. Parses the structured output and prints the agent's response to stdout
+
+The agent running inside the container has the same capabilities as when invoked through a chat channel — including group memory, file mounts, and MCP tools.
+
+## Scripting examples
+
+### CI/CD post-deploy check
+
+```bash
+claw -g ops "Deploy to production just finished. Check for errors in the last 10 minutes."
+```
+
+### Pipe git diff for code review
+
+```bash
+git diff main..HEAD | claw --pipe -g dev "Review this diff for issues"
+```
+
+### Daily summary via cron
+
+```bash
+claw "Summarize today's standups" >> daily-brief.txt
+```
+
+### Chain with other tools
+
+```bash
+claw "What are the open P0 bugs?" | mail -s "P0 Bug Report" team@example.com
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="'neither container nor docker found'">
+    Install Docker Desktop or Apple Container (macOS 15+), or pass `--runtime` explicitly.
+  </Accordion>
+
+  <Accordion title="'no secrets found in .env'">
+    The script reads `.env` from your NanoClaw directory. Verify it exists and contains at least one of: `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`.
+  </Accordion>
+
+  <Accordion title="Container times out">
+    The default timeout is 300 seconds. For longer tasks, pass `--timeout 600` (or higher). If the container consistently hangs, rebuild the image with `./container/build.sh`.
+  </Accordion>
+
+  <Accordion title="'group not found'">
+    Run `claw --list-groups` to see registered groups. Group lookup does fuzzy partial matching on name and folder — if your query matches multiple groups, you get an error listing the ambiguous matches.
+  </Accordion>
+
+  <Accordion title="Container crashes mid-stream">
+    Containers run with `--rm` so they're automatically removed. If the agent crashes before emitting the output sentinel, `claw` falls back to printing raw stdout. Use `-v` to inspect output. Rebuild the image if crashes are consistent.
+  </Accordion>
+
+  <Accordion title="Override the NanoClaw directory">
+    If `claw` can't find your database or `.env`, set the `NANOCLAW_DIR` environment variable:
+
+    ```bash
+    export NANOCLAW_DIR=/path/to/your/nanoclaw
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Scheduled tasks" icon="clock" href="/features/scheduled-tasks">
+    Automate recurring agent tasks with the built-in scheduler
+  </Card>
+
+  <Card title="Container runtime" icon="box" href="/advanced/container-runtime">
+    Learn how agent containers are configured and managed
+  </Card>
+</CardGroup>
