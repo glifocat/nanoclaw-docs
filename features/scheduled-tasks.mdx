@@ -1,6 +1,7 @@
 ---
 title: Setting up scheduled tasks
 description: Set up recurring and one-time tasks with cron expressions, intervals, or specific timestamps
+tag: "UPDATED"
 ---
 
 ## Overview
@@ -316,7 +317,7 @@ logTaskRun({
 Query task history:
 
 ```sql
-SELECT * FROM task_runs 
+SELECT * FROM task_run_logs 
 WHERE task_id = 'task-1234567890-abc123'
 ORDER BY run_at DESC;
 ```
@@ -359,7 +360,7 @@ Schedule: `2026-03-01T14:00:00Z` (once)
 
 If a task fails:
 
-1. The error is logged in `task_runs` table
+1. The error is logged in `task_run_logs` table
 2. For recurring tasks, the next run is still scheduled (no automatic pause)
 3. For one-time tasks, the task is marked complete even if it failed
 4. If a group folder is invalid, the task is automatically paused to prevent retry churn

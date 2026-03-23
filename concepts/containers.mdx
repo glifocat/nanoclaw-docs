@@ -86,7 +86,6 @@ The entrypoint script (`/app/entrypoint.sh`):
    - Compiled output is read-only to prevent runtime tampering
 2. **Read input from stdin**: `cat > /tmp/input.json`
    - Input contains prompt, session ID, and group metadata (not secrets)
-   - Input file deleted after read
 3. **Execute agent**: `node /tmp/dist/index.js < /tmp/input.json`
    - Runs agent-runner with input
    - Credentials handled by the credential proxy, never passed via stdin
@@ -94,7 +93,7 @@ The entrypoint script (`/app/entrypoint.sh`):
 4. **Container exits**: Cleaned up automatically via `--rm` flag
 
 <Note>
-The agent-runner is recompiled on every container start. This allows agents to modify their own tools and behavior by editing files in `/workspace/group/` or their agent-runner source.
+The agent-runner is recompiled on every container start from `/app/src` (mounted from `data/sessions/{group}/agent-runner-src/`). This allows agents to modify their own tools and behavior by editing their agent-runner source. The agent-runner source is copied once when the group is first created — subsequent changes to `container/agent-runner/src/` are not automatically propagated to existing groups.
 </Note>
 
 ## Volume mounts
@@ -137,7 +136,7 @@ When the project root is mounted for the main group, the `.env` file is shadowed
 
 ```typescript
 // Shadow .env so the agent cannot read secrets from the mounted project root
-{ host: '/dev/null', container: '/workspace/project/.env', readonly: true }
+{ hostPath: '/dev/null', containerPath: '/workspace/project/.env', readonly: true }
 ```
 
 ### Non-main group mounts
@@ -223,9 +222,10 @@ const container = spawn('docker', [
 
 **User mapping:**
 
-- If host uid is 0 (root): Run as container's `node` user (uid 1000)
-- If host uid is 1000: Run as `node` user (no mapping needed)
-- Otherwise: Run as host uid (via `--user` flag)
+- If host uid is 0 (root): No `--user` flag set; Dockerfile default (`node`, uid 1000) applies
+- If host uid is 1000: No `--user` flag set (already matches container default)
+- If `process.getuid` is unavailable (native Windows without WSL): No `--user` flag set
+- Otherwise: Run as host uid/gid (via `--user` flag), with `HOME=/home/node` explicitly set
 
 This ensures bind-mounted files are accessible (same uid on both sides).
 
@@ -363,7 +363,7 @@ docker run -i --rm --name nanoclaw-family-chat-1234567890 ...
 
 === Mounts ===
 /path/to/groups/family-chat -> /workspace/group
-/path/to/sessions/family-chat/.claude -> /home/node/.claude (ro)
+/path/to/sessions/family-chat/.claude -> /home/node/.claude
 ...
 
 === Stderr ===
@@ -377,7 +377,7 @@ docker run -i --rm --name nanoclaw-family-chat-1234567890 ...
 
 **Log verbosity:**
 
-- **Success + non-verbose**: Summary only (input length, mount count)
+- **Success + non-verbose**: Summary only (input length, mount paths)
 - **Success + verbose** (`LOG_LEVEL=debug`): Full input/output including prompt content
 - **Error**: Input metadata only (prompt length and session ID), plus full stderr/stdout
 
@@ -409,9 +409,9 @@ The runtime binary is a constant. To switch to Apple Container on macOS, use the
 
 Skills synced to each container:
 
-1. **Copy from project**: Skills from `container/skills/` are synced to `data/sessions/{group}/.claude/skills/` for each container session
+1. **Copy from project**: Skills from `container/skills/` are synced to `data/sessions/{group}/.claude/skills/` on every container spawn (overwriting existing files)
 2. **Available to agent**: Claude Agent SDK loads from `.claude/skills/`
-3. **Per-group customization**: Each group gets a copy, can modify independently
+3. **Per-group customization**: Each group gets a copy, but changes are overwritten on next container spawn (unlike agent-runner source, which is copied once)
 
 ### Built-in container skills
 
@@ -428,18 +428,25 @@ Skills synced to each container:
 **MCP servers:**
 
 - Configured in agent-runner source (`container/agent-runner/src/index.ts`)
-- Built-in: `nanoclaw` MCP server (task scheduling, message sending)
+- Built-in: `nanoclaw` MCP server (8 tools: `send_message`, `schedule_task`, `list_tasks`, `pause_task`, `resume_task`, `cancel_task`, `update_task`, `register_group`)
 - Custom: Add by modifying agent-runner code
 
 <Accordion title="Adding a custom MCP server">
 1. Edit `data/sessions/{group}/agent-runner-src/index.ts`
-2. Import and register MCP server:
+2. Add the MCP server to the `mcpServers` config dictionary passed to the SDK `query()` call:
    ```typescript
-   import { CustomMcpServer } from 'custom-mcp-server';
-   const mcpServers = [
-     new NanoClawMcpServer(),
-     new CustomMcpServer()
-   ];
+   mcpServers: {
+     nanoclaw: {
+       command: 'node',
+       args: [mcpServerPath],
+       env: { /* ... */ },
+     },
+     'my-custom-server': {
+       command: 'node',
+       args: ['/path/to/custom-server.js'],
+       env: {},
+     },
+   },
    ```
 3. Next container spawn will recompile with new server
 4. Tools available to agent immediately
@@ -476,7 +483,7 @@ agent-browser pdf https://example.com output.pdf
 
 - **Network access**: Agents have full network access (can exfiltrate data)
 - **Mounted directory tampering**: Agents can modify anything in mounted directories
-- **Credential exposure**: Mounted credentials (Claude tokens) are readable
+- **Proxy-based API access**: Containers can make authenticated API requests through the credential proxy (though they cannot extract real credentials)
 - **Resource exhaustion**: No CPU/memory limits (can DoS host)
 
 <Warning>
