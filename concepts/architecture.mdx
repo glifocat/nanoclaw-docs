@@ -301,11 +301,7 @@ The agent runner is the TypeScript code that wraps Claude Agent SDK. It handles 
 2. **Database initialization**: Create tables if needed, load schema
 3. **State loading**: Restore message cursors, sessions, registered groups
 4. **Remote Control restore**: Re-adopt any surviving Remote Control session from a previous run
-5. **Secret injection**: Ensure credential injection is available for containers
-
-<Note>
-In v1.2.22+, this step syncs OneCLI agents for all registered groups. In earlier versions, this starts the built-in credential proxy on `CREDENTIAL_PROXY_PORT`.
-</Note>
+5. **Secret injection**: Sync OneCLI agents for all registered groups to ensure credential injection is available for containers
 6. **Shutdown handlers**: Register graceful shutdown on `SIGTERM` and `SIGINT`
 7. **Channel connection**: Connect to messaging channels, authenticate if needed
 8. **Subsystem startup**:

@@ -236,42 +236,20 @@ For the full file format and API details, see the [security deep dive](/advanced
 
 ### 6. Credential handling
 
-<Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
-    NanoClaw uses the [OneCLI](https://onecli.sh) gateway for centralized secret management. API keys are never stored in `.env` or exposed to containers — the gateway intercepts outbound API traffic from containers and injects credentials at request time.
+NanoClaw uses the [OneCLI](https://onecli.sh) gateway for centralized secret management. API keys are never stored in `.env` or exposed to containers — the gateway intercepts outbound API traffic from containers and injects credentials at request time.
 
-    - Secrets are registered once via `onecli secrets create` (CLI or dashboard)
-    - The host's `.env` file is shadowed with `/dev/null` when the project root is mounted, preventing containers from reading any residual secrets
-    - Each non-main group gets its own OneCLI agent identifier, enabling per-group credential scoping
-    - If the OneCLI gateway is unreachable, the container starts with no credentials and logs a warning
+- Secrets are registered once via `onecli secrets create` (CLI or dashboard)
+- The host's `.env` file is shadowed with `/dev/null` when the project root is mounted, preventing containers from reading any residual secrets
+- Each non-main group gets its own OneCLI agent identifier, enabling per-group credential scoping
+- If the OneCLI gateway is unreachable, the container starts with no credentials and logs a warning
 
-    <Warning>
-    The OneCLI gateway prevents credential exposure to containers. However, containers can still make authenticated API requests through the gateway — they cannot extract the real credentials, but they can use them indirectly.
-    </Warning>
-  </Tab>
+<Warning>
+The OneCLI gateway prevents credential exposure to containers. However, containers can still make authenticated API requests through the gateway — they cannot extract the real credentials, but they can use them indirectly.
+</Warning>
 
-  <Tab title="Credential Proxy (legacy)">
-    - Containers receive a placeholder token and a proxy URL — never real credentials
-    - The host's `.env` file is shadowed with `/dev/null` when the project root is mounted, preventing containers from reading secrets
-
-    Containers never see real credentials. A credential proxy (`src/credential-proxy.ts`) runs on the host and injects authentication on every outbound API request:
-
-    ```typescript
-    // Container has a placeholder token — real credentials injected by proxy
-    ANTHROPIC_BASE_URL=http://host.docker.internal:3001  // → proxy
-    CLAUDE_CODE_OAUTH_TOKEN=placeholder                   // → replaced by proxy
-    ```
-
-    The proxy reads credentials from `.env` once at startup. It supports both API key mode (`ANTHROPIC_API_KEY`) and OAuth mode (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN`):
-
-    - **API key mode**: The proxy replaces the `x-api-key` header on every outbound request
-    - **OAuth mode**: The proxy replaces the `Authorization` header only on requests that include one (used during the initial token exchange). Subsequent requests use a temporary API key obtained during the exchange and pass through without modification
-
-    <Warning>
-    The credential proxy prevents credential exposure to containers. However, the proxy URL is accessible from within the container's network. The container cannot extract the real credentials, but it can make authenticated API requests through the proxy.
-    </Warning>
-  </Tab>
-</Tabs>
+<Note>
+If you prefer `.env`-based credential management without OneCLI, the `/use-native-credential-proxy` skill restores the built-in credential proxy that was removed in v1.2.23. See the [skills system](/integrations/skills-system) for how to apply skills.
+</Note>
 
 #### NOT mounted
 
@@ -369,7 +347,7 @@ Even with restrictions, non-main groups have full agent capabilities (MCP tools,
 │  • IPC authorization                                              │
 │  • Mount validation (external allowlist)                          │
 │  • Container lifecycle                                            │
-│  • Secret injection (OneCLI or credential proxy)                    │
+│  • Secret injection (OneCLI gateway)                                │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │
                                  ▼ Explicit mounts only

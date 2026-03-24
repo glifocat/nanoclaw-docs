@@ -5,6 +5,18 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Credential proxy removal (v1.2.23)" description="2026-03-24" tags={["Updated"]}>
+  Updated documentation to reflect the removal of the built-in credential proxy in v1.2.23. OneCLI gateway is now the only built-in credential method. The legacy credential proxy is available as an opt-in skill (`/use-native-credential-proxy`).
+
+  ## Pages updated
+  - **Security overview and deep dive**: Removed credential proxy tabs, simplified to OneCLI-only with skill note
+  - **Configuration**: Removed credential proxy tabs for env vars, example `.env`, and security notes
+  - **Container runtime**: Removed credential proxy tab from container arguments section
+  - **Architecture**: Simplified startup sequence credential injection step
+  - **Containers, Ollama**: Updated passing references to OneCLI-only language
+  - **Product changelog**: Added v1.2.23 release entry
+</Update>
+
 <Update label="OneCLI gateway documentation" description="2026-03-24" tags={["New", "Updated"]}>
   Added tabbed documentation for OneCLI gateway secret injection (v1.2.22+) alongside legacy credential proxy across 9 pages. Updated container image base from Node 22 to Node 24. Added OneCLI as installation prerequisite.
 

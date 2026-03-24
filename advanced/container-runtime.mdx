@@ -211,7 +211,7 @@ export async function runContainerAgent(
     container.stdin.end();
     ```
     
-    The input JSON contains the prompt, session ID, group folder, and metadata. Credentials are handled by the secret injection layer (OneCLI gateway or credential proxy) — never passed via stdin or mounted as files.
+    The input JSON contains the prompt, session ID, group folder, and metadata. Credentials are handled by the OneCLI gateway — never passed via stdin or mounted as files.
   </Step>
   
   <Step title="Stream output">
@@ -227,109 +227,56 @@ export async function runContainerAgent(
 
 From the `buildContainerArgs` function in `src/container-runner.ts`:
 
-<Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
-    ```typescript
-    async function buildContainerArgs(
-      mounts: VolumeMount[],
-      containerName: string,
-      agentIdentifier?: string,
-    ): Promise<string[]> {
-      const args: string[] = ['run', '-i', '--rm', '--name', containerName];
+```typescript
+async function buildContainerArgs(
+  mounts: VolumeMount[],
+  containerName: string,
+  agentIdentifier?: string,
+): Promise<string[]> {
+  const args: string[] = ['run', '-i', '--rm', '--name', containerName];
 
-      // Pass host timezone so container's local time matches the user's
-      args.push('-e', `TZ=${TIMEZONE}`);
+  // Pass host timezone so container's local time matches the user's
+  args.push('-e', `TZ=${TIMEZONE}`);
 
-      // OneCLI gateway handles credential injection
-      const onecliApplied = await onecli.applyContainerConfig(args, {
-        addHostMapping: false,
-        agent: agentIdentifier,
-      });
-      if (!onecliApplied) {
-        logger.warn({ containerName }, 'OneCLI gateway not reachable');
-      }
+  // OneCLI gateway handles credential injection
+  const onecliApplied = await onecli.applyContainerConfig(args, {
+    addHostMapping: false,
+    agent: agentIdentifier,
+  });
+  if (!onecliApplied) {
+    logger.warn(
+      { containerName },
+      'OneCLI gateway not reachable — container will have no credentials',
+    );
+  }
 
-      // Run as host user so bind-mounted files are accessible
-      const hostUid = process.getuid?.();
-      const hostGid = process.getgid?.();
-      if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
-        args.push('--user', `${hostUid}:${hostGid}`);
-        args.push('-e', 'HOME=/home/node');
-      }
+  // Run as host user so bind-mounted files are accessible
+  const hostUid = process.getuid?.();
+  const hostGid = process.getgid?.();
+  if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
+    args.push('--user', `${hostUid}:${hostGid}`);
+    args.push('-e', 'HOME=/home/node');
+  }
 
-      for (const mount of mounts) {
-        if (mount.readonly) {
-          args.push(...readonlyMountArgs(mount.hostPath, mount.containerPath));
-        } else {
-          args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
-        }
-      }
-
-      args.push(CONTAINER_IMAGE);
-      return args;
+  for (const mount of mounts) {
+    if (mount.readonly) {
+      args.push(...readonlyMountArgs(mount.hostPath, mount.containerPath));
+    } else {
+      args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
     }
-    ```
+  }
 
-    **Key flags:**
-    - `-i` - Interactive (keeps stdin open)
-    - `--rm` - Remove container after exit (ephemeral)
-    - `--name` - Unique container name for management
-    - `--user` - Run as host UID/GID for file permissions
-    - OneCLI SDK configures container networking for credential injection (no explicit env vars)
-  </Tab>
+  args.push(CONTAINER_IMAGE);
+  return args;
+}
+```
 
-  <Tab title="Credential Proxy (legacy)">
-    ```typescript
-    function buildContainerArgs(
-      mounts: VolumeMount[],
-      containerName: string,
-    ): string[] {
-      const args: string[] = ['run', '-i', '--rm', '--name', containerName];
-
-      // Pass host timezone so container's local time matches the user's
-      args.push('-e', `TZ=${TIMEZONE}`);
-
-      // Route API traffic through the credential proxy
-      args.push('-e', `ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}`);
-
-      // Mirror the host's auth method with a placeholder value
-      const authMode = detectAuthMode();
-      if (authMode === 'api-key') {
-        args.push('-e', 'ANTHROPIC_API_KEY=placeholder');
-      } else {
-        args.push('-e', 'CLAUDE_CODE_OAUTH_TOKEN=placeholder');
-      }
-
-      // Run as host user so bind-mounted files are accessible
-      const hostUid = process.getuid?.();
-      const hostGid = process.getgid?.();
-      if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
-        args.push('--user', `${hostUid}:${hostGid}`);
-        args.push('-e', 'HOME=/home/node');
-      }
-
-      for (const mount of mounts) {
-        if (mount.readonly) {
-          args.push(...readonlyMountArgs(mount.hostPath, mount.containerPath));
-        } else {
-          args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
-        }
-      }
-
-      args.push(CONTAINER_IMAGE);
-      return args;
-    }
-    ```
-
-    **Key flags:**
-    - `-i` - Interactive (keeps stdin open)
-    - `--rm` - Remove container after exit (ephemeral)
-    - `--name` - Unique container name for management
-    - `--user` - Run as host UID/GID for file permissions
-    - `-e ANTHROPIC_BASE_URL` - Routes API calls through the credential proxy
-    - `-e ANTHROPIC_API_KEY` or `-e CLAUDE_CODE_OAUTH_TOKEN` - Placeholder credential (replaced by proxy)
-  </Tab>
-</Tabs>
+**Key flags:**
+- `-i` - Interactive (keeps stdin open)
+- `--rm` - Remove container after exit (ephemeral)
+- `--name` - Unique container name for management
+- `--user` - Run as host UID/GID for file permissions
+- OneCLI SDK configures container networking for credential injection (no explicit env vars)
 
 ### Volume mounts
 

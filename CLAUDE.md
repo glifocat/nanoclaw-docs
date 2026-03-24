@@ -102,7 +102,7 @@ keywords: ["relevant", "search", "terms"]
 
 **Components available:** `<Note>`, `<Info>`, `<Tip>`, `<Warning>`, `<Check>`, `<Danger>`, `<Steps>/<Step>`, `<Tabs>/<Tab>`, `<CodeGroup>`, `<Columns>`, `<Card>`, `<AccordionGroup>/<Accordion>`, Mermaid diagrams, and more (see `/mintlify` skill for full list).
 
-**Version-gated features**: When documenting a breaking change where older versions are still valid, use `<Tabs>` with version labels (e.g., "OneCLI Gateway (v1.2.22+)" / "Credential Proxy (legacy)") for sections with substantial content, and `<Note>` callouts for passing references. Use version placeholders (`vX.Y.Z`) when the release version isn't confirmed yet.
+**Version-gated features**: When documenting a breaking change where older versions are still valid, use `<Tabs>` with version labels for sections with substantial content, and `<Note>` callouts for passing references. Use version placeholders (`vX.Y.Z`) when the release version isn't confirmed yet. As of v1.2.23, credential proxy documentation has been removed (the feature is now an opt-in skill) — no more credential proxy tabs needed.
 
 **Directory trees:** Use `<Tree>` component (not ASCII art). See `reference/components.md` for syntax.
 

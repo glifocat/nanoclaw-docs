@@ -5,6 +5,12 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v1.2.23" description="2026-03-24" tags={["Maintenance"]}>
+  - Removed built-in credential proxy (`src/credential-proxy.ts`) — OneCLI gateway is now the only built-in credential method
+  - Added `/use-native-credential-proxy` skill for users who want `.env`-based credential management without OneCLI
+  - Code formatting cleanup (prettier)
+</Update>
+
 <Update label="v1.2.22" description="2026-03-24" tags={["Maintenance"]}>
   - Replaced credential proxy with OneCLI gateway for container credential injection
   - Updated container base image from `node:22-slim` to `node:24-slim`
