@@ -109,20 +109,6 @@ Mintlify workflows in `.mintlify/workflows/` auto-manage `tag` frontmatter:
 - Tags are cleaned up after 2 weeks by the weekly audit workflow
 - Do NOT add tags for cosmetic-only changes (formatting, component swaps)
 
-## Automated PR Triage
-
-Mintlify workflows generate automated PRs (`mintlify/*` branches) on upstream changes. These need manual review:
-- **Always verify claims against source**: `gh search code "<term>" repo:qwibitai/nanoclaw` or fetch files directly
-- **Check for overlapping PRs**: Multiple automated PRs often fix the same thing (e.g., table renames). Merge the most thorough one first, then cherry-pick unique changes from the rest.
-- **Common errors in automated PRs**: fabricated commit references, incorrect renames (verify exported types), speculative feature descriptions, `allowed-tools` or other frontmatter claims that don't exist in source
-- **"Superseded" PRs may have unique changes**: Always diff line-by-line before closing — never rely solely on PR descriptions
-
-## Changelogs
-
-Two changelogs to maintain — update both after any docs work session:
-- `changelog/index.mdx` — Product releases (newest version first, uses `<Update>` component)
-- `changelog/docs-updates.mdx` — Documentation site changes (newest entry first)
-
 ## Writing Standards
 
 - Second-person voice ("you"), active voice, direct language
