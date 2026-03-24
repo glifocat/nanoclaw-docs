@@ -34,7 +34,7 @@ The IPC system is built on three core components:
 
 ### Starting the IPC watcher
 
-The IPC watcher starts at application launch and runs continuously, polling for new files at `IPC_POLL_INTERVAL` (default: 1000ms).
+The IPC watcher starts at application launch and runs continuously, polling for new files at `IPC_POLL_INTERVAL` (default: 1000ms on the host). Inside containers, the agent runner polls its own IPC input directory at 500ms intervals.
 
 From `src/ipc.ts`:
 
@@ -136,12 +136,11 @@ Allows agents to send messages to chats.
 {
   "type": "message",
   "chatJid": "1234567890@s.whatsapp.net",
-  "text": "Message content",
-  "sender": "Researcher"
+  "text": "Message content"
 }
 ```
 
-The `sender` field is optional. When set, messages appear from a dedicated bot identity in Telegram (useful for agent swarms where multiple agents post to the same chat).
+The host extracts `chatJid` and `text` from the JSON file. Any additional fields are ignored by the core IPC handler.
 
 **Authorization:**
 - Main group can send to any chat
@@ -399,7 +398,7 @@ fs.renameSync(
 ## Performance considerations
 
 <Tip>
-  The IPC poll interval is configurable via `IPC_POLL_INTERVAL` in `src/config.ts`. The default is 1000ms. Lowering it reduces latency but increases CPU usage. Raising it saves resources but increases response time.
+  The host-side IPC poll interval is configurable via `IPC_POLL_INTERVAL` in `src/config.ts` (default: 1000ms). The in-container poll interval is 500ms (hardcoded in the agent runner). Lowering the host interval reduces latency but increases CPU usage.
 </Tip>
 
 <Warning>

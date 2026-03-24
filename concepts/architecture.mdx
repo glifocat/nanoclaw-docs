@@ -144,12 +144,12 @@ The IPC watcher (`src/ipc.ts`) enables container-to-host communication:
 
 SQLite database (`store/messages.db`) stores:
 
-- **messages**: All messages with timestamps (queries capped at 200 per invocation)
-- **chats**: Chat metadata (name, last activity, is_group)
+- **messages**: All messages with timestamps, sender info, and bot-message flag (queries capped at 200 per invocation)
+- **chats**: Chat metadata (name, last activity, channel, is_group)
 - **sessions**: Claude session IDs per group folder
-- **registered_groups**: Active groups configuration
+- **registered_groups**: Active groups with folder, trigger, container config, is_main flag
 - **router_state**: Message cursors and last processed timestamps
-- **scheduled_tasks**: Scheduled task definitions
+- **scheduled_tasks**: Task definitions with schedule, context_mode (`group` or `isolated`), and status
 - **task_run_logs**: Task execution history with duration and results
 
 <Warning>
@@ -300,12 +300,12 @@ The agent runner is the TypeScript code that wraps Claude Agent SDK. It handles 
 1. **Container system check**: Ensure Docker is running, clean up orphaned containers
 2. **Database initialization**: Create tables if needed, load schema
 3. **State loading**: Restore message cursors, sessions, registered groups
-4. **Remote Control restore**: Re-adopt any surviving Remote Control session from a previous run
-5. **Secret injection**: Ensure credential injection is available for containers
+4. **OneCLI agent sync**: Ensure each registered non-main group has a corresponding OneCLI agent for per-group credential scoping (best-effort, non-blocking)
 
 <Note>
 In v1.2.22+, this step syncs OneCLI agents for all registered groups. In earlier versions, this starts the built-in credential proxy on `CREDENTIAL_PROXY_PORT`.
 </Note>
+5. **Remote Control restore**: Re-adopt any surviving Remote Control session from a previous run
 6. **Shutdown handlers**: Register graceful shutdown on `SIGTERM` and `SIGINT`
 7. **Channel connection**: Connect to messaging channels, authenticate if needed
 8. **Subsystem startup**:
