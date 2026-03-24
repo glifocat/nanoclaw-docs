@@ -5,6 +5,23 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Upstream docs audit and platform fixes" description="2026-03-24" tags={["Updated", "Fixed"]}>
+  Audited documentation in the upstream NanoClaw repo against the docs portal and submitted fixes via [qwibitai/nanoclaw#1388](https://github.com/qwibitai/nanoclaw/pull/1388).
+
+  ## Updated
+  - **Installation, introduction, creating-skills**: Added Windows (WSL2) to all platform references — NanoClaw supports macOS, Linux, and Windows via WSL2
+  - **Introduction**: Fixed token count from 34.9k to ~41k (matches auto-generated `repo-tokens/badge.svg`)
+  - **CLAUDE.md**: Added guidance for automated PR triage, changelogs, upstream PR workflow, and token count source of truth
+
+  ## Upstream PR (#1388)
+  - Added `docs.nanoclaw.dev` link to README header
+  - Populated CHANGELOG.md with all releases from v1.1.0 through v1.2.21
+  - Updated `docs/REQUIREMENTS.md` — multi-channel support, current RFS, WSL2 deployment
+  - Updated `docs/SECURITY.md` — channel-neutral language
+  - Updated `docs/DEBUG_CHECKLIST.md` — Docker (default) commands, channel-neutral
+  - Added `docs/README.md` — index pointing to docs portal as authoritative source
+</Update>
+
 <Update label="PR consolidation and issue cleanup" description="2026-03-23" tags={["New", "Updated", "Fixed"]}>
   Reviewed, triaged, and consolidated 10 automated Mintlify PRs (#60–#69). Verified all changes against NanoClaw source code, excluded 6 incorrect changes, and resolved the final 2 open issues.
 
