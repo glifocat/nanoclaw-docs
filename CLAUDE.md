@@ -123,6 +123,18 @@ Two changelogs to maintain — update both after any docs work session:
 - `changelog/index.mdx` — Product releases (newest version first, uses `<Update>` component)
 - `changelog/docs-updates.mdx` — Documentation site changes (newest entry first)
 
+## Upstream PRs
+
+To PR changes to `qwibitai/nanoclaw` from Ethan's fork (`glifocat/nanoclaw-glifocat`):
+- Work in `/Users/ethanmunoz/Projects/clients/qwibit/nanoclaw-glifocat`
+- Remote `upstream` = `qwibitai/nanoclaw`, `origin` = `glifocat/nanoclaw-glifocat`
+- Branch from `upstream/main`, push to `origin`, PR with `--repo qwibitai/nanoclaw --head glifocat:<branch>`
+- The fork may be on a different branch (e.g., `feat/dashboard-api`) — stash before switching
+
+## Token Count
+
+Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated). Currently ~41k tokens. Update `introduction.mdx` and `integrations/skills-system.mdx` if the badge value changes significantly.
+
 ## Writing Standards
 
 - Second-person voice ("you"), active voice, direct language
