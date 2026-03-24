@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Mintlify
+.mintlify/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Playwright MCP
+.playwright-mcp/
+
+# Local Claude settings
+.claude/settings.json
+.claude/settings.local.json
+
+# Scratch files
+*.png
+!images/**/*.png
+discord-message.md
