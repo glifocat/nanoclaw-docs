@@ -136,11 +136,12 @@ Allows agents to send messages to chats.
 {
   "type": "message",
   "chatJid": "1234567890@s.whatsapp.net",
-  "text": "Message content"
+  "text": "Message content",
+  "sender": "Researcher"
 }
 ```
 
-The host extracts `chatJid` and `text` from the JSON file. Any additional fields are ignored by the core IPC handler.
+The host extracts `chatJid` and `text` from the JSON file. The optional `sender` field sets a role/identity name — on channels that support it (e.g. Telegram), messages appear from a dedicated bot with that name. Any additional fields are ignored by the core IPC handler.
 
 **Authorization:**
 - Main group can send to any chat
