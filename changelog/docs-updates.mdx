@@ -5,6 +5,15 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v1.2.22 source sync" description="2026-03-24" tags={["Updated"]}>
+  Synced documentation with NanoClaw v1.2.22 source code changes.
+
+  - Updated container base image references from `node:22-slim` to `node:24-slim` across 4 pages
+  - Fixed mount allowlist format in customization page (`allowedPaths` → `allowedRoots` with proper structure)
+  - Added `@onecli-sh/sdk` to dependency list in installation page
+  - Added v1.2.22 release and v1.2.0 scheduled task fix to product changelog
+</Update>
+
 <Update label="Upstream docs audit and platform fixes" description="2026-03-24" tags={["Updated", "Fixed"]}>
   Audited documentation in the upstream NanoClaw repo against the docs portal and submitted fixes via [qwibitai/nanoclaw#1388](https://github.com/qwibitai/nanoclaw/pull/1388).
 

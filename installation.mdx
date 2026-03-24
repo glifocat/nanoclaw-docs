@@ -354,6 +354,7 @@ NanoClaw uses these core dependencies (from `package.json`):
 ```json
 {
   "dependencies": {
+    "@onecli-sh/sdk": "^0.2.0",    // Credential gateway SDK
     "better-sqlite3": "^11.8.1",   // SQLite database
     "cron-parser": "^5.5.0",       // Task scheduling
     "pino": "^9.6.0",              // Logging
@@ -376,7 +377,7 @@ All dependencies are installed automatically by `/setup` via `npm install`.
 
 The agent container includes:
 
-- **Base**: Node.js 22 (Debian slim)
+- **Base**: Node.js 24 (Debian slim)
 - **Browser**: Chromium with CJK and emoji font support
 - **Claude Agent SDK**: `@anthropic-ai/claude-code` (pre-installed)
 - **Tools**: `agent-browser`, bash, git, curl
