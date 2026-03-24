@@ -194,7 +194,7 @@ This affects cron expression evaluation for scheduled tasks.
 
   <Tab title="Credential Proxy (legacy)">
     - **Secrets** (API keys, credentials) are NOT read in `config.ts`
-    - Secrets are loaded only by the credential proxy (`credential-proxy.ts`) once at startup, never exposed to containers
+    - Secrets are loaded only by the credential proxy once at startup, never exposed to containers
     - This prevents leaking secrets to child processes
     - Mount allowlist is stored OUTSIDE project root and never mounted into containers
   </Tab>
