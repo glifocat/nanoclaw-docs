@@ -79,7 +79,7 @@ Messages sent to the agent receive no response.
   Verify the trigger word in your message matches the configured trigger:
   
   ```bash
-  sqlite3 store/messages.db "SELECT name, trigger FROM registered_groups;"
+  sqlite3 store/messages.db "SELECT name, trigger_pattern FROM registered_groups;"
   ```
   
   The trigger is case-insensitive and must appear at the start of the message.
@@ -400,39 +400,65 @@ This issue was fixed by passing `resumeSessionAt` with the last assistant messag
 
 ## Service management
 
-### Restart the service
-
-```bash
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-```
-
-### View live logs
-
-```bash
-tail -f logs/nanoclaw.log
-```
-
-### Stop the service
-
 <Warning>
-Stopping the service does NOT kill running containers. They will continue running as orphaned processes.
+Stopping the service does NOT kill running containers. They will continue running as orphaned processes until their idle or hard timeout expires.
 </Warning>
 
-```bash
-launchctl bootout gui/$(id -u)/com.nanoclaw
-```
+<Tabs>
+  <Tab title="macOS (launchd)">
+    **Restart the service:**
+    ```bash
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    ```
 
-### Start the service
+    **View live logs:**
+    ```bash
+    tail -f logs/nanoclaw.log
+    ```
 
-```bash
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw.plist
-```
+    **Stop the service:**
+    ```bash
+    launchctl bootout gui/$(id -u)/com.nanoclaw
+    ```
 
-### Rebuild after code changes
+    **Start the service:**
+    ```bash
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw.plist
+    ```
 
-```bash
-npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-```
+    **Rebuild after code changes:**
+    ```bash
+    npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    ```
+  </Tab>
+
+  <Tab title="Linux (systemd)">
+    **Restart the service:**
+    ```bash
+    systemctl --user restart nanoclaw
+    ```
+
+    **View live logs:**
+    ```bash
+    journalctl --user -u nanoclaw -f
+    ```
+
+    **Stop the service:**
+    ```bash
+    systemctl --user stop nanoclaw
+    ```
+
+    **Start the service:**
+    ```bash
+    systemctl --user start nanoclaw
+    ```
+
+    **Rebuild after code changes:**
+    ```bash
+    npm run build && systemctl --user restart nanoclaw
+    ```
+  </Tab>
+</Tabs>
 
 ## Getting help
 

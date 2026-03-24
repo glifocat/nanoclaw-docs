@@ -247,7 +247,7 @@ sequenceDiagram
 
 The agent container (`container/Dockerfile`) includes:
 
-- **Base**: `node:24-slim`
+- **Base**: `node:22-slim`
 - **Browser**: Chromium with all required dependencies
 - **Tools**: `agent-browser` CLI for browser automation
 - **Runtime**: `@anthropic-ai/claude-code` (Claude Agent SDK)
@@ -274,7 +274,7 @@ Each group maintains an isolated Claude conversation session:
 
 ### Skills system
 
-Shared skills in `container/skills/` are synced to each group's `.claude/skills/` on startup:
+Shared skills in `container/skills/` are synced to each group's `.claude/skills/` on every container spawn:
 
 - Skills are available to all agents
 - Per-group copies allow customization without affecting others

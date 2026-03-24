@@ -47,8 +47,9 @@ Standard cron syntax with timezone support:
 
 **Timezone:**
 
-- Defaults to system timezone (`process.env.TZ` or `Intl.DateTimeFormat().resolvedOptions().timeZone`)
-- Configurable via `TZ` environment variable
+- Resolution order: `process.env.TZ` → `.env` file `TZ` → system timezone → `'UTC'`
+- Each candidate is validated as a real IANA identifier
+- Configurable via `TZ` environment variable or `.env` file
 - Uses `cron-parser` with timezone support
 
 <Note>

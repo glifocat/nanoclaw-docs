@@ -1,6 +1,7 @@
 ---
 title: Group management
 description: API reference for group registration, retrieval, privilege management, and container configuration
+tag: "UPDATED"
 ---
 
 Group management functions for registering groups, retrieving group lists, and managing group state.
@@ -195,8 +196,12 @@ Invalid folders are rejected during registration and skipped when loading from d
 
 ## Main group
 
-The "main" group (folder name `"main"`) has special privileges:
+The main group is identified by the `isMain` flag on its `RegisteredGroup` record, not strictly by folder name. By convention, the main group uses folder name `"main"` (existing groups with `folder = 'main'` are backfilled with `isMain = true` during migration), but any group can be designated as main via the `isMain` flag.
+
+The main group has special privileges:
 
 - Can see all available groups
 - Does not require trigger by default
 - Has access to group management functions via IPC
+- Gets the project root mounted read-only at `/workspace/project`
+- Registration also ensures a OneCLI agent exists for non-main groups (best-effort, non-blocking)

@@ -52,8 +52,12 @@ Configuration is read from `.env` file or `process.env`.
   Maximum number of concurrent agent containers.
 </ParamField>
 
-<ParamField path="TZ" type="string" default="system timezone">
-  Timezone for scheduled tasks (cron expressions). Uses `Intl.DateTimeFormat().resolvedOptions().timeZone` by default.
+<ParamField path="TZ" type="string" default="system timezone or UTC">
+  Timezone for scheduled tasks (cron expressions). Resolution order: `process.env.TZ` → `.env` file `TZ` → system timezone → `'UTC'`. Each candidate is validated as a real IANA identifier.
+</ParamField>
+
+<ParamField path="LOG_LEVEL" type="string" default="info">
+  Log verbosity level. Set to `debug` or `trace` for verbose container logging (includes full prompt content in logs). Used throughout the system for controlling output detail.
 </ParamField>
 
 ## Configuration constants
@@ -105,11 +109,28 @@ Matches messages starting with `@{ASSISTANT_NAME}` (case-insensitive).
 
 ## Timezone configuration
 
-Scheduled tasks use the configured timezone:
+Scheduled tasks use the configured timezone. The resolution order is:
+
+1. `process.env.TZ`
+2. `TZ` from `.env` file
+3. `Intl.DateTimeFormat().resolvedOptions().timeZone` (system default)
+4. `'UTC'` (final fallback)
+
+Each candidate is validated as a real IANA timezone identifier before being accepted.
 
 ```typescript
-export const TIMEZONE =
-  process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+function resolveConfigTimezone(): string {
+  const candidates = [
+    process.env.TZ,
+    envConfig.TZ,
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  ];
+  for (const tz of candidates) {
+    if (tz && isValidTimezone(tz)) return tz;
+  }
+  return 'UTC';
+}
+export const TIMEZONE = resolveConfigTimezone();
 ```
 
 This affects cron expression evaluation for scheduled tasks.
