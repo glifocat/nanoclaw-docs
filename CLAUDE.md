@@ -36,6 +36,7 @@ When editing docs, keep these architectural facts current:
 - **Channel forks:** Channels live in separate fork repos (`nanoclaw-whatsapp`, `nanoclaw-telegram`, etc.). Channel-specific skills (image-vision, voice-transcription, reactions, pdf-reader) live on the channel fork, not upstream.
 - **Removing a skill:** `git revert -m 1 <merge-commit>`, not manual file deletion.
 - **Source of truth for NanoClaw code:** https://github.com/qwibitai/nanoclaw
+- **Credential management (v1.2.22+):** OneCLI gateway is the default. The built-in credential proxy is available as an opt-in skill (`/use-native-credential-proxy`). Legacy tabs in docs cover both methods.
 
 ## PR Workflow
 
@@ -120,6 +121,7 @@ Mintlify workflows generate automated PRs (`mintlify/*` branches) on upstream ch
 - **Always verify claims against source**: `gh search code "<term>" repo:qwibitai/nanoclaw` or fetch files directly
 - **Check for overlapping PRs**: Multiple automated PRs often fix the same thing (e.g., table renames). Merge the most thorough one first, then cherry-pick unique changes from the rest.
 - **Common errors in automated PRs**: fabricated commit references, incorrect renames (verify exported types), speculative feature descriptions, `allowed-tools` or other frontmatter claims that don't exist in source
+- **Watch for destructive automated PRs**: PRs that remove legacy/deprecated content may conflict with intentional version-tabbed documentation. Verify the removal is actually desired before merging.
 - **"Superseded" PRs may have unique changes**: Always diff line-by-line before closing — never rely solely on PR descriptions
 - **After large manual docs PRs**: Check for and close overlapping automated `mintlify/*` PRs immediately after merge — they pile up fast on upstream releases
 - **Finding the upstream version**: `gh api 'repos/qwibitai/nanoclaw/commits?path=package.json&per_page=5' --jq '.[] | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"'` — version bumps show in commit messages
@@ -140,7 +142,7 @@ To PR changes to `qwibitai/nanoclaw` from Ethan's fork (`glifocat/nanoclaw-glifo
 
 ## Token Count
 
-Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated). Currently ~41k tokens. Update `introduction.mdx` and `integrations/skills-system.mdx` if the badge value changes significantly.
+Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated). Currently ~39.8k tokens. Update `introduction.mdx` and `integrations/skills-system.mdx` if the badge value changes significantly.
 
 ## Writing Standards
 
