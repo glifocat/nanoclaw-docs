@@ -457,7 +457,7 @@ Directories mounted at `/workspace/extra/*` (via additional mounts) are automati
 **MCP servers:**
 
 - Configured in agent-runner source (`container/agent-runner/src/index.ts`)
-- Built-in: `nanoclaw` MCP server (8 tools: `send_message`, `schedule_task`, `list_tasks`, `pause_task`, `resume_task`, `cancel_task`, `update_task`, `register_group`)
+- Built-in: `nanoclaw` MCP server (8 tools: `send_message`, `schedule_task`, `list_tasks`, `pause_task`, `resume_task`, `cancel_task`, `update_task`, `register_group`). The `send_message` tool accepts an optional `sender` field for per-message bot identity (supported by Telegram). The `register_group` tool enforces channel-prefixed folder names (e.g., `whatsapp_family-chat`, `telegram_dev-team`).
 - Custom: Add by modifying agent-runner code
 
 <Accordion title="Adding a custom MCP server">

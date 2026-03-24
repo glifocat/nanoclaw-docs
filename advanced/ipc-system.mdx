@@ -136,11 +136,14 @@ Allows agents to send messages to chats.
 {
   "type": "message",
   "chatJid": "1234567890@s.whatsapp.net",
-  "text": "Message content"
+  "text": "Message content",
+  "sender": "Researcher"
 }
 ```
 
-The host extracts `chatJid` and `text` from the JSON file. Any additional fields are ignored by the core IPC handler.
+The `sender` field is optional. When set, channels that support it (such as Telegram) display the message from a dedicated bot identity instead of the default assistant name.
+
+The host extracts `chatJid` and `text` from the JSON file.
 
 **Authorization:**
 - Main group can send to any chat
@@ -285,7 +288,7 @@ Registers a new group for agent access. **Main group only.**
   "type": "register_group",
   "jid": "1234567890-9876543210@g.us",
   "name": "Family Chat",
-  "folder": "family-chat",
+  "folder": "whatsapp_family-chat",
   "trigger": "@Andy",
   "requiresTrigger": true,
   "containerConfig": {
@@ -294,6 +297,8 @@ Registers a new group for agent access. **Main group only.**
   }
 }
 ```
+
+The `folder` field must use a channel-prefixed format: `{channel}_{group-name}` (e.g., `whatsapp_family-chat`, `telegram_dev-team`, `discord_general`). Use lowercase with hyphens for the group name part.
 
 ## Task snapshot refresh
 
