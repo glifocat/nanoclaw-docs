@@ -35,7 +35,7 @@ Configuration is read from `.env` file or `process.env`.
 </ParamField>
 
 <Tabs>
-  <Tab title="OneCLI Gateway (vX.Y.Z+)">
+  <Tab title="OneCLI Gateway (v1.2.22+)">
     <ParamField path="ONECLI_URL" type="string" default="http://localhost:10254">
       URL for the OneCLI gateway that handles credential injection for containers.
     </ParamField>
@@ -117,7 +117,7 @@ This affects cron expression evaluation for scheduled tasks.
 ## Example .env file
 
 <Tabs>
-  <Tab title="OneCLI Gateway (vX.Y.Z+)">
+  <Tab title="OneCLI Gateway (v1.2.22+)">
     ```bash
     ASSISTANT_NAME=Andy
     ASSISTANT_HAS_OWN_NUMBER=false
@@ -146,7 +146,7 @@ This affects cron expression evaluation for scheduled tasks.
 ## Credential environment variables
 
 <Tabs>
-  <Tab title="OneCLI Gateway (vX.Y.Z+)">
+  <Tab title="OneCLI Gateway (v1.2.22+)">
     Credentials are managed externally via OneCLI — no credential environment variables are needed in `.env`.
 
     Register secrets with OneCLI using the CLI or dashboard:
@@ -185,7 +185,7 @@ This affects cron expression evaluation for scheduled tasks.
 ## Security notes
 
 <Tabs>
-  <Tab title="OneCLI Gateway (vX.Y.Z+)">
+  <Tab title="OneCLI Gateway (v1.2.22+)">
     - **Secrets** are never read by NanoClaw — OneCLI manages them externally
     - The OneCLI gateway injects credentials into container API traffic at request time
     - Containers cannot extract real credentials from the gateway

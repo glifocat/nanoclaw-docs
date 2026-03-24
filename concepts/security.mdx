@@ -237,7 +237,7 @@ For the full file format and API details, see the [security deep dive](/advanced
 ### 6. Credential handling
 
 <Tabs>
-  <Tab title="OneCLI Gateway (vX.Y.Z+)">
+  <Tab title="OneCLI Gateway (v1.2.22+)">
     NanoClaw uses the [OneCLI](https://onecli.sh) gateway for centralized secret management. API keys are never stored in `.env` or exposed to containers — the gateway intercepts outbound API traffic from containers and injects credentials at request time.
 
     - Secrets are registered once via `onecli secrets create` (CLI or dashboard)
