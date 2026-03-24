@@ -254,7 +254,7 @@ For the full file format and API details, see the [security deep dive](/advanced
     - Containers receive a placeholder token and a proxy URL — never real credentials
     - The host's `.env` file is shadowed with `/dev/null` when the project root is mounted, preventing containers from reading secrets
 
-    Containers never see real credentials. A credential proxy (`src/credential-proxy.ts`) runs on the host and injects authentication on every outbound API request:
+    Containers never see real credentials. A credential proxy runs on the host and injects authentication on every outbound API request. To restore the built-in credential proxy, apply the `/use-native-credential-proxy` skill.
 
     ```typescript
     // Container has a placeholder token — real credentials injected by proxy

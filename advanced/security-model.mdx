@@ -219,7 +219,7 @@ The sender allowlist complements container isolation. Containers protect against
   </Tab>
 
   <Tab title="Credential Proxy (legacy)">
-    **Credential proxy** (`src/credential-proxy.ts`):
+    **Credential proxy** (restored via the `/use-native-credential-proxy` skill):
     - Runs on the host as an HTTP proxy (default port 3001, configurable via `CREDENTIAL_PROXY_PORT`)
     - Containers send API requests to the proxy with a placeholder token
     - Reads credentials from `.env` once at startup
