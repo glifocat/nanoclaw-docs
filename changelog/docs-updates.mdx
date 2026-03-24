@@ -5,6 +5,40 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="PR consolidation and issue cleanup" description="2026-03-23" tags={["New", "Updated", "Fixed"]}>
+  Reviewed, triaged, and consolidated 10 automated Mintlify PRs (#60–#69). Verified all changes against NanoClaw source code, excluded 6 incorrect changes, and resolved the final 2 open issues.
+
+  ## New pages
+  - **Claw CLI** (`features/cli`) — documents the `/claw` Python CLI for running agents from the command line (#64)
+
+  ## New sections
+  - **Apple Container vs Docker** (`advanced/container-runtime`) — when to use each runtime, key differences table, switching instructions (closes #50)
+  - **Container internals** (`concepts/containers`) — allowed tools table, conversation archival, global memory injection, additional directory auto-discovery
+  - **Slack message formatting** (`integrations/slack`) — mrkdwn syntax differences and `/slack-formatting` skill
+  - **200-message history cap** (`features/messaging`) — documents the default query limit on message retrieval (closes #49)
+  - **Opt-in diagnostics** (`concepts/security`, `quickstart`) — PostHog telemetry, consent flow, permanent opt-out (#68)
+
+  ## Updated pages
+  - **Skill system** — updated from 3 to 4 skill types (feature, utility, operational, container) across 6 pages
+  - **Skills documentation** — added utility skill structure, creation steps, and `/claw` as example
+  - **Architecture** — fixed database table names (`scheduled_tasks`, `task_run_logs`), `isScheduledTask` flag, stdin description, startup sequence expansion
+  - **Message routing** — added `syncGroups` to Channel interface
+  - **Configuration** — fixed DATA_DIR description (runtime data, not legacy)
+  - **Skills system** — added missing skills (`/get-qodo-rules`, `/qodo-pr-resolver`, `/x-integration`, `/add-compact`, `/add-parallel`, `/slack-formatting`)
+  - **Contributing** — removed `/clear` from RFS (exists as `/add-compact`), updated to 4 skill types
+  - **SEO descriptions** — improved frontmatter across 10 pages for better search discoverability
+
+  ## Fixed
+  - 13-page factual error sweep against source code (#67) — credential proxy terminology, IPC operations, container mount behavior, removed phantom MCP tool
+  - Consolidated overlapping fixes from 6 PRs into 2 clean PRs (#70, #71), closing 7 automated PRs as superseded
+  - Excluded incorrect automated changes: Channel Factory rename, fabricated commit reference, speculative formatting table, unverified frontmatter claims
+
+  ## Housekeeping
+  - Product changelog: added v1.2.20 (ESLint) and v1.2.21 (diagnostics) entries, fixed version ordering
+  - Resolved all open issues — 0 issues remaining
+  - Token count updated from "under 35k" to "~41k"
+</Update>
+
 <Update label="Content gap sweep — 13 issues resolved" description="2026-03-20" tags={["New", "Updated"]}>
   Ran a full docs-gap analysis against the upstream codebase and resolved 13 of 15 content-gap issues. Two low-priority items remain open (#49, #50).
 
