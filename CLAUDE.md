@@ -142,7 +142,7 @@ To PR changes to `qwibitai/nanoclaw` from Ethan's fork (`glifocat/nanoclaw-glifo
 
 ## Token Count
 
-Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated). Currently ~39.8k tokens. Update `introduction.mdx` and `integrations/skills-system.mdx` if the badge value changes significantly.
+Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated). Currently ~42.2k tokens. Update `introduction.mdx` and `integrations/skills-system.mdx` if the badge value changes significantly.
 
 ## Writing Standards
 
