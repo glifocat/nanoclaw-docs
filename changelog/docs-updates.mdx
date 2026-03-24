@@ -5,6 +5,20 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v1.2.23 source sync and credential proxy skill" description="2026-03-24" tags={["Updated", "Fixed"]}>
+  Merged 3 automated PRs syncing docs with v1.2.23 upstream changes (#82, #84, #85). Closed #83 (would have removed legacy credential proxy tabs).
+
+  ## Updated
+  - **Legacy credential proxy tabs**: Updated to reference `/use-native-credential-proxy` skill instead of deleted `src/credential-proxy.ts` file path
+  - **Skills system**: Added `/use-native-credential-proxy` to upstream skills list
+  - **Architecture**: Fixed startup sequence order (OneCLI agent sync before Remote Control restore), enriched database schema descriptions
+  - **IPC system**: Documented in-container poll interval (500ms), removed undocumented `sender` field
+  - **Containers**: Fixed `.env` shadow mount to note conditional existence check, clarified container stop timeout cascade
+  - **Configuration and installation**: Added `onecli --help` references
+  - **Introduction and skills system**: Updated token count from ~41k to ~39.8k
+  - **Product changelog**: Updated v1.2.23 entry with credential proxy skill and dead code cleanup
+</Update>
+
 <Update label="OneCLI gateway documentation" description="2026-03-24" tags={["New", "Updated"]}>
   Added tabbed documentation for OneCLI gateway secret injection (v1.2.22+) alongside legacy credential proxy across 9 pages. Updated container image base from Node 22 to Node 24. Added OneCLI as installation prerequisite.
 
