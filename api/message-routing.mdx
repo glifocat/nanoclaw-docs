@@ -46,7 +46,7 @@ function formatMessages(messages: NewMessage[], timezone: string): string
 </ParamField>
 
 <ParamField path="timezone" type="string" required>
-  IANA timezone identifier (e.g., `"America/New_York"`). Used to format timestamps in local time and included in the output `<context>` header.
+  IANA timezone identifier (e.g., `"America/New_York"`). Used to format timestamps in local time and included in the output `<context>` header. Falls back to UTC if the provided value is not a valid IANA identifier.
 </ParamField>
 
 <ResponseField name="return" type="string">

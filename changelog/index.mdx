@@ -5,6 +5,12 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v1.2.24" description="2026-03-25" tags={["Fix"]}>
+  - Fixed crash on POSIX-style `TZ` values (e.g., `IST-2`) — timezone is now validated as a real IANA identifier before use, with UTC fallback
+  - Reverted container base image from `node:24-slim` to `node:22-slim` (Trixie package renames)
+  - Added timezone setup step to detect and prompt when autodetection fails
+</Update>
+
 <Update label="v1.2.23" description="2026-03-24" tags={["Maintenance", "Skill"]}>
   - Added `/use-native-credential-proxy` skill — opt-in restoration of the built-in `.env`-based credential proxy for users who prefer it over OneCLI
   - Removed dead `src/credential-proxy.ts` code (unused since v1.2.22)
@@ -14,7 +20,7 @@ rss: true
 
 <Update label="v1.2.22" description="2026-03-24" tags={["Maintenance"]}>
   - Replaced credential proxy with OneCLI gateway for container credential injection
-  - Updated container base image from `node:22-slim` to `node:24-slim`
+  - Updated container base image from `node:22-slim` to `node:24-slim` (reverted in v1.2.24)
   - Updated token count to 40.7k tokens (20% of context window)
 </Update>
 
