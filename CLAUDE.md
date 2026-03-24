@@ -44,6 +44,7 @@ When editing docs, keep these architectural facts current:
 - Available labels: `content-gap`, `new-page`, `update-existing`, `high-priority`, `medium-priority`, plus GitHub defaults
 - For auto-closing issues, put each `Closes #N` on its own line in the PR body
 - For multi-concern changes, split into stacked PRs (base each on the previous branch). After merging, retarget the next PR to `main` and rebase.
+- **Post-merge verification**: Use the `nanoclaw-docs` MCP (`search_nano_claw`) to verify changes are live and indexed correctly after merging to `main`.
 
 ## Architecture
 
@@ -87,6 +88,8 @@ keywords: ["relevant", "search", "terms"]
 
 **`mint validate`**: Must be run from the directory containing `docs.json` — fails otherwise.
 
+**Non-docs files**: `mint validate` and `mint broken-links` parse ALL `.md`/`.mdx` files in the repo tree, including non-docs files (plans, specs). MDX snippets in markdown code blocks cause parsing errors. Keep non-docs markdown files outside the repo or delete them before validating.
+
 **Multi-issue PRs**: When closing multiple issues, put each `Closes #N` on its own line AND add matching labels via `gh pr edit --add-label`.
 
 **Navigation:** When adding or moving pages, update the `navigation` array in `docs.json`. The site has two tabs: "Documentation" (5 groups) and "API Reference" (2 groups). New pages not added to `docs.json` won't appear in the sidebar.
@@ -98,6 +101,8 @@ keywords: ["relevant", "search", "terms"]
 **Images:** Store in `images/`, reference with root-relative paths, always include descriptive alt text.
 
 **Components available:** `<Note>`, `<Info>`, `<Tip>`, `<Warning>`, `<Check>`, `<Danger>`, `<Steps>/<Step>`, `<Tabs>/<Tab>`, `<CodeGroup>`, `<Columns>`, `<Card>`, `<AccordionGroup>/<Accordion>`, Mermaid diagrams, and more (see `/mintlify` skill for full list).
+
+**Version-gated features**: When documenting a breaking change where older versions are still valid, use `<Tabs>` with version labels (e.g., "OneCLI Gateway (v1.2.22+)" / "Credential Proxy (legacy)") for sections with substantial content, and `<Note>` callouts for passing references. Use version placeholders (`vX.Y.Z`) when the release version isn't confirmed yet.
 
 **Directory trees:** Use `<Tree>` component (not ASCII art). See `reference/components.md` for syntax.
 
@@ -116,6 +121,8 @@ Mintlify workflows generate automated PRs (`mintlify/*` branches) on upstream ch
 - **Check for overlapping PRs**: Multiple automated PRs often fix the same thing (e.g., table renames). Merge the most thorough one first, then cherry-pick unique changes from the rest.
 - **Common errors in automated PRs**: fabricated commit references, incorrect renames (verify exported types), speculative feature descriptions, `allowed-tools` or other frontmatter claims that don't exist in source
 - **"Superseded" PRs may have unique changes**: Always diff line-by-line before closing — never rely solely on PR descriptions
+- **After large manual docs PRs**: Check for and close overlapping automated `mintlify/*` PRs immediately after merge — they pile up fast on upstream releases
+- **Finding the upstream version**: `gh api 'repos/qwibitai/nanoclaw/commits?path=package.json&per_page=5' --jq '.[] | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"'` — version bumps show in commit messages
 
 ## Changelogs
 
