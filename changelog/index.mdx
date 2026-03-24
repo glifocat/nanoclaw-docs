@@ -5,6 +5,12 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v1.2.22" description="2026-03-24" tags={["Maintenance"]}>
+  - Replaced credential proxy with OneCLI gateway for container credential injection
+  - Updated container base image from `node:22-slim` to `node:24-slim`
+  - Updated token count to 40.7k tokens (20% of context window)
+</Update>
+
 <Update label="v1.2.21" description="2026-03-22" tags={["Feature"]}>
   - Added opt-in diagnostics via PostHog — collects anonymous system info (OS, architecture, version, selected channels) during `/setup` and `/update-nanoclaw` with explicit user consent
   - Three-option prompt: **Yes** (send once), **No** (skip), **Never ask again** (permanently opt out)
@@ -144,6 +150,9 @@ rss: true
   - **WhatsApp moved to skill**: No longer part of core — apply with `/add-whatsapp`
   - **`ENABLED_CHANNELS` removed**: Orchestrator uses `getRegisteredChannelNames()`; channels detected by credential presence
   - **All channel skills simplified**: No more `*_ONLY` flags — all use self-registration pattern
+
+  ## Fixes
+  - Prevent scheduled tasks from executing twice when container runtime exceeds poll interval
 
   ## Migration
   Existing WhatsApp users: run `/add-whatsapp` in Claude Code CLI after updating.

@@ -68,7 +68,7 @@ Apple Container uses the same `container/Dockerfile` to build the agent image. I
 
 The agent container is built from `container/Dockerfile` and includes:
 
-- **Node.js 22** - Runtime for the agent runner
+- **Node.js 24** - Runtime for the agent runner
 - **Chromium** - Browser automation via agent-browser
 - **Claude Code SDK** - Installed globally as `@anthropic-ai/claude-code`
 - **System fonts** - Emoji and international character support
@@ -77,7 +77,7 @@ The agent container is built from `container/Dockerfile` and includes:
 
 <Accordion title="Base image and system dependencies">
   ```dockerfile
-  FROM node:22-slim
+  FROM node:24-slim
 
   # Install system dependencies for Chromium
   RUN apt-get update && apt-get install -y \
@@ -211,7 +211,7 @@ export async function runContainerAgent(
     container.stdin.end();
     ```
     
-    The input JSON contains the prompt, session ID, group folder, and metadata. Credentials are handled by the credential proxy — never passed via stdin or mounted as files.
+    The input JSON contains the prompt, session ID, group folder, and metadata. Credentials are handled by the secret injection layer (OneCLI gateway or credential proxy) — never passed via stdin or mounted as files.
   </Step>
   
   <Step title="Stream output">
@@ -227,55 +227,109 @@ export async function runContainerAgent(
 
 From the `buildContainerArgs` function in `src/container-runner.ts`:
 
-```typescript
-function buildContainerArgs(
-  mounts: VolumeMount[],
-  containerName: string,
-): string[] {
-  const args: string[] = ['run', '-i', '--rm', '--name', containerName];
+<Tabs>
+  <Tab title="OneCLI Gateway (v1.2.22+)">
+    ```typescript
+    async function buildContainerArgs(
+      mounts: VolumeMount[],
+      containerName: string,
+      agentIdentifier?: string,
+    ): Promise<string[]> {
+      const args: string[] = ['run', '-i', '--rm', '--name', containerName];
 
-  // Pass host timezone so container's local time matches the user's
-  args.push('-e', `TZ=${TIMEZONE}`);
+      // Pass host timezone so container's local time matches the user's
+      args.push('-e', `TZ=${TIMEZONE}`);
 
-  // Route API traffic through the credential proxy
-  args.push('-e', `ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}`);
+      // OneCLI gateway handles credential injection
+      const onecliApplied = await onecli.applyContainerConfig(args, {
+        addHostMapping: false,
+        agent: agentIdentifier,
+      });
+      if (!onecliApplied) {
+        logger.warn({ containerName }, 'OneCLI gateway not reachable');
+      }
 
-  // Mirror the host's auth method with a placeholder value
-  const authMode = detectAuthMode();
-  if (authMode === 'api-key') {
-    args.push('-e', 'ANTHROPIC_API_KEY=placeholder');
-  } else {
-    args.push('-e', 'CLAUDE_CODE_OAUTH_TOKEN=placeholder');
-  }
+      // Run as host user so bind-mounted files are accessible
+      const hostUid = process.getuid?.();
+      const hostGid = process.getgid?.();
+      if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
+        args.push('--user', `${hostUid}:${hostGid}`);
+        args.push('-e', 'HOME=/home/node');
+      }
 
-  // Run as host user so bind-mounted files are accessible
-  const hostUid = process.getuid?.();
-  const hostGid = process.getgid?.();
-  if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
-    args.push('--user', `${hostUid}:${hostGid}`);
-    args.push('-e', 'HOME=/home/node');
-  }
+      for (const mount of mounts) {
+        if (mount.readonly) {
+          args.push(...readonlyMountArgs(mount.hostPath, mount.containerPath));
+        } else {
+          args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
+        }
+      }
 
-  for (const mount of mounts) {
-    if (mount.readonly) {
-      args.push(...readonlyMountArgs(mount.hostPath, mount.containerPath));
-    } else {
-      args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
+      args.push(CONTAINER_IMAGE);
+      return args;
     }
-  }
+    ```
 
-  args.push(CONTAINER_IMAGE);
-  return args;
-}
-```
+    **Key flags:**
+    - `-i` - Interactive (keeps stdin open)
+    - `--rm` - Remove container after exit (ephemeral)
+    - `--name` - Unique container name for management
+    - `--user` - Run as host UID/GID for file permissions
+    - OneCLI SDK configures container networking for credential injection (no explicit env vars)
+  </Tab>
 
-**Key flags:**
-- `-i` - Interactive (keeps stdin open)
-- `--rm` - Remove container after exit (ephemeral)
-- `--name` - Unique container name for management
-- `--user` - Run as host UID/GID for file permissions
-- `-e ANTHROPIC_BASE_URL` - Routes API calls through the credential proxy
-- `-e ANTHROPIC_API_KEY` or `-e CLAUDE_CODE_OAUTH_TOKEN` - Placeholder credential (replaced by proxy)
+  <Tab title="Credential Proxy (legacy)">
+    ```typescript
+    function buildContainerArgs(
+      mounts: VolumeMount[],
+      containerName: string,
+    ): string[] {
+      const args: string[] = ['run', '-i', '--rm', '--name', containerName];
+
+      // Pass host timezone so container's local time matches the user's
+      args.push('-e', `TZ=${TIMEZONE}`);
+
+      // Route API traffic through the credential proxy
+      args.push('-e', `ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}`);
+
+      // Mirror the host's auth method with a placeholder value
+      const authMode = detectAuthMode();
+      if (authMode === 'api-key') {
+        args.push('-e', 'ANTHROPIC_API_KEY=placeholder');
+      } else {
+        args.push('-e', 'CLAUDE_CODE_OAUTH_TOKEN=placeholder');
+      }
+
+      // Run as host user so bind-mounted files are accessible
+      const hostUid = process.getuid?.();
+      const hostGid = process.getgid?.();
+      if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
+        args.push('--user', `${hostUid}:${hostGid}`);
+        args.push('-e', 'HOME=/home/node');
+      }
+
+      for (const mount of mounts) {
+        if (mount.readonly) {
+          args.push(...readonlyMountArgs(mount.hostPath, mount.containerPath));
+        } else {
+          args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
+        }
+      }
+
+      args.push(CONTAINER_IMAGE);
+      return args;
+    }
+    ```
+
+    **Key flags:**
+    - `-i` - Interactive (keeps stdin open)
+    - `--rm` - Remove container after exit (ephemeral)
+    - `--name` - Unique container name for management
+    - `--user` - Run as host UID/GID for file permissions
+    - `-e ANTHROPIC_BASE_URL` - Routes API calls through the credential proxy
+    - `-e ANTHROPIC_API_KEY` or `-e CLAUDE_CODE_OAUTH_TOKEN` - Placeholder credential (replaced by proxy)
+  </Tab>
+</Tabs>
 
 ### Volume mounts
 

@@ -86,7 +86,7 @@ The container runner (`src/container-runner.ts`) spawns and manages isolated age
 **Container lifecycle:**
 1. Build volume mounts based on group privileges
 2. Spawn container with Docker CLI
-3. Pass prompt and metadata via stdin JSON (credentials handled by proxy, never passed here)
+3. Pass prompt and metadata via stdin JSON (credentials handled by secret injection layer, never passed here)
 4. Stream stdout/stderr for real-time output
 5. Parse output markers (`---NANOCLAW_OUTPUT_START---` / `---NANOCLAW_OUTPUT_END---`)
 6. Clean up automatically on exit (`--rm` flag)
@@ -247,7 +247,7 @@ sequenceDiagram
 
 The agent container (`container/Dockerfile`) includes:
 
-- **Base**: `node:22-slim`
+- **Base**: `node:24-slim`
 - **Browser**: Chromium with all required dependencies
 - **Tools**: `agent-browser` CLI for browser automation
 - **Runtime**: `@anthropic-ai/claude-code` (Claude Agent SDK)
@@ -301,7 +301,11 @@ The agent runner is the TypeScript code that wraps Claude Agent SDK. It handles 
 2. **Database initialization**: Create tables if needed, load schema
 3. **State loading**: Restore message cursors, sessions, registered groups
 4. **Remote Control restore**: Re-adopt any surviving Remote Control session from a previous run
-5. **Credential proxy**: Start the credential proxy on `CREDENTIAL_PROXY_PORT` (containers route API calls through this)
+5. **Secret injection**: Ensure credential injection is available for containers
+
+<Note>
+In v1.2.22+, this step syncs OneCLI agents for all registered groups. In earlier versions, this starts the built-in credential proxy on `CREDENTIAL_PROXY_PORT`.
+</Note>
 6. **Shutdown handlers**: Register graceful shutdown on `SIGTERM` and `SIGINT`
 7. **Channel connection**: Connect to messaging channels, authenticate if needed
 8. **Subsystem startup**:

@@ -27,7 +27,7 @@ NanoClaw uses Docker by default for cross-platform compatibility. On macOS, you 
 The container is built from `container/Dockerfile`:
 
 ```dockerfile
-FROM node:22-slim
+FROM node:24-slim
 
 # System dependencies for Chromium
 RUN apt-get update && apt-get install -y \
@@ -70,7 +70,7 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 
 **Key components:**
 
-- **Base**: `node:22-slim` (Debian-based, minimal)
+- **Base**: `node:24-slim` (Debian-based, minimal)
 - **Browser**: Chromium with all dependencies
 - **Tools**: `agent-browser` for browser automation
 - **Runtime**: `@anthropic-ai/claude-code` (Claude Agent SDK)
@@ -88,7 +88,7 @@ The entrypoint script (`/app/entrypoint.sh`):
    - Input contains prompt, session ID, and group metadata (not secrets)
 3. **Execute agent**: `node /tmp/dist/index.js < /tmp/input.json`
    - Runs agent-runner with input
-   - Credentials handled by the credential proxy, never passed via stdin
+   - Credentials handled by the secret injection layer (OneCLI gateway or credential proxy), never passed via stdin
    - Outputs JSON results to stdout
 4. **Container exits**: Cleaned up automatically via `--rm` flag
 
@@ -510,7 +510,7 @@ agent-browser pdf https://example.com output.pdf
 
 - **Network access**: Agents have full network access (can exfiltrate data)
 - **Mounted directory tampering**: Agents can modify anything in mounted directories
-- **Proxy-based API access**: Containers can make authenticated API requests through the credential proxy (though they cannot extract real credentials)
+- **Gateway-based API access**: Containers can make authenticated API requests through the secret injection layer (though they cannot extract real credentials)
 - **Resource exhaustion**: No CPU/memory limits (can DoS host)
 
 <Warning>

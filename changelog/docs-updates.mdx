@@ -5,6 +5,20 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="OneCLI gateway documentation" description="2026-03-24" tags={["New", "Updated"]}>
+  Added tabbed documentation for OneCLI gateway secret injection (v1.2.22+) alongside legacy credential proxy across 9 pages. Updated container image base from Node 22 to Node 24. Added OneCLI as installation prerequisite.
+
+  ## Pages updated
+  - **Security overview and deep dive**: Credential handling sections now use tabs for OneCLI Gateway vs Credential Proxy (legacy)
+  - **Configuration**: Environment variables, example `.env`, and security notes updated with tabs
+  - **Container runtime**: Container arguments code and key flags documented for both methods
+  - **Architecture**: Startup sequence and container image updated
+  - **Installation**: OneCLI added as prerequisite #5, Node 24, `@onecli-sh/sdk` dependency
+  - **Containers, Ollama, Skills examples**: Passing references updated to version-neutral language
+  - **Customization**: Mount allowlist format updated (`allowedPaths` → `allowedRoots` with per-root read/write control)
+  - **Product changelog**: Added v1.2.22 release entry and v1.2.0 scheduled task fix
+</Update>
+
 <Update label="Upstream docs audit and platform fixes" description="2026-03-24" tags={["Updated", "Fixed"]}>
   Audited documentation in the upstream NanoClaw repo against the docs portal and submitted fixes via [qwibitai/nanoclaw#1388](https://github.com/qwibitai/nanoclaw/pull/1388).
 

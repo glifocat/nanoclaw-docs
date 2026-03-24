@@ -2,7 +2,8 @@
 title: Installation
 description: Detailed installation requirements and setup for macOS, Linux, and Windows (WSL)
 icon: "download"
-keywords: ["requirements", "docker", "node", "apple container", "windows", "wsl"]
+tag: "UPDATED"
+keywords: ["requirements", "docker", "node", "apple container", "windows", "wsl", "onecli"]
 ---
 
 # Installation
@@ -37,7 +38,7 @@ Complete installation guide for NanoClaw on macOS, Linux, and Windows (WSL).
     - Docker Desktop with WSL 2 backend enabled
 
     <Note>
-    NanoClaw runs inside WSL, not natively on Windows. All commands should be run in a WSL terminal. The credential proxy detects WSL automatically and uses the correct network routing.
+    NanoClaw runs inside WSL, not natively on Windows. All commands should be run in a WSL terminal.
     </Note>
   </Tab>
 </Tabs>
@@ -224,7 +225,7 @@ Agents run in isolated containers. You need either Apple Container (macOS only) 
   </Tab>
 
   <Tab title="Windows (WSL) — Docker Desktop">
-    WSL uses Docker Desktop's WSL 2 backend. The credential proxy detects WSL automatically and routes through `127.0.0.1` (same as macOS).
+    WSL uses Docker Desktop's WSL 2 backend.
 
     1. Install [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
     2. Open Docker Desktop Settings > Resources > WSL Integration
@@ -286,6 +287,28 @@ NanoClaw uses `better-sqlite3`, which requires native compilation.
     ```
   </Tab>
 </Tabs>
+
+### 5. OneCLI (v1.2.22+)
+
+Starting in v1.2.22, NanoClaw uses OneCLI for credential management. OneCLI is a local gateway that injects API keys into container traffic without exposing secrets.
+
+```bash
+curl -fsSL onecli.sh/install | sh
+curl -fsSL onecli.sh/cli/install | sh
+```
+
+Verify installation:
+```bash
+onecli version
+```
+
+<Info>
+OneCLI is also installed automatically by the `/setup` skill if not already present. It's listed here so you know about the dependency upfront.
+</Info>
+
+<Note>
+**What `/setup` handles for you:** OneCLI installation, npm dependencies, container image build, channel configuration, and service setup. **What you need beforehand:** Node.js, Claude Code, a container runtime, and build tools.
+</Note>
 
 ## Installation steps
 
@@ -354,6 +377,7 @@ NanoClaw uses these core dependencies (from `package.json`):
 ```json
 {
   "dependencies": {
+    "@onecli-sh/sdk": "^0.2.0",     // OneCLI gateway integration (v1.2.22+)
     "better-sqlite3": "^11.8.1",   // SQLite database
     "cron-parser": "^5.5.0",       // Task scheduling
     "pino": "^9.6.0",              // Logging
@@ -376,7 +400,7 @@ All dependencies are installed automatically by `/setup` via `npm install`.
 
 The agent container includes:
 
-- **Base**: Node.js 22 (Debian slim)
+- **Base**: Node.js 24 (Debian slim)
 - **Browser**: Chromium with CJK and emoji font support
 - **Claude Agent SDK**: `@anthropic-ai/claude-code` (pre-installed)
 - **Tools**: `agent-browser`, bash, git, curl

@@ -193,33 +193,61 @@ The sender allowlist complements container isolation. Containers protect against
 
 ### Credential handling
 
-**Credential proxy** (`src/credential-proxy.ts`):
-- Runs on the host as an HTTP proxy (default port 3001, configurable via `CREDENTIAL_PROXY_PORT`)
-- Containers send API requests to the proxy with a placeholder token
-- Reads credentials from `.env` once at startup
-- Supports API key mode (`ANTHROPIC_API_KEY`) and OAuth mode (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN`)
+<Tabs>
+  <Tab title="OneCLI Gateway (v1.2.22+)">
+    NanoClaw delegates all credential management to the [OneCLI](https://onecli.sh) gateway. The host process never reads API keys — secrets are registered with OneCLI and injected into container traffic by the gateway.
 
-**Credential injection behavior differs by auth mode:**
-- **API key mode**: The proxy replaces the `x-api-key` header on every outbound request
-- **OAuth mode**: The proxy replaces the `Authorization` header only on requests that include one (during the initial token exchange). The Claude CLI exchanges the placeholder token for a temporary API key, and subsequent requests use that key directly without further injection
+    **How it works:**
+    - The `@onecli-sh/sdk` package's `applyContainerConfig()` configures each container's network to route through the gateway
+    - The gateway intercepts HTTPS traffic to `api.anthropic.com` and injects the registered secret
+    - Each non-main group receives an `agentIdentifier` (derived from its folder name) for per-group credential scoping
+    - `ONECLI_URL` (default `http://localhost:10254`) configures the gateway address
+
+    **Container environment** (from `src/container-runner.ts`):
+
+    ```typescript
+    // OneCLI SDK configures container networking — no explicit env vars needed
+    const onecliApplied = await onecli.applyContainerConfig(args, {
+      addHostMapping: false, // NanoClaw already handles host gateway
+      agent: agentIdentifier,
+    });
+    ```
+
+    <Note>
+    If the OneCLI gateway is unreachable at container start, the container launches with no credentials. The agent will fail on API calls, and a warning is logged. Re-run after ensuring OneCLI is running (`curl http://127.0.0.1:10254/api/health`).
+    </Note>
+  </Tab>
+
+  <Tab title="Credential Proxy (legacy)">
+    **Credential proxy** (`src/credential-proxy.ts`):
+    - Runs on the host as an HTTP proxy (default port 3001, configurable via `CREDENTIAL_PROXY_PORT`)
+    - Containers send API requests to the proxy with a placeholder token
+    - Reads credentials from `.env` once at startup
+    - Supports API key mode (`ANTHROPIC_API_KEY`) and OAuth mode (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN`)
+
+    **Credential injection behavior differs by auth mode:**
+    - **API key mode**: The proxy replaces the `x-api-key` header on every outbound request
+    - **OAuth mode**: The proxy replaces the `Authorization` header only on requests that include one (during the initial token exchange). The Claude CLI exchanges the placeholder token for a temporary API key, and subsequent requests use that key directly without further injection
+
+    **Container environment** (from `src/container-runner.ts`):
+
+    ```typescript
+    // Containers get a placeholder token and proxy URL — never real credentials
+    ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}
+    CLAUDE_CODE_OAUTH_TOKEN=placeholder
+    ```
+
+    <Note>
+    Containers cannot extract real credentials. The credential proxy intercepts all API requests and replaces the placeholder token with real authentication before forwarding to `api.anthropic.com`.
+    </Note>
+  </Tab>
+</Tabs>
 
 **NOT mounted:**
 - Channel sessions (e.g., `store/auth/` for WhatsApp) - host only
 - Mount allowlist - external, never mounted
-- Real API keys or OAuth tokens - injected by proxy, never in containers
+- Real API keys or OAuth tokens - injected by secret injection layer, never in containers
 - Any credentials matching blocked patterns
-
-**Container environment** (from `src/container-runner.ts`):
-
-```typescript
-// Containers get a placeholder token and proxy URL — never real credentials
-ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}
-CLAUDE_CODE_OAUTH_TOKEN=placeholder
-```
-
-<Note>
-Containers cannot extract real credentials. The credential proxy intercepts all API requests and replaces the placeholder token with real authentication before forwarding to `api.anthropic.com`.
-</Note>
 
 ## Privilege comparison
 
@@ -247,7 +275,7 @@ Containers cannot extract real credentials. The credential proxy intercepts all 
 │  • IPC authorization                                              │
 │  • Mount validation (external allowlist)                          │
 │  • Container lifecycle                                            │
-│  • Credential proxy                                                │
+│  • Secret injection (OneCLI or credential proxy)                  │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │
                                  ▼ Explicit mounts only

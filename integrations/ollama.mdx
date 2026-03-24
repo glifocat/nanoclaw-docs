@@ -1,7 +1,7 @@
 ---
 title: Ollama integration
 description: Use local LLMs alongside Claude via the Ollama MCP server
-tag: "NEW"
+tag: "UPDATED"
 keywords: ["ollama", "local models", "llm", "mcp", "self-hosted"]
 ---
 
@@ -123,7 +123,7 @@ This allows you to use:
 - Custom model deployments with Anthropic-compatible APIs
 
 <Warning>
-When using `ANTHROPIC_BASE_URL`, the credential proxy still intercepts container API requests. Make sure the proxy can reach your custom endpoint.
+When using custom endpoints, the secret injection layer (OneCLI gateway in v1.2.22+, or the credential proxy in earlier versions) still intercepts container API requests. Ensure the endpoint is reachable from the host.
 </Warning>
 
 ## Related pages

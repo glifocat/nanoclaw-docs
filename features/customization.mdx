@@ -1,6 +1,7 @@
 ---
 title: Customize NanoClaw
 description: Learn how to modify NanoClaw's behavior by changing code, not configuration files
+tag: "UPDATED"
 ---
 
 ## Philosophy
@@ -343,10 +344,20 @@ Requests are validated against `~/.config/nanoclaw/mount-allowlist.json`:
 
 ```json
 {
-  "allowedPaths": [
-    "/Users/you/Documents/vault",
-    "/Users/you/code/project"
-  ]
+  "allowedRoots": [
+    {
+      "path": "/Users/you/Documents/vault",
+      "allowReadWrite": false,
+      "description": "Personal vault"
+    },
+    {
+      "path": "/Users/you/code/project",
+      "allowReadWrite": true,
+      "description": "Development project"
+    }
+  ],
+  "blockedPatterns": [],
+  "nonMainReadOnly": true
 }
 ```
 
