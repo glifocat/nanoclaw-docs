@@ -247,10 +247,10 @@ sequenceDiagram
 
 The agent container (`container/Dockerfile`) includes:
 
-- **Base**: `node:24-slim`
+- **Base**: `node:22-slim`
 - **Browser**: Chromium with all required dependencies
-- **Tools**: `agent-browser` CLI for browser automation
-- **Runtime**: `@anthropic-ai/claude-code` (Claude Agent SDK)
+- **Tools**: `agent-browser` CLI for browser automation, `@anthropic-ai/claude-code` CLI (installed globally)
+- **Runtime**: `@anthropic-ai/claude-agent-sdk` (agent runner SDK dependency)
 - **User**: Runs as `node` user (uid 1000, non-root)
 - **Working directory**: `/workspace/group` (group's folder)
 

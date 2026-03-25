@@ -402,9 +402,9 @@ All dependencies are installed automatically by `/setup` via `npm install`.
 
 The agent container includes:
 
-- **Base**: Node.js 24 (Debian slim)
+- **Base**: Node.js 22 (Debian slim)
 - **Browser**: Chromium with CJK and emoji font support
-- **Claude Agent SDK**: `@anthropic-ai/claude-code` (pre-installed)
+- **Claude Agent SDK**: `@anthropic-ai/claude-agent-sdk` (agent runner dependency), `@anthropic-ai/claude-code` CLI (installed globally)
 - **Tools**: `agent-browser`, bash, git, curl
 - **User**: Non-root `node` user (uid 1000)
 

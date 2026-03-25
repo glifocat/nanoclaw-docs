@@ -68,16 +68,16 @@ Apple Container uses the same `container/Dockerfile` to build the agent image. I
 
 The agent container is built from `container/Dockerfile` and includes:
 
-- **Node.js 24** - Runtime for the agent runner
+- **Node.js 22** - Runtime for the agent runner
 - **Chromium** - Browser automation via agent-browser
-- **Claude Code SDK** - Installed globally as `@anthropic-ai/claude-code`
+- **Claude Agent SDK** - `@anthropic-ai/claude-agent-sdk` (agent runner dependency)
 - **System fonts** - Emoji and international character support
 
 ### Dockerfile breakdown
 
 <Accordion title="Base image and system dependencies">
   ```dockerfile
-  FROM node:24-slim
+  FROM node:22-slim
 
   # Install system dependencies for Chromium
   RUN apt-get update && apt-get install -y \
@@ -104,7 +104,7 @@ The agent container is built from `container/Dockerfile` and includes:
   RUN npm install -g agent-browser @anthropic-ai/claude-code
   ```
   
-  Browser automation is available to all agents via the `agent-browser` command.
+  Browser automation is available to all agents via the `agent-browser` command. The `@anthropic-ai/claude-code` CLI is also installed globally.
 </Accordion>
 
 <Accordion title="Agent runner compilation">
