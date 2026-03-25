@@ -316,11 +316,23 @@ Additional mounts bypass group isolation. Only mount directories that are safe f
 
 1. Main group sends registration command
 2. Folder created under `groups/{folder}/`
-3. Session directory created under `data/sessions/{folder}/`
-4. IPC directory created under `data/ipc/{folder}/`
-5. Skills synced to `.claude/skills/`
-6. Agent runner source copied to `agent-runner-src/`
-7. Group added to database
+3. `CLAUDE.md` copied from the appropriate template (see below)
+4. Session directory created under `data/sessions/{folder}/`
+5. IPC directory created under `data/ipc/{folder}/`
+6. Skills synced to `.claude/skills/`
+7. Agent runner source copied to `agent-runner-src/`
+8. Group added to database
+
+**CLAUDE.md template selection:**
+
+- **Main groups** (`isMain: true`) receive a copy of `groups/main/CLAUDE.md`, which includes admin context and elevated instructions
+- **Non-main groups** receive a copy of `groups/global/CLAUDE.md`, the standard template
+- If the template file doesn't exist, no `CLAUDE.md` is created
+- An existing `CLAUDE.md` is **never overwritten** — re-registration or re-adding a channel preserves any customizations you've made
+
+<Note>
+When a custom assistant name is configured (anything other than the default "Andy"), all `CLAUDE.md` files across every group are updated to reflect the new name on registration.
+</Note>
 
 ### Active operation
 

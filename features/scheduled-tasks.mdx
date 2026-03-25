@@ -235,6 +235,7 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
   "schedule_type": "cron",
   "schedule_value": "0 9 * * *",
   "context_mode": "isolated",
+  "script": "echo '{\"wakeAgent\": true}'",
   "targetJid": "user@s.whatsapp.net or tg:12345 or similar"
 }
 ```
@@ -266,7 +267,8 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
   "taskId": "task-1234567890-abc123",
   "prompt": "Updated prompt",
   "schedule_type": "interval",
-  "schedule_value": "7200000"
+  "schedule_value": "7200000",
+  "script": "echo '{\"wakeAgent\": true}'"
 }
 ```
 </CodeGroup>
@@ -274,6 +276,31 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
 <Info>
 After any task mutation via IPC, the `current_tasks.json` snapshot is refreshed immediately for all groups. This means `list_tasks` always returns up-to-date results, even within the same agent session.
 </Info>
+
+## Task scripts
+
+Tasks can include an optional `script` field — a bash script that runs inside the container before the agent is invoked. The script decides whether to wake the agent based on external conditions.
+
+```
+@Andy every 5 minutes, check if there are new support tickets and notify me.
+Use a script to only wake if there are new tickets.
+```
+
+The script must output JSON on its last line of stdout:
+
+```json
+{ "wakeAgent": true, "data": { "ticketCount": 3 } }
+```
+
+- If `wakeAgent` is `true`, the agent runs with the script's `data` added to the prompt
+- If `wakeAgent` is `false`, the container exits without calling the agent
+- If the script fails or times out (30 seconds), the agent is not invoked
+
+<Info>
+Scripts help reduce unnecessary agent invocations for high-frequency tasks. The agent only runs when there's something meaningful to act on.
+</Info>
+
+You can add or remove scripts from existing tasks with `update_task`. Set `script` to an empty string to remove it.
 
 ## Task isolation
 
