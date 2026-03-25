@@ -93,7 +93,7 @@ The entrypoint script (`/app/entrypoint.sh`):
 4. **Container exits**: Cleaned up automatically via `--rm` flag
 
 <Note>
-The agent-runner is recompiled on every container start from `/app/src` (mounted from `data/sessions/{group}/agent-runner-src/`). This allows agents to modify their own tools and behavior by editing their agent-runner source. The agent-runner source is copied once when the group is first created — subsequent changes to `container/agent-runner/src/` are not automatically propagated to existing groups.
+The agent-runner is recompiled on every container start from `/app/src` (mounted from `data/sessions/{group}/agent-runner-src/`). This allows agents to modify their own tools and behavior by editing their agent-runner source. The source cache is automatically refreshed when the upstream `container/agent-runner/src/index.ts` is newer than the cached copy, so changes to the agent-runner source are propagated to existing groups on the next container spawn.
 </Note>
 
 ## Volume mounts
@@ -413,7 +413,7 @@ Skills synced to each container:
 
 1. **Copy from project**: Skills from `container/skills/` are synced to `data/sessions/{group}/.claude/skills/` on every container spawn (overwriting existing files)
 2. **Available to agent**: Claude Agent SDK loads from `.claude/skills/`
-3. **Per-group customization**: Each group gets a copy, but changes are overwritten on next container spawn (unlike agent-runner source, which is copied once)
+3. **Per-group customization**: Each group gets a copy, but changes are overwritten on every container spawn. Agent-runner source is only refreshed when the upstream source is newer than the cached copy, so per-group customizations persist until the upstream changes
 
 ### Built-in container skills
 
