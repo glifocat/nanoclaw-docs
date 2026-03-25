@@ -211,7 +211,11 @@ export async function runContainerAgent(
     container.stdin.end();
     ```
     
-    The input JSON contains the prompt, session ID, group folder, and metadata. Credentials are handled by the secret injection layer (OneCLI gateway or credential proxy) — never passed via stdin or mounted as files.
+    The input JSON contains the prompt, session ID, group folder, metadata, and an optional `script` field. Credentials are handled by the secret injection layer (OneCLI gateway or credential proxy) — never passed via stdin or mounted as files.
+  </Step>
+
+  <Step title="Script phase (scheduled tasks only)">
+    If the input includes a `script` field and `isScheduledTask` is `true`, the agent runner executes the script as a bash script (30-second timeout) before invoking Claude. The script's last stdout line must be JSON with a `wakeAgent` boolean. If `wakeAgent` is `false` or the script errors, the container exits without invoking the agent. If `wakeAgent` is `true`, the script's `data` is injected into the prompt.
   </Step>
   
   <Step title="Stream output">

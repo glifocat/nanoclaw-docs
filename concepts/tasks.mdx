@@ -4,13 +4,14 @@ description: How NanoClaw's task scheduler works and how tasks are executed
 tag: "UPDATED"
 ---
 
-NanoClaw includes a built-in task scheduler that runs Claude agents on a schedule. Tasks have full agent capabilities and can optionally send results to group chats.
+NanoClaw includes a built-in task scheduler that runs Claude agents on a schedule. Tasks have full agent capabilities and can optionally send results to group chats. Tasks can also include a **pre-run script** that gates whether the agent wakes up and provides data to enrich the prompt.
 
 ## What is a scheduled task?
 
 A scheduled task is:
 
 - A prompt that runs on a schedule (cron, interval, or one-time)
+- Optionally gated by a **pre-run script** that decides whether to wake the agent
 - Executed in the context of a specific group
 - Has access to all agent tools (Bash, browser, MCP, etc.)
 - Can send messages to the group chat or complete silently
@@ -107,6 +108,7 @@ sequenceDiagram
     participant DB as Database
     participant GQ as GroupQueue
     participant CR as ContainerRunner
+    participant SC as Script
     participant AG as Agent
     participant CH as Channel
     
@@ -115,8 +117,19 @@ sequenceDiagram
     SCH->>GQ: enqueueTask()
     GQ->>GQ: Check concurrency
     GQ->>CR: runContainerAgent(isScheduledTask: true)
-    CR->>AG: Spawn container
-    AG->>AG: Execute task prompt
+    CR->>CR: Spawn container
+    alt Task has script
+        CR->>SC: Run script (30s timeout)
+        SC-->>CR: { wakeAgent, data }
+        alt wakeAgent = false or script error
+            CR-->>DB: logTaskRun(success, no result)
+            Note over CR: Task completes silently
+        else wakeAgent = true
+            CR->>AG: Execute prompt + script data
+        end
+    else No script
+        CR->>AG: Execute task prompt
+    end
     AG-->>CR: Stream output
     CR->>CH: Auto-forward result to chat (if output present)
     CR->>DB: logTaskRun()
@@ -131,11 +144,12 @@ sequenceDiagram
 4. Enqueues task in GroupQueue
 5. GroupQueue respects concurrency limits (tasks and messages share the pool)
 6. Container spawned with `isScheduledTask: true` flag
-7. Agent executes task prompt
-8. Results automatically forwarded to the group chat when the agent produces output
-9. Run logged to `task_run_logs` table with duration and result
-10. `next_run` recalculated based on schedule type
-11. Container closes after 10-second grace period
+7. **Script phase** (if task has a `script` field): the script runs first with a 30-second timeout. If it returns `wakeAgent: false` or errors, the task completes silently (no agent invocation). If `wakeAgent: true`, the script's `data` is injected into the prompt.
+8. Agent executes task prompt (enriched with script data if applicable)
+9. Results automatically forwarded to the group chat when the agent produces output
+10. Run logged to `task_run_logs` table with duration and result
+11. `next_run` recalculated based on schedule type
+12. Container closes after 10-second grace period
 
 <Info>
 Tasks respect the same concurrency limits as interactive messages. If all 5 container slots are busy, tasks wait in queue.
@@ -172,6 +186,42 @@ setTimeout(() => {
 - Grace period allows final MCP calls to complete
 - Much faster than idle timeout (30 minutes for interactive sessions)
 - Prevents resource waste from long-lived task containers
+
+## Task scripts
+
+Tasks can include an optional `script` field containing a bash script that runs inside the container **before** the agent is invoked. This enables two key patterns:
+
+1. **Conditional execution** — skip the agent entirely if a condition isn't met (e.g., no new data)
+2. **Data enrichment** — fetch external data and inject it into the agent's prompt
+
+### Script contract
+
+The script must output a JSON object as its **last line** of stdout:
+
+```typescript
+interface ScriptResult {
+  wakeAgent: boolean;  // Required — whether to invoke the agent
+  data?: unknown;      // Optional — passed to the agent prompt as context
+}
+```
+
+**Behavior:**
+
+- **`wakeAgent: true`** — the agent runs with the prompt: `[SCHEDULED TASK]\n\nScript output:\n{data}\n\nInstructions:\n{original prompt}`
+- **`wakeAgent: false`** — task completes silently with `status: 'success'` and `result: null`
+- **Script error or invalid JSON** — task completes silently (same as `wakeAgent: false`)
+- **Timeout** — scripts have a 30-second timeout (`SCRIPT_TIMEOUT_MS`) and 1 MB stdout buffer
+
+### Database field
+
+```typescript
+interface ScheduledTask {
+  script?: string | null;  // Optional bash script
+  // ... other fields
+}
+```
+
+The `script` column was added via migration (`ALTER TABLE scheduled_tasks ADD COLUMN script TEXT`). Existing tasks without scripts continue to work unchanged.
 
 ## Task context modes
 
@@ -235,6 +285,18 @@ await claudeCode.tools.schedule_task({
 });
 ```
 
+With a pre-run script:
+
+```typescript
+await claudeCode.tools.schedule_task({
+  prompt: "Summarize the new pull requests",
+  schedule_type: "cron",
+  schedule_value: "0 9 * * 1-5",
+  context_mode: "isolated",
+  script: "#!/bin/bash\nDATA=$(curl -s https://api.github.com/repos/org/repo/pulls?state=open)\nCOUNT=$(echo $DATA | jq length)\nif [ \"$COUNT\" -gt 0 ]; then\n  echo \"{\\\"wakeAgent\\\": true, \\\"data\\\": $DATA}\"\nelse\n  echo '{\"wakeAgent\": false}'\nfi"
+});
+```
+
 ### list_tasks
 
 View tasks (filtered by group):
@@ -267,17 +329,19 @@ await claudeCode.tools.resume_task({ task_id: "abc123" });
 
 ### update_task
 
-Modify an existing task's prompt or schedule:
+Modify an existing task's prompt, schedule, or script:
 
 ```typescript
 await claudeCode.tools.update_task({
   task_id: "abc123",
   prompt: "Updated prompt text",
   schedule_type: "interval",
-  schedule_value: "7200000"
+  schedule_value: "7200000",
+  script: "#!/bin/bash\necho '{\"wakeAgent\": true}'"
 });
 // Only include the fields you want to change
 // next_run is automatically recalculated if schedule changes
+// Set script to null to remove an existing script
 ```
 
 ### cancel_task
@@ -430,6 +494,20 @@ await claudeCode.tools.schedule_task({
   context_mode: "isolated"
 });
 ```
+
+### Script-gated alert
+
+```typescript
+await claudeCode.tools.schedule_task({
+  prompt: "The website is returning errors. Investigate and send a report.",
+  schedule_type: "interval",
+  schedule_value: "300000", // Every 5 minutes
+  context_mode: "isolated",
+  script: "#!/bin/bash\nSTATUS=$(curl -s -o /dev/null -w '%{http_code}' https://example.com)\nif [ \"$STATUS\" != \"200\" ]; then\n  echo \"{\\\"wakeAgent\\\": true, \\\"data\\\": {\\\"status\\\": $STATUS}}\"\nelse\n  echo '{\"wakeAgent\": false}'\nfi"
+});
+```
+
+This pattern avoids waking the agent (and using API credits) when everything is healthy.
 
 ## Error handling
 
