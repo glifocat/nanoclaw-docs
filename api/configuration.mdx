@@ -53,7 +53,7 @@ Configuration is read from `.env` file or `process.env`.
 </ParamField>
 
 <ParamField path="TZ" type="string" default="system timezone">
-  Timezone for scheduled tasks (cron expressions). Uses `Intl.DateTimeFormat().resolvedOptions().timeZone` by default.
+  Timezone for scheduled tasks and message formatting. Can be set via `process.env.TZ` or `.env` file. Falls back to system timezone, then `UTC`. Each candidate is validated as a real IANA identifier before being accepted.
 </ParamField>
 
 ## Configuration constants
@@ -108,11 +108,21 @@ Matches messages starting with `@{ASSISTANT_NAME}` (case-insensitive).
 Scheduled tasks use the configured timezone:
 
 ```typescript
-export const TIMEZONE =
-  process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+function resolveConfigTimezone(): string {
+  const candidates = [
+    process.env.TZ,
+    envConfig.TZ,  // from .env file
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  ];
+  for (const tz of candidates) {
+    if (tz && isValidTimezone(tz)) return tz;
+  }
+  return 'UTC';
+}
+export const TIMEZONE = resolveConfigTimezone();
 ```
 
-This affects cron expression evaluation for scheduled tasks.
+Each candidate is validated as a real IANA timezone identifier before being accepted. If none are valid, falls back to `UTC`. This affects cron expression evaluation for scheduled tasks.
 
 ## Example .env file
 
