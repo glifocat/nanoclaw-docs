@@ -1,6 +1,7 @@
 ---
 title: Group management
 description: API reference for group registration, retrieval, privilege management, and container configuration
+tag: "UPDATED"
 ---
 
 Group management functions for registering groups, retrieving group lists, and managing group state.
@@ -27,8 +28,16 @@ function registerGroup(jid: string, group: RegisteredGroup): void
 
 - Validates the group folder path
 - Creates the group directory structure (`groups/{folder}/logs/`)
+- Copies a `CLAUDE.md` template into the group folder if one does not already exist:
+  - Main groups: copies from `groups/main/CLAUDE.md`
+  - Non-main groups: copies from `groups/global/CLAUDE.md`
+- Substitutes the assistant name in all `CLAUDE.md` files across groups (if name differs from default)
 - Stores group configuration in database
 - Rejects registration if folder is invalid
+
+<Note>
+Existing `CLAUDE.md` files are never overwritten during registration. Re-registering a group or promoting it to main preserves any user customizations.
+</Note>
 
 **Example:**
 

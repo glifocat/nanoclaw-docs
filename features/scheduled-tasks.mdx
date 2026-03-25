@@ -83,6 +83,69 @@ When you request a scheduled task, the agent:
 Only the main channel can create tasks for other groups. Non-main groups can only schedule tasks for themselves.
 </Note>
 
+## Task scripts
+
+Tasks can include an optional bash script that runs before waking the agent. This enables frequent scheduling (every 1–10 minutes) without hitting API rate limits — the script performs a lightweight check and only wakes the agent when there's something to act on.
+
+### How scripts work
+
+1. The script runs as bash inside the container with a 30-second timeout
+2. The script must output JSON on its **last line** of stdout: `{ "wakeAgent": boolean, "data"?: any }`
+3. If `wakeAgent` is `false`, the agent never starts — the task completes silently
+4. If `wakeAgent` is `true`, the agent receives the script's `data` in its prompt
+
+### Example: GitHub PR monitor with script
+
+```
+@Andy every 5 minutes, check for new PRs needing my review. Use a script to check first.
+```
+
+The agent creates a task with a script like:
+
+```bash
+#!/bin/bash
+count=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+  "https://api.github.com/search/issues?q=is:pr+review-requested:username" \
+  | jq '.total_count')
+
+if [ "$count" -gt 0 ]; then
+  echo "{\"wakeAgent\": true, \"data\": {\"pr_count\": $count}}"
+else
+  echo "{\"wakeAgent\": false}"
+fi
+```
+
+When the script returns `wakeAgent: true`, the agent receives:
+
+```
+[SCHEDULED TASK]
+
+Script output:
+{ "pr_count": 3 }
+
+Instructions:
+Check for new PRs needing my review and notify me.
+```
+
+<Warning>
+Scripts run with the container's environment. Test your script with `bash -c "..."` before scheduling to verify it works.
+</Warning>
+
+### Creating tasks with scripts via IPC
+
+```json
+{
+  "type": "schedule_task",
+  "prompt": "Notify me about PRs requiring review",
+  "script": "#!/bin/bash\ncount=$(curl -s ...)\nif [ \"$count\" -gt 0 ]; then\n  echo '{\"wakeAgent\": true}'\nelse\n  echo '{\"wakeAgent\": false}'\nfi",
+  "schedule_type": "interval",
+  "schedule_value": "300000",
+  "context_mode": "isolated"
+}
+```
+
+To update a task's script, use `update_task` with the `script` field. Set `script` to an empty string to remove it.
+
 ## Task execution
 
 The scheduler runs as a background loop:
@@ -160,9 +223,13 @@ context_mode: 'group'
   <Step title="Scheduler picks up task">
     When `next_run` is in the past and status is `active`, the task is enqueued
   </Step>
+
+  <Step title="Script phase (optional)">
+    If the task has a `script`, it runs first. If the script returns `wakeAgent: false`, the task completes without starting the agent.
+  </Step>
   
   <Step title="Agent executes">
-    The agent runs in an isolated container with the task prompt
+    The agent runs in an isolated container with the task prompt (enriched with script data if applicable)
   </Step>
   
   <Step title="Results sent">
@@ -232,6 +299,7 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
 {
   "type": "schedule_task",
   "prompt": "Send me a summary of today's events",
+  "script": "#!/bin/bash\n...(optional pre-check script)...",
   "schedule_type": "cron",
   "schedule_value": "0 9 * * *",
   "context_mode": "isolated",
@@ -265,6 +333,7 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
   "type": "update_task",
   "taskId": "task-1234567890-abc123",
   "prompt": "Updated prompt",
+  "script": "#!/bin/bash\n...(optional, empty string removes script)...",
   "schedule_type": "interval",
   "schedule_value": "7200000"
 }
@@ -282,6 +351,7 @@ Each task runs in its own container with:
 - The group's filesystem mounted
 - Access to the group's `CLAUDE.md` memory
 - A task-specific session (in isolated mode) or the group session (in group mode)
+- An optional script phase that runs before waking the agent
 - A 10-second close delay after completion (vs 30-minute idle timeout for conversations)
 
 ```typescript

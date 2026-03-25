@@ -11,6 +11,7 @@ NanoClaw includes a built-in task scheduler that runs Claude agents on a schedul
 A scheduled task is:
 
 - A prompt that runs on a schedule (cron, interval, or one-time)
+- Optionally includes a bash script that runs before the agent (to gate execution)
 - Executed in the context of a specific group
 - Has access to all agent tools (Bash, browser, MCP, etc.)
 - Can send messages to the group chat or complete silently
@@ -107,6 +108,7 @@ sequenceDiagram
     participant DB as Database
     participant GQ as GroupQueue
     participant CR as ContainerRunner
+    participant SC as Script Phase
     participant AG as Agent
     participant CH as Channel
     
@@ -115,11 +117,17 @@ sequenceDiagram
     SCH->>GQ: enqueueTask()
     GQ->>GQ: Check concurrency
     GQ->>CR: runContainerAgent(isScheduledTask: true)
-    CR->>AG: Spawn container
-    AG->>AG: Execute task prompt
-    AG-->>CR: Stream output
-    CR->>CH: Auto-forward result to chat (if output present)
-    CR->>DB: logTaskRun()
+    CR->>SC: Run script (if present)
+    alt wakeAgent = false
+        SC-->>CR: Skip agent
+        CR->>DB: logTaskRun(success, no agent)
+    else wakeAgent = true (or no script)
+        SC-->>AG: Pass script data
+        AG->>AG: Execute task prompt
+        AG-->>CR: Stream output
+        CR->>CH: Auto-forward result to chat
+        CR->>DB: logTaskRun()
+    end
     CR->>DB: updateTaskAfterRun(next_run)
 ```
 
@@ -131,11 +139,12 @@ sequenceDiagram
 4. Enqueues task in GroupQueue
 5. GroupQueue respects concurrency limits (tasks and messages share the pool)
 6. Container spawned with `isScheduledTask: true` flag
-7. Agent executes task prompt
-8. Results automatically forwarded to the group chat when the agent produces output
-9. Run logged to `task_run_logs` table with duration and result
-10. `next_run` recalculated based on schedule type
-11. Container closes after 10-second grace period
+7. **Script phase** (if task has a `script`): Script runs as bash with a 30-second timeout. If the script returns `wakeAgent: false` or errors, the container exits without starting the agent — the task completes silently with a success status.
+8. **Agent phase**: If no script or script returns `wakeAgent: true`, the agent executes the task prompt (enriched with script data if applicable)
+9. Results automatically forwarded to the group chat when the agent produces output
+10. Run logged to `task_run_logs` table with duration and result
+11. `next_run` recalculated based on schedule type
+12. Container closes after 10-second grace period
 
 <Info>
 Tasks respect the same concurrency limits as interactive messages. If all 5 container slots are busy, tasks wait in queue.
@@ -210,6 +219,7 @@ Tasks can run in two context modes:
 ```typescript
 interface ScheduledTask {
   context_mode: 'isolated' | 'group';
+  script?: string | null;  // Optional bash script (runs before agent)
   // ... other fields
 }
 ```
@@ -231,7 +241,8 @@ await claudeCode.tools.schedule_task({
   prompt: "Check if example.com is up and notify if down",
   schedule_type: "interval",
   schedule_value: "300000", // 5 minutes
-  context_mode: "isolated"
+  context_mode: "isolated",
+  script: "curl -sf https://example.com > /dev/null && echo '{\"wakeAgent\": false}' || echo '{\"wakeAgent\": true}'"
 });
 ```
 
@@ -267,14 +278,15 @@ await claudeCode.tools.resume_task({ task_id: "abc123" });
 
 ### update_task
 
-Modify an existing task's prompt or schedule:
+Modify an existing task's prompt, schedule, or script:
 
 ```typescript
 await claudeCode.tools.update_task({
   task_id: "abc123",
   prompt: "Updated prompt text",
   schedule_type: "interval",
-  schedule_value: "7200000"
+  schedule_value: "7200000",
+  script: "#!/bin/bash\n..."  // Set to empty string to remove script
 });
 // Only include the fields you want to change
 // next_run is automatically recalculated if schedule changes
@@ -379,11 +391,12 @@ Task privileges match the group's general privilege model. Main group can manage
 1. **Use cron for wall-clock times**: "Every day at 9 AM" should be cron, not interval
 2. **Use interval for frequency-based**: "Every 5 minutes" should be interval, not cron
 3. **Start with isolated context**: Add group context only if needed
-4. **Include error handling**: Tasks should handle failures gracefully
-5. **Use descriptive prompts**: "Check website uptime" not "check status"
-6. **Monitor task_run_logs**: Failed tasks may indicate issues
-7. **Avoid very short intervals**: Respect container startup overhead (minimum ~5s)
-8. **Clean up completed one-time tasks**: Cancel or pause them to reduce clutter
+4. **Use scripts for frequent polling**: Tasks running every 1–10 minutes should use a script to check if the agent needs to wake up, avoiding unnecessary API calls
+5. **Include error handling**: Tasks should handle failures gracefully
+6. **Use descriptive prompts**: "Check website uptime" not "check status"
+7. **Monitor task_run_logs**: Failed tasks may indicate issues
+8. **Avoid very short intervals without scripts**: Respect container startup overhead and API rate limits — use scripts to gate agent execution
+9. **Clean up completed one-time tasks**: Cancel or pause them to reduce clutter
 
 ## Common patterns
 

@@ -60,6 +60,20 @@ Groups must be registered before the agent will respond to messages.
 3. Host validates folder name and creates directory structure
 4. Group added to SQLite database
 5. Group folder and logs directory created
+6. `CLAUDE.md` copied from template into the new group folder (see below)
+
+### CLAUDE.md template initialization
+
+When a group is registered (via IPC at runtime or during setup), NanoClaw copies a `CLAUDE.md` template into the new group folder so agents have identity and instructions from the first run:
+
+- **Main groups** receive a copy of `groups/main/CLAUDE.md` (includes admin context)
+- **Non-main groups** receive a copy of `groups/global/CLAUDE.md` (shared identity only)
+- If the assistant name differs from the default ("Andy"), all `CLAUDE.md` files across every group are updated with the configured name
+- **Existing files are never overwritten** — if a `CLAUDE.md` already exists in the group folder (e.g., from manual customization), it is preserved as-is, even on re-registration or promotion to main
+
+<Note>
+If a group is promoted to main after registration, admin context sections are **not** automatically added to the existing `CLAUDE.md`. Users who want admin context after promotion should add it manually. This is intentional — users customize these files extensively and an automatic overwrite would destroy that work.
+</Note>
 
 ### Registration data structure
 
@@ -316,11 +330,13 @@ Additional mounts bypass group isolation. Only mount directories that are safe f
 
 1. Main group sends registration command
 2. Folder created under `groups/{folder}/`
-3. Session directory created under `data/sessions/{folder}/`
-4. IPC directory created under `data/ipc/{folder}/`
-5. Skills synced to `.claude/skills/`
-6. Agent runner source copied to `agent-runner-src/`
-7. Group added to database
+3. `CLAUDE.md` copied from appropriate template (main or global) if not already present
+4. Assistant name substituted across all group `CLAUDE.md` files if non-default
+5. Session directory created under `data/sessions/{folder}/`
+6. IPC directory created under `data/ipc/{folder}/`
+7. Skills synced to `.claude/skills/`
+8. Agent runner source copied to `agent-runner-src/`
+9. Group added to database
 
 ### Active operation
 

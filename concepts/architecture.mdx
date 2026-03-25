@@ -111,6 +111,7 @@ The scheduler (`src/task-scheduler.ts`) runs scheduled tasks:
   - **cron**: Cron expressions (e.g., `0 9 * * *` for 9am daily)
   - **interval**: Millisecond intervals (e.g., `3600000` for hourly)
   - **once**: ISO timestamp for one-time execution
+- Tasks can include an optional bash script that runs before the agent — if the script returns `wakeAgent: false`, the agent is skipped entirely (useful for frequent polling without API rate limit concerns)
 - Tasks run in group context with full agent capabilities
 - Results can be sent to the group chat or completed silently
 - Task containers close automatically 10 seconds after producing output
@@ -119,10 +120,12 @@ The scheduler (`src/task-scheduler.ts`) runs scheduled tasks:
 1. Scheduler finds due task from database
 2. Enqueues task in GroupQueue (respects concurrency limits)
 3. Spawns container in task mode (`isScheduledTask: true`)
-4. Streams output and optionally sends to chat via `send_message` tool
-5. Logs run to database with duration and result
-6. Calculates next run time based on schedule type
-7. Container closes after 10-second grace period
+4. **Script phase** (if task has a `script`): Runs a bash script inside the container. If the script returns `wakeAgent: false`, the container exits without starting the agent.
+5. **Agent phase**: Agent executes the task prompt (enriched with script data if applicable)
+6. Streams output and optionally sends to chat via `send_message` tool
+7. Logs run to database with duration and result
+8. Calculates next run time based on schedule type
+9. Container closes after 10-second grace period
 </Accordion>
 
 ### IPC watcher
@@ -149,7 +152,7 @@ SQLite database (`store/messages.db`) stores:
 - **sessions**: Claude session IDs per group folder
 - **registered_groups**: Active groups with folder, trigger, container config, is_main flag
 - **router_state**: Message cursors and last processed timestamps
-- **scheduled_tasks**: Task definitions with schedule, context_mode (`group` or `isolated`), and status
+- **scheduled_tasks**: Task definitions with schedule, optional script, context_mode (`group` or `isolated`), and status
 - **task_run_logs**: Task execution history with duration and results
 
 <Warning>
