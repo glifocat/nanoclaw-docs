@@ -33,6 +33,7 @@ The upstream repo (`qwibitai/nanoclaw`) maintains skill branches for features th
 | `main` | Core NanoClaw — no channel or skill code |
 | `skill/ollama-tool` | Ollama MCP server for local models |
 | `skill/compact` | `/compact` session command |
+| `skill/channel-formatting` | Channel-aware text formatting |
 | `skill/apple-container` | Apple Container runtime (macOS) |
 | ... | And more |
 
@@ -200,6 +201,7 @@ Dependencies are implicit in git history — no separate dependency file is need
 - **`/add-compact`** — Manual context compaction skill
 - **`/add-ollama-tool`** — Ollama MCP server for local models
 - **`/add-parallel`** — Parallel AI MCP servers for web research
+- **`/channel-formatting`** — Channel-aware Markdown-to-native text conversion for outbound messages (WhatsApp, Telegram, Slack, Signal)
 - **`/convert-to-apple-container`** — Switch from Docker to Apple Container on macOS
 - **`/use-native-credential-proxy`** — Replace OneCLI gateway with built-in `.env`-based credential proxy
 

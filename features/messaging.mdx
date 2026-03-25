@@ -28,7 +28,7 @@ NanoClaw processes messages through a polling-based architecture that connects m
   </Step>
   
   <Step title="Response routing">
-    The agent's response is stripped of internal tags and sent back to the channel
+    The agent's response is stripped of internal tags, optionally formatted for the target channel's native syntax, and sent back to the channel
   </Step>
 </Steps>
 
@@ -108,6 +108,30 @@ The weather today is sunny with a high of 75°F.
 ```
 
 Only the visible text is sent to the user.
+
+## Channel-aware formatting
+
+<Note>
+This feature requires the `/channel-formatting` skill. Apply it with:
+```bash
+git fetch upstream skill/channel-formatting
+git merge upstream/skill/channel-formatting
+```
+</Note>
+
+When the channel-formatting skill is applied, outbound messages are automatically converted from Claude's Markdown output to each channel's native text syntax. This happens in the `formatOutbound` pipeline before delivery.
+
+| Channel | Transformation |
+|---------|---------------|
+| WhatsApp | `**bold**` → `*bold*`, `*italic*` → `_italic_`, headings → bold, links flattened |
+| Telegram | Same as WhatsApp |
+| Slack | Same as WhatsApp, but links become `<url\|text>` |
+| Discord | Passthrough (Discord already renders Markdown) |
+| Signal | Passthrough for `parseTextStyles`; native `textStyle` ranges via `parseSignalStyles` |
+
+Code blocks (fenced and inline) are always protected — their content is never transformed.
+
+Without this skill, `formatOutbound` only strips internal tags. With it, the function accepts an optional `channel` parameter and calls `parseTextStyles` to convert Markdown markers to each platform's native syntax.
 
 ## Group message queues
 

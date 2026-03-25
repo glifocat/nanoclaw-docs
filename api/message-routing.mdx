@@ -114,14 +114,18 @@ const clean = stripInternalTags(raw);
 
 ### formatOutbound
 
-Prepares agent output for sending to users (strips internal tags).
+Prepares agent output for sending to users. Strips internal tags and optionally converts Markdown to the target channel's native text syntax.
 
 ```typescript
-function formatOutbound(rawText: string): string
+function formatOutbound(rawText: string, channel?: ChannelType): string
 ```
 
 <ParamField path="rawText" type="string" required>
   Raw text from agent
+</ParamField>
+
+<ParamField path="channel" type="ChannelType">
+  Target channel name (e.g., `"whatsapp"`, `"telegram"`, `"slack"`). When provided and the `/channel-formatting` skill is applied, the function calls `parseTextStyles` to convert Markdown markers to the channel's native syntax. Without this parameter, only internal tag stripping is performed.
 </ParamField>
 
 <ResponseField name="return" type="string">
@@ -133,10 +137,19 @@ function formatOutbound(rawText: string): string
 ```typescript
 import { formatOutbound } from './router.js';
 
+// Without channel formatting
 const raw = `<internal>Debug info</internal>Response to user`;
 const outbound = formatOutbound(raw);
 // "Response to user"
+
+// With channel formatting (requires /channel-formatting skill)
+const formatted = formatOutbound(raw, 'whatsapp');
+// Markdown markers converted to WhatsApp-native syntax
 ```
+
+<Note>
+The `channel` parameter is added by the `/channel-formatting` skill (`skill/channel-formatting` branch). On base NanoClaw without the skill applied, `formatOutbound` only accepts `rawText`.
+</Note>
 
 ### routeOutbound
 
