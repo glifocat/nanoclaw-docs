@@ -235,6 +235,7 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
   "schedule_type": "cron",
   "schedule_value": "0 9 * * *",
   "context_mode": "isolated",
+  "script": "optional bash script (see Task scripts section)",
   "targetJid": "user@s.whatsapp.net or tg:12345 or similar"
 }
 ```
@@ -265,6 +266,7 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
   "type": "update_task",
   "taskId": "task-1234567890-abc123",
   "prompt": "Updated prompt",
+  "script": "updated script (empty string to remove)",
   "schedule_type": "interval",
   "schedule_value": "7200000"
 }
@@ -274,6 +276,95 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
 <Info>
 After any task mutation via IPC, the `current_tasks.json` snapshot is refreshed immediately for all groups. This means `list_tasks` always returns up-to-date results, even within the same agent session.
 </Info>
+
+## Task scripts
+
+Tasks can include an optional bash script that runs before the agent wakes up. This is useful for condition-checking tasks — if the condition isn't met, the agent never starts, saving API credits and reducing noise.
+
+### How scripts work
+
+<Steps>
+  <Step title="Task fires on schedule">
+    The scheduler picks up the task as usual
+  </Step>
+  
+  <Step title="Script runs first">
+    The bash script executes inside the container with a 30-second timeout
+  </Step>
+  
+  <Step title="Script outputs JSON">
+    The last line of stdout must be valid JSON: `{ "wakeAgent": true/false, "data": ... }`
+  </Step>
+  
+  <Step title="Agent wakes (or doesn't)">
+    If `wakeAgent` is `true`, the agent receives the script's data along with the task prompt. If `false`, the container exits silently.
+  </Step>
+</Steps>
+
+### Creating a task with a script
+
+```
+@Andy every hour, check if there are new open PRs on our repo. Use a script to check first — only wake up if there are new ones.
+```
+
+The agent translates this into a `schedule_task` call with both a `prompt` and a `script` parameter.
+
+### Script requirements
+
+- Must output JSON on the **last line** of stdout: `{ "wakeAgent": boolean, "data"?: any }`
+- Has a 30-second timeout (`SCRIPT_TIMEOUT_MS`)
+- Maximum 1 MB of output
+- Runs with `bash` in the container environment
+- Non-zero exit codes or invalid JSON are treated as errors (agent does not wake)
+
+<Warning>
+Always test your script in the sandbox before scheduling. Use `bash -c '...'` to verify it produces valid JSON output.
+</Warning>
+
+### When to use scripts
+
+**Good candidates:**
+- Monitoring tasks that check a condition (new PRs, website changes, API status)
+- High-frequency tasks where the condition is rarely true
+- Tasks where a simple HTTP check or file comparison can determine if action is needed
+
+**Skip scripts for:**
+- Tasks that always require agent judgment (daily briefings, summaries, reports)
+- Tasks running infrequently (once a day or less)
+
+### Script in IPC commands
+
+```json
+{
+  "type": "schedule_task",
+  "prompt": "Summarize the new PRs and notify me",
+  "script": "curl -s https://api.github.com/repos/owner/repo/pulls?state=open | node -e \"const d=require('fs').readFileSync('/dev/stdin','utf8'); const prs=JSON.parse(d); console.log(JSON.stringify({wakeAgent: prs.length > 0, data: prs.slice(0,5)}))\"",
+  "schedule_type": "interval",
+  "schedule_value": "3600000",
+  "context_mode": "isolated"
+}
+```
+
+To update or remove a script on an existing task:
+
+```json
+{
+  "type": "update_task",
+  "taskId": "task-1234567890-abc123",
+  "script": ""
+}
+```
+
+Setting `script` to an empty string removes it.
+
+### Frequent task guidance
+
+If a task needs to run more than about twice per day and a script can reduce unnecessary wake-ups:
+
+- Each agent wake-up uses API credits and counts against concurrency limits
+- Suggest restructuring with a script that checks the condition first
+- For tasks that need LLM evaluation of data, consider using direct API calls inside the script
+- Help find the minimum viable frequency
 
 ## Task isolation
 
@@ -332,13 +423,13 @@ ORDER BY run_at DESC;
 
 Schedule: `0 9 * * 1-5` (cron)
 
-### GitHub PR monitor
+### GitHub PR monitor (with script)
 
 ```
-@Andy check for new pull requests every hour and notify me if there are any requiring my review
+@Andy check for new pull requests every hour and notify me if there are any requiring my review. Use a script to check the GitHub API first so you only wake up when there are new PRs.
 ```
 
-Schedule: `3600000` (interval - 1 hour)
+Schedule: `3600000` (interval - 1 hour), with a script that checks the GitHub API before waking the agent
 
 ### Weekly report
 
