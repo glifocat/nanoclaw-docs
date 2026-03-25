@@ -27,7 +27,7 @@ NanoClaw uses Docker by default for cross-platform compatibility. On macOS, you 
 The container is built from `container/Dockerfile`:
 
 ```dockerfile
-FROM node:24-slim
+FROM node:22-slim
 
 # System dependencies for Chromium
 RUN apt-get update && apt-get install -y \
@@ -70,7 +70,7 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 
 **Key components:**
 
-- **Base**: `node:24-slim` (Debian-based, minimal)
+- **Base**: `node:22-slim` (Debian-based, minimal)
 - **Browser**: Chromium with all dependencies
 - **Tools**: `agent-browser` for browser automation
 - **Runtime**: `@anthropic-ai/claude-code` (Claude Agent SDK)
