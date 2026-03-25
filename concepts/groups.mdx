@@ -316,11 +316,19 @@ Additional mounts bypass group isolation. Only mount directories that are safe f
 
 1. Main group sends registration command
 2. Folder created under `groups/{folder}/`
-3. Session directory created under `data/sessions/{folder}/`
-4. IPC directory created under `data/ipc/{folder}/`
-5. Skills synced to `.claude/skills/`
-6. Agent runner source copied to `agent-runner-src/`
-7. Group added to database
+3. `CLAUDE.md` template copied into the group folder (see below)
+4. Session directory created under `data/sessions/{folder}/`
+5. IPC directory created under `data/ipc/{folder}/`
+6. Skills synced to `.claude/skills/`
+7. Agent runner source copied to `agent-runner-src/`
+8. Group added to database
+
+**Template selection:** When a group is first registered, NanoClaw copies a `CLAUDE.md` template into its folder so the agent has identity and instructions from its first run. The template is selected based on the group type:
+
+- **Main groups** (`isMain: true`) use `groups/main/CLAUDE.md` — includes admin context and elevated instructions
+- **Non-main groups** use `groups/global/CLAUDE.md` — shared baseline instructions
+
+If `ASSISTANT_NAME` differs from the default, the template's name references are updated automatically.
 
 ### Active operation
 
