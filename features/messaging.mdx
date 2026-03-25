@@ -235,7 +235,7 @@ This updates `ASSISTANT_NAME` in `src/config.ts` and `.env`.
 
 ## Group registration
 
-Groups must be registered before the agent can respond. The main channel can register groups via IPC:
+Groups must be registered before the agent can respond. The main channel can register groups via IPC. When a group is registered, the `CLAUDE.md` template from `groups/global/` is automatically copied into the new group folder, giving agents identity and instructions from the first run.
 
 ```typescript
 // From src/ipc.ts — register_group handler (simplified)
