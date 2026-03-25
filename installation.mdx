@@ -3,7 +3,7 @@ title: Installation
 description: Detailed installation requirements and setup for macOS, Linux, and Windows (WSL)
 icon: "download"
 tag: "UPDATED"
-keywords: ["requirements", "docker", "node", "apple container", "windows", "wsl", "onecli"]
+keywords: ["requirements", "docker", "node", "apple container", "windows", "wsl"]
 ---
 
 # Installation
@@ -288,28 +288,8 @@ NanoClaw uses `better-sqlite3`, which requires native compilation.
   </Tab>
 </Tabs>
 
-### 5. OneCLI (v1.2.22+)
-
-Starting in v1.2.22, NanoClaw uses OneCLI for credential management. OneCLI is a local gateway that injects API keys into container traffic without exposing secrets.
-
-```bash
-curl -fsSL onecli.sh/install | sh
-curl -fsSL onecli.sh/cli/install | sh
-```
-
-Verify installation:
-```bash
-onecli version
-```
-
-Run `onecli --help` to see all available commands for managing secrets and gateway configuration.
-
-<Info>
-OneCLI is also installed automatically by the `/setup` skill if not already present. It's listed here so you know about the dependency upfront.
-</Info>
-
 <Note>
-**What `/setup` handles for you:** OneCLI installation, npm dependencies, container image build, channel configuration, and service setup. **What you need beforehand:** Node.js, Claude Code, a container runtime, and build tools.
+**What `/setup` handles for you:** npm dependencies, container image build, channel configuration, and service setup. **What you need beforehand:** Node.js, Claude Code, a container runtime, and build tools.
 </Note>
 
 ## Installation steps
@@ -379,7 +359,6 @@ NanoClaw uses these core dependencies (from `package.json`):
 ```json
 {
   "dependencies": {
-    "@onecli-sh/sdk": "^0.2.0",     // OneCLI gateway integration (v1.2.22+)
     "better-sqlite3": "^11.8.1",   // SQLite database
     "cron-parser": "^5.5.0",       // Task scheduling
     "pino": "^9.6.0",              // Logging

@@ -1,14 +1,18 @@
 ---
-title: Remote Control
-description: Launch a browser-based Claude Code session linked to your NanoClaw instance
+title: Remote Control (removed)
+description: Remote Control was removed in v1.2.0
 tag: "UPDATED"
 ---
 
-<Note>
-  Remote Control was added in **v1.2.14** ([PR #1072](https://github.com/qwibitai/nanoclaw/pull/1072)).
-</Note>
+<Warning>
+Remote Control was removed from NanoClaw core. The `/remote-control` and `/remote-control-end` commands are no longer available. The `src/remote-control.ts` module has been deleted.
+</Warning>
 
-Remote Control lets you open a full Claude Code session in your browser that runs inside your NanoClaw project directory. The session is managed by the host process — start it from the main group's chat on any connected channel, share the URL, and stop it when you're done.
+The following documentation is preserved for historical reference only.
+
+---
+
+Remote Control previously let you open a full Claude Code session in your browser that ran inside your NanoClaw project directory. The session was managed by the host process — start it from the main group's chat on any connected channel, share the URL, and stop it when done.
 
 <Warning>
   Remote Control is restricted to the **main group only**. Commands sent from non-main groups are silently rejected. This is because the session has full host-level access to the NanoClaw project directory.

@@ -135,7 +135,7 @@ sequenceDiagram
 8. Results automatically forwarded to the group chat when the agent produces output
 9. Run logged to `task_run_logs` table with duration and result
 10. `next_run` recalculated based on schedule type
-11. Container closes after 10-second grace period
+11. Container closes after 10-second grace period (when the agent produces output)
 
 <Info>
 Tasks respect the same concurrency limits as interactive messages. If all 5 container slots are busy, tasks wait in queue.
@@ -151,7 +151,7 @@ After a task completes:
    - Interval: Scheduled time + interval milliseconds (anchored to prevent drift)
    - Once: Set to `null`
 3. **Last result updated**: First 200 chars of result stored in `tasks.last_result`
-4. **Container closes**: 10-second grace period, then stdin closed (container exits)
+4. **Container closes**: 10-second grace period after producing output, then stdin closed (container exits). Tasks that communicate only via IPC (no direct output) rely on idle timeout instead
 
 ### Completion
 
@@ -244,8 +244,6 @@ const tasks = await claudeCode.tools.list_tasks();
 // Main group: sees all tasks
 // Non-main groups: only see own tasks
 ```
-
-Task snapshots are refreshed immediately after any IPC task mutation (`schedule_task`, `pause_task`, `resume_task`, `cancel_task`, `update_task`), so `list_tasks` always reflects the latest state — even within the same agent session that made the change.
 
 ### pause_task
 

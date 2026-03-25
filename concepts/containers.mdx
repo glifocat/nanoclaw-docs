@@ -55,7 +55,7 @@ RUN npm run build
 # Create workspace directories
 RUN mkdir -p /workspace/group /workspace/global /workspace/extra /workspace/ipc/messages /workspace/ipc/tasks /workspace/ipc/input
 
-# Entrypoint script
+# Secrets are passed via stdin JSON — temp file is deleted immediately after Node reads it
 RUN printf '#!/bin/bash\nset -e\ncd /app && npx tsc --outDir /tmp/dist 2>&1 >&2\nln -s /app/node_modules /tmp/dist/node_modules\nchmod -R a-w /tmp/dist\ncat > /tmp/input.json\nnode /tmp/dist/index.js < /tmp/input.json\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Set ownership for writable directories
@@ -85,15 +85,15 @@ The entrypoint script (`/app/entrypoint.sh`):
    - Allows per-group customization of agent runner code
    - Compiled output is read-only to prevent runtime tampering
 2. **Read input from stdin**: `cat > /tmp/input.json`
-   - Input contains prompt, session ID, and group metadata (not secrets)
+   - Input contains prompt, session ID, group metadata, and secrets
 3. **Execute agent**: `node /tmp/dist/index.js < /tmp/input.json`
    - Runs agent-runner with input
-   - Credentials handled by the secret injection layer (OneCLI gateway or credential proxy), never passed via stdin
+   - Secrets are extracted from stdin, injected into the SDK environment only, and the temp file is deleted immediately
    - Outputs JSON results to stdout
 4. **Container exits**: Cleaned up automatically via `--rm` flag
 
 <Note>
-The agent-runner is recompiled on every container start from `/app/src` (mounted from `data/sessions/{group}/agent-runner-src/`). This allows agents to modify their own tools and behavior by editing their agent-runner source. The agent-runner source is copied once when the group is first created — subsequent changes to `container/agent-runner/src/` are not automatically propagated to existing groups.
+The agent-runner is recompiled on every container start from `/app/src` (mounted from `data/sessions/{group}/agent-runner-src/`). This allows agents to modify their own tools and behavior by editing their agent-runner source. The agent-runner source directory is created once when the group is first created (copied from `container/agent-runner/src/` if it exists in the group folder). Subsequent changes to the upstream agent-runner source are not automatically propagated to existing groups.
 </Note>
 
 ## Volume mounts
@@ -237,7 +237,7 @@ This ensures bind-mounted files are accessible (same uid on both sides).
 2. **Stdout streaming**: Parsed for output markers in real-time
 3. **Stderr logging**: Logged at debug level (SDK writes lots of debug info)
 4. **Timeout tracking**: Hard timeout with activity-based reset
-5. **Graceful shutdown**: `docker stop -t 1` (SIGTERM with 1-second grace), wrapped in a 15-second exec timeout. If the stop command itself hangs, the process is force-killed via `SIGKILL`
+5. **Graceful shutdown**: `docker stop` (SIGTERM with default grace period), wrapped in a 15-second exec timeout. If the stop command itself hangs, the process is force-killed via `SIGKILL`
 
 ### Cleanup
 
@@ -297,7 +297,7 @@ Two timeout mechanisms:
 - **Configurable**: Per-group via `containerConfig.timeout`
 - **Grace period**: At least `IDLE_TIMEOUT + 30s`
 - **Reset on activity**: Resets whenever output markers are parsed
-- **Enforcement**: `docker stop -t 1` (SIGTERM with 1-second grace), wrapped in a 15-second exec timeout. Falls back to `SIGKILL` if the stop command hangs
+- **Enforcement**: `docker stop` (SIGTERM with default grace period), wrapped in a 15-second exec timeout. Falls back to `SIGKILL` if the stop command hangs
 
 **Timeout after output:**
 
@@ -356,9 +356,8 @@ Exit Code: 0
 Stdout Truncated: false
 Stderr Truncated: false
 
-=== Input Summary ===
-Prompt length: 142 chars
-Session ID: abc123
+=== Input ===
+{"prompt":"Check the weather...","sessionId":"abc123","groupFolder":"family-chat",...}
 
 === Container Args ===
 docker run -i --rm --name nanoclaw-family-chat-1234567890 ...
@@ -379,12 +378,12 @@ docker run -i --rm --name nanoclaw-family-chat-1234567890 ...
 
 **Log verbosity:**
 
-- **Success + non-verbose**: Summary only (input length, mount paths)
-- **Success + verbose** (`LOG_LEVEL=debug`): Full input/output including prompt content
-- **Error**: Input metadata only (prompt length and session ID), plus full stderr/stdout
+- **Success + non-verbose**: No log file written
+- **Success + verbose** (`LOG_LEVEL=debug`): Full input, container args, mounts, stderr/stdout
+- **Error**: Full input (with secrets stripped), container args, mounts, stderr/stdout
 
 <Info>
-User prompt content is never written to error logs. Only verbose mode (`LOG_LEVEL=debug`) includes the full prompt. This prevents sensitive conversation content from persisting on disk during normal error handling.
+Secrets are always stripped from the input object before logging — the `secrets` field is deleted immediately after passing to the container's stdin. Logs never contain API keys or credentials regardless of log level.
 </Info>
 
 <Info>
@@ -420,12 +419,9 @@ Skills synced to each container:
 | Skill | Description | Access |
 |-------|-------------|--------|
 | `/agent-browser` | Browse the web, fill forms, extract data | All groups |
-| `/capabilities` | Report installed skills, available tools, MCP tools, container utilities, and group info | Main channel only |
-| `/slack-formatting` | Format messages for Slack using mrkdwn syntax | All groups |
-| `/status` | Quick health check — session context, workspace mounts, tool availability, and scheduled task snapshot | Main channel only |
 
 <Note>
-`/capabilities` and `/status` are restricted to the main channel. They detect this by checking for the `/workspace/project` mount, which is only present for main groups. Non-main groups receive a redirect message.
+Additional container skills can be added by placing `SKILL.md` files in `container/skills/`. They are synced to each group's `.claude/skills/` directory on every container spawn.
 </Note>
 
 ### Allowed tools
@@ -512,7 +508,7 @@ agent-browser pdf https://example.com output.pdf
 
 - **Network access**: Agents have full network access (can exfiltrate data)
 - **Mounted directory tampering**: Agents can modify anything in mounted directories
-- **Gateway-based API access**: Containers can make authenticated API requests through the secret injection layer (though they cannot extract real credentials)
+- **SDK-based API access**: The Claude Agent SDK inside containers has access to secrets for API authentication (though Bash subprocesses cannot extract them)
 - **Resource exhaustion**: No CPU/memory limits (can DoS host)
 
 <Warning>

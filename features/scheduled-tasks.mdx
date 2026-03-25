@@ -271,9 +271,7 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
 ```
 </CodeGroup>
 
-<Info>
-After any task mutation via IPC, the `current_tasks.json` snapshot is refreshed immediately for all groups. This means `list_tasks` always returns up-to-date results, even within the same agent session.
-</Info>
+
 
 ## Task isolation
 

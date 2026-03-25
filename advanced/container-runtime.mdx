@@ -44,10 +44,10 @@ Apple Container is Apple's native virtualization framework (macOS 15+). It runs 
 |---|---|---|
 | Binary | `docker` | `container` |
 | Bind mounts | `-v host:container:ro` | `--mount type=bind,source=...,target=...,readonly` |
-| Stop command | `docker stop -t 1 name` | `container stop name` |
+| Stop command | `docker stop name` | `container stop name` |
 | Health check | `docker info` | `container system status` |
 | Orphan cleanup | Parses `docker ps --format` JSON | Parses `container ls --format json` |
-| Host gateway | Built-in on macOS, `--add-host` on Linux | Built-in (`host.docker.internal`) |
+| Host gateway | Built-in | Built-in |
 | Platform | macOS, Linux, Windows (WSL2) | macOS 15+ only |
 
 ### Switching runtimes
@@ -142,7 +142,7 @@ The agent container is built from `container/Dockerfile` and includes:
 
 <Accordion title="Entrypoint script">
   ```dockerfile
-  # Create entrypoint script
+  # Secrets are passed via stdin JSON — temp file is deleted immediately after Node reads it
   RUN printf '#!/bin/bash\nset -e\ncd /app && npx tsc --outDir /tmp/dist 2>&1 >&2\nln -s /app/node_modules /tmp/dist/node_modules\nchmod -R a-w /tmp/dist\ncat > /tmp/input.json\nnode /tmp/dist/index.js < /tmp/input.json\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
   ENTRYPOINT ["/app/entrypoint.sh"]
@@ -150,8 +150,8 @@ The agent container is built from `container/Dockerfile` and includes:
   
   The entrypoint:
   1. Recompiles the agent runner from `/app/src` (allows per-group customization)
-  2. Reads input JSON from stdin
-  3. Executes the agent runner with the input
+  2. Reads input JSON (including secrets) from stdin into a temp file
+  3. Executes the agent runner with the input — the agent runner deletes the temp file immediately after reading
 </Accordion>
 
 ### Building the image
@@ -207,11 +207,15 @@ export async function runContainerAgent(
   
   <Step title="Pass input via stdin">
     ```typescript
+    // Pass secrets via stdin (never written to disk or mounted as files)
+    input.secrets = readSecrets();
     container.stdin.write(JSON.stringify(input));
     container.stdin.end();
+    // Remove secrets from input so they don't appear in logs
+    delete input.secrets;
     ```
     
-    The input JSON contains the prompt, session ID, group folder, and metadata. Credentials are handled by the secret injection layer (OneCLI gateway or credential proxy) — never passed via stdin or mounted as files.
+    The input JSON contains the prompt, session ID, group folder, metadata, and secrets. Secrets are stripped from the input object immediately after writing to prevent them from appearing in logs.
   </Step>
   
   <Step title="Stream output">
@@ -219,7 +223,7 @@ export async function runContainerAgent(
   </Step>
   
   <Step title="Handle completion">
-    When the container exits, logs are written to `groups/{name}/logs/container-{timestamp}.log` and the promise resolves with the final output. Error logs include only input metadata (prompt length and session ID) rather than the full prompt to avoid persisting user conversation content on disk.
+    When the container exits, logs are written to `groups/{name}/logs/container-{timestamp}.log` and the promise resolves with the final output. Secrets are always stripped from logs — the input object logged contains prompts and metadata but never API keys or credentials.
   </Step>
 </Steps>
 
@@ -227,109 +231,45 @@ export async function runContainerAgent(
 
 From the `buildContainerArgs` function in `src/container-runner.ts`:
 
-<Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
-    ```typescript
-    async function buildContainerArgs(
-      mounts: VolumeMount[],
-      containerName: string,
-      agentIdentifier?: string,
-    ): Promise<string[]> {
-      const args: string[] = ['run', '-i', '--rm', '--name', containerName];
+```typescript
+function buildContainerArgs(
+  mounts: VolumeMount[],
+  containerName: string,
+): string[] {
+  const args: string[] = ['run', '-i', '--rm', '--name', containerName];
 
-      // Pass host timezone so container's local time matches the user's
-      args.push('-e', `TZ=${TIMEZONE}`);
+  // Pass host timezone so container's local time matches the user's
+  args.push('-e', `TZ=${TIMEZONE}`);
 
-      // OneCLI gateway handles credential injection
-      const onecliApplied = await onecli.applyContainerConfig(args, {
-        addHostMapping: false,
-        agent: agentIdentifier,
-      });
-      if (!onecliApplied) {
-        logger.warn({ containerName }, 'OneCLI gateway not reachable');
-      }
+  // Run as host user so bind-mounted files are accessible
+  const hostUid = process.getuid?.();
+  const hostGid = process.getgid?.();
+  if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
+    args.push('--user', `${hostUid}:${hostGid}`);
+    args.push('-e', 'HOME=/home/node');
+  }
 
-      // Run as host user so bind-mounted files are accessible
-      const hostUid = process.getuid?.();
-      const hostGid = process.getgid?.();
-      if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
-        args.push('--user', `${hostUid}:${hostGid}`);
-        args.push('-e', 'HOME=/home/node');
-      }
-
-      for (const mount of mounts) {
-        if (mount.readonly) {
-          args.push(...readonlyMountArgs(mount.hostPath, mount.containerPath));
-        } else {
-          args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
-        }
-      }
-
-      args.push(CONTAINER_IMAGE);
-      return args;
+  for (const mount of mounts) {
+    if (mount.readonly) {
+      args.push(...readonlyMountArgs(mount.hostPath, mount.containerPath));
+    } else {
+      args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
     }
-    ```
+  }
 
-    **Key flags:**
-    - `-i` - Interactive (keeps stdin open)
-    - `--rm` - Remove container after exit (ephemeral)
-    - `--name` - Unique container name for management
-    - `--user` - Run as host UID/GID for file permissions
-    - OneCLI SDK configures container networking for credential injection (no explicit env vars)
-  </Tab>
+  args.push(CONTAINER_IMAGE);
+  return args;
+}
+```
 
-  <Tab title="Credential Proxy (legacy)">
-    ```typescript
-    function buildContainerArgs(
-      mounts: VolumeMount[],
-      containerName: string,
-    ): string[] {
-      const args: string[] = ['run', '-i', '--rm', '--name', containerName];
+**Key flags:**
+- `-i` - Interactive (keeps stdin open for secrets and input)
+- `--rm` - Remove container after exit (ephemeral)
+- `--name` - Unique container name for management
+- `--user` - Run as host UID/GID for file permissions
+- `-e TZ` - Pass host timezone for cron and time formatting
 
-      // Pass host timezone so container's local time matches the user's
-      args.push('-e', `TZ=${TIMEZONE}`);
-
-      // Route API traffic through the credential proxy
-      args.push('-e', `ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}`);
-
-      // Mirror the host's auth method with a placeholder value
-      const authMode = detectAuthMode();
-      if (authMode === 'api-key') {
-        args.push('-e', 'ANTHROPIC_API_KEY=placeholder');
-      } else {
-        args.push('-e', 'CLAUDE_CODE_OAUTH_TOKEN=placeholder');
-      }
-
-      // Run as host user so bind-mounted files are accessible
-      const hostUid = process.getuid?.();
-      const hostGid = process.getgid?.();
-      if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
-        args.push('--user', `${hostUid}:${hostGid}`);
-        args.push('-e', 'HOME=/home/node');
-      }
-
-      for (const mount of mounts) {
-        if (mount.readonly) {
-          args.push(...readonlyMountArgs(mount.hostPath, mount.containerPath));
-        } else {
-          args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
-        }
-      }
-
-      args.push(CONTAINER_IMAGE);
-      return args;
-    }
-    ```
-
-    **Key flags:**
-    - `-i` - Interactive (keeps stdin open)
-    - `--rm` - Remove container after exit (ephemeral)
-    - `--name` - Unique container name for management
-    - `--user` - Run as host UID/GID for file permissions
-    - `-e ANTHROPIC_BASE_URL` - Routes API calls through the credential proxy
-    - `-e ANTHROPIC_API_KEY` or `-e CLAUDE_CODE_OAUTH_TOKEN` - Placeholder credential (replaced by proxy)
-  </Tab>
-</Tabs>
+Credentials are passed via stdin JSON (not environment variables) and injected into the SDK environment only inside the container.
 
 ### Volume mounts
 
@@ -516,7 +456,7 @@ This allows the host to receive and act on agent output in real-time, rather tha
 
 <Accordion title="Stop a running container">
   ```bash
-  docker stop -t 1 nanoclaw-main-1234567890
+  docker stop nanoclaw-main-1234567890
   ```
 </Accordion>
 
@@ -526,10 +466,10 @@ This allows the host to receive and act on agent output in real-time, rather tha
   ```
   
   Logs include:
-  - Input summary (prompt length and session ID) — full prompt only at verbose level
+  - Full input (with secrets stripped)
   - Container arguments
   - Volume mounts
-  - Stdout/stderr (when verbose logging is enabled)
+  - Stdout/stderr
   - Exit code and duration
 </Accordion>
 

@@ -36,7 +36,8 @@ When editing docs, keep these architectural facts current:
 - **Channel forks:** Channels live in separate fork repos (`nanoclaw-whatsapp`, `nanoclaw-telegram`, etc.). Channel-specific skills (image-vision, voice-transcription, reactions, pdf-reader) live on the channel fork, not upstream.
 - **Removing a skill:** `git revert -m 1 <merge-commit>`, not manual file deletion.
 - **Source of truth for NanoClaw code:** https://github.com/qwibitai/nanoclaw
-- **Credential management (v1.2.22+):** OneCLI gateway is the default. The built-in credential proxy is available as an opt-in skill (`/use-native-credential-proxy`). Legacy tabs in docs cover both methods.
+- **Credential management:** Secrets are passed to containers via stdin JSON and injected into the SDK environment only. A `PreToolUse` hook strips secrets from Bash subprocesses. No external gateway or proxy needed.
+- **Remote Control removed:** The `/remote-control` feature and `src/remote-control.ts` have been deleted. The `advanced/remote-control.mdx` page exists for historical reference only and is hidden from navigation.
 
 ## PR Workflow
 

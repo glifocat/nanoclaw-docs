@@ -107,7 +107,7 @@ Messages sent to the agent receive no response.
   Stop stuck containers:
   
   ```bash
-  docker stop -t 1 $(docker ps -q --filter name=nanoclaw-)
+   docker stop $(docker ps -q --filter name=nanoclaw-)
   ```
 </Accordion>
 

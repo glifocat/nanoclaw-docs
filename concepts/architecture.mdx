@@ -86,7 +86,7 @@ The container runner (`src/container-runner.ts`) spawns and manages isolated age
 **Container lifecycle:**
 1. Build volume mounts based on group privileges
 2. Spawn container with Docker CLI
-3. Pass prompt and metadata via stdin JSON (credentials handled by secret injection layer, never passed here)
+3. Pass prompt, metadata, and secrets via stdin JSON
 4. Stream stdout/stderr for real-time output
 5. Parse output markers (`---NANOCLAW_OUTPUT_START---` / `---NANOCLAW_OUTPUT_END---`)
 6. Clean up automatically on exit (`--rm` flag)
@@ -100,7 +100,7 @@ The container runner (`src/container-runner.ts`) spawns and manages isolated age
 **Logging:**
 - All container runs logged to `groups/{name}/logs/container-{timestamp}.log`
 - Verbose mode (`LOG_LEVEL=debug`) logs full input/output
-- Error runs log input metadata (prompt length, session ID) and full stderr — prompt content is not included
+- Error runs log full input (with secrets stripped) and full stderr
 
 ### Task scheduler
 
@@ -279,8 +279,8 @@ Shared skills in `container/skills/` are synced to each group's `.claude/skills/
 - Skills are available to all agents
 - Per-group copies allow customization without affecting others
 - Changes to shared skills require container restart to sync
-- Built-in container skills include `/agent-browser` (web automation), `/capabilities` (system introspection), and `/status` (health check)
-- `/capabilities` and `/status` are main-channel only — they check for the `/workspace/project` mount to enforce access
+- Built-in container skills include `/agent-browser` (web automation)
+- Additional container skills can be added by placing `SKILL.md` files in `container/skills/`
 
 ### Agent runner customization
 
@@ -300,20 +300,14 @@ The agent runner is the TypeScript code that wraps Claude Agent SDK. It handles 
 1. **Container system check**: Ensure Docker is running, clean up orphaned containers
 2. **Database initialization**: Create tables if needed, load schema
 3. **State loading**: Restore message cursors, sessions, registered groups
-4. **OneCLI agent sync**: Ensure each registered non-main group has a corresponding OneCLI agent for per-group credential scoping (best-effort, non-blocking)
-
-<Note>
-In v1.2.22+, this step syncs OneCLI agents for all registered groups. In earlier versions, this starts the built-in credential proxy on `CREDENTIAL_PROXY_PORT`.
-</Note>
-5. **Remote Control restore**: Re-adopt any surviving Remote Control session from a previous run
-6. **Shutdown handlers**: Register graceful shutdown on `SIGTERM` and `SIGINT`
-7. **Channel connection**: Connect to messaging channels, authenticate if needed
-8. **Subsystem startup**:
+4. **Shutdown handlers**: Register graceful shutdown on `SIGTERM` and `SIGINT`
+5. **Channel connection**: Connect to messaging channels, authenticate if needed
+6. **Subsystem startup**:
    - Task scheduler loop (60s interval)
    - IPC watcher (1s poll interval)
    - Message loop (2s poll interval)
-9. **Recovery**: Check for unprocessed messages from previous crash
-10. **Ready**: System begins processing messages and tasks
+7. **Recovery**: Check for unprocessed messages from previous crash
+8. **Ready**: System begins processing messages and tasks
 
 ## Graceful shutdown
 
