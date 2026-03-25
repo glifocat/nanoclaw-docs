@@ -198,18 +198,21 @@ if (task.schedule_type === 'cron') {
 
 ## Timezone configuration
 
-Tasks use the system timezone by default:
+Tasks use the system timezone by default. The timezone is resolved from multiple sources, with IANA validation on each candidate:
 
 ```typescript
-// From src/config.ts
-export const TIMEZONE =
-  process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+// Resolution order (first valid IANA timezone wins):
+// 1. process.env.TZ
+// 2. TZ from .env file
+// 3. Intl.DateTimeFormat().resolvedOptions().timeZone
+// Fallback: 'UTC'
+export const TIMEZONE = resolveConfigTimezone();
 ```
 
-To override, set the `TZ` environment variable:
+To override, set the `TZ` environment variable in `.env` or the system environment:
 
 ```bash
-export TZ="America/New_York"
+TZ=America/New_York
 ```
 
 ## Task management
@@ -235,7 +238,8 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
   "schedule_type": "cron",
   "schedule_value": "0 9 * * *",
   "context_mode": "isolated",
-  "targetJid": "user@s.whatsapp.net or tg:12345 or similar"
+  "targetJid": "user@s.whatsapp.net or tg:12345 or similar",
+  "script": "optional pre-flight bash script"
 }
 ```
 
@@ -265,6 +269,7 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
   "type": "update_task",
   "taskId": "task-1234567890-abc123",
   "prompt": "Updated prompt",
+  "script": "optional updated script",
   "schedule_type": "interval",
   "schedule_value": "7200000"
 }

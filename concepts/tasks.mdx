@@ -14,6 +14,7 @@ A scheduled task is:
 - Executed in the context of a specific group
 - Has access to all agent tools (Bash, browser, MCP, etc.)
 - Can send messages to the group chat or complete silently
+- Optionally includes a **pre-flight script** that runs before waking the agent
 - Tracked in the database with run history
 
 <Info>
@@ -210,6 +211,7 @@ Tasks can run in two context modes:
 ```typescript
 interface ScheduledTask {
   context_mode: 'isolated' | 'group';
+  script?: string | null; // Optional pre-flight script
   // ... other fields
 }
 ```
@@ -217,6 +219,39 @@ interface ScheduledTask {
 <Note>
 Group context tasks share the session with interactive messages. This means the task's actions (files read, tools used) become part of the group's conversation history.
 </Note>
+
+## Pre-flight scripts
+
+Tasks can include an optional `script` field containing a bash script that runs **before** the agent wakes up. This enables lightweight checks (API polling, file diffs, etc.) without consuming an agent invocation.
+
+**How it works:**
+
+1. The container starts and runs the script via `bash`
+2. The script must output a JSON object on its last line with `{ "wakeAgent": true/false, "data": ... }`
+3. If `wakeAgent` is `true`, the agent is started with the script's `data` injected into the prompt
+4. If `wakeAgent` is `false` (or the script fails), the container exits without waking the agent
+
+```bash
+# Example: only wake agent if there are new PRs
+RESULT=$(curl -s "https://api.github.com/repos/owner/repo/pulls?state=open")
+COUNT=$(echo "$RESULT" | jq length)
+if [ "$COUNT" -gt "0" ]; then
+  echo "{\"wakeAgent\": true, \"data\": {\"open_prs\": $COUNT}}"
+else
+  echo "{\"wakeAgent\": false}"
+fi
+```
+
+**Key constraints:**
+
+- Scripts have a 30-second timeout
+- Output is capped at 1MB
+- Only the last line of stdout is parsed as JSON
+- Scripts only run for scheduled tasks (`isScheduledTask: true`), not interactive messages
+
+<Tip>
+Pre-flight scripts are ideal for reducing agent invocations on high-frequency interval tasks. Instead of waking Claude every 5 minutes to check if something changed, the script can do the check and only wake the agent when action is needed.
+</Tip>
 
 ## Task management operations
 

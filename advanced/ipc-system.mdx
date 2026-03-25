@@ -160,7 +160,8 @@ Creates a scheduled task that runs at specified intervals.
   "schedule_type": "cron",
   "schedule_value": "0 9 * * 1",
   "context_mode": "group",
-  "targetJid": "1234567890@s.whatsapp.net"
+  "targetJid": "1234567890@s.whatsapp.net",
+  "script": "curl -s https://api.example.com/status | jq '{wakeAgent: .needsAction, data: .}'"
 }
 ```
 
@@ -169,6 +170,7 @@ Creates a scheduled task that runs at specified intervals.
 - `schedule_value`: Cron expression, milliseconds, or ISO timestamp
 - `context_mode`: `group` (shared session) or `isolated` (fresh session)
 - `targetJid`: The chat JID to associate with this task
+- `script` (optional): Bash script that runs before waking the agent. Must output `{"wakeAgent": true/false}` as JSON on the last line. If `wakeAgent` is `false`, the agent is not started.
 
 **Authorization:**
 - Main group can schedule tasks for any group
@@ -213,7 +215,7 @@ Resumes a paused task.
 
 ### Update task
 
-Updates an existing task's prompt, schedule type, or schedule value. The next run time is automatically recalculated when the schedule changes.
+Updates an existing task's prompt, script, schedule type, or schedule value. The next run time is automatically recalculated when the schedule changes.
 
 **Format:**
 ```json
@@ -221,12 +223,13 @@ Updates an existing task's prompt, schedule type, or schedule value. The next ru
   "type": "update_task",
   "taskId": "task-1234567890-abc123",
   "prompt": "Updated task prompt",
+  "script": "echo '{\"wakeAgent\": true}'",
   "schedule_type": "cron",
   "schedule_value": "0 10 * * *"
 }
 ```
 
-All fields except `taskId` are optional — only include the fields you want to change.
+All fields except `taskId` are optional — only include the fields you want to change. Set `script` to an empty string or `null` to remove a pre-flight script.
 
 **Authorization:**
 - Main group can update any task
