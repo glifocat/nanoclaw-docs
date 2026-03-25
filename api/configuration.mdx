@@ -107,10 +107,12 @@ Matches messages starting with `@{ASSISTANT_NAME}` (case-insensitive).
 
 Scheduled tasks use the configured timezone:
 
-```typescript
-export const TIMEZONE =
-  process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
-```
+The timezone is resolved by checking candidates in order, validating each is a real IANA identifier before accepting:
+
+1. `process.env.TZ`
+2. `TZ` from `.env` file
+3. `Intl.DateTimeFormat().resolvedOptions().timeZone` (system default)
+4. Falls back to `'UTC'` if none are valid
 
 This affects cron expression evaluation for scheduled tasks.
 
