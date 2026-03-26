@@ -83,12 +83,29 @@ claude
 /add-whatsapp
 ```
 
-This merges the `skill/whatsapp` branch into your fork, adding the WhatsApp channel code and its dependencies (including `@whiskeysockets/baileys`). The skill will then:
+This merges the `skill/whatsapp` branch into your fork, adding the WhatsApp channel code and its dependencies (including `@whiskeysockets/baileys`). The skill will then guide you through authentication.
 
-1. Generate a QR code for WhatsApp Web authentication
-2. Wait for you to scan it with your phone
-3. Store authentication credentials in `store/auth/`
-4. Connect to WhatsApp and verify the connection
+### Authentication methods
+
+The skill offers two authentication methods:
+
+- **QR code** (recommended on desktop) — scan a QR code displayed in your browser or terminal
+- **Pairing code** (recommended on headless servers) — enter a numeric code on your phone, no camera needed
+
+<Tabs>
+  <Tab title="QR code">
+    1. A QR code is displayed in your browser or terminal
+    2. Open WhatsApp on your phone → **Linked Devices** → **Link a Device**
+    3. Scan the QR code
+    4. Credentials are stored in `store/auth/`
+  </Tab>
+  <Tab title="Pairing code">
+    1. The skill prompts you for your phone number
+    2. Enter your number as **digits only** — country code followed by your number, with no `+` prefix, spaces, or dashes (e.g., `14155551234` where `1` is the US country code and `4155551234` is the number)
+    3. A pairing code appears — enter it on your phone within 60 seconds
+    4. Credentials are stored in `store/auth/`
+  </Tab>
+</Tabs>
 
 <Note>
   If authentication fails or expires, run `/add-whatsapp` again to re-authenticate.
@@ -271,6 +288,17 @@ claude
 ```
 
 Follow the QR code authentication flow again.
+
+### Pairing code not working
+
+Pairing codes expire in about 60 seconds. If authentication fails:
+
+1. Verify your phone number is **digits only** — country code + number, no `+` prefix, spaces, or dashes (e.g., `14155551234`)
+2. Make sure your phone has internet access
+3. Update WhatsApp to the latest version
+4. Enter the code immediately when it appears
+
+If pairing code keeps failing, try QR code authentication instead by running `/add-whatsapp` again and selecting the QR code option.
 
 ### Connection issues
 
