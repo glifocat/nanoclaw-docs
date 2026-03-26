@@ -5,6 +5,33 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Automated PR triage: v1.2.24–v1.2.34 sync" description="2026-03-26" tags={["New", "Updated", "Fixed"]}>
+  Reviewed and triaged 43 automated Mintlify PRs (#86–#128). Merged 8, closed 30 (superseded or inaccurate), kept 5 pending v1.2.35 release. Validated all changes against upstream source code at v1.2.34.
+
+  ## New sections
+  - **Task scripts** (`concepts/tasks`, `features/scheduled-tasks`, `api/task-scheduling`) — pre-execution bash scripts with `wakeAgent` JSON contract, `ScriptResult` type, execution flow
+  - **Per-group trigger patterns** (`features/messaging`, `concepts/groups`, `api/configuration`) — custom trigger words per group instead of global `@{ASSISTANT_NAME}`
+  - **CLAUDE.md template system** (`concepts/groups`, `api/group-management`) — automatic template copy during registration with `isMain`-based selection
+  - **Channel-formatting skill** (`features/messaging`, `api/message-routing`, `integrations/slack`, `integrations/skills-system`) — per-channel text transformation table
+  - **WhatsApp pairing code auth** (`integrations/whatsapp`) — tabbed QR code vs pairing code with phone number formatting rules
+  - **loginctl linger** (`installation`, `quickstart`, `advanced/troubleshooting`) — systemd user service persistence after SSH logout
+  - **Mount-allowlist preservation** (`quickstart`, `advanced/troubleshooting`) — `/setup` skips overwrite of existing config
+
+  ## Updated
+  - **Container base image**: Fixed `node:24-slim` → `node:22-slim` across 6 pages (v1.2.22 changelog never upgraded to Node 24)
+  - **Timezone configuration**: Added `resolveConfigTimezone()` with IANA validation and UTC fallback across 4 pages
+  - **Token count**: Updated from ~39.8k to ~41.3k in introduction and skills system pages
+  - **Agent-runner cache**: Documented mtime-based refresh instead of one-time copy
+  - **Customization**: Removed phantom `MAIN_GROUP_FOLDER` constant
+  - **Product changelog**: Added entries for v1.2.24 through v1.2.34
+
+  ## Closed as invalid
+  - **#125**: Fabricated upstream PR #1346 as "stdin secrets / remove OneCLI" — actual PR is macOS menu bar status indicator
+  - **#119**: Destructively removed credential proxy legacy tabs that are intentionally maintained
+  - **#88**: Incorrectly documented `sender` as IPC `send_message` parameter (it's a `NewMessage` field)
+  - **#89**: Falsely claimed Telegram is a core channel on main (it lives in `nanoclaw-telegram` fork)
+</Update>
+
 <Update label="v1.2.23 source sync and credential proxy skill" description="2026-03-24" tags={["Updated", "Fixed"]}>
   Merged 3 automated PRs syncing docs with v1.2.23 upstream changes (#82, #84, #85). Closed #83 (would have removed legacy credential proxy tabs).
 
