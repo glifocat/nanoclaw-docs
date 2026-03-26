@@ -497,6 +497,10 @@ NanoClaw runs as a background service:
     # View logs
     journalctl --user -u nanoclaw -f
     ```
+
+    <Note>
+      **VM / SSH users:** The setup script automatically runs `loginctl enable-linger` for non-root users so the service keeps running after you disconnect from SSH. If linger is not enabled, systemd terminates all user processes when the last session closes. You can verify with `loginctl show-user $USER | grep Linger`.
+    </Note>
   </Tab>
   
   <Tab title="WSL (without systemd)">

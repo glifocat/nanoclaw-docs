@@ -179,6 +179,37 @@ cat groups/{group}/logs/container-{timestamp}.log
   ```
 </Accordion>
 
+## Service stops after SSH logout (Linux)
+
+### Symptoms
+- NanoClaw works while SSH is connected but stops silently after disconnecting
+- `systemctl --user status nanoclaw` shows inactive after reconnecting
+- No error logs or crash — the service simply disappears
+- `systemctl --user enable nanoclaw` appears to succeed but the service still stops
+
+### Cause
+
+By default, systemd sets `Linger=no` for users. When your last SSH session closes, systemd terminates all user-level processes — including the NanoClaw service. This is especially common on cloud VMs (EC2, GCP, Oracle Cloud).
+
+### Solution
+
+The setup script automatically enables linger for non-root users. If you're still experiencing this issue (e.g., you set up NanoClaw before this fix), run:
+
+```bash
+loginctl enable-linger
+```
+
+Verify it's enabled:
+
+```bash
+loginctl show-user $USER | grep Linger
+# Expected: Linger=yes
+```
+
+<Note>
+  If `loginctl enable-linger` fails with a permission error, your system may require polkit authorization. Contact your system administrator or run the command with `sudo`.
+</Note>
+
 ## Known issues
 
 ### Cursor rollback on error
