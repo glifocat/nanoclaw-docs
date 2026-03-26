@@ -88,7 +88,7 @@ The entrypoint script (`/app/entrypoint.sh`):
    - Input contains prompt, session ID, and group metadata (not secrets)
 3. **Execute agent**: `node /tmp/dist/index.js < /tmp/input.json`
    - Runs agent-runner with input
-   - Credentials handled by the secret injection layer (OneCLI gateway or credential proxy), never passed via stdin
+   - Credentials handled by the secret injection layer (OneCLI Agent Vault or credential proxy), never passed via stdin
    - Outputs JSON results to stdout
 4. **Container exits**: Cleaned up automatically via `--rm` flag
 

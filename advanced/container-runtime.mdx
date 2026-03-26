@@ -211,7 +211,7 @@ export async function runContainerAgent(
     container.stdin.end();
     ```
     
-    The input JSON contains the prompt, session ID, group folder, and metadata. Credentials are handled by the secret injection layer (OneCLI gateway or credential proxy) — never passed via stdin or mounted as files.
+    The input JSON contains the prompt, session ID, group folder, and metadata. Credentials are handled by the secret injection layer (OneCLI Agent Vault or credential proxy) — never passed via stdin or mounted as files.
   </Step>
   
   <Step title="Stream output">
@@ -228,7 +228,7 @@ export async function runContainerAgent(
 From the `buildContainerArgs` function in `src/container-runner.ts`:
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Agent Vault (v1.2.22+)">
     ```typescript
     async function buildContainerArgs(
       mounts: VolumeMount[],
@@ -240,7 +240,7 @@ From the `buildContainerArgs` function in `src/container-runner.ts`:
       // Pass host timezone so container's local time matches the user's
       args.push('-e', `TZ=${TIMEZONE}`);
 
-      // OneCLI gateway handles credential injection
+      // OneCLI Agent Vault handles credential injection
       const onecliApplied = await onecli.applyContainerConfig(args, {
         addHostMapping: false,
         agent: agentIdentifier,
@@ -275,7 +275,7 @@ From the `buildContainerArgs` function in `src/container-runner.ts`:
     - `--rm` - Remove container after exit (ephemeral)
     - `--name` - Unique container name for management
     - `--user` - Run as host UID/GID for file permissions
-    - OneCLI SDK configures container networking for credential injection (no explicit env vars)
+    - OneCLI SDK configures container networking for Agent Vault credential injection (no explicit env vars)
   </Tab>
 
   <Tab title="Credential Proxy (legacy)">

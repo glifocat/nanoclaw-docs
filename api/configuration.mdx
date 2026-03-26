@@ -35,9 +35,9 @@ Configuration is read from `.env` file or `process.env`.
 </ParamField>
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Agent Vault (v1.2.22+)">
     <ParamField path="ONECLI_URL" type="string" default="http://localhost:10254">
-      URL for the OneCLI gateway that handles credential injection for containers.
+      URL for the OneCLI Agent Vault that handles credential injection for containers.
     </ParamField>
   </Tab>
 
@@ -117,7 +117,7 @@ This affects cron expression evaluation for scheduled tasks.
 ## Example .env file
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Agent Vault (v1.2.22+)">
     ```bash
     ASSISTANT_NAME=Andy
     ASSISTANT_HAS_OWN_NUMBER=false
@@ -128,7 +128,7 @@ This affects cron expression evaluation for scheduled tasks.
     ```
 
     <Note>
-    With the OneCLI gateway, API keys and OAuth tokens are no longer stored in `.env`. Secrets are managed via `onecli secrets create` and injected by the gateway at request time. The only credential-related variable is `ONECLI_URL`.
+    With the OneCLI Agent Vault, API keys and OAuth tokens are no longer stored in `.env`. Secrets are managed via `onecli secrets create` and injected by the Agent Vault at request time. The only credential-related variable is `ONECLI_URL`.
     </Note>
   </Tab>
 
@@ -146,8 +146,8 @@ This affects cron expression evaluation for scheduled tasks.
 ## Credential environment variables
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
-    Credentials are managed externally via OneCLI — no credential environment variables are needed in `.env`.
+  <Tab title="OneCLI Agent Vault (v1.2.22+)">
+    Credentials are managed externally via OneCLI's Agent Vault — no credential environment variables are needed in `.env`.
 
     Register secrets with OneCLI using the CLI or dashboard:
     ```bash
@@ -185,10 +185,10 @@ This affects cron expression evaluation for scheduled tasks.
 ## Security notes
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Agent Vault (v1.2.22+)">
     - **Secrets** are never read by NanoClaw — OneCLI manages them externally
-    - The OneCLI gateway injects credentials into container API traffic at request time
-    - Containers cannot extract real credentials from the gateway
+    - The Agent Vault injects credentials into container API traffic at request time and enforces per-agent policies and rate limits
+    - Containers cannot extract real credentials from the Agent Vault
     - Mount allowlist is stored OUTSIDE project root and never mounted into containers
   </Tab>
 
