@@ -360,6 +360,10 @@ Key differences from standard Markdown:
 
 The formatting rules are also embedded in the group `CLAUDE.md` files so agents always have access to them, even without invoking the skill directly.
 
+<Tip>
+If you apply the `/channel-formatting` skill, Markdown-to-mrkdwn conversion happens automatically in the outbound pipeline — the agent doesn't need to know Slack's syntax at all. Links are converted to `<url|text>` format and bold markers are adjusted. See [channel-aware formatting](/features/messaging#channel-aware-formatting) for details.
+</Tip>
+
 ## Known limitations
 
 - **Threads are flattened** - Threaded replies appear as regular channel messages. Responses go to main channel, not back into threads.
