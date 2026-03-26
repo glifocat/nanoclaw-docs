@@ -5,8 +5,62 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v1.2.34" description="2026-03-25" tags={["Fix", "Skill", "Channel"]}>
+  - Added `/add-emacs` channel skill (contributed by @kenbolton)
+  - Fixed mount-allowlist preservation — `/setup` no longer overwrites existing `mount-allowlist.json` (contributed by @akasha-scheuermann)
+  - Fixed Telegram migration backfill to default chats as direct messages instead of groups (contributed by @RichardCao)
+  - Fixed CI workflows to skip `bump-version` and `update-tokens` on forks (contributed by @shawnyeager)
+</Update>
+
 <Update label="v1.2.33" description="2026-03-25" tags={["Fix"]}>
-  - Fixed Telegram migration backfill to default chats as direct messages instead of groups — prevents stale Telegram DMs from appearing in group discovery
+  - Fixed container mounts to include group folder and sessions directory (contributed by @kenbolton)
+</Update>
+
+<Update label="v1.2.32" description="2026-03-25" tags={["Feature", "Skill", "Fix"]}>
+  - Added `/channel-formatting` skill — channel-aware text formatting for WhatsApp, Telegram, Slack, and Signal
+  - Fixed per-group trigger pattern matching — each group can now define its own trigger word (contributed by @mrbob-git)
+  - Fixed `loginctl enable-linger` so systemd user service survives SSH logout (contributed by @IYENTeam)
+  - Clarified WhatsApp phone number prompt to prevent auth failures (contributed by @ingyukoh)
+  - Added Telegram forum topics contributor (contributed by @flobo3)
+</Update>
+
+<Update label="v1.2.31" description="2026-03-25" tags={["Fix"]}>
+  - Fixed `isMain`-based CLAUDE.md template selection during runtime group registration
+</Update>
+
+<Update label="v1.2.30" description="2026-03-25" tags={["Fix"]}>
+  - Fixed CLAUDE.md template copy when registering groups via IPC (contributed by @ingyukoh)
+  - Fixed diagnostics to use explicit Read tool directive for pickup instructions (contributed by @Koshkoshinsk)
+</Update>
+
+<Update label="v1.2.29" description="2026-03-25" tags={["Feature"]}>
+  - Added task scripts — scheduled tasks can now run a pre-execution bash script that conditionally wakes the agent via `wakeAgent` JSON contract (contributed by @gabi-simons)
+</Update>
+
+<Update label="v1.2.28" description="2026-03-25" tags={["Fix"]}>
+  - Fixed agent-runner source cache to refresh based on file modification time instead of copying once at startup
+</Update>
+
+<Update label="v1.2.27" description="2026-03-25" tags={["Maintenance"]}>
+  - Removed accidentally merged Telegram channel code from main
+  - Removed Grammy dependency and pinned `better-sqlite3@11.10.0` and `cron-parser@5.5.0`
+  - Removed auto-sync GitHub Actions
+</Update>
+
+<Update label="v1.2.26" description="2026-03-25" tags={["Fix"]}>
+  - Enabled `loginctl linger` during setup so systemd user service survives SSH logout
+  - Clarified WhatsApp phone number prompt format (digits only, no `+` prefix)
+  - Added CLAUDE.md template copy during IPC group registration
+</Update>
+
+<Update label="v1.2.25" description="2026-03-24" tags={["Fix"]}>
+  - Fixed timezone validation to prevent crash on POSIX-style TZ values — now validates IANA identifiers and falls back to UTC
+  - Expanded fork sync auto-resolve patterns and added missing forks to dispatch list
+</Update>
+
+<Update label="v1.2.24" description="2026-03-24" tags={["Fix"]}>
+  - Fixed diagnostics prompt not being shown to user (contributed by @Koshkoshinsk)
+  - Added auto-resolve for `package-lock.json`, badge, and version conflicts during fork sync
 </Update>
 
 <Update label="v1.2.23" description="2026-03-24" tags={["Maintenance", "Skill"]}>
