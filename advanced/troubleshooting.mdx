@@ -315,6 +315,16 @@ sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;
   Then restart the service.
 </Accordion>
 
+<Accordion title="Reset mount allowlist to defaults">
+  If you need to regenerate the default mount allowlist (for example, after a misconfiguration), re-run setup with the `--force` flag:
+
+  ```bash
+  claude /setup --force
+  ```
+
+  Without `--force`, setup skips the mount allowlist if it already exists to preserve your customizations.
+</Accordion>
+
 <Accordion title="Check for symlinks">
   The mount security system resolves symlinks before validation. If you're mounting a symlink, ensure the resolved path is in the allowlist:
   
