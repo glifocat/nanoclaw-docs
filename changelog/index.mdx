@@ -5,6 +5,10 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v1.2.33" description="2026-03-25" tags={["Fix"]}>
+  - Fixed Telegram migration backfill to default chats as direct messages instead of groups — prevents stale Telegram DMs from appearing in group discovery
+</Update>
+
 <Update label="v1.2.23" description="2026-03-24" tags={["Maintenance", "Skill"]}>
   - Added `/use-native-credential-proxy` skill — opt-in restoration of the built-in `.env`-based credential proxy for users who prefer it over OneCLI
   - Removed dead `src/credential-proxy.ts` code (unused since v1.2.22)
