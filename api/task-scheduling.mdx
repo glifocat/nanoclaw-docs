@@ -340,8 +340,8 @@ Starts with no session, providing a fresh context for each execution.
 // Scheduler poll interval (1 minute)
 export const SCHEDULER_POLL_INTERVAL = 60000;
 
-// Timezone for cron expressions
-export const TIMEZONE = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+// Timezone for cron expressions (validated IANA identifier; falls back to UTC)
+export const TIMEZONE = resolveConfigTimezone();
 
 // Container close delay after task result (10 seconds)
 const TASK_CLOSE_DELAY_MS = 10000;

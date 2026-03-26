@@ -175,10 +175,9 @@ export const MAX_CONCURRENT_CONTAINERS = 5;
 // Paths
 export const GROUPS_DIR = path.resolve(PROJECT_ROOT, 'groups');
 export const DATA_DIR = path.resolve(PROJECT_ROOT, 'data');
-export const MAIN_GROUP_FOLDER = 'main';
 
-// Timezone
-export const TIMEZONE = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+// Timezone (validated IANA identifier; falls back to UTC)
+export const TIMEZONE = resolveConfigTimezone();
 ```
 
 See the full file at `src/config.ts`.
