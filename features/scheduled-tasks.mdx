@@ -232,6 +232,7 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
 {
   "type": "schedule_task",
   "prompt": "Send me a summary of today's events",
+  "script": "optional-bash-script-here",
   "schedule_type": "cron",
   "schedule_value": "0 9 * * *",
   "context_mode": "isolated",
@@ -265,6 +266,7 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
   "type": "update_task",
   "taskId": "task-1234567890-abc123",
   "prompt": "Updated prompt",
+  "script": "optional-updated-script",
   "schedule_type": "interval",
   "schedule_value": "7200000"
 }
@@ -274,6 +276,45 @@ Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
 <Info>
 After any task mutation via IPC, the `current_tasks.json` snapshot is refreshed immediately for all groups. This means `list_tasks` always returns up-to-date results, even within the same agent session.
 </Info>
+
+## Task scripts
+
+Tasks can include an optional pre-execution script — a bash script that runs inside the container before the agent is invoked. This is useful for lightweight checks that determine whether the agent should run at all.
+
+### Creating a task with a script
+
+```json
+{
+  "type": "schedule_task",
+  "prompt": "Summarize the new issues and notify me",
+  "script": "curl -s https://api.github.com/repos/org/repo/issues?since=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) | jq '{wakeAgent: (length > 0), data: .}'",
+  "schedule_type": "interval",
+  "schedule_value": "3600000"
+}
+```
+
+The script must output a JSON object on its last line with a `wakeAgent` boolean:
+
+- `{"wakeAgent": false}` — the container exits silently, no agent invocation
+- `{"wakeAgent": true, "data": {...}}` — the agent runs with the script data injected into its prompt
+
+<Note>
+Scripts have a 30-second timeout and 1 MB output limit. If the script fails or produces no output, the agent is not invoked.
+</Note>
+
+### Updating a task's script
+
+You can add, change, or remove a task's script via `update_task`:
+
+```json
+{
+  "type": "update_task",
+  "taskId": "task-1234567890-abc123",
+  "script": "new-script-here"
+}
+```
+
+Set `script` to an empty string or omit it to remove the script.
 
 ## Task isolation
 

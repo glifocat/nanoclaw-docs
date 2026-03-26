@@ -70,12 +70,13 @@ async function runTask(
 3. Loads session ID based on context mode:
    - `"group"`: Uses group's current session
    - `"isolated"`: No session (fresh context)
-4. Spawns agent container with task prompt
-5. Streams results to chat via `sendMessage`
-6. Logs execution to `task_run_logs` table
-7. Calculates next run time based on schedule type
-8. Updates task status (`"completed"` for one-time tasks)
-9. Closes container after result (10-second delay for final MCP calls)
+4. Passes `script` field to container input (if present)
+5. Spawns agent container with task prompt
+6. Streams results to chat via `sendMessage`
+7. Logs execution to `task_run_logs` table
+8. Calculates next run time based on schedule type
+9. Updates task status (`"completed"` for one-time tasks)
+10. Closes container after result (10-second delay for final MCP calls)
 
 ## Database operations
 
@@ -144,7 +145,7 @@ Updates task fields.
 ```typescript
 function updateTask(
   id: string,
-  updates: Partial<Pick<ScheduledTask, 'prompt' | 'schedule_type' | 'schedule_value' | 'next_run' | 'status'>>
+  updates: Partial<Pick<ScheduledTask, 'prompt' | 'script' | 'schedule_type' | 'schedule_value' | 'next_run' | 'status'>>
 ): void
 ```
 
@@ -234,6 +235,7 @@ interface ScheduledTask {
   group_folder: string;                 // Group folder name
   chat_jid: string;                     // Chat to send results to
   prompt: string;                       // Agent prompt
+  script?: string | null;               // Optional pre-execution bash script
   schedule_type: 'cron' | 'interval' | 'once';
   schedule_value: string;               // Cron expression, interval ms, or ISO timestamp
   context_mode: 'group' | 'isolated';   // Session mode
@@ -333,6 +335,50 @@ context_mode: 'isolated'
 ```
 
 Starts with no session, providing a fresh context for each execution.
+
+## Task scripts
+
+Tasks can include an optional `script` field containing a bash script that runs inside the container **before** the agent wakes up. This is useful for lightweight checks that don't require a full agent invocation.
+
+### Script execution
+
+When a scheduled task has a `script` field, the agent runner:
+
+1. Writes the script to a temporary file and executes it with `bash`
+2. Parses the last line of stdout as JSON
+3. If the script returns `{"wakeAgent": false}`, the container exits without invoking the agent
+4. If the script returns `{"wakeAgent": true, "data": ...}`, the agent is invoked with the script's data injected into the prompt
+
+### Script contract
+
+The script must output a JSON object on its last line with the following shape:
+
+```typescript
+interface ScriptResult {
+  wakeAgent: boolean;  // Whether to invoke the agent
+  data?: unknown;      // Optional data to pass to the agent prompt
+}
+```
+
+### Constraints
+
+- **Timeout**: Scripts are killed after 30 seconds (`SCRIPT_TIMEOUT_MS`)
+- **Output buffer**: Maximum 1 MB of stdout
+- **Only for scheduled tasks**: The `script` field is only evaluated when `isScheduledTask` is true
+
+### Example
+
+```json
+{
+  "type": "schedule_task",
+  "prompt": "Summarize the new issues and notify me",
+  "script": "curl -s https://api.github.com/repos/org/repo/issues?since=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) | jq '{wakeAgent: (length > 0), data: .}'",
+  "schedule_type": "interval",
+  "schedule_value": "3600000"
+}
+```
+
+In this example, the script checks for new GitHub issues. If there are none, `wakeAgent` is `false` and the agent never starts — saving resources. If there are new issues, the agent wakes up with the issue data pre-loaded in its prompt.
 
 ## Configuration
 

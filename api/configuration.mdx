@@ -92,16 +92,23 @@ All paths are absolute and resolved from the project root:
 
 ## Trigger pattern
 
-The trigger pattern is generated from `ASSISTANT_NAME`:
+The default trigger pattern is generated from `ASSISTANT_NAME`:
 
 ```typescript
-export const TRIGGER_PATTERN = new RegExp(
-  `^@${escapeRegex(ASSISTANT_NAME)}\\b`,
-  'i',
-);
+export const DEFAULT_TRIGGER = `@${ASSISTANT_NAME}`;
+export const TRIGGER_PATTERN = buildTriggerPattern(DEFAULT_TRIGGER);
 ```
 
-Matches messages starting with `@{ASSISTANT_NAME}` (case-insensitive).
+Each group can override the trigger with a custom value. During message processing, the per-group trigger is resolved via `getTriggerPattern(group.trigger)`, which falls back to the default if no custom trigger is set.
+
+```typescript
+export function getTriggerPattern(trigger?: string): RegExp {
+  const normalizedTrigger = trigger?.trim();
+  return buildTriggerPattern(normalizedTrigger || DEFAULT_TRIGGER);
+}
+```
+
+Matches messages starting with the trigger word (case-insensitive, word-boundary).
 
 ## Timezone configuration
 

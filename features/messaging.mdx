@@ -34,13 +34,25 @@ NanoClaw processes messages through a polling-based architecture that connects m
 
 ## Trigger patterns
 
-Trigger patterns determine when the agent should respond. The default trigger is `@{ASSISTANT_NAME}` at the start of a message.
+Trigger patterns determine when the agent should respond. Each group can define its own trigger word. If no custom trigger is set, the default `@{ASSISTANT_NAME}` is used.
 
 ```typescript
 // From src/config.ts
-export const TRIGGER_PATTERN = new RegExp(
-  `^@${escapeRegex(ASSISTANT_NAME)}\\b`,
-  'i',
+export const DEFAULT_TRIGGER = `@${ASSISTANT_NAME}`;
+
+export function getTriggerPattern(trigger?: string): RegExp {
+  const normalizedTrigger = trigger?.trim();
+  return buildTriggerPattern(normalizedTrigger || DEFAULT_TRIGGER);
+}
+```
+
+During message processing, the trigger pattern is resolved per-group:
+
+```typescript
+// Per-group trigger resolution in src/index.ts
+const triggerPattern = getTriggerPattern(group.trigger);
+const hasTrigger = missedMessages.some(
+  (m) => triggerPattern.test(m.content.trim()) && /* sender check */
 );
 ```
 
@@ -53,7 +65,7 @@ export const TRIGGER_PATTERN = new RegExp(
 ```
 
 <Note>
-The main channel (your self-chat) doesn't require a trigger - every message is processed automatically.
+The main channel (your self-chat) doesn't require a trigger — every message is processed automatically. Non-main groups can set a custom trigger word during registration (e.g., `@Bot` instead of `@Andy`).
 </Note>
 
 ## Message formatting
@@ -225,13 +237,10 @@ Messages are polled every 2 seconds by default. This can be adjusted by modifyin
 
 ### Trigger customization
 
-To change the trigger word, ask Claude Code to modify it:
+There are two ways to customize trigger behavior:
 
-```
-Change the trigger word to @Bob
-```
-
-This updates `ASSISTANT_NAME` in `src/config.ts` and `.env`.
+- **Global default**: Change `ASSISTANT_NAME` in `.env` to update the default trigger for all groups (e.g., `ASSISTANT_NAME=Bob` makes the default `@Bob`).
+- **Per-group trigger**: Set a custom `trigger` value during group registration. Each group can have its own trigger word, independent of the global default.
 
 ## Group registration
 

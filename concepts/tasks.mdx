@@ -293,6 +293,45 @@ await claudeCode.tools.cancel_task({ task_id: "abc123" });
 Canceling a task deletes all run history. Pause the task instead if you want to preserve logs.
 </Warning>
 
+## Task scripts
+
+Tasks can include an optional `script` — a bash script that runs inside the container before the agent is invoked. This enables lightweight pre-checks without a full agent invocation.
+
+### How scripts work
+
+```mermaid
+flowchart TD
+    A[Scheduler triggers task] --> B[Container starts]
+    B --> C{Has script?}
+    C -->|No| D[Run agent with prompt]
+    C -->|Yes| E[Execute bash script]
+    E --> F{Script output}
+    F -->|wakeAgent: false| G[Exit silently]
+    F -->|wakeAgent: true| H[Inject script data into prompt]
+    H --> D
+    F -->|Error / no output| G
+```
+
+The script must output a JSON object on its last line:
+
+```json
+{"wakeAgent": true, "data": {"issues": [...]}}
+```
+
+- If `wakeAgent` is `false` (or the script fails), the container exits without invoking the agent
+- If `wakeAgent` is `true`, the agent prompt is enriched with the script's `data` field
+- Scripts have a 30-second timeout and 1 MB output limit
+
+### Use cases
+
+- **Conditional execution**: Only wake the agent when there's new data (e.g., new GitHub issues, new emails)
+- **Data pre-fetching**: Fetch data via `curl` or CLI tools before the agent runs, reducing agent token usage
+- **Cost optimization**: Avoid billing for agent invocations when there's nothing to act on
+
+<Info>
+Task scripts only run for scheduled tasks (`isScheduledTask: true`). Interactive messages never execute scripts.
+</Info>
+
 ## Sending messages from tasks
 
 Tasks can send messages to their group chat using the `send_message` tool:

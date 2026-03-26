@@ -346,7 +346,7 @@ Mounts are built per-group in `src/container-runner.ts`:
 | Additional mounts | Configurable | Configurable | Per-config |
 
 <Tip>
-Each group gets its own copy of the agent-runner source in `data/sessions/{group}/agent-runner-src/`, allowing per-group customization without affecting other groups.
+Each group gets its own copy of the agent-runner source in `data/sessions/{group}/agent-runner-src/`, allowing per-group customization without affecting other groups. The cached copy is automatically refreshed when the upstream source file's modification time is newer than the cached version.
 </Tip>
 
 ### Timeouts

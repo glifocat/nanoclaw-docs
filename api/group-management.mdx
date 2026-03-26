@@ -1,6 +1,7 @@
 ---
 title: Group management
 description: API reference for group registration, retrieval, privilege management, and container configuration
+tag: "UPDATED"
 ---
 
 Group management functions for registering groups, retrieving group lists, and managing group state.
@@ -27,6 +28,8 @@ function registerGroup(jid: string, group: RegisteredGroup): void
 
 - Validates the group folder path
 - Creates the group directory structure (`groups/{folder}/logs/`)
+- Copies a `CLAUDE.md` template into the new group folder if one doesn't already exist (from `groups/main/CLAUDE.md` for main groups or `groups/global/CLAUDE.md` for non-main groups), substituting the assistant name if it differs from the default
+- Ensures a corresponding OneCLI agent exists (best-effort, non-blocking)
 - Stores group configuration in database
 - Rejects registration if folder is invalid
 

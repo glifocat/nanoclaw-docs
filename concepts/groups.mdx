@@ -243,9 +243,12 @@ When a group's container is already active, new messages are piped directly to t
 Non-main groups require a trigger pattern to activate:
 
 - **Default pattern**: `@{ASSISTANT_NAME}` (case insensitive)
-- **Configured via**: `ASSISTANT_NAME` environment variable
-- **Example**: `@Andy` if `ASSISTANT_NAME=Andy`
+- **Per-group override**: Each group can set its own `trigger` value during registration
+- **Configured via**: `ASSISTANT_NAME` environment variable (sets the default)
+- **Example**: `@Andy` if `ASSISTANT_NAME=Andy`, or `@Bot` if the group registered with `trigger: "@Bot"`
 - **Can be disabled**: Set `requiresTrigger: false` in group config
+
+When processing messages, NanoClaw resolves the trigger pattern per-group using `getTriggerPattern(group.trigger)`. If the group has no custom trigger, the default `@{ASSISTANT_NAME}` is used.
 
 **Why triggers are required:**
 
@@ -316,11 +319,12 @@ Additional mounts bypass group isolation. Only mount directories that are safe f
 
 1. Main group sends registration command
 2. Folder created under `groups/{folder}/`
-3. Session directory created under `data/sessions/{folder}/`
-4. IPC directory created under `data/ipc/{folder}/`
-5. Skills synced to `.claude/skills/`
-6. Agent runner source copied to `agent-runner-src/`
-7. Group added to database
+3. `CLAUDE.md` template copied from `groups/main/CLAUDE.md` (for main groups) or `groups/global/CLAUDE.md` (for non-main groups), with the assistant name substituted if different from the default
+4. Session directory created under `data/sessions/{folder}/`
+5. IPC directory created under `data/ipc/{folder}/`
+6. Skills synced to `.claude/skills/`
+7. Agent runner source copied to `agent-runner-src/`
+8. Group added to database
 
 ### Active operation
 
