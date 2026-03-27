@@ -136,7 +136,7 @@ The IPC watcher (`src/ipc.ts`) enables container-to-host communication:
 - Each group has isolated IPC namespace
 
 **Available operations:**
-- `send_message`: Send message to group chat (own chat only for non-main)
+- `send_message`: Send message to group chat (own chat only for non-main; optional `sender` parameter sets role identity)
 - `schedule_task`, `pause_task`, `resume_task`, `cancel_task`, `update_task`: Task management
 - `register_group`, `refresh_groups`: Group management (main only)
 

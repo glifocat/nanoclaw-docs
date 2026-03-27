@@ -177,21 +177,7 @@ setTimeout(() => {
 
 Tasks can run in two context modes:
 
-### Isolated context (default)
-
-- Fresh Claude session for each run
-- No conversation history from previous runs
-- No conversation history from group chat
-- Stateless execution (each run is independent)
-
-**Use cases:**
-
-- Status checks that don't need history
-- Periodic data fetching
-- Health monitoring
-- Any task that should start fresh each time
-
-### Group context
+### Group context (default)
 
 - Uses the group's current Claude session
 - Has access to conversation history
@@ -204,6 +190,20 @@ Tasks can run in two context modes:
 - Tasks that build on previous interactions
 - Context-aware notifications
 - Any task that should feel like part of the conversation
+
+### Isolated context
+
+- Fresh Claude session for each run
+- No conversation history from previous runs
+- No conversation history from group chat
+- Stateless execution (each run is independent)
+
+**Use cases:**
+
+- Status checks that don't need history
+- Periodic data fetching
+- Health monitoring
+- Any task that should start fresh each time
 
 **Database field:**
 
@@ -339,9 +339,12 @@ Tasks can send messages to their group chat using the `send_message` tool:
 ```typescript
 // Inside task prompt:
 await claudeCode.tools.send_message({
-  text: "Website is down! Last checked: " + new Date().toISOString()
+  text: "Website is down! Last checked: " + new Date().toISOString(),
+  sender: "Monitor"  // Optional: role name (appears as dedicated bot in Telegram)
 });
 ```
+
+The optional `sender` parameter sets a role or identity name (e.g. "Researcher", "Monitor"). When set, messages appear from a dedicated bot in Telegram.
 
 **Authorization:**
 

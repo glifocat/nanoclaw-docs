@@ -282,7 +282,9 @@ case 'register_group':
     break;
   }
   if (data.jid && data.name && data.folder && data.trigger) {
-    // Defense in depth: isMain is never set via IPC
+    // Defense in depth: preserve existing isMain flag from database
+    // so IPC config updates cannot strip it
+    const existingGroup = registeredGroups[data.jid];
     deps.registerGroup(data.jid, {
       name: data.name,
       folder: data.folder,
@@ -290,6 +292,7 @@ case 'register_group':
       added_at: new Date().toISOString(),
       containerConfig: data.containerConfig,
       requiresTrigger: data.requiresTrigger,
+      isMain: existingGroup?.isMain,
     });
   }
 ```

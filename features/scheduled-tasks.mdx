@@ -135,20 +135,20 @@ The scheduler checks for due tasks every 60 seconds.
 Tasks can run in two context modes:
 
 <CodeGroup>
-```typescript Isolated (default)
-// Each task run gets a fresh session
-context_mode: 'isolated'
-```
-
-```typescript Group context
+```typescript Group context (default)
 // Task uses the group's ongoing session
 context_mode: 'group'
 ```
+
+```typescript Isolated
+// Each task run gets a fresh session
+context_mode: 'isolated'
+```
 </CodeGroup>
 
-**Isolated mode** is recommended for most tasks - each run is independent and won't be affected by previous conversations.
+**Group context mode** (default) allows tasks to build on previous context and remember information across runs. Useful for tasks that need continuity.
 
-**Group context mode** allows tasks to build on previous context and remember information across runs. Useful for tasks that need continuity.
+**Isolated mode** is recommended for stateless tasks — each run is independent and won't be affected by previous conversations.
 
 ## Task lifecycle
 
@@ -198,18 +198,30 @@ if (task.schedule_type === 'cron') {
 
 ## Timezone configuration
 
-Tasks use the system timezone by default:
+Tasks use the system timezone by default. The timezone is resolved through a validation chain:
 
 ```typescript
 // From src/config.ts
-export const TIMEZONE =
-  process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+function resolveConfigTimezone(): string {
+  const candidates = [
+    process.env.TZ,
+    envConfig.TZ,  // from .env file
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  ];
+  for (const tz of candidates) {
+    if (tz && isValidTimezone(tz)) return tz;
+  }
+  return 'UTC';
+}
+export const TIMEZONE = resolveConfigTimezone();
 ```
 
-To override, set the `TZ` environment variable:
+Each candidate is validated as a real IANA timezone identifier before being accepted. If none are valid, it falls back to `UTC`.
+
+To override, set the `TZ` environment variable or add it to your `.env` file:
 
 ```bash
-export TZ="America/New_York"
+TZ="America/New_York"
 ```
 
 ## Task management
