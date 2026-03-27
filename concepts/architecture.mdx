@@ -51,7 +51,7 @@ The router (`src/index.ts`) is the central orchestrator:
 - Polls SQLite database every 2 seconds for new messages
 - Filters messages by registered groups only
 - Checks for trigger pattern (`@{ASSISTANT_NAME}`)
-- Maintains cursor state to track processed messages
+- Maintains cursor state to track processed messages (with automatic recovery from last bot reply)
 - Routes messages to the appropriate group queue
 
 <Info>
@@ -144,7 +144,7 @@ The IPC watcher (`src/ipc.ts`) enables container-to-host communication:
 
 SQLite database (`store/messages.db`) stores:
 
-- **messages**: All messages with timestamps, sender info, and bot-message flag (queries capped at 200 per invocation)
+- **messages**: All messages with timestamps, sender info, and bot-message flag (agent prompts capped at `MAX_MESSAGES_PER_PROMPT`, default 10)
 - **chats**: Chat metadata (name, last activity, channel, is_group)
 - **sessions**: Claude session IDs per group folder
 - **registered_groups**: Active groups with folder, trigger, container config, is_main flag

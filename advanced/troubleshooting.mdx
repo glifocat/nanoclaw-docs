@@ -223,6 +223,10 @@ If you need to manually reset the cursor, update it in `router_state`:
 SELECT value FROM router_state WHERE key = 'last_agent_timestamp';
 ```
 
+### Cursor recovery
+
+When the message cursor is missing (new group, corrupted state, or restart), NanoClaw automatically recovers it from the last bot reply timestamp in the database. This prevents the full message history from being sent to the agent as a prompt. If no bot reply exists, the `MAX_MESSAGES_PER_PROMPT` cap (default 10) ensures only recent messages are included.
+
 ### IDLE_TIMEOUT and CONTAINER_TIMEOUT
 
 The hard timeout is calculated as `Math.max(configTimeout, IDLE_TIMEOUT + 30_000)`, ensuring a 30-second gap for graceful `_close` sentinel shutdown before the hard kill fires. With default settings (both 30 minutes), the hard timeout is 30 minutes 30 seconds.

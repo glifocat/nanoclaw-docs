@@ -48,6 +48,10 @@ Configuration is read from `.env` file or `process.env`.
   </Tab>
 </Tabs>
 
+<ParamField path="MAX_MESSAGES_PER_PROMPT" type="number" default="10">
+  Maximum number of messages included in each agent prompt. Caps all message retrieval queries (initial processing, piped follow-ups, and crash recovery). Must be at least 1.
+</ParamField>
+
 <ParamField path="MAX_CONCURRENT_CONTAINERS" type="number" default="5">
   Maximum number of concurrent agent containers.
 </ParamField>
@@ -140,6 +144,7 @@ Each candidate is validated as a real IANA timezone identifier before being acce
     ASSISTANT_HAS_OWN_NUMBER=false
     CONTAINER_TIMEOUT=1800000
     MAX_CONCURRENT_CONTAINERS=5
+    MAX_MESSAGES_PER_PROMPT=10
     TZ=America/Los_Angeles
     ONECLI_URL=http://127.0.0.1:10254
     ```
@@ -155,6 +160,7 @@ Each candidate is validated as a real IANA timezone identifier before being acce
     ASSISTANT_HAS_OWN_NUMBER=false
     CONTAINER_TIMEOUT=1800000
     MAX_CONCURRENT_CONTAINERS=5
+    MAX_MESSAGES_PER_PROMPT=10
     TZ=America/Los_Angeles
     ```
   </Tab>

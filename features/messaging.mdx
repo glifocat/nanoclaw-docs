@@ -20,7 +20,7 @@ NanoClaw processes messages through a polling-based architecture that connects m
   </Step>
   
   <Step title="Context gathering">
-    All messages since the last agent response are gathered for context
+    Recent messages since the last agent response are gathered for context (capped at `MAX_MESSAGES_PER_PROMPT`, default 10)
   </Step>
   
   <Step title="Agent invocation">
@@ -235,18 +235,27 @@ function storeMessage(msg: NewMessage): void {
 
 ### Message retrieval
 
+Messages sent to agent prompts are capped by `MAX_MESSAGES_PER_PROMPT` (default **10**, configurable via environment variable). This applies to all three retrieval paths: initial message processing, piped follow-ups to active containers, and crash recovery.
+
 ```typescript
-// Get messages since a specific timestamp (default limit: 200)
+// Get messages since a specific timestamp (capped at MAX_MESSAGES_PER_PROMPT)
 const messages = getMessagesSince(
   chatJid,
-  lastTimestamp,
-  ASSISTANT_NAME
+  getOrRecoverCursor(chatJid),
+  ASSISTANT_NAME,
+  MAX_MESSAGES_PER_PROMPT,
 );
 ```
 
 <Note>
-Both `getNewMessages` and `getMessagesSince` cap results at **200 messages** by default. The agent only sees the most recent 200 messages per invocation — older messages remain in the database but are not included in the agent's prompt. This prevents unbounded result sets and out-of-memory crashes in active groups.
+The prompt message cap (`MAX_MESSAGES_PER_PROMPT`) limits how many messages are included in each agent invocation. The underlying `getMessagesSince` query supports a separate database-level limit (default 200) to prevent unbounded result sets. Older messages remain in the database but are not included in the agent's prompt.
 </Note>
+
+### Cursor recovery
+
+When the message cursor (`lastAgentTimestamp`) is missing — for example, in a new group, after corrupted state, or on startup recovery — NanoClaw recovers it from the timestamp of the last bot reply in the database. This prevents the agent from receiving the full message history as its prompt.
+
+If no bot reply exists (brand-new group), the cursor defaults to empty and the message cap ensures only the most recent messages are sent.
 
 ## Configuration
 
