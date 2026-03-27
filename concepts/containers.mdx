@@ -202,7 +202,7 @@ All mounts are validated against the allowlist at `~/.config/nanoclaw/mount-allo
 3. Verify path is under an allowed root
 4. Enforce `nonMainReadOnly` for non-main groups
 5. Enforce per-root `allowReadWrite` setting
-6. Reject container paths with `..` or absolute paths
+6. Reject container paths with `..`, absolute paths, or colons (prevents Docker `-v` flag injection)
 
 ## Container lifecycle
 
@@ -444,7 +444,7 @@ The SDK runs with `permissionMode: 'bypassPermissions'` since containers already
 
 ### Conversation archival
 
-Before the SDK compacts context (when the conversation gets long), a `PreCompact` hook archives the full transcript to `/workspace/group/conversations/` as a markdown file. Files are named `{date}-{summary}.md` where the summary is derived from the session context. This preserves conversation history that would otherwise be lost during compaction.
+Before the SDK compacts context (when the conversation gets long), a `PreCompact` hook archives the transcript to `/workspace/group/conversations/` as a markdown file. Individual messages are truncated to 2,000 characters in the archived files. Files are named `{date}-{summary}.md` where the summary is derived from the session context. This preserves conversation history that would otherwise be lost during compaction.
 
 ### Global memory injection
 

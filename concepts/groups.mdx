@@ -72,7 +72,7 @@ interface RegisteredGroup {
   requiresTrigger?: boolean; // Default: true (false for main)
   isMain?: boolean;          // True for the main control group
   containerConfig?: {
-    timeout?: number;                    // Container timeout (ms)
+    timeout?: number;                    // Container timeout in ms (default: CONTAINER_TIMEOUT, 30 minutes)
     additionalMounts?: AdditionalMount[]; // Extra directories to mount
   };
 }

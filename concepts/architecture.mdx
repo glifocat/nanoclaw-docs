@@ -144,7 +144,7 @@ The IPC watcher (`src/ipc.ts`) enables container-to-host communication:
 
 SQLite database (`store/messages.db`) stores:
 
-- **messages**: All messages with timestamps, sender info, and bot-message flag (queries capped at 200 per invocation)
+- **messages**: All messages with timestamps, sender info, and bot-message flag (per-prompt limit controlled by `MAX_MESSAGES_PER_PROMPT`, default 10)
 - **chats**: Chat metadata (name, last activity, channel, is_group)
 - **sessions**: Claude session IDs per group folder
 - **registered_groups**: Active groups with folder, trigger, container config, is_main flag
@@ -319,7 +319,7 @@ In v1.2.22+, this step syncs OneCLI agents for all registered groups. In earlier
 
 On `SIGTERM` or `SIGINT`:
 
-1. GroupQueue enters shutdown mode (stops accepting new work)
+1. GroupQueue enters shutdown mode (stops accepting new work, 10-second grace period)
 2. Active containers are detached (not killed)
 3. Channels disconnect gracefully
 4. Process exits with code 0

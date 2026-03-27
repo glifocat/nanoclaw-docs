@@ -48,6 +48,10 @@ Configuration is read from `.env` file or `process.env`.
   </Tab>
 </Tabs>
 
+<ParamField path="MAX_MESSAGES_PER_PROMPT" type="number" default="10">
+  Maximum number of messages included in each agent prompt. The underlying database functions accept up to 200 as a fallback, but this value controls the actual per-prompt cap.
+</ParamField>
+
 <ParamField path="MAX_CONCURRENT_CONTAINERS" type="number" default="5">
   Maximum number of concurrent agent containers.
 </ParamField>
