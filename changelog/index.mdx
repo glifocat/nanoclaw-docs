@@ -5,6 +5,10 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v1.2.35" description="2026-03-26" tags={["Breaking", "Security"]}>
+  - **[BREAKING]** OneCLI Agent Vault replaces the built-in credential proxy. Existing `.env` credentials must be migrated to the vault. Run `/init-onecli` to install OneCLI and migrate credentials.
+</Update>
+
 <Update label="v1.2.34" description="2026-03-25" tags={["Fix", "Skill", "Channel"]}>
   - Added `/add-emacs` channel skill (contributed by @kenbolton)
   - Fixed mount-allowlist preservation — `/setup` no longer overwrites existing `mount-allowlist.json` (contributed by @akasha-scheuermann)

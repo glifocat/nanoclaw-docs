@@ -245,7 +245,7 @@ const messages = getMessagesSince(
 ```
 
 <Note>
-Both `getNewMessages` and `getMessagesSince` cap results at **200 messages** by default. The agent only sees the most recent 200 messages per invocation — older messages remain in the database but are not included in the agent's prompt. This prevents unbounded result sets and out-of-memory crashes in active groups.
+The message loop passes `MAX_MESSAGES_PER_PROMPT` (default **10**) as the query limit, so the agent sees at most 10 recent messages per invocation. The underlying database functions accept a configurable limit (up to 200), but the orchestrator enforces the lower cap. Older messages remain in the database but are not included in the agent's prompt. This keeps prompts focused and prevents unbounded context in active groups.
 </Note>
 
 ## Configuration

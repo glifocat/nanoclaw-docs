@@ -48,6 +48,10 @@ Configuration is read from `.env` file or `process.env`.
   </Tab>
 </Tabs>
 
+<ParamField path="MAX_MESSAGES_PER_PROMPT" type="number" default="10">
+  Maximum number of messages included in each agent prompt. The message loop passes this as the SQL query limit, so the agent sees at most this many recent messages per invocation. Minimum: 1.
+</ParamField>
+
 <ParamField path="MAX_CONCURRENT_CONTAINERS" type="number" default="5">
   Maximum number of concurrent agent containers.
 </ParamField>
@@ -64,6 +68,7 @@ Defined in `src/config.ts`:
 export const POLL_INTERVAL = 2000; // Message loop interval (ms)
 export const SCHEDULER_POLL_INTERVAL = 60000; // Task scheduler interval (ms)
 export const IPC_POLL_INTERVAL = 1000; // IPC watcher interval (ms)
+export const MAX_MESSAGES_PER_PROMPT = 10; // Max messages per agent invocation
 ```
 
 ## Directory paths
