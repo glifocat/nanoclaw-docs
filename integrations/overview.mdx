@@ -1,7 +1,8 @@
 ---
 title: Integrations overview
 description: Connect NanoClaw to your favorite messaging platforms and services
-keywords: ["integrations", "whatsapp", "telegram", "discord", "slack"]
+keywords: ["integrations", "whatsapp", "telegram", "discord", "slack", "emacs"]
+tag: "UPDATED"
 ---
 
 NanoClaw supports multiple communication channels and integrations, allowing you to interact with your AI assistant wherever you work.
@@ -29,6 +30,10 @@ All channels are installed via the [skills system](/integrations/skills-system).
 
   <Card title="Gmail" icon="envelope" href="/integrations/gmail">
     Add Gmail with `/add-gmail`. Use as a tool or full channel for email monitoring.
+  </Card>
+
+  <Card title="Emacs" icon="code" href="/integrations/skills-system#upstream-skills-from-skill-branches">
+    Add Emacs with `/add-emacs`. Chat buffer and org-mode integration via local HTTP bridge.
   </Card>
 </CardGroup>
 
@@ -63,6 +68,7 @@ To add an integration, use the corresponding skill command in Claude Code:
 /add-discord     # Add Discord
 /add-slack       # Add Slack
 /add-gmail       # Add Gmail
+/add-emacs       # Add Emacs
 ```
 
 Each skill will:

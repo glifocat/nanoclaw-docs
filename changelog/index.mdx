@@ -5,6 +5,22 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v1.2.37" description="2026-03-27" tags={["Maintenance"]}>
+  - Version bump (no functional changes)
+</Update>
+
+<Update label="v1.2.36" description="2026-03-27" tags={["Maintenance"]}>
+  - Version bump (no functional changes)
+</Update>
+
+<Update label="v1.2.35" description="2026-03-26" tags={["Breaking", "Maintenance"]}>
+  - **[BREAKING]** OneCLI Agent Vault formally replaces the built-in credential proxy. Existing `.env` credentials must be migrated to the vault. Run `/init-onecli` to install OneCLI and migrate credentials.
+  - Added `/add-macos-statusbar` skill — macOS menu bar status indicator with start/stop/restart controls
+  - Added `/add-emacs` skill — Emacs channel with interactive chat buffer and org-mode integration (contributed by @kenbolton)
+  - Removed phantom dependencies (`pino`, `pino-pretty`, `yaml`, `zod`) — core runtime now uses only `@onecli-sh/sdk`, `better-sqlite3`, and `cron-parser`
+  - Pinned `better-sqlite3` to `11.10.0` (was `^11.8.1`)
+</Update>
+
 <Update label="v1.2.34" description="2026-03-25" tags={["Fix", "Skill", "Channel"]}>
   - Added `/add-emacs` channel skill (contributed by @kenbolton)
   - Fixed mount-allowlist preservation — `/setup` no longer overwrites existing `mount-allowlist.json` (contributed by @akasha-scheuermann)
