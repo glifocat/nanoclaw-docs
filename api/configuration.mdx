@@ -34,26 +34,28 @@ Configuration is read from `.env` file or `process.env`.
   How long to keep container alive after last result in milliseconds (default: 30 minutes).
 </ParamField>
 
-<Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
-    <ParamField path="ONECLI_URL" type="string" default="http://localhost:10254">
-      URL for the OneCLI gateway that handles credential injection for containers.
-    </ParamField>
-  </Tab>
+<ParamField path="ONECLI_URL" type="string" default="http://localhost:10254">
+  URL for the OneCLI gateway that handles credential injection for containers.
+</ParamField>
 
-  <Tab title="Credential Proxy (legacy)">
-    <ParamField path="CREDENTIAL_PROXY_PORT" type="number" default="3001">
-      Port for the credential proxy that containers route API calls through.
-    </ParamField>
-  </Tab>
-</Tabs>
+<Note>
+The built-in credential proxy was removed in favor of OneCLI. If you need the legacy `.env`-based proxy, apply the `/use-native-credential-proxy` skill.
+</Note>
+
+<ParamField path="MAX_MESSAGES_PER_PROMPT" type="number" default="10">
+  Maximum number of messages included in a single agent prompt. The agent sees only the most recent messages per invocation — older messages remain in the database but are not included.
+</ParamField>
 
 <ParamField path="MAX_CONCURRENT_CONTAINERS" type="number" default="5">
   Maximum number of concurrent agent containers.
 </ParamField>
 
+<ParamField path="LOG_LEVEL" type="string" default="info">
+  Log verbosity. Valid values: `debug`, `info`, `warn`, `error`, `fatal`. Logs at `warn` and above go to stderr; `info` and `debug` go to stdout.
+</ParamField>
+
 <ParamField path="TZ" type="string" default="system timezone">
-  Timezone for scheduled tasks (cron expressions). Uses `Intl.DateTimeFormat().resolvedOptions().timeZone` by default.
+  Timezone for scheduled tasks (cron expressions). Resolution order: `process.env.TZ`, `.env` file `TZ`, `Intl.DateTimeFormat().resolvedOptions().timeZone`, then `UTC`. Each candidate is validated as a real IANA identifier before being accepted.
 </ParamField>
 
 ## Configuration constants

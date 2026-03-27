@@ -22,14 +22,17 @@ docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
 # 3. Any stopped/orphaned containers?
 docker ps -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
 
-# 4. Recent errors in service log?
-grep -E 'ERROR|WARN' logs/nanoclaw.log | tail -20
+# 4. Recent errors in service log? (macOS / Linux)
+# macOS (launchd): logs go to stdout/stderr of the service
+log show --predicate 'process == "node"' --last 10m | grep -E 'ERROR|WARN' | tail -20
+# Linux (systemd): use journalctl
+journalctl --user -u nanoclaw --no-pager -n 50 | grep -E 'ERROR|WARN'
 
 # 5. Are channels connected? (look for last connection event)
-grep -E 'Connected|Connection closed|connection.*close' logs/nanoclaw.log | tail -5
+journalctl --user -u nanoclaw --no-pager -n 100 | grep -E 'Connected|Connection closed'
 
 # 6. Are groups loaded?
-grep 'groupCount' logs/nanoclaw.log | tail -3
+journalctl --user -u nanoclaw --no-pager -n 50 | grep 'groupCount'
 ```
 
 ## Agent not responding
@@ -42,7 +45,7 @@ Messages sent to the agent receive no response.
 <Steps>
   <Step title="Check if messages are being received">
     ```bash
-    grep 'New messages' logs/nanoclaw.log | tail -10
+    journalctl --user -u nanoclaw --no-pager -n 100 | grep 'New messages'
     ```
     
     If no messages appear, the issue is with channel connectivity.
@@ -50,7 +53,7 @@ Messages sent to the agent receive no response.
   
   <Step title="Check if containers are being spawned">
     ```bash
-    grep -E 'Processing messages|Spawning container' logs/nanoclaw.log | tail -10
+    journalctl --user -u nanoclaw --no-pager -n 100 | grep -E 'Processing messages|Spawning container'
     ```
     
     If messages are received but no containers spawn, check trigger patterns.
@@ -79,7 +82,7 @@ Messages sent to the agent receive no response.
   Verify the trigger word in your message matches the configured trigger:
   
   ```bash
-  sqlite3 store/messages.db "SELECT name, trigger FROM registered_groups;"
+  sqlite3 store/messages.db "SELECT name, trigger_pattern FROM registered_groups;"
   ```
   
   The trigger is case-insensitive and must appear at the start of the message.
@@ -100,9 +103,9 @@ Messages sent to the agent receive no response.
 <Accordion title="Queue at concurrency limit">
   Check if the queue is blocked:
   
-  ```bash
-  grep 'concurrency limit' logs/nanoclaw.log | tail -5
-  ```
+    ```bash
+    journalctl --user -u nanoclaw --no-pager -n 100 | grep 'concurrency limit'
+    ```
   
   Stop stuck containers:
   
@@ -122,7 +125,7 @@ Messages sent to the agent receive no response.
 
 ```bash
 # Check for recent timeouts
-grep -E 'Container timeout|timed out' logs/nanoclaw.log | tail -10
+journalctl --user -u nanoclaw --no-pager -n 200 | grep -E 'Container timeout|timed out'
 
 # Check container log files
 ls -lt groups/*/logs/container-*.log | head -10
@@ -246,7 +249,7 @@ If containers are consistently hitting the hard timeout, consider lowering `IDLE
 
 ```bash
 # Check for QR code requests
-grep 'QR\|authentication required\|qr' logs/nanoclaw.log | tail -5
+journalctl --user -u nanoclaw --no-pager -n 200 | grep -E 'QR|authentication required|qr'
 
 # Check auth files exist
 ls -la store/auth/
@@ -284,7 +287,7 @@ systemctl --user restart nanoclaw
 
 ```bash
 # Check mount validation logs
-grep -E 'Mount validated|Mount.*REJECTED|mount' logs/nanoclaw.log | tail -10
+journalctl --user -u nanoclaw --no-pager -n 200 | grep -E 'Mount validated|Mount.*REJECTED|mount'
 
 # Verify the mount allowlist is readable
 cat ~/.config/nanoclaw/mount-allowlist.json
@@ -362,12 +365,8 @@ sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;
 ### Diagnosis
 
 ```bash
-# Check for failed IPC operations
-ls -la data/ipc/errors/
-cat data/ipc/errors/main-message-*.json
-
 # Monitor IPC activity
-grep 'IPC' logs/nanoclaw.log | tail -20
+journalctl --user -u nanoclaw --no-pager -n 100 | grep 'IPC'
 
 # Verify IPC directory permissions
 ls -la data/ipc/main/
@@ -399,8 +398,8 @@ ls -la data/ipc/family-chat/
   echo '{"type":"message","chatJid":"me","text":"test"}' > \
     data/ipc/main/messages/test.json
   
-  # Watch logs for processing
-  tail -f logs/nanoclaw.log | grep IPC
+   # Watch logs for processing (Linux)
+  journalctl --user -u nanoclaw -f | grep IPC
   ```
 </Accordion>
 
@@ -449,9 +448,15 @@ launchctl kickstart -k gui/$(id -u)/com.nanoclaw
 
 ### View live logs
 
-```bash
-tail -f logs/nanoclaw.log
+<CodeGroup>
+```bash macOS
+log stream --predicate 'process == "node"' --level info
 ```
+
+```bash Linux
+journalctl --user -u nanoclaw -f
+```
+</CodeGroup>
 
 ### Stop the service
 
