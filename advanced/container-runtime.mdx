@@ -192,7 +192,7 @@ export async function runContainerAgent(
   </Step>
   
   <Step title="Generate container name">
-    Each container gets a unique name: `nanoclaw-{group}-{timestamp}`
+    Each container gets a unique name: `nanoclaw-{group}-{timestamp}`. Container names are validated against `^[a-zA-Z0-9][a-zA-Z0-9_.-]*$` before any stop operation, rejecting names with shell metacharacters to prevent command injection.
   </Step>
   
   <Step title="Spawn container process">
@@ -368,11 +368,11 @@ const killOnTimeout = () => {
     { group: group.name, containerName },
     'Container timeout, stopping gracefully',
   );
-  exec(stopContainer(containerName), { timeout: 15000 }, (err) => {
-    if (err) {
-      container.kill('SIGKILL');
-    }
-  });
+  try {
+    stopContainer(containerName);  // validates name, then execSync stop
+  } catch (err) {
+    container.kill('SIGKILL');
+  }
 };
 
 let timeout = setTimeout(killOnTimeout, timeoutMs);
@@ -424,7 +424,7 @@ export function cleanupOrphans(): void {
     const orphans = output.trim().split('\n').filter(Boolean);
     for (const name of orphans) {
       try {
-        execSync(stopContainer(name), { stdio: 'pipe' });
+        stopContainer(name);
       } catch {
         /* already stopped */
       }

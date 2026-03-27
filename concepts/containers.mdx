@@ -202,7 +202,7 @@ All mounts are validated against the allowlist at `~/.config/nanoclaw/mount-allo
 3. Verify path is under an allowed root
 4. Enforce `nonMainReadOnly` for non-main groups
 5. Enforce per-root `allowReadWrite` setting
-6. Reject container paths with `..` or absolute paths
+6. Reject container paths with `..`, absolute paths, or colons (`:` prevents Docker `-v` option injection)
 
 ## Container lifecycle
 
@@ -237,7 +237,7 @@ This ensures bind-mounted files are accessible (same uid on both sides).
 2. **Stdout streaming**: Parsed for output markers in real-time
 3. **Stderr logging**: Logged at debug level (SDK writes lots of debug info)
 4. **Timeout tracking**: Hard timeout with activity-based reset
-5. **Graceful shutdown**: `docker stop -t 1` (SIGTERM with 1-second grace), wrapped in a 15-second exec timeout. If the stop command itself hangs, the process is force-killed via `SIGKILL`
+5. **Graceful shutdown**: `stopContainer()` validates the container name then runs `docker stop -t 1` (SIGTERM with 1-second grace). Falls back to `SIGKILL` if the stop fails
 
 ### Cleanup
 
@@ -297,7 +297,7 @@ Two timeout mechanisms:
 - **Configurable**: Per-group via `containerConfig.timeout`
 - **Grace period**: At least `IDLE_TIMEOUT + 30s`
 - **Reset on activity**: Resets whenever output markers are parsed
-- **Enforcement**: `docker stop -t 1` (SIGTERM with 1-second grace), wrapped in a 15-second exec timeout. Falls back to `SIGKILL` if the stop command hangs
+- **Enforcement**: `stopContainer()` validates the container name against a strict pattern, then runs `docker stop -t 1` (SIGTERM with 1-second grace). Falls back to `SIGKILL` if the stop fails
 
 **Timeout after output:**
 
