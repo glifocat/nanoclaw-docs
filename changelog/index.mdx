@@ -5,6 +5,16 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v1.2.36" description="2026-03-27" tags={["Maintenance"]}>
+  - Updated token count to 42.0k tokens (21% of context window)
+  - Added new Claude Code skills: `/add-emacs`, `/add-macos-statusbar`, `/x-integration`, and more
+</Update>
+
+<Update label="v1.2.35" description="2026-03-26" tags={["Breaking", "Security"]}>
+  - **[BREAKING]** OneCLI Agent Vault formally replaces the built-in credential proxy. Existing `.env` credentials must be migrated to the vault. Run `/init-onecli` to install OneCLI and migrate credentials.
+  - The `/use-native-credential-proxy` skill remains available as an opt-in fallback for users who prefer the legacy proxy.
+</Update>
+
 <Update label="v1.2.34" description="2026-03-25" tags={["Fix", "Skill", "Channel"]}>
   - Added `/add-emacs` channel skill (contributed by @kenbolton)
   - Fixed mount-allowlist preservation — `/setup` no longer overwrites existing `mount-allowlist.json` (contributed by @akasha-scheuermann)
