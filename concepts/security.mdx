@@ -97,6 +97,7 @@ The mount allowlist is the security control that prevents agents from accessing 
 
 - **Symlink resolution** before validation (prevents traversal attacks)
 - **Container path validation** (rejects `..` and absolute paths)
+- **Container path colon rejection** (prevents Docker `-v` option injection, e.g. `repo:rw` overriding readonly flags)
 - **`nonMainReadOnly` option** forces read-only for non-main groups
 
 Example allowlist:
