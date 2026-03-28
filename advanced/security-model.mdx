@@ -57,12 +57,13 @@ Mount permissions are stored at `~/.config/nanoclaw/mount-allowlist.json`, which
 
 - Symlink resolution before validation (prevents traversal attacks)
 - Container path validation (rejects `..` and absolute paths)
+- Container path colon rejection (prevents Docker `-v` option injection, e.g. `repo:rw` overriding readonly flags)
 - `nonMainReadOnly` option forces read-only for non-main groups
 
 See `src/mount-security.ts` for the validation implementation.
 
 <Warning>
-The mount allowlist is cached in memory for the lifetime of the host process. Changes to `mount-allowlist.json` require a restart to take effect. This is different from the sender allowlist, which is reloaded on every message cycle.
+The mount allowlist is cached in memory after first successful load. Changes to `mount-allowlist.json` require a restart to take effect. However, if the file does not exist at startup, it is not permanently cached as missing — NanoClaw will detect the file if it is created later without a restart.
 </Warning>
 
 **Read-only project root**

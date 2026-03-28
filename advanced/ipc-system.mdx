@@ -277,7 +277,7 @@ case 'refresh_groups':
 
 ### Register group
 
-Registers a new group for agent access. **Main group only.**
+Registers or updates a group for agent access. **Main group only.**
 
 **Format:**
 ```json
@@ -294,6 +294,10 @@ Registers a new group for agent access. **Main group only.**
   }
 }
 ```
+
+<Note>
+When updating an existing group via `register_group`, the `isMain` flag is preserved from the current registration. This prevents IPC configuration updates (e.g. adding mounts) from accidentally stripping the main group's privileged status.
+</Note>
 
 ## Task snapshot refresh
 

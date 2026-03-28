@@ -375,7 +375,7 @@ sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;
   }
   ```
   
-  Then restart the service.
+  Then restart the service. If the mount allowlist file did not exist at startup, NanoClaw will detect it once created without requiring a restart.
 </Accordion>
 
 <Accordion title="Reset mount allowlist to defaults">
