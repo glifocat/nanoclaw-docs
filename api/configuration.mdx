@@ -182,7 +182,7 @@ Each candidate is validated as a real IANA timezone identifier before being acce
     </ParamField>
 
     <ParamField path="CLAUDE_CODE_OAUTH_TOKEN" type="string">
-      OAuth token for Claude Code authentication. Used when `ANTHROPIC_API_KEY` is not set.
+      OAuth token for Claude Code authentication. Used when `ANTHROPIC_API_KEY` is not set. Must be a long-lived token from `claude setup-token` — short-lived tokens from the system keychain expire within hours and cause container 401 errors.
     </ParamField>
 
     <ParamField path="ANTHROPIC_AUTH_TOKEN" type="string">

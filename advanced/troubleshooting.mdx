@@ -264,6 +264,40 @@ If you need Kubernetes enabled, set `CONTAINER_IMAGE` to an image stored in a re
 
 **Fix:** Already fixed. The agent runner now passes `resumeSessionAt` with the last assistant message UUID to explicitly anchor each resume.
 
+## Container 401 errors
+
+### Symptoms
+- Container logs show `401 Unauthorized` or `authentication_error` on API calls
+- Agent starts but fails immediately when trying to respond
+- Errors recur every few hours even after restarting
+
+### Cause
+
+Short-lived OAuth tokens copied from the system keychain or `~/.claude/.credentials.json` expire within hours. These tokens share the same `sk-ant-oat01-` prefix as long-lived tokens, so the mistake isn't obvious. When they expire, every container launch fails with a 401.
+
+### Solution
+
+Use one of these credential types instead:
+
+- **Long-lived OAuth token**: Run `claude setup-token` and add the resulting `CLAUDE_CODE_OAUTH_TOKEN` to `.env`
+- **API key**: Get a key from [console.anthropic.com](https://console.anthropic.com) and add `ANTHROPIC_API_KEY` to `.env`
+
+After updating credentials, restart the service:
+
+<CodeGroup>
+```bash macOS
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+```
+
+```bash Linux
+systemctl --user restart nanoclaw
+```
+</CodeGroup>
+
+<Warning>
+Never copy tokens from `~/.claude/.credentials.json` into `.env`. These are short-lived keychain tokens that expire within hours. Use `claude setup-token` to generate a long-lived token instead.
+</Warning>
+
 ## WhatsApp authentication issues
 
 ### Symptoms

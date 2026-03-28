@@ -223,7 +223,7 @@ The sender allowlist complements container isolation. Containers protect against
     - Runs on the host as an HTTP proxy (default port 3001, configurable via `CREDENTIAL_PROXY_PORT`)
     - Containers send API requests to the proxy with a placeholder token
     - Reads credentials from `.env` once at startup
-    - Supports API key mode (`ANTHROPIC_API_KEY`) and OAuth mode (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN`)
+    - Supports API key mode (`ANTHROPIC_API_KEY`) and OAuth mode (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN`). OAuth tokens must be long-lived (from `claude setup-token`) — short-lived keychain tokens expire within hours and cause recurring 401 errors
 
     **Credential injection behavior differs by auth mode:**
     - **API key mode**: The proxy replaces the `x-api-key` header on every outbound request
