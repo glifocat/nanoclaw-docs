@@ -52,6 +52,14 @@ Configuration is read from `.env` file or `process.env`.
   Maximum number of concurrent agent containers.
 </ParamField>
 
+<ParamField path="MAX_MESSAGES_PER_PROMPT" type="number" default="10">
+  Maximum number of recent messages included in each agent prompt. Clamped to a minimum of 1.
+</ParamField>
+
+<ParamField path="LOG_LEVEL" type="string" default="info">
+  Logging verbosity. Set to `debug` to enable verbose container logging (includes full prompt content in logs). Supported values: `debug`, `trace`, `info`, `warn`, `error`.
+</ParamField>
+
 <ParamField path="TZ" type="string" default="system timezone">
   Timezone for scheduled tasks (cron expressions). Uses `Intl.DateTimeFormat().resolvedOptions().timeZone` by default.
 </ParamField>

@@ -15,7 +15,7 @@ From the NanoClaw README:
 
 This approach means:
 
-- The base NanoClaw codebase stays small (~41.3k tokens)
+- The base NanoClaw codebase stays small (~42.4k tokens)
 - Each installation is customized to your exact needs
 - No configuration sprawl or unused features
 - The code remains understandable and modifiable
@@ -26,7 +26,7 @@ Skills are distributed as **git branches** on the upstream repository. Applying 
 
 ### Repository structure
 
-The upstream repo (`qwibitai/nanoclaw`) maintains skill branches for features that extend core functionality:
+The upstream repo (`qwibitai/nanoclaw`) maintains `skill/*` and `feat/*` branches for features that extend core functionality:
 
 | Branch | Description |
 |--------|-------------|
@@ -234,6 +234,16 @@ git fetch discord main
 git merge discord/main
 ```
 
+<Warning>
+Forward-merging `main` into a channel fork re-introduces upstream-only workflows (`bump-version.yml`, `update-tokens.yml`). Remove them after every forward merge:
+
+```bash
+git rm .github/workflows/bump-version.yml .github/workflows/update-tokens.yml 2>/dev/null
+```
+
+This recurs on every forward merge because `main` always contains those files.
+</Warning>
+
 ### Checking for skill updates
 
 Run `/update-skills` or let `/update-nanoclaw` check after a core update. For each previously-merged skill branch or channel fork that has new commits, Claude offers to merge the updates.
@@ -278,11 +288,11 @@ Users can also add marketplaces manually:
 
 A GitHub Action runs on every push to `main`:
 
-1. Lists all `skill/*` branches
-2. Merges `main` into each skill branch (merge-forward, not rebase)
+1. Lists all `skill/*` and `feat/*` branches
+2. Merges `main` into each branch (merge-forward, not rebase)
 3. Runs build and tests on the merged result
-4. Pushes the updated skill branch if tests pass
-5. Opens a GitHub issue for any skill that fails
+4. Pushes the updated branch if tests pass
+5. Opens a GitHub issue for any branch that fails
 
 <Note>
   Merge-forward (not rebase) preserves history for users who already merged the skill. No force-push needed.

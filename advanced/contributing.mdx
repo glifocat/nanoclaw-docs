@@ -1,6 +1,7 @@
 ---
 title: Contributing
 description: Guidelines for contributing to NanoClaw, including PR requirements, skill types, and code standards
+tag: "UPDATED"
 ---
 
 NanoClaw is designed to stay small and minimal. Contributions should prioritize reducing code, not adding features.
@@ -335,7 +336,7 @@ When contributing source code:
 - Prefer explicit over implicit
 
 <Note>
-NanoClaw doesn't use a linter or formatter. Code style is enforced through review. The goal is readability and simplicity, not stylistic uniformity.
+NanoClaw uses ESLint and Prettier, enforced via a Husky pre-commit hook. Run `npm run lint` and `npm run format:check` before submitting. The ESLint config includes `no-catch-all` to prevent swallowed errors and TypeScript-specific rules for unused variables and explicit `any`.
 </Note>
 
 ## Getting help
