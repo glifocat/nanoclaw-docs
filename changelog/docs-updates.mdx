@@ -5,6 +5,34 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Automated PR triage: v1.2.35–v1.2.42 sync" description="2026-03-28" tags={["Updated", "Fixed"]}>
+  Reviewed and triaged 27 automated Mintlify PRs (#92–#151). Merged 6, consolidated 7 into a single verified PR (#153), closed 15 (superseded, fabricated, or conflicting). Validated all changes against upstream source code at v1.2.42. Deleted 41 stale `mintlify/*` branches.
+
+  ## Updated
+  - **OneCLI rebrand**: Renamed "OneCLI Gateway" to "OneCLI Agent Vault" across 15 pages, updated URL to `github.com/onecli/onecli`. Code snippets preserved as-is (upstream source still uses "gateway" in code).
+  - **Message limits**: Corrected 200-message cap to `MAX_MESSAGES_PER_PROMPT` (default 10) across messaging, architecture, and configuration pages
+  - **Dependencies**: Removed phantom deps (`pino`, `pino-pretty`, `yaml`, `zod`), updated `better-sqlite3` to `11.10.0` and `cron-parser` to `5.5.0`
+  - **Token count**: Updated from ~41.3k to ~42.4k
+  - **Mount property**: Fixed `containerConfig.mounts` → `additionalMounts` with `hostPath`
+  - **SQL column**: Fixed `trigger` → `trigger_pattern` in troubleshooting query
+  - **Product changelog**: Added entries for v1.2.35 through v1.2.42
+
+  ## New sections
+  - **Telegram forum topics** (`integrations/telegram`) — `message_thread_id` tracking and automatic topic routing
+  - **Task scripts cost guidance** (`concepts/tasks`, `features/scheduled-tasks`, `api/task-scheduling`) — API credit awareness, testing guidance, when-not-to-use advice
+  - **Auth 401 troubleshooting** (`advanced/troubleshooting`) — short-lived vs long-lived OAuth tokens, `claude setup-token` fix
+  - **K8s image GC** (`advanced/troubleshooting`) — Rancher Desktop kubelet garbage collection known issue
+  - **Text-style formatting** (`features/messaging`) — corrected WhatsApp link rendering and Telegram Markdown v1 preservation
+  - **Security fixes** (`advanced/container-runtime`, `advanced/security-model`, `concepts/security`) — `stopContainer` name validation, mount path colon rejection, `isMain` preservation, allowlist caching behavior
+  - **Configuration**: Added `MAX_MESSAGES_PER_PROMPT` and `LOG_LEVEL` environment variables
+  - **Skills**: Added `/init-onecli` (operational) and `/add-emacs` (upstream)
+
+  ## Closed as invalid
+  - **#150**: Fabricated runtime-based credential routing — no such feature exists in upstream
+  - **#149**: Wrong `context_mode` default (`group` instead of actual `isolated`)
+  - **#134**: Promoted skill-only `OLLAMA_ADMIN_TOOLS` env var to core config
+</Update>
+
 <Update label="Automated PR triage: v1.2.24–v1.2.34 sync" description="2026-03-26" tags={["New", "Updated", "Fixed"]}>
   Reviewed and triaged 43 automated Mintlify PRs (#86–#128). Merged 8, closed 30 (superseded or inaccurate), kept 5 pending v1.2.35 release. Validated all changes against upstream source code at v1.2.34.
 
