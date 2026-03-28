@@ -35,9 +35,9 @@ Configuration is read from `.env` file or `process.env`.
 </ParamField>
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Agent Vault (v1.2.22+)">
     <ParamField path="ONECLI_URL" type="string" default="http://localhost:10254">
-      URL for the OneCLI gateway that handles credential injection for containers.
+      URL for the OneCLI Agent Vault that handles credential injection for containers.
     </ParamField>
   </Tab>
 
@@ -48,8 +48,16 @@ Configuration is read from `.env` file or `process.env`.
   </Tab>
 </Tabs>
 
+<ParamField path="MAX_MESSAGES_PER_PROMPT" type="number" default="10">
+  Maximum number of messages sent to container agents per prompt. Minimum value is 1. The database retrieval function defaults to 200 but in practice receives this value.
+</ParamField>
+
 <ParamField path="MAX_CONCURRENT_CONTAINERS" type="number" default="5">
   Maximum number of concurrent agent containers.
+</ParamField>
+
+<ParamField path="LOG_LEVEL" type="string" default="info">
+  Logging verbosity. Valid values: `debug`, `info`, `warn`, `error`, `fatal`.
 </ParamField>
 
 <ParamField path="TZ" type="string" default="system timezone">
@@ -134,7 +142,7 @@ Each candidate is validated as a real IANA timezone identifier before being acce
 ## Example .env file
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Agent Vault (v1.2.22+)">
     ```bash
     ASSISTANT_NAME=Andy
     ASSISTANT_HAS_OWN_NUMBER=false
@@ -145,7 +153,7 @@ Each candidate is validated as a real IANA timezone identifier before being acce
     ```
 
     <Note>
-    With the OneCLI gateway, API keys and OAuth tokens are no longer stored in `.env`. Secrets are managed via `onecli secrets create` and injected by the gateway at request time. The only credential-related variable is `ONECLI_URL`.
+    With the OneCLI Agent Vault, API keys and OAuth tokens are no longer stored in `.env`. Secrets are managed via `onecli secrets create` and injected by the vault at request time. The only credential-related variable is `ONECLI_URL`.
     </Note>
   </Tab>
 
@@ -163,7 +171,7 @@ Each candidate is validated as a real IANA timezone identifier before being acce
 ## Credential environment variables
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Agent Vault (v1.2.22+)">
     Credentials are managed externally via OneCLI — no credential environment variables are needed in `.env`.
 
     Register secrets with OneCLI using the CLI or dashboard:
@@ -202,10 +210,10 @@ Each candidate is validated as a real IANA timezone identifier before being acce
 ## Security notes
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Agent Vault (v1.2.22+)">
     - **Secrets** are never read by NanoClaw — OneCLI manages them externally
-    - The OneCLI gateway injects credentials into container API traffic at request time
-    - Containers cannot extract real credentials from the gateway
+    - The OneCLI Agent Vault injects credentials into container API traffic at request time
+    - Containers cannot extract real credentials from the vault
     - Mount allowlist is stored OUTSIDE project root and never mounted into containers
   </Tab>
 

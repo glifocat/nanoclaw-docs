@@ -238,16 +238,16 @@ For the full file format and API details, see the [security deep dive](/advanced
 ### 6. Credential handling
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
-    NanoClaw uses the [OneCLI](https://onecli.sh) gateway for centralized secret management. API keys are never stored in `.env` or exposed to containers — the gateway intercepts outbound API traffic from containers and injects credentials at request time.
+  <Tab title="OneCLI Agent Vault (v1.2.22+)">
+    NanoClaw uses the [OneCLI](https://github.com/onecli/onecli) Agent Vault for centralized secret management. API keys are never stored in `.env` or exposed to containers — the vault intercepts outbound API traffic from containers and injects credentials at request time.
 
     - Secrets are registered once via `onecli secrets create` (CLI or dashboard)
     - The host's `.env` file is shadowed with `/dev/null` when the project root is mounted, preventing containers from reading any residual secrets
     - Each non-main group gets its own OneCLI agent identifier, enabling per-group credential scoping
-    - If the OneCLI gateway is unreachable, the container starts with no credentials and logs a warning
+    - If the OneCLI Agent Vault is unreachable, the container starts with no credentials and logs a warning
 
     <Warning>
-    The OneCLI gateway prevents credential exposure to containers. However, containers can still make authenticated API requests through the gateway — they cannot extract the real credentials, but they can use them indirectly.
+    The OneCLI Agent Vault prevents credential exposure to containers. However, containers can still make authenticated API requests through the vault — they cannot extract the real credentials, but they can use them indirectly.
     </Warning>
   </Tab>
 

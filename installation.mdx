@@ -290,7 +290,7 @@ NanoClaw uses `better-sqlite3`, which requires native compilation.
 
 ### 5. OneCLI (v1.2.22+)
 
-Starting in v1.2.22, NanoClaw uses OneCLI for credential management. OneCLI is a local gateway that injects API keys into container traffic without exposing secrets.
+Starting in v1.2.22, NanoClaw uses OneCLI Agent Vault for credential management. OneCLI is a local vault that injects API keys into container traffic without exposing secrets.
 
 ```bash
 curl -fsSL onecli.sh/install | sh
@@ -302,7 +302,7 @@ Verify installation:
 onecli version
 ```
 
-Run `onecli --help` to see all available commands for managing secrets and gateway configuration.
+Run `onecli --help` to see all available commands for managing secrets and vault configuration.
 
 <Info>
 OneCLI is also installed automatically by the `/setup` skill if not already present. It's listed here so you know about the dependency upfront.
@@ -379,13 +379,9 @@ NanoClaw uses these core dependencies (from `package.json`):
 ```json
 {
   "dependencies": {
-    "@onecli-sh/sdk": "^0.2.0",     // OneCLI gateway integration (v1.2.22+)
-    "better-sqlite3": "^11.8.1",   // SQLite database
-    "cron-parser": "^5.5.0",       // Task scheduling
-    "pino": "^9.6.0",              // Logging
-    "pino-pretty": "^13.0.0",      // Log formatting
-    "yaml": "^2.8.2",              // YAML parsing
-    "zod": "^4.3.6"                // Schema validation
+    "@onecli-sh/sdk": "^0.2.0",    // OneCLI Agent Vault integration (v1.2.22+)
+    "better-sqlite3": "11.10.0",   // SQLite database
+    "cron-parser": "5.5.0"         // Task scheduling
   }
 }
 ```

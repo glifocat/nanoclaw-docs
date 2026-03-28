@@ -329,12 +329,12 @@ mounts.push({
 
 ### Mount allowlist
 
-Groups can request additional mounts via `containerConfig.mounts` in their registration:
+Groups can request additional mounts via `containerConfig.additionalMounts` in their registration:
 
 ```typescript
 containerConfig: {
-  mounts: [
-    { path: '/Users/you/Documents/vault', readonly: true }
+  additionalMounts: [
+    { hostPath: '/Users/you/Documents/vault', readonly: true }
   ]
 }
 ```

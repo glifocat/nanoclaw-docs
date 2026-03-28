@@ -195,14 +195,14 @@ The sender allowlist complements container isolation. Containers protect against
 ### Credential handling
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
-    NanoClaw delegates all credential management to the [OneCLI](https://onecli.sh) gateway. The host process never reads API keys — secrets are registered with OneCLI and injected into container traffic by the gateway.
+  <Tab title="OneCLI Agent Vault (v1.2.22+)">
+    NanoClaw delegates all credential management to the [OneCLI](https://github.com/onecli/onecli) Agent Vault. The host process never reads API keys — secrets are registered with OneCLI and injected into container traffic by the vault.
 
     **How it works:**
-    - The `@onecli-sh/sdk` package's `applyContainerConfig()` configures each container's network to route through the gateway
-    - The gateway intercepts HTTPS traffic to `api.anthropic.com` and injects the registered secret
+    - The `@onecli-sh/sdk` package's `applyContainerConfig()` configures each container's network to route through the vault
+    - The vault intercepts HTTPS traffic to `api.anthropic.com` and injects the registered secret
     - Each non-main group receives an `agentIdentifier` (derived from its folder name) for per-group credential scoping
-    - `ONECLI_URL` (default `http://localhost:10254`) configures the gateway address
+    - `ONECLI_URL` (default `http://localhost:10254`) configures the vault address
 
     **Container environment** (from `src/container-runner.ts`):
 
@@ -215,7 +215,7 @@ The sender allowlist complements container isolation. Containers protect against
     ```
 
     <Note>
-    If the OneCLI gateway is unreachable at container start, the container launches with no credentials. The agent will fail on API calls, and a warning is logged. Re-run after ensuring OneCLI is running (`curl http://127.0.0.1:10254/api/health`).
+    If the OneCLI Agent Vault is unreachable at container start, the container launches with no credentials. The agent will fail on API calls, and a warning is logged. Re-run after ensuring OneCLI is running (`curl http://127.0.0.1:10254/api/health`).
     </Note>
   </Tab>
 

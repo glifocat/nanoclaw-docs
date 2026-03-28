@@ -5,6 +5,45 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v1.2.42" description="2026-03-28" tags={["Feature"]}>
+  - Setup skill now routes credential system by container runtime: Docker uses OneCLI Agent Vault, Apple Container uses native credential proxy
+  - Marked Apple Container as experimental
+</Update>
+
+<Update label="v1.2.41" description="2026-03-28" tags={["Fix", "Maintenance"]}>
+  - Migrated `x-integration` host.ts from pino to built-in logger (follow-up to v1.2.36 cleanup)
+  - Fixed `stopContainer()` test compatibility — mocked container-runtime so tests don't require Docker
+  - Cleared stale Telegram token from `.env.example`
+</Update>
+
+<Update label="v1.2.40" description="2026-03-27" tags={["Fix"]}>
+  - Fixed message history overflow: when `lastAgentTimestamp` was missing, all 200 messages were sent to the agent instead of respecting `MAX_MESSAGES_PER_PROMPT` (default 10). Added cursor recovery from last bot reply.
+</Update>
+
+<Update label="v1.2.39" description="2026-03-27" tags={["Fix", "Security"]}>
+  - Security fixes: command injection prevention in `stopContainer` (name validation), mount path colon rejection, allowlist caching fix (contributed by @foxsky)
+</Update>
+
+<Update label="v1.2.38" description="2026-03-27" tags={["Fix"]}>
+  - Fixed `isMain` flag preservation on `register_group` IPC updates — prevents accidental privilege stripping (contributed by @snw35)
+</Update>
+
+<Update label="v1.2.37" description="2026-03-27" tags={["Fix"]}>
+  - Fixed `.env` parser crash on single-character values (contributed by @foxsky)
+</Update>
+
+<Update label="v1.2.36" description="2026-03-27" tags={["Maintenance", "Fix"]}>
+  - Replaced `pino` logger with built-in logger module — removes 2 runtime dependencies
+  - Removed `yaml` and `zod` dependencies — core runtime now uses only 3 packages
+  - Updated Ollama skill with admin model management tools
+  - Channel-formatting text-style fixes for WhatsApp and Telegram (contributed by @kenbolton)
+</Update>
+
+<Update label="v1.2.35" description="2026-03-26" tags={["Breaking"]}>
+  - **[BREAKING]** OneCLI Agent Vault replaces the built-in credential proxy. Run `/init-onecli` to install OneCLI and migrate credentials. The legacy credential proxy is available as an opt-in skill via `/use-native-credential-proxy`.
+  - Channel tokens (Telegram, Slack, Discord) remain in `.env` — only container-facing credentials (Anthropic, OpenAI, etc.) are migrated to the vault.
+</Update>
+
 <Update label="v1.2.34" description="2026-03-25" tags={["Fix", "Skill", "Channel"]}>
   - Added `/add-emacs` channel skill (contributed by @kenbolton)
   - Fixed mount-allowlist preservation — `/setup` no longer overwrites existing `mount-allowlist.json` (contributed by @akasha-scheuermann)
@@ -71,7 +110,7 @@ rss: true
 </Update>
 
 <Update label="v1.2.22" description="2026-03-24" tags={["Maintenance"]}>
-  - Replaced credential proxy with OneCLI gateway for container credential injection
+  - Replaced credential proxy with OneCLI Agent Vault for container credential injection
   - Updated token count to 40.7k tokens (20% of context window)
 </Update>
 
