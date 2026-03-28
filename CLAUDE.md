@@ -36,7 +36,7 @@ When editing docs, keep these architectural facts current:
 - **Channel forks:** Channels live in separate fork repos (`nanoclaw-whatsapp`, `nanoclaw-telegram`, etc.). Channel-specific skills (image-vision, voice-transcription, reactions, pdf-reader) live on the channel fork, not upstream.
 - **Removing a skill:** `git revert -m 1 <merge-commit>`, not manual file deletion.
 - **Source of truth for NanoClaw code:** https://github.com/qwibitai/nanoclaw
-- **Credential management (v1.2.22+):** OneCLI gateway is the default. The built-in credential proxy is available as an opt-in skill (`/use-native-credential-proxy`). Legacy tabs in docs cover both methods.
+- **Credential management (v1.2.35+):** OneCLI Agent Vault is the sole credential system. The built-in credential proxy is available as an opt-in skill (`/use-native-credential-proxy`). Legacy tabs in docs cover both methods. Note: upstream source code still uses "gateway" in code — docs prose says "Agent Vault" but code snippets must match actual source.
 
 ## PR Workflow
 
@@ -103,7 +103,7 @@ keywords: ["relevant", "search", "terms"]
 
 **Components available:** `<Note>`, `<Info>`, `<Tip>`, `<Warning>`, `<Check>`, `<Danger>`, `<Steps>/<Step>`, `<Tabs>/<Tab>`, `<CodeGroup>`, `<Columns>`, `<Card>`, `<AccordionGroup>/<Accordion>`, Mermaid diagrams, and more (see `/mintlify` skill for full list).
 
-**Version-gated features**: When documenting a breaking change where older versions are still valid, use `<Tabs>` with version labels (e.g., "OneCLI Gateway (v1.2.22+)" / "Credential Proxy (legacy)") for sections with substantial content, and `<Note>` callouts for passing references. Use version placeholders (`vX.Y.Z`) when the release version isn't confirmed yet.
+**Version-gated features**: When documenting a breaking change where older versions are still valid, use `<Tabs>` with version labels (e.g., "OneCLI Agent Vault (v1.2.22+)" / "Credential Proxy (legacy)") for sections with substantial content, and `<Note>` callouts for passing references. Use version placeholders (`vX.Y.Z`) when the release version isn't confirmed yet.
 
 **Directory trees:** Use `<Tree>` component (not ASCII art). See `reference/components.md` for syntax.
 
@@ -121,6 +121,11 @@ Mintlify workflows generate automated PRs (`mintlify/*` branches) on upstream ch
 - **Always verify claims against source**: `gh search code "<term>" repo:qwibitai/nanoclaw` or fetch files directly
 - **Check for overlapping PRs**: Multiple automated PRs often fix the same thing (e.g., table renames). Merge the most thorough one first, then cherry-pick unique changes from the rest.
 - **Common errors in automated PRs**: fabricated commit references, incorrect renames (verify exported types), speculative feature descriptions, `allowed-tools` or other frontmatter claims that don't exist in source
+- **Common fabrications found**: inventing env vars that only exist in skill SKILL.md files (not core config), inventing skill branches that don't exist, claiming runtime-based routing that doesn't exist in code, getting enum defaults wrong (e.g., `context_mode` default is `'isolated'` not `'group'`)
+- **Code snippets must match source**: Automated PRs sometimes rename terms in code snippets to match marketing (e.g., "gateway" → "Agent Vault" in logger.warn). Always compare code blocks against actual upstream files — docs prose uses product names but code must match `src/`.
+- **Cascading merge conflicts**: Merging one PR invalidates others touching the same files. When triaging a batch, merge isolated-file PRs first, then tackle overlapping clusters. Close conflicting PRs and consolidate verified changes into a single new PR.
+- **Bulk branch cleanup**: `gh api -X DELETE repos/OWNER/REPO/git/refs/heads/BRANCH` — use after closing automated PRs to prevent clutter
+- **Verify upstream PRs exist**: `gh pr view NUMBER --repo qwibitai/nanoclaw --json title,state` — automated PRs cite upstream PRs that may not exist
 - **Watch for destructive automated PRs**: PRs that remove legacy/deprecated content may conflict with intentional version-tabbed documentation. Verify the removal is actually desired before merging.
 - **"Superseded" PRs may have unique changes**: Always diff line-by-line before closing — never rely solely on PR descriptions
 - **After large manual docs PRs**: Check for and close overlapping automated `mintlify/*` PRs immediately after merge — they pile up fast on upstream releases
@@ -142,7 +147,7 @@ To PR changes to `qwibitai/nanoclaw` from Ethan's fork (`glifocat/nanoclaw-glifo
 
 ## Token Count
 
-Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated). Currently ~39.8k tokens. Update `introduction.mdx` and `integrations/skills-system.mdx` if the badge value changes significantly.
+Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated). Currently ~42.4k tokens. Update `introduction.mdx` and `integrations/skills-system.mdx` if the badge value changes significantly.
 
 ## Writing Standards
 
