@@ -135,8 +135,8 @@ When the channel-formatting skill is applied, outbound messages are automaticall
 
 | Channel | Transformation |
 |---------|---------------|
-| WhatsApp | `**bold**` → `*bold*`, `*italic*` → `_italic_`, headings → bold, links flattened |
-| Telegram | Same as WhatsApp |
+| WhatsApp | `**bold**` → `*bold*`, `*italic*` → `_italic_`, headings → bold, links → `text (url)` |
+| Telegram | Same as WhatsApp, but `[text](url)` links are preserved (Markdown v1 renders them natively) |
 | Slack | Same as WhatsApp, but links become `<url\|text>` |
 | Discord | Passthrough (Discord already renders Markdown) |
 | Signal | Passthrough for `parseTextStyles`; native `textStyle` ranges via `parseSignalStyles` |
