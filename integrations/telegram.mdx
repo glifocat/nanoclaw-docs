@@ -1,6 +1,7 @@
 ---
 title: Telegram integration
 description: Add Telegram support using the /add-telegram skill
+tag: "UPDATED"
 ---
 
 import SyncEnv from "/snippets/sync-env.mdx";
@@ -15,6 +16,7 @@ The Telegram integration uses the [grammy](https://grammy.dev/) library to conne
 ### Features
 
 - **Full channel support** - Direct messages, group chats, and channels
+- **Forum topics** - Replies land in the correct topic thread in supergroups
 - **Bot commands** - Built-in `/chatid` command for registration
 - **Typing indicators** - Shows when the assistant is working
 - **Concurrent chats** - Handle multiple conversations simultaneously
@@ -218,9 +220,31 @@ Telegram chats use the `tg:` prefix:
 - **Group chat:** `tg:-1001234567890`
 - **Channel:** `tg:-1001234567890`
 
+## Forum topics (supergroups)
+
+Telegram supergroups can enable [Topics](https://telegram.org/blog/topics-in-groups-collectible-usernames) to organize conversations into threads. The Telegram integration automatically tracks `message_thread_id` from incoming messages and routes replies to the correct topic.
+
+### How it works
+
+- When a user messages the bot from a specific topic, the bot extracts the `message_thread_id`
+- Replies and typing indicators are sent back to the same topic thread
+- Non-forum groups (without topics enabled) work as before — no configuration needed
+
+<Note>
+  Forum topics support requires no additional setup. The bot detects and tracks thread IDs automatically.
+</Note>
+
+### Enabling topics in a group
+
+1. Open your Telegram supergroup settings
+2. Go to **Topics** and enable them
+3. The bot will automatically reply within the correct topic
+
+If the bot was already added to the group before topics were enabled, no changes are needed — it picks up thread IDs from new incoming messages.
+
 ## Implementation details
 
-The Telegram channel implements the `Channel` interface:
+The Telegram channel implements the `Channel` interface. Incoming messages include the `thread_id` when sent from a forum topic, and outgoing messages route to the correct thread:
 
 ```typescript
 export class TelegramChannel implements Channel {
@@ -232,6 +256,7 @@ export class TelegramChannel implements Channel {
     // Handle text messages
     this.bot.on('message:text', async (ctx) => {
       const chatId = `tg:${ctx.chat.id}`;
+      const threadId = ctx.message.message_thread_id;
       this.opts.onMessage(chatId, {
         id: ctx.message.message_id.toString(),
         chat_jid: chatId,
@@ -241,15 +266,19 @@ export class TelegramChannel implements Channel {
         timestamp: new Date(ctx.message.date * 1000).toISOString(),
         is_from_me: ctx.from.is_bot,
         is_bot_message: ctx.from.id === this.bot.botInfo?.id,
+        thread_id: threadId ? threadId.toString() : undefined,
       });
     });
     
     await this.bot.start();
   }
   
-  async sendMessage(jid: string, text: string): Promise<void> {
+  async sendMessage(jid: string, text: string, threadId?: string): Promise<void> {
     const chatId = jid.replace('tg:', '');
-    await this.bot.api.sendMessage(chatId, text);
+    const options = threadId
+      ? { message_thread_id: parseInt(threadId, 10) }
+      : {};
+    await this.bot.api.sendMessage(chatId, text, options);
   }
 }
 ```
@@ -291,6 +320,18 @@ Check these common issues:
     For non-main chats with `requiresTrigger: true`, messages must include the trigger pattern (e.g., `@Andy`).
   </Accordion>
 </AccordionGroup>
+
+### Bot replies in General instead of the correct topic
+
+If your supergroup has topics enabled but the bot always replies in the General thread:
+
+1. Make sure you're running the latest version of the Telegram skill — topic support was added in the `message_thread_id` fix
+2. Re-merge the skill branch to pick up the update:
+   ```bash
+   git fetch telegram main
+   git merge telegram/main
+   ```
+3. Rebuild and restart NanoClaw
 
 ### Bot only responds to @mentions in groups
 
