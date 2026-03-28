@@ -338,7 +338,7 @@ Starts with no session, providing a fresh context for each execution.
 
 ## Task scripts
 
-Tasks can include an optional `script` field containing a bash script that runs inside the container **before** the agent wakes up. This is useful for lightweight checks that don't require a full agent invocation.
+Frequent agent invocations consume API credits and can risk account restrictions. If a simple check can determine whether action is needed, add a `script` to your task — it runs first, and the agent is only called when the check passes.
 
 ### Script execution
 
@@ -360,6 +360,22 @@ interface ScriptResult {
 }
 ```
 
+### Always test your script first
+
+Before scheduling, run the script in the sandbox to verify it works:
+
+```bash
+bash -c 'node --input-type=module -e "
+  const r = await fetch(\"https://api.github.com/repos/owner/repo/pulls?state=open\");
+  const prs = await r.json();
+  console.log(JSON.stringify({ wakeAgent: prs.length > 0, data: prs.slice(0, 5) }));
+"'
+```
+
+### When NOT to use scripts
+
+If a task requires agent judgment every time (daily briefings, reminders, reports), skip the script — just use a regular prompt.
+
 ### Constraints
 
 - **Timeout**: Scripts are killed after 30 seconds (`SCRIPT_TIMEOUT_MS`)
@@ -379,6 +395,10 @@ interface ScriptResult {
 ```
 
 In this example, the script checks for new GitHub issues. If there are none, `wakeAgent` is `false` and the agent never starts — saving resources. If there are new issues, the agent wakes up with the issue data pre-loaded in its prompt.
+
+<Note>
+For tasks running more than roughly twice a day, always include a script to minimize agent wake-ups. If the task needs an LLM to evaluate data, consider using direct Anthropic API calls inside the script instead of waking the agent.
+</Note>
 
 ## Configuration
 
