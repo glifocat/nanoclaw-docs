@@ -144,7 +144,7 @@ The IPC watcher (`src/ipc.ts`) enables container-to-host communication:
 
 SQLite database (`store/messages.db`) stores:
 
-- **messages**: All messages with timestamps, sender info, and bot-message flag (queries capped at 200 per invocation)
+- **messages**: All messages with timestamps, sender info, and bot-message flag (queries capped at `MAX_MESSAGES_PER_PROMPT` per invocation, default 10)
 - **chats**: Chat metadata (name, last activity, channel, is_group)
 - **sessions**: Claude session IDs per group folder
 - **registered_groups**: Active groups with folder, trigger, container config, is_main flag
@@ -300,7 +300,7 @@ The agent runner is the TypeScript code that wraps Claude Agent SDK. It handles 
 1. **Container system check**: Ensure Docker is running, clean up orphaned containers
 2. **Database initialization**: Create tables if needed, load schema
 3. **State loading**: Restore message cursors, sessions, registered groups
-4. **OneCLI agent sync**: Ensure each registered non-main group has a corresponding OneCLI agent for per-group credential scoping (best-effort, non-blocking)
+4. **OneCLI Agent Vault sync**: Ensure each registered non-main group has a corresponding OneCLI agent for per-group credential scoping (best-effort, non-blocking)
 
 <Note>
 In v1.2.22+, this step syncs OneCLI agents for all registered groups. In earlier versions, this starts the built-in credential proxy on `CREDENTIAL_PROXY_PORT`.

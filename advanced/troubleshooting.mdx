@@ -79,7 +79,7 @@ Messages sent to the agent receive no response.
   Verify the trigger word in your message matches the configured trigger:
   
   ```bash
-  sqlite3 store/messages.db "SELECT name, trigger FROM registered_groups;"
+  sqlite3 store/messages.db "SELECT name, trigger_pattern FROM registered_groups;"
   ```
   
   The trigger is case-insensitive and must appear at the start of the message.
