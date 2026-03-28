@@ -144,9 +144,13 @@ Here's what Claude Code does when you run `/setup`:
 
 <Accordion title="3. Claude authentication">
   - Asks if you have a Claude subscription (Pro/Max) or Anthropic API key
-  - **Subscription**: Guides you to run `claude setup-token` and add token to `.env`
+  - **Subscription**: Guides you to run `claude setup-token` and add the long-lived token to `.env` as `CLAUDE_CODE_OAUTH_TOKEN`
   - **API key**: Guides you to add `ANTHROPIC_API_KEY` to `.env`
   - These credentials allow agents to authenticate with Claude Code
+
+  <Warning>
+  Do not copy tokens from `~/.claude/.credentials.json` — these are short-lived keychain tokens that expire within hours and will cause container 401 errors. Always use `claude setup-token` for OAuth.
+  </Warning>
 </Accordion>
 
 <Accordion title="4. Upstream remote and marketplace">
