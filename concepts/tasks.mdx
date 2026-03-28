@@ -295,7 +295,7 @@ Canceling a task deletes all run history. Pause the task instead if you want to 
 
 ## Task scripts
 
-Tasks can include an optional `script` — a bash script that runs inside the container before the agent is invoked. This enables lightweight pre-checks without a full agent invocation.
+For any recurring task, use `schedule_task`. Frequent agent invocations — especially multiple times a day — consume API credits and can risk account restrictions. If a simple check can determine whether action is needed, add a `script` — it runs first, and the agent is only called when the check passes. This keeps invocations to a minimum.
 
 ### How scripts work
 
@@ -312,15 +312,36 @@ flowchart TD
     F -->|Error / no output| G
 ```
 
-The script must output a JSON object on its last line:
+1. You provide a bash `script` alongside the `prompt` when scheduling
+2. When the task fires, the script runs first (30-second timeout)
+3. The script prints JSON to stdout: `{ "wakeAgent": true/false, "data": {...} }`
+4. If `wakeAgent` is `false` — nothing happens, the task waits for the next run
+5. If `wakeAgent` is `true` — the agent wakes up and receives the script's data plus the prompt
 
-```json
-{"wakeAgent": true, "data": {"issues": [...]}}
+### Always test your script first
+
+Before scheduling, run the script in the sandbox to verify it works:
+
+```bash
+bash -c 'node --input-type=module -e "
+  const r = await fetch(\"https://api.github.com/repos/owner/repo/pulls?state=open\");
+  const prs = await r.json();
+  console.log(JSON.stringify({ wakeAgent: prs.length > 0, data: prs.slice(0, 5) }));
+"'
 ```
 
-- If `wakeAgent` is `false` (or the script fails), the container exits without invoking the agent
-- If `wakeAgent` is `true`, the agent prompt is enriched with the script's `data` field
-- Scripts have a 30-second timeout and 1 MB output limit
+### When NOT to use scripts
+
+If a task requires agent judgment every time (daily briefings, reminders, reports), skip the script — just use a regular prompt.
+
+### Frequent task guidance
+
+If a task needs to run more than roughly twice a day and a script can't reduce agent wake-ups:
+
+- Each wake-up uses API credits and risks rate limits
+- Restructure with a script that checks the condition first
+- If the task needs an LLM to evaluate data, consider using an API key with direct Anthropic API calls inside the script
+- Find the minimum viable frequency
 
 ### Use cases
 
@@ -415,14 +436,16 @@ Task privileges match the group's general privilege model. Main group can manage
 
 ## Task scheduling best practices
 
-1. **Use cron for wall-clock times**: "Every day at 9 AM" should be cron, not interval
-2. **Use interval for frequency-based**: "Every 5 minutes" should be interval, not cron
-3. **Start with isolated context**: Add group context only if needed
-4. **Include error handling**: Tasks should handle failures gracefully
-5. **Use descriptive prompts**: "Check website uptime" not "check status"
-6. **Monitor task_run_logs**: Failed tasks may indicate issues
-7. **Avoid very short intervals**: Respect container startup overhead (minimum ~5s)
-8. **Clean up completed one-time tasks**: Cancel or pause them to reduce clutter
+1. **Use scripts for frequent tasks**: Tasks running more than roughly twice a day should include a script to minimize unnecessary agent wake-ups and conserve API credits
+2. **Use cron for wall-clock times**: "Every day at 9 AM" should be cron, not interval
+3. **Use interval for frequency-based**: "Every 5 minutes" should be interval, not cron
+4. **Start with isolated context**: Add group context only if needed
+5. **Include error handling**: Tasks should handle failures gracefully
+6. **Use descriptive prompts**: "Check website uptime" not "check status"
+7. **Monitor task_run_logs**: Failed tasks may indicate issues
+8. **Avoid very short intervals**: Respect container startup overhead (minimum ~5s)
+9. **Clean up completed one-time tasks**: Cancel or pause them to reduce clutter
+10. **Test scripts before scheduling**: Always verify your script produces valid JSON output in the sandbox before deploying
 
 ## Common patterns
 

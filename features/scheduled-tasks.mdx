@@ -279,7 +279,15 @@ After any task mutation via IPC, the `current_tasks.json` snapshot is refreshed 
 
 ## Task scripts
 
-Tasks can include an optional pre-execution script — a bash script that runs inside the container before the agent is invoked. This is useful for lightweight checks that determine whether the agent should run at all.
+For any recurring task, use `schedule_task`. Frequent agent invocations — especially multiple times a day — consume API credits and can risk account restrictions. If a simple check can determine whether action is needed, add a `script` — it runs first, and the agent is only called when the check passes.
+
+### How it works
+
+1. You provide a bash `script` alongside the `prompt` when scheduling
+2. When the task fires, the script runs first (30-second timeout)
+3. The script prints JSON to stdout: `{ "wakeAgent": true/false, "data": {...} }`
+4. If `wakeAgent` is `false` — nothing happens, the task waits for the next run
+5. If `wakeAgent` is `true` — the agent wakes up and receives the script's data plus the prompt
 
 ### Creating a task with a script
 
@@ -297,6 +305,31 @@ The script must output a JSON object on its last line with a `wakeAgent` boolean
 
 - `{"wakeAgent": false}` — the container exits silently, no agent invocation
 - `{"wakeAgent": true, "data": {...}}` — the agent runs with the script data injected into its prompt
+
+### Always test your script first
+
+Before scheduling, run the script in the sandbox to verify it works:
+
+```bash
+bash -c 'node --input-type=module -e "
+  const r = await fetch(\"https://api.github.com/repos/owner/repo/pulls?state=open\");
+  const prs = await r.json();
+  console.log(JSON.stringify({ wakeAgent: prs.length > 0, data: prs.slice(0, 5) }));
+"'
+```
+
+### When NOT to use scripts
+
+If a task requires agent judgment every time (daily briefings, reminders, reports), skip the script — just use a regular prompt.
+
+### Frequent task guidance
+
+If a task needs to run more than roughly twice a day and a script can't reduce agent wake-ups:
+
+- Each wake-up uses API credits and risks rate limits
+- Restructure with a script that checks the condition first
+- If the task needs an LLM to evaluate data, consider using an API key with direct Anthropic API calls inside the script
+- Find the minimum viable frequency
 
 <Note>
 Scripts have a 30-second timeout and 1 MB output limit. If the script fails or produces no output, the agent is not invoked.
