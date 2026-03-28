@@ -10,8 +10,8 @@ NanoClaw runs agents in isolated Linux containers to provide security through OS
 
 All runtime-specific logic lives in `src/container-runtime.ts`, making it easy to swap runtimes. Currently supported:
 
-- **Docker** (default) - Cross-platform support (macOS, Linux, Windows via WSL2)
-- **Apple Container** (macOS only) - Lightweight native runtime
+- **Docker** (default, recommended) - Cross-platform support (macOS, Linux, Windows via WSL2)
+- **Apple Container** (macOS only, experimental) - Lightweight native runtime
 
 The runtime binary is specified by `CONTAINER_RUNTIME_BIN` in `src/container-runtime.ts`:
 
@@ -24,12 +24,17 @@ export const CONTAINER_RUNTIME_BIN = 'docker';
 
 Apple Container is Apple's native virtualization framework (macOS 15+). It runs Linux containers without a VM layer like Docker Desktop, making it lighter weight and faster to start.
 
+<Warning>
+Apple Container support is **experimental**. It requires advanced setup and uses the native credential proxy instead of OneCLI (which is incompatible with Apple Container). Docker is recommended for most users.
+</Warning>
+
 ### When to use Apple Container
 
 - You're on **macOS 15 (Sequoia) or later**
 - You want to **avoid installing Docker Desktop** (and its licensing)
 - You want **faster container startup** — no VM boot overhead
 - You're running NanoClaw on a personal Mac, not a shared server
+- You're comfortable with experimental features and advanced troubleshooting
 
 ### When to stick with Docker
 
@@ -37,6 +42,7 @@ Apple Container is Apple's native virtualization framework (macOS 15+). It runs 
 - You need **cross-platform parity** — Docker behaves identically across OS
 - You're deploying to a **production server** (Linux VPS, Hetzner, etc.)
 - You rely on Docker-specific tooling (Docker Compose, Portainer, etc.)
+- You want the default OneCLI credential management
 
 ### Key differences
 
@@ -48,7 +54,8 @@ Apple Container is Apple's native virtualization framework (macOS 15+). It runs 
 | Health check | `docker info` | `container system status` |
 | Orphan cleanup | Parses `docker ps --format` JSON | Parses `container ls --format json` |
 | Host gateway | Built-in on macOS, `--add-host` on Linux | Built-in (`host.docker.internal`) |
-| Platform | macOS, Linux, Windows (WSL2) | macOS 15+ only |
+| Credential system | OneCLI gateway | Native credential proxy (`.env`-based) |
+| Platform | macOS, Linux, Windows (WSL2) | macOS 15+ only (experimental) |
 
 ### Switching runtimes
 
@@ -228,7 +235,7 @@ export async function runContainerAgent(
 From the `buildContainerArgs` function in `src/container-runner.ts`:
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Gateway (Docker)">
     ```typescript
     async function buildContainerArgs(
       mounts: VolumeMount[],
@@ -278,7 +285,7 @@ From the `buildContainerArgs` function in `src/container-runner.ts`:
     - OneCLI SDK configures container networking for credential injection (no explicit env vars)
   </Tab>
 
-  <Tab title="Credential Proxy (legacy)">
+  <Tab title="Native Credential Proxy (Apple Container)">
     ```typescript
     function buildContainerArgs(
       mounts: VolumeMount[],

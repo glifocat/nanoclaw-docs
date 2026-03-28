@@ -163,7 +163,7 @@ You need a Claude Pro or Claude Team subscription, or an Anthropic API key.
 Agents run in isolated containers. You need either Apple Container (macOS only) or Docker.
 
 <Tabs>
-  <Tab title="Apple Container (macOS)">
+  <Tab title="Apple Container (macOS, experimental)">
     Apple Container is a lightweight, native macOS container runtime.
 
     **Installation**:
@@ -181,8 +181,12 @@ Agents run in isolated containers. You need either Apple Container (macOS only) 
     - Lighter resource usage than Docker
     - Faster startup times
 
+    <Warning>
+    Apple Container support is **experimental**. It requires advanced setup and uses the native credential proxy instead of OneCLI for credential management. Docker is the recommended default.
+    </Warning>
+
     <Note>
-    Apple Container is macOS-only. During setup, you can choose between Apple Container and Docker. Docker is the default and works on macOS, Linux, and Windows (via WSL2).
+    Apple Container is macOS-only. During setup, you can choose between Docker (recommended) and Apple Container. Docker works on macOS, Linux, and Windows (via WSL2).
     </Note>
   </Tab>
   
@@ -288,28 +292,41 @@ NanoClaw uses `better-sqlite3`, which requires native compilation.
   </Tab>
 </Tabs>
 
-### 5. OneCLI (v1.2.22+)
+### 5. Credential system
 
-Starting in v1.2.22, NanoClaw uses OneCLI for credential management. OneCLI is a local gateway that injects API keys into container traffic without exposing secrets.
+The credential system is determined by your container runtime choice:
 
-```bash
-curl -fsSL onecli.sh/install | sh
-curl -fsSL onecli.sh/cli/install | sh
-```
+- **Docker** → [OneCLI](https://onecli.sh) gateway (injects API keys into container traffic without exposing secrets)
+- **Apple Container** → Native credential proxy (reads credentials from `.env` and injects via a local HTTP proxy)
 
-Verify installation:
-```bash
-onecli version
-```
+<Tabs>
+  <Tab title="Docker → OneCLI">
+    OneCLI is a local gateway that manages secret injection for Docker containers.
 
-Run `onecli --help` to see all available commands for managing secrets and gateway configuration.
+    ```bash
+    curl -fsSL onecli.sh/install | sh
+    curl -fsSL onecli.sh/cli/install | sh
+    ```
 
-<Info>
-OneCLI is also installed automatically by the `/setup` skill if not already present. It's listed here so you know about the dependency upfront.
-</Info>
+    Verify installation:
+    ```bash
+    onecli version
+    ```
+
+    Run `onecli --help` to see all available commands for managing secrets and gateway configuration.
+
+    <Info>
+    OneCLI is also installed automatically by the `/setup` skill if not already present. It's listed here so you know about the dependency upfront.
+    </Info>
+  </Tab>
+
+  <Tab title="Apple Container → Native credential proxy">
+    Apple Container is incompatible with OneCLI. The `/setup` skill automatically configures the built-in credential proxy instead, which reads credentials from `.env` and injects them into container API requests via a local HTTP proxy. No additional installation is needed.
+  </Tab>
+</Tabs>
 
 <Note>
-**What `/setup` handles for you:** OneCLI installation, npm dependencies, container image build, channel configuration, and service setup. **What you need beforehand:** Node.js, Claude Code, a container runtime, and build tools.
+**What `/setup` handles for you:** Credential system setup, npm dependencies, container image build, channel configuration, and service setup. **What you need beforehand:** Node.js, Claude Code, a container runtime, and build tools.
 </Note>
 
 ## Installation steps

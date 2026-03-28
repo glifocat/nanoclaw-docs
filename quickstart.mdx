@@ -134,7 +134,7 @@ Here's what Claude Code does when you run `/setup`:
 </Accordion>
 
 <Accordion title="2. Container runtime setup">
-  - **macOS**: Offers choice between Docker (default) or Apple Container (native)
+  - **macOS**: Offers choice between Docker (recommended) or Apple Container (experimental)
   - **Linux**: Uses Docker (only option)
   - Installs the chosen runtime if not present
   - Starts the runtime service
@@ -142,11 +142,13 @@ Here's what Claude Code does when you run `/setup`:
   - Tests that containers can run successfully
 </Accordion>
 
-<Accordion title="3. Claude authentication">
-  - Asks if you have a Claude subscription (Pro/Max) or Anthropic API key
-  - **Subscription**: Guides you to run `claude setup-token` and add token to `.env`
-  - **API key**: Guides you to add `ANTHROPIC_API_KEY` to `.env`
-  - These credentials allow agents to authenticate with Claude Code
+<Accordion title="3. Credential system setup">
+  The credential system is determined by your container runtime choice:
+
+  - **Docker → OneCLI gateway**: Installs OneCLI, guides you through registering your Claude credentials via the CLI or dashboard. Secrets are injected into container traffic by the gateway.
+  - **Apple Container → Native credential proxy**: Guides you to add your Claude subscription token or API key to `.env`. The built-in proxy injects credentials into container API requests.
+
+  Both paths ask whether you have a Claude subscription (Pro/Max) or an Anthropic API key, then walk you through the appropriate credential registration flow.
 </Accordion>
 
 <Accordion title="4. Upstream remote and marketplace">

@@ -17,7 +17,7 @@ Containers provide:
 - **Non-root execution** - Agents run as unprivileged user
 
 <Info>
-NanoClaw uses Docker by default for cross-platform compatibility. On macOS, you can use Apple Container instead (via `/convert-to-apple-container` skill).
+NanoClaw uses Docker by default for cross-platform compatibility. On macOS, you can use Apple Container instead (via `/convert-to-apple-container` skill), though this is currently **experimental** and requires the native credential proxy instead of OneCLI.
 </Info>
 
 ## Container architecture
@@ -404,8 +404,8 @@ The runtime binary is a constant. To switch to Apple Container on macOS, use the
 
 **Supported runtimes:**
 
-- **Docker** (default): Cross-platform, well-tested
-- **Apple Container** (macOS): Lightweight, native virtualization
+- **Docker** (default, recommended): Cross-platform, well-tested, uses OneCLI for credential management
+- **Apple Container** (macOS, experimental): Lightweight, native virtualization, uses native credential proxy
 
 ## Skills and MCP servers
 

@@ -236,8 +236,15 @@ For the full file format and API details, see the [security deep dive](/advanced
 
 ### 6. Credential handling
 
+The credential system is determined by the container runtime:
+
+- **Docker** → OneCLI gateway
+- **Apple Container** → Native credential proxy (OneCLI is incompatible with Apple Container)
+
+Setup automatically selects the correct credential system based on your runtime choice.
+
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Gateway (Docker)">
     NanoClaw uses the [OneCLI](https://onecli.sh) gateway for centralized secret management. API keys are never stored in `.env` or exposed to containers — the gateway intercepts outbound API traffic from containers and injects credentials at request time.
 
     - Secrets are registered once via `onecli secrets create` (CLI or dashboard)
@@ -250,11 +257,11 @@ For the full file format and API details, see the [security deep dive](/advanced
     </Warning>
   </Tab>
 
-  <Tab title="Credential Proxy (legacy)">
+  <Tab title="Native Credential Proxy (Apple Container)">
     - Containers receive a placeholder token and a proxy URL — never real credentials
-    - The host's `.env` file is shadowed with `/dev/null` when the project root is mounted, preventing containers from reading secrets
+    - The host's `.env` file is shadowed via `mount --bind` inside the container (Apple Container only supports directory mounts, not file-level overlays)
 
-    Containers never see real credentials. A credential proxy runs on the host and injects authentication on every outbound API request. To restore the built-in credential proxy, apply the `/use-native-credential-proxy` skill.
+    Containers never see real credentials. A credential proxy runs on the host and injects authentication on every outbound API request. This is the default credential system for Apple Container installations. For Docker users who prefer `.env`-based credentials, apply the `/use-native-credential-proxy` skill.
 
     ```typescript
     // Container has a placeholder token — real credentials injected by proxy

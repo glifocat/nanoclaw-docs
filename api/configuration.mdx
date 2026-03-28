@@ -35,15 +35,15 @@ Configuration is read from `.env` file or `process.env`.
 </ParamField>
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Gateway (Docker)">
     <ParamField path="ONECLI_URL" type="string" default="http://localhost:10254">
-      URL for the OneCLI gateway that handles credential injection for containers.
+      URL for the OneCLI gateway that handles credential injection for containers. Used when Docker is the container runtime.
     </ParamField>
   </Tab>
 
-  <Tab title="Credential Proxy (legacy)">
+  <Tab title="Native Credential Proxy (Apple Container)">
     <ParamField path="CREDENTIAL_PROXY_PORT" type="number" default="3001">
-      Port for the credential proxy that containers route API calls through.
+      Port for the credential proxy that containers route API calls through. Used when Apple Container is the runtime, or when the `/use-native-credential-proxy` skill is applied.
     </ParamField>
   </Tab>
 </Tabs>
@@ -134,7 +134,7 @@ Each candidate is validated as a real IANA timezone identifier before being acce
 ## Example .env file
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Gateway (Docker)">
     ```bash
     ASSISTANT_NAME=Andy
     ASSISTANT_HAS_OWN_NUMBER=false
@@ -145,11 +145,11 @@ Each candidate is validated as a real IANA timezone identifier before being acce
     ```
 
     <Note>
-    With the OneCLI gateway, API keys and OAuth tokens are no longer stored in `.env`. Secrets are managed via `onecli secrets create` and injected by the gateway at request time. The only credential-related variable is `ONECLI_URL`.
+    With the OneCLI gateway (Docker runtime), API keys and OAuth tokens are no longer stored in `.env`. Secrets are managed via `onecli secrets create` and injected by the gateway at request time. The only credential-related variable is `ONECLI_URL`.
     </Note>
   </Tab>
 
-  <Tab title="Credential Proxy (legacy)">
+  <Tab title="Native Credential Proxy (Apple Container)">
     ```bash
     ASSISTANT_NAME=Andy
     ASSISTANT_HAS_OWN_NUMBER=false
@@ -163,8 +163,8 @@ Each candidate is validated as a real IANA timezone identifier before being acce
 ## Credential environment variables
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
-    Credentials are managed externally via OneCLI — no credential environment variables are needed in `.env`.
+  <Tab title="OneCLI Gateway (Docker)">
+    Credentials are managed externally via OneCLI — no credential environment variables are needed in `.env`. This is the default credential system when using Docker as the container runtime.
 
     Register secrets with OneCLI using the CLI or dashboard:
     ```bash
@@ -174,8 +174,8 @@ Each candidate is validated as a real IANA timezone identifier before being acce
     See `onecli secrets list` to verify registered secrets. Run `onecli --help` for the full list of available commands.
   </Tab>
 
-  <Tab title="Credential Proxy (legacy)">
-    The credential proxy reads these from `.env` at startup (never exposed to containers):
+  <Tab title="Native Credential Proxy (Apple Container)">
+    The credential proxy reads these from `.env` at startup (never exposed to containers). This is the default credential system when using Apple Container, or when the `/use-native-credential-proxy` skill is applied with Docker.
 
     <ParamField path="ANTHROPIC_API_KEY" type="string">
       Anthropic API key. If set, the proxy uses API key mode.
@@ -202,14 +202,14 @@ Each candidate is validated as a real IANA timezone identifier before being acce
 ## Security notes
 
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Gateway (Docker)">
     - **Secrets** are never read by NanoClaw — OneCLI manages them externally
     - The OneCLI gateway injects credentials into container API traffic at request time
     - Containers cannot extract real credentials from the gateway
     - Mount allowlist is stored OUTSIDE project root and never mounted into containers
   </Tab>
 
-  <Tab title="Credential Proxy (legacy)">
+  <Tab title="Native Credential Proxy (Apple Container)">
     - **Secrets** (API keys, credentials) are NOT read in `config.ts`
     - Secrets are loaded only by the credential proxy once at startup, never exposed to containers
     - This prevents leaking secrets to child processes

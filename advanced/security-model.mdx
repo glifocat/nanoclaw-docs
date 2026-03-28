@@ -193,8 +193,10 @@ The sender allowlist complements container isolation. Containers protect against
 
 ### Credential handling
 
+The credential system is automatically selected based on the container runtime: Docker uses the OneCLI gateway, while Apple Container uses the native credential proxy (OneCLI is incompatible with Apple Container).
+
 <Tabs>
-  <Tab title="OneCLI Gateway (v1.2.22+)">
+  <Tab title="OneCLI Gateway (Docker)">
     NanoClaw delegates all credential management to the [OneCLI](https://onecli.sh) gateway. The host process never reads API keys — secrets are registered with OneCLI and injected into container traffic by the gateway.
 
     **How it works:**
@@ -218,8 +220,8 @@ The sender allowlist complements container isolation. Containers protect against
     </Note>
   </Tab>
 
-  <Tab title="Credential Proxy (legacy)">
-    **Credential proxy** (restored via the `/use-native-credential-proxy` skill):
+  <Tab title="Native Credential Proxy (Apple Container)">
+    **Credential proxy** (default for Apple Container, or restored via the `/use-native-credential-proxy` skill for Docker users):
     - Runs on the host as an HTTP proxy (default port 3001, configurable via `CREDENTIAL_PROXY_PORT`)
     - Containers send API requests to the proxy with a placeholder token
     - Reads credentials from `.env` once at startup
