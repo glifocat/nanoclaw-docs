@@ -303,7 +303,7 @@ The agent runner is the TypeScript code that wraps Claude Agent SDK. It handles 
 4. **OneCLI Agent Vault sync**: Ensure each registered non-main group has a corresponding OneCLI agent for per-group credential scoping (best-effort, non-blocking)
 
 <Note>
-In v1.2.22+, this step syncs OneCLI agents for all registered groups. In earlier versions, this starts the built-in credential proxy on `CREDENTIAL_PROXY_PORT`.
+In v1.2.35+, this step syncs OneCLI agents for all registered groups. In earlier versions, this starts the built-in credential proxy on `CREDENTIAL_PROXY_PORT`.
 </Note>
 5. **Remote Control restore**: Re-adopt any surviving Remote Control session from a previous run
 6. **Shutdown handlers**: Register graceful shutdown on `SIGTERM` and `SIGINT`
