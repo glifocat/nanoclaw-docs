@@ -136,13 +136,13 @@ Session state is persisted to `{DATA_DIR}/remote-control.json`:
 ## Security considerations
 
 <Warning>
-  The Remote Control URL grants full Claude Code access to your NanoClaw project directory. Only share it with trusted users.
+  The Remote Control URL grants full Claude Code access to your NanoClaw project directory. Only share it with trusted users who have an authorized Anthropic account.
 </Warning>
 
+- **Anthropic sign-in required:** The URL is hosted on `claude.ai` and requires the user to be signed in to an Anthropic account with access to the session. The URL alone is not enough.
 - The session runs with the same permissions as the NanoClaw host process
-- Anyone with the URL can execute commands in the project directory
 - Sessions persist until explicitly stopped or the process exits
-- There is no built-in authentication beyond the URL itself
+- NanoClaw does not add its own authentication layer — access control relies on the Anthropic session and the secrecy of the bridge token in the URL
 
 ## Related pages
 
