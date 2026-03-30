@@ -117,15 +117,11 @@ const clean = stripInternalTags(raw);
 Prepares agent output for sending to users. Strips internal tags and optionally converts Markdown to the target channel's native text syntax.
 
 ```typescript
-function formatOutbound(rawText: string, channel?: ChannelType): string
+function formatOutbound(rawText: string): string
 ```
 
 <ParamField path="rawText" type="string" required>
   Raw text from agent
-</ParamField>
-
-<ParamField path="channel" type="ChannelType">
-  Target channel name (e.g., `"whatsapp"`, `"telegram"`, `"slack"`). When provided and the `/channel-formatting` skill is applied, the function calls `parseTextStyles` to convert Markdown markers to the channel's native syntax. Without this parameter, only internal tag stripping is performed.
 </ParamField>
 
 <ResponseField name="return" type="string">
