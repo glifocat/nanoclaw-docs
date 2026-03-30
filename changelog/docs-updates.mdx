@@ -5,6 +5,20 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Health check fixes and remote-control security clarification" description="2026-03-30" tags={["Updated", "Fixed"]}>
+  Merged automated health check PR #158 (4 of 5 fixes verified against upstream). Corrected the remaining inaccurate claim in a follow-up (#159).
+
+  ## Fixed
+  - **`api/message-routing`**: Removed phantom `channel?: ChannelType` param from `formatOutbound` signature
+  - **`features/scheduled-tasks`**: Updated TIMEZONE snippet to current `resolveConfigTimezone()` with IANA validation and UTC fallback
+  - **`advanced/container-runtime`**: Fixed `stopContainer` code from async `exec()` callback to actual sync try/catch pattern
+  - **`api/configuration`**: Added `trace` as valid `LOG_LEVEL` value (used by container runner for verbose output)
+  - **`features/messaging`**: Corrected stale `src/session-commands.ts` reference to `src/index.ts`, and fixed misleading description of what `index.ts` does
+
+  ## Updated
+  - **`advanced/remote-control`**: Fixed inaccurate security section — the remote control URL requires Anthropic sign-in, not just URL secrecy. Based on feedback from Gavriel Cohen.
+</Update>
+
 <Update label="Automated PR triage: v1.2.35–v1.2.42 sync" description="2026-03-28" tags={["Updated", "Fixed"]}>
   Reviewed and triaged 27 automated Mintlify PRs (#92–#151). Merged 6, consolidated 7 into a single verified PR (#153), closed 15 (superseded, fabricated, or conflicting). Validated all changes against upstream source code at v1.2.42. Deleted 41 stale `mintlify/*` branches.
 
