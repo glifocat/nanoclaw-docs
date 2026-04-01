@@ -71,6 +71,7 @@ The agent container is built from `container/Dockerfile` and includes:
 - **Node.js 22** - Runtime for the agent runner
 - **Chromium** - Browser automation via agent-browser
 - **Claude Code SDK** - Installed globally as `@anthropic-ai/claude-code`
+- **System tools** - `curl` and `git` for network requests and version control
 - **System fonts** - Emoji and international character support
 
 ### Dockerfile breakdown
@@ -249,6 +250,9 @@ From the `buildContainerArgs` function in `src/container-runner.ts`:
         logger.warn({ containerName }, 'OneCLI gateway not reachable');
       }
 
+      // Runtime-specific args for host gateway resolution
+      args.push(...hostGatewayArgs());
+
       // Run as host user so bind-mounted files are accessible
       const hostUid = process.getuid?.();
       const hostGid = process.getgid?.();
@@ -274,6 +278,7 @@ From the `buildContainerArgs` function in `src/container-runner.ts`:
     - `-i` - Interactive (keeps stdin open)
     - `--rm` - Remove container after exit (ephemeral)
     - `--name` - Unique container name for management
+    - `--add-host` - Maps `host.docker.internal` on Linux (automatic on macOS)
     - `--user` - Run as host UID/GID for file permissions
     - OneCLI SDK configures container networking for credential injection (no explicit env vars)
   </Tab>
