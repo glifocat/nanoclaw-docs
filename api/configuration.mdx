@@ -204,7 +204,11 @@ Each candidate is validated as a real IANA timezone identifier before being acce
 </Tabs>
 
 <ParamField path="OLLAMA_HOST" type="string" default="http://host.docker.internal:11434">
-  Ollama API endpoint. Only used when the `/add-ollama-tool` skill is installed. The MCP server inside the container uses this to reach the host's Ollama instance. Falls back to `localhost` if `host.docker.internal` fails.
+  Ollama API endpoint. Only used when the `/add-ollama-tool` skill is installed. The MCP server inside the container uses this to reach the host's Ollama instance. Falls back to `localhost` if `host.docker.internal` fails. See [Ollama integration](/integrations/ollama).
+</ParamField>
+
+<ParamField path="OLLAMA_ADMIN_TOOLS" type="string" default="false">
+  When set to `true`, enables admin model management tools (`ollama_pull_model`, `ollama_delete_model`, `ollama_show_model`, `ollama_list_running`) in the Ollama MCP server. Only used when the `/add-ollama-tool` skill is installed.
 </ParamField>
 
 ## Security notes

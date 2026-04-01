@@ -9,12 +9,16 @@ NanoClaw can delegate tasks to local models running on [Ollama](https://ollama.c
 
 ## How it works
 
-The `/add-ollama-tool` skill adds a stdio-based MCP server inside the agent container. The MCP server exposes two tools:
+The `/add-ollama-tool` skill adds a stdio-based MCP server inside the agent container. The MCP server exposes these tools:
 
-| Tool | Description |
-|------|-------------|
-| `ollama_list_models` | Lists all locally installed Ollama models |
-| `ollama_generate` | Sends a prompt to a specified model and returns the response |
+| Tool | Description | Requires |
+|------|-------------|----------|
+| `ollama_list_models` | Lists all locally installed Ollama models | — |
+| `ollama_generate` | Sends a prompt to a specified model and returns the response | — |
+| `ollama_pull_model` | Pulls (downloads) a model from the Ollama registry | `OLLAMA_ADMIN_TOOLS=true` |
+| `ollama_delete_model` | Deletes a locally installed model to free disk space | `OLLAMA_ADMIN_TOOLS=true` |
+| `ollama_show_model` | Shows model details: parameters, template, architecture info | `OLLAMA_ADMIN_TOOLS=true` |
+| `ollama_list_running` | Lists models currently loaded in memory with resource usage | `OLLAMA_ADMIN_TOOLS=true` |
 
 The container agent reaches Ollama on the host via `host.docker.internal:11434`. Claude decides when to use local models based on task complexity — you don't need to configure routing rules.
 
@@ -75,8 +79,8 @@ git merge upstream/skill/ollama-tool
 This adds:
 - `container/agent-runner/src/ollama-mcp-stdio.ts` — MCP server that bridges to Ollama
 - `scripts/ollama-watch.sh` — macOS notification watcher for Ollama status
-- Ollama MCP configuration in the agent runner
-- `[OLLAMA]` log surfacing in container output
+- Ollama MCP configuration and `[OLLAMA]` log surfacing in the agent runner
+- `OLLAMA_ADMIN_TOOLS` config option for model management tools
 
 After merging, rebuild the container:
 
@@ -94,6 +98,12 @@ OLLAMA_HOST=http://host.docker.internal:11434
 ```
 
 The MCP server automatically falls back to `localhost` if `host.docker.internal` fails.
+
+To enable admin tools (pull, delete, show, list running), add:
+
+```bash
+OLLAMA_ADMIN_TOOLS=true
+```
 
 <Note>
 Ollama must be running on the host before starting NanoClaw. The MCP server writes status to `/workspace/ipc/ollama_status.json` so the host process can surface connection issues in logs.
