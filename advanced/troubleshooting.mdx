@@ -277,10 +277,28 @@ Short-lived OAuth tokens copied from the system keychain or `~/.claude/.credenti
 
 ### Solution
 
-Use one of these credential types instead:
+<Tabs>
+  <Tab title="OneCLI Agent Vault (v1.2.35+)">
+    Update the secret registered with OneCLI:
 
-- **Long-lived OAuth token**: Run `claude setup-token` and add the resulting `CLAUDE_CODE_OAUTH_TOKEN` to `.env`
-- **API key**: Get a key from [console.anthropic.com](https://console.anthropic.com) and add `ANTHROPIC_API_KEY` to `.env`
+    ```bash
+    # Replace with a long-lived OAuth token or API key
+    onecli secrets create --name Anthropic --type anthropic --value YOUR_KEY --host-pattern api.anthropic.com
+    ```
+
+    You can also use a long-lived OAuth token from `claude setup-token`:
+    ```bash
+    onecli secrets create --name Claude --type oauth --value YOUR_TOKEN --host-pattern api.anthropic.com
+    ```
+  </Tab>
+
+  <Tab title="Credential Proxy (legacy)">
+    Use one of these credential types in `.env`:
+
+    - **Long-lived OAuth token**: Run `claude setup-token` and add the resulting `CLAUDE_CODE_OAUTH_TOKEN` to `.env`
+    - **API key**: Get a key from [console.anthropic.com](https://console.anthropic.com) and add `ANTHROPIC_API_KEY` to `.env`
+  </Tab>
+</Tabs>
 
 After updating credentials, restart the service:
 
