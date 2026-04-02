@@ -237,7 +237,7 @@ This ensures bind-mounted files are accessible (same uid on both sides).
 2. **Stdout streaming**: Parsed for output markers in real-time
 3. **Stderr logging**: Logged at debug level (SDK writes lots of debug info)
 4. **Timeout tracking**: Hard timeout with activity-based reset
-5. **Graceful shutdown**: `docker stop -t 1` (SIGTERM with 1-second grace), wrapped in a 15-second exec timeout. If the stop command itself hangs, the process is force-killed via `SIGKILL`
+5. **Graceful shutdown**: `docker stop -t 1` (SIGTERM with 1-second grace). If the stop command fails, the process is force-killed via `SIGKILL`
 
 ### Cleanup
 
@@ -297,7 +297,7 @@ Two timeout mechanisms:
 - **Configurable**: Per-group via `containerConfig.timeout`
 - **Grace period**: At least `IDLE_TIMEOUT + 30s`
 - **Reset on activity**: Resets whenever output markers are parsed
-- **Enforcement**: `docker stop -t 1` (SIGTERM with 1-second grace), wrapped in a 15-second exec timeout. Falls back to `SIGKILL` if the stop command hangs
+- **Enforcement**: `docker stop -t 1` (SIGTERM with 1-second grace). Falls back to `SIGKILL` if the stop command fails
 
 **Timeout after output:**
 

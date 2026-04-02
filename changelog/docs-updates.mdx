@@ -5,6 +5,15 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v1.2.45 sync: container timeout fix, new skill" description="2026-04-02" tags={["Updated", "Fixed"]}>
+  ## Fixed
+  - **`concepts/containers`**: Removed incorrect "15-second exec timeout" claim from `stopContainer` — the source uses `execSync` with no timeout, falling back to `SIGKILL` on failure
+
+  ## Updated
+  - **`integrations/skills-system`**: Added `/add-macos-statusbar` utility skill to upstream skills listing
+  - **`changelog/index`**: Added v1.2.45 release entry with new contributors and skill
+</Update>
+
 <Update label="PR triage: v1.2.43–v1.2.46 sync" description="2026-04-02" tags={["Updated"]}>
   Reviewed and triaged 8 automated Mintlify PRs (#161–#168). Merged 4, closed 4 (superseded or stale token counts). Validated all changes against upstream source code at v1.2.46. Deleted 11 stale branches (4 PR + 7 orphan).
 
