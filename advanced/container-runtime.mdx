@@ -221,6 +221,8 @@ export async function runContainerAgent(
   
   <Step title="Handle completion">
     When the container exits, logs are written to `groups/{name}/logs/container-{timestamp}.log` and the promise resolves with the final output. Error logs include only input metadata (prompt length and session ID) rather than the full prompt to avoid persisting user conversation content on disk.
+
+    If the container exits with an error indicating a stale or missing session (e.g., missing `.jsonl` file or "no conversation found"), the session is automatically cleared from the database so the next retry starts fresh. See [stale session recovery](/advanced/troubleshooting#stale-session-auto-recovery) for details.
   </Step>
 </Steps>
 

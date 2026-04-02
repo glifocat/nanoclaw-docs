@@ -499,6 +499,16 @@ Stale session detected — clearing for next retry
 
 No manual intervention is required.
 
+### Manual recovery
+
+If auto-recovery doesn't trigger (e.g., the error message doesn't match the expected patterns), you can manually clear a stale session:
+
+```bash
+sqlite3 store/messages.db "DELETE FROM sessions WHERE group_folder = '{group-folder}';"
+```
+
+Then restart the service or wait for the next retry.
+
 ## Session branching issues
 
 ### Symptoms

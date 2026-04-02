@@ -5,6 +5,20 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="PR triage: v1.2.43–v1.2.46 sync" description="2026-04-02" tags={["Updated"]}>
+  Reviewed and triaged 8 automated Mintlify PRs (#161–#168). Merged 4, closed 4 (superseded or stale token counts). Validated all changes against upstream source code at v1.2.46. Deleted 11 stale branches (4 PR + 7 orphan).
+
+  ## Updated
+  - **OneCLI version labels**: Corrected Agent Vault version from v1.2.22+ to v1.2.35+ across 8 pages, added tabbed 401 troubleshooting
+  - **Ollama integration**: Added 4 admin tools (`ollama_pull_model`, `ollama_delete_model`, `ollama_show_model`, `ollama_list_running`) gated by `OLLAMA_ADMIN_TOOLS=true`, noted Ollama removal from core
+  - **Stale session recovery**: Added auto-recovery docs to troubleshooting and container-runtime lifecycle, plus manual sqlite3 fallback
+  - **Container runtime**: Documented `hostGatewayArgs()`, `--add-host` flag, `curl`/`git` in container image
+  - **SDK options**: Added `settingSources` and `sender` parameter docs
+  - **Reply context**: Documented reply/quoted message support — `reply_to` attribute, `<quoted_message>` element, 4 new `NewMessage` fields, DB migration
+  - **Token count**: Updated from ~42.4k to ~43.3k (22%)
+  - **v1.2.43 changelog**: Added npm audit dependency fixes bullet
+</Update>
+
 <Update label="Health check fixes and remote-control security clarification" description="2026-03-30" tags={["Updated", "Fixed"]}>
   Merged automated health check PR #158 (4 of 5 fixes verified against upstream). Corrected the remaining inaccurate claim in a follow-up (#159).
 
