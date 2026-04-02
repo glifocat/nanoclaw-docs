@@ -144,7 +144,7 @@ The IPC watcher (`src/ipc.ts`) enables container-to-host communication:
 
 SQLite database (`store/messages.db`) stores:
 
-- **messages**: All messages with timestamps, sender info, and bot-message flag (queries capped at `MAX_MESSAGES_PER_PROMPT` per invocation, default 10)
+- **messages**: All messages with timestamps, sender info, bot-message flag, and reply context (queries capped at `MAX_MESSAGES_PER_PROMPT` per invocation, default 10)
 - **chats**: Chat metadata (name, last activity, channel, is_group)
 - **sessions**: Claude session IDs per group folder
 - **registered_groups**: Active groups with folder, trigger, container config, is_main flag
