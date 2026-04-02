@@ -5,6 +5,15 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v1.2.45 sync: fix container timeout docs, add new skill" description="2026-04-02" tags={["Updated", "Fixed"]}>
+  ## Fixed
+  - **`concepts/containers`**: Removed incorrect "15-second exec timeout" claim from `stopContainer` — the source uses `execSync` with no timeout, falling back to `SIGKILL` on failure
+
+  ## Updated
+  - **`integrations/skills-system`**: Added `/add-macos-statusbar` utility skill to upstream skills listing
+  - **`changelog/index`**: Added v1.2.45 release entry with new contributors and skill
+</Update>
+
 <Update label="Health check fixes and remote-control security clarification" description="2026-03-30" tags={["Updated", "Fixed"]}>
   Merged automated health check PR #158 (4 of 5 fixes verified against upstream). Corrected the remaining inaccurate claim in a follow-up (#159).
 
