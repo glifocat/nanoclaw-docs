@@ -72,7 +72,7 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 
 - **Base**: `node:22-slim` (Debian-based, minimal)
 - **Browser**: Chromium with all dependencies
-- **Tools**: `agent-browser` for browser automation
+- **Tools**: `agent-browser` for browser automation, `curl`, `git`
 - **Runtime**: `@anthropic-ai/claude-code` (Claude Agent SDK)
 - **User**: `node` (uid 1000, non-root)
 - **Working directory**: `/workspace/group`
@@ -440,7 +440,7 @@ The agent runner passes an explicit allowlist to the Claude Agent SDK. Only thes
 | Utilities | `TodoWrite`, `ToolSearch`, `Skill`, `NotebookEdit` |
 | MCP | `mcp__nanoclaw__*` (all tools from the built-in NanoClaw MCP server) |
 
-The SDK runs with `permissionMode: 'bypassPermissions'` since containers already provide the security boundary.
+The SDK runs with `permissionMode: 'bypassPermissions'` since containers already provide the security boundary. Settings are loaded from both project and user sources (`settingSources: ['project', 'user']`), allowing `.claude/settings.json` at both levels to configure SDK behavior.
 
 ### Conversation archival
 
@@ -457,7 +457,7 @@ Directories mounted at `/workspace/extra/*` (via additional mounts) are automati
 **MCP servers:**
 
 - Configured in agent-runner source (`container/agent-runner/src/index.ts`)
-- Built-in: `nanoclaw` MCP server (8 tools: `send_message`, `schedule_task`, `list_tasks`, `pause_task`, `resume_task`, `cancel_task`, `update_task`, `register_group`)
+- Built-in: `nanoclaw` MCP server (8 tools: `send_message`, `schedule_task`, `list_tasks`, `pause_task`, `resume_task`, `cancel_task`, `update_task`, `register_group`). The `send_message` tool accepts an optional `sender` parameter for named bot identities on supported channels (e.g., Telegram)
 - Custom: Add by modifying agent-runner code
 
 <Accordion title="Adding a custom MCP server">

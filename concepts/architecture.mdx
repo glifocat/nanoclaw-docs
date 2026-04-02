@@ -249,7 +249,7 @@ The agent container (`container/Dockerfile`) includes:
 
 - **Base**: `node:22-slim`
 - **Browser**: Chromium with all required dependencies
-- **Tools**: `agent-browser` CLI for browser automation
+- **Tools**: `agent-browser` CLI for browser automation, `curl`, `git`
 - **Runtime**: `@anthropic-ai/claude-code` (Claude Agent SDK)
 - **User**: Runs as `node` user (uid 1000, non-root)
 - **Working directory**: `/workspace/group` (group's folder)
