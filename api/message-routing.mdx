@@ -59,9 +59,12 @@ function formatMessages(messages: NewMessage[], timezone: string): string
 <context timezone="America/New_York" />
 <messages>
 <message sender="John Doe" time="2:34 PM">Hello!</message>
-<message sender="Jane Smith" time="2:35 PM">Hi there!</message>
+<message sender="Jane Smith" time="2:35 PM" reply_to="msg-001">
+  <quoted_message from="John Doe">Hello!</quoted_message>Hi there!</message>
 </messages>
 ```
+
+When a message includes reply context (`reply_to_message_id`), a `reply_to` attribute is added to the `<message>` element. If `reply_to_message_content` and `reply_to_sender_name` are also present, a nested `<quoted_message>` element is included with the original sender and content.
 
 **Example:**
 
@@ -76,6 +79,17 @@ const messages = [
     sender_name: 'John',
     content: 'Hello!',
     timestamp: '2026-02-28T12:34:56.789Z',
+  },
+  {
+    id: '2',
+    chat_jid: '123@g.us',
+    sender: '789@s.whatsapp.net',
+    sender_name: 'Jane',
+    content: 'Hi there!',
+    timestamp: '2026-02-28T12:35:00.000Z',
+    reply_to_message_id: '1',
+    reply_to_message_content: 'Hello!',
+    reply_to_sender_name: 'John',
   },
 ];
 
@@ -221,16 +235,22 @@ if (channel) {
 
 ```typescript
 interface NewMessage {
-  id: string;              // Unique message ID
-  chat_jid: string;        // Chat identifier (e.g., "123@g.us")
-  sender: string;          // Sender JID (e.g., "456@s.whatsapp.net")
-  sender_name: string;     // Display name
-  content: string;         // Message text
-  timestamp: string;       // ISO 8601 timestamp
-  is_from_me?: boolean;    // Whether sent by the bot
-  is_bot_message?: boolean; // Whether this is a bot message
+  id: string;                       // Unique message ID
+  chat_jid: string;                 // Chat identifier (e.g., "123@g.us")
+  sender: string;                   // Sender JID (e.g., "456@s.whatsapp.net")
+  sender_name: string;              // Display name
+  content: string;                  // Message text
+  timestamp: string;                // ISO 8601 timestamp
+  is_from_me?: boolean;             // Whether sent by the bot
+  is_bot_message?: boolean;         // Whether this is a bot message
+  thread_id?: string;               // Thread/topic ID (channel-specific)
+  reply_to_message_id?: string;     // ID of the message being replied to
+  reply_to_message_content?: string; // Content of the quoted message
+  reply_to_sender_name?: string;    // Display name of the quoted message sender
 }
 ```
+
+The `thread_id` and `reply_to_*` fields allow any channel to pass quoted message context to the agent. These fields are optional — channels that don't support replies simply omit them.
 
 ### Channel
 
