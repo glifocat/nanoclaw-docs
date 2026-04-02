@@ -485,6 +485,20 @@ ls -la data/ipc/family-chat/
   ```
 </Accordion>
 
+## Stale session auto-recovery
+
+NanoClaw automatically detects and recovers from stale or corrupt sessions. When a container fails because the session transcript file (`.jsonl`) is missing — due to a crash mid-write, manual deletion, or disk-full condition — NanoClaw clears the broken session ID and lets the existing backoff mechanism in the group queue retry with a fresh session.
+
+Stale sessions are detected by matching the error output against known patterns (`no conversation found`, `ENOENT` on `.jsonl` files, or `session not found`). Only these specific signals trigger session clearing — transient errors (network, API) fall through to the normal retry path.
+
+You can identify stale session recovery in logs by looking for:
+
+```
+Stale session detected — clearing for next retry
+```
+
+No manual intervention is required.
+
 ## Session branching issues
 
 ### Symptoms
