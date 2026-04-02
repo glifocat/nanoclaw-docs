@@ -264,6 +264,35 @@ If you need Kubernetes enabled, set `CONTAINER_IMAGE` to an image stored in a re
 
 **Fix:** Already fixed. The agent runner now passes `resumeSessionAt` with the last assistant message UUID to explicitly anchor each resume.
 
+## Stale session recovery
+
+### Symptoms
+- Agent fails repeatedly for a specific group but works for others
+- Container logs show errors when resuming a session
+- Restarting NanoClaw doesn't fix the issue
+
+### How it works
+
+NanoClaw automatically detects when a container fails while resuming an existing session. When this happens, it clears the stale session from the database and retries once with a fresh session. This prevents infinite retry loops caused by corrupt or incompatible session state.
+
+You'll see this in logs as:
+
+```
+Container failed with existing session — clearing stale session and retrying with fresh session
+```
+
+If the fresh session retry also fails, the error is logged and the group enters normal retry backoff.
+
+### Manual fix
+
+If auto-recovery isn't working, you can manually clear a group's session:
+
+```bash
+sqlite3 store/messages.db "DELETE FROM sessions WHERE group_folder = '{group-folder}';"
+```
+
+Then restart the service.
+
 ## Container 401 errors
 
 ### Symptoms

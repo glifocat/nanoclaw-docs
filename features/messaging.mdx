@@ -70,7 +70,7 @@ The main channel (your self-chat) doesn't require a trigger — every message is
 
 ## Message formatting
 
-Messages are formatted as XML before being sent to the agent, preserving sender information and timestamps:
+Messages are formatted as XML before being sent to the agent, preserving sender information, timestamps, and reply context:
 
 ```typescript
 // From src/router.ts
@@ -80,12 +80,23 @@ function formatMessages(
 ): string {
   const lines = messages.map((m) => {
     const displayTime = formatLocalTime(m.timestamp, timezone);
-    return `<message sender="${escapeXml(m.sender_name)}" time="${escapeXml(displayTime)}">${escapeXml(m.content)}</message>`;
+    const replyAttr = m.reply_to_message_id
+      ? ` reply_to="${escapeXml(m.reply_to_message_id)}"`
+      : '';
+    const replySnippet =
+      m.reply_to_message_content && m.reply_to_sender_name
+        ? `\n  <quoted_message from="${escapeXml(m.reply_to_sender_name)}">${escapeXml(m.reply_to_message_content)}</quoted_message>`
+        : '';
+    return `<message sender="${escapeXml(m.sender_name)}" time="${escapeXml(displayTime)}"${replyAttr}>${replySnippet}${escapeXml(m.content)}</message>`;
   });
   const header = `<context timezone="${escapeXml(timezone)}" />\n`;
   return `${header}<messages>\n${lines.join('\n')}\n</messages>`;
 }
 ```
+
+When a message is a reply to another message, the formatted output includes:
+- A `reply_to` attribute on the `<message>` element with the original message ID
+- A nested `<quoted_message>` element containing the original sender name and content
 
 ### Example formatted output
 
@@ -93,7 +104,8 @@ function formatMessages(
 <context timezone="America/Los_Angeles" />
 <messages>
 <message sender="Alice" time="2026-02-28 10:30 AM">@Andy what's the weather?</message>
-<message sender="Bob" time="2026-02-28 10:31 AM">I think it's sunny</message>
+<message sender="Bob" time="2026-02-28 10:31 AM" reply_to="msg_abc123">
+  <quoted_message from="Alice">@Andy what's the weather?</quoted_message>I think it's sunny</message>
 <message sender="Alice" time="2026-02-28 10:32 AM">Can you check?</message>
 </messages>
 ```
@@ -221,17 +233,19 @@ Channels are added via skills, not configuration files. Use `/add-telegram` or s
 
 ## Message persistence
 
-All messages are stored in SQLite (`store/messages.db`) with full history:
+All messages are stored in SQLite (`store/messages.db`) with full history, including reply context:
 
 ```typescript
 // From src/db.ts
 function storeMessage(msg: NewMessage): void {
   db.prepare(
-    `INSERT OR REPLACE INTO messages (id, chat_jid, sender, sender_name, content, timestamp, is_from_me, is_bot_message)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(msg.id, msg.chat_jid, msg.sender, msg.sender_name, msg.content, msg.timestamp, msg.is_from_me ? 1 : 0, msg.is_bot_message ? 1 : 0);
+    `INSERT OR REPLACE INTO messages (id, chat_jid, sender, sender_name, content, timestamp, is_from_me, is_bot_message, reply_to_message_id, reply_to_message_content, reply_to_sender_name)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(msg.id, msg.chat_jid, msg.sender, msg.sender_name, msg.content, msg.timestamp, msg.is_from_me ? 1 : 0, msg.is_bot_message ? 1 : 0, msg.reply_to_message_id ?? null, msg.reply_to_message_content ?? null, msg.reply_to_sender_name ?? null);
 }
 ```
+
+Reply context columns (`reply_to_message_id`, `reply_to_message_content`, `reply_to_sender_name`) are added automatically via migration on existing databases.
 
 ### Message retrieval
 
