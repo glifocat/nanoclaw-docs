@@ -288,9 +288,9 @@ NanoClaw uses `better-sqlite3`, which requires native compilation.
   </Tab>
 </Tabs>
 
-### 5. OneCLI (v1.2.22+)
+### 5. OneCLI (v1.2.35+)
 
-Starting in v1.2.22, NanoClaw uses OneCLI Agent Vault for credential management. OneCLI is a local vault that injects API keys into container traffic without exposing secrets.
+Starting in v1.2.35, NanoClaw uses OneCLI Agent Vault for credential management. OneCLI is a local vault that injects API keys into container traffic without exposing secrets.
 
 ```bash
 curl -fsSL onecli.sh/install | sh
@@ -379,7 +379,7 @@ NanoClaw uses these core dependencies (from `package.json`):
 ```json
 {
   "dependencies": {
-    "@onecli-sh/sdk": "^0.2.0",    // OneCLI Agent Vault integration (v1.2.22+)
+    "@onecli-sh/sdk": "^0.2.0",    // OneCLI Agent Vault integration (v1.2.35+)
     "better-sqlite3": "11.10.0",   // SQLite database
     "cron-parser": "5.5.0"         // Task scheduling
   }

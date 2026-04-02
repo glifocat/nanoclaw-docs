@@ -238,7 +238,7 @@ For the full file format and API details, see the [security deep dive](/advanced
 ### 6. Credential handling
 
 <Tabs>
-  <Tab title="OneCLI Agent Vault (v1.2.22+)">
+  <Tab title="OneCLI Agent Vault (v1.2.35+)">
     NanoClaw uses the [OneCLI](https://github.com/onecli/onecli) Agent Vault for centralized secret management. API keys are never stored in `.env` or exposed to containers — the vault intercepts outbound API traffic from containers and injects credentials at request time.
 
     - Secrets are registered once via `onecli secrets create` (CLI or dashboard)
