@@ -41,6 +41,7 @@ When editing docs, keep these architectural facts current:
 ## PR Workflow
 
 - Always run `mint validate` before creating PRs
+- **Validating PR branches**: `git worktree add /tmp/validate-prN origin/BRANCH && cd /tmp/validate-prN && mint validate` — validates without switching branches. Clean up with `git worktree remove /tmp/validate-prN`.
 - Run `mint broken-links` when adding or changing internal links
 - Available labels: `content-gap`, `new-page`, `update-existing`, `high-priority`, `medium-priority`, plus GitHub defaults
 - For auto-closing issues, put each `Closes #N` on its own line in the PR body
@@ -122,6 +123,8 @@ Mintlify workflows generate automated PRs (`mintlify/*` branches) on upstream ch
 - **Check for overlapping PRs**: Multiple automated PRs often fix the same thing (e.g., table renames). Merge the most thorough one first, then cherry-pick unique changes from the rest.
 - **Common errors in automated PRs**: fabricated commit references, incorrect renames (verify exported types), speculative feature descriptions, `allowed-tools` or other frontmatter claims that don't exist in source
 - **Common fabrications found**: inventing env vars that only exist in skill SKILL.md files (not core config), inventing skill branches that don't exist, claiming runtime-based routing that doesn't exist in code, getting enum defaults wrong (e.g., `context_mode` default is `'isolated'` not `'group'`)
+- **Telegram is NOT on main**: Automated PRs repeatedly claim Telegram is a core channel — it lives in `nanoclaw-telegram` fork. Only stubs and `/add-telegram` skill exist on main.
+- **Token counts in automated PRs are always wrong**: Every automated PR uses a hallucinated value. Only verify against `repo-tokens/badge.svg` in upstream.
 - **Code snippets must match source**: Automated PRs sometimes rename terms in code snippets to match marketing (e.g., "gateway" → "Agent Vault" in logger.warn). Always compare code blocks against actual upstream files — docs prose uses product names but code must match `src/`.
 - **Cascading merge conflicts**: Merging one PR invalidates others touching the same files. When triaging a batch, merge isolated-file PRs first, then tackle overlapping clusters. Close conflicting PRs and consolidate verified changes into a single new PR.
 - **Bulk branch cleanup**: `gh api -X DELETE repos/OWNER/REPO/git/refs/heads/BRANCH` — use after closing automated PRs to prevent clutter
@@ -136,6 +139,8 @@ Mintlify workflows generate automated PRs (`mintlify/*` branches) on upstream ch
 Two changelogs to maintain — update both after any docs work session:
 - `changelog/index.mdx` — Product releases (newest version first, uses `<Update>` component)
 - `changelog/docs-updates.mdx` — Documentation site changes (newest entry first)
+- **Upstream CHANGELOG is sparse** — often skips 10+ versions. Reconstruct by mapping commits between version bumps: `gh api 'repos/qwibitai/nanoclaw/commits?per_page=100' --jq '.[] | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"'` and tracing features between "bump to X" commits.
+- **Pre-release CHANGELOG headers**: Upstream CHANGELOG may have headers for unreleased versions (package.json not yet bumped). Don't add changelog entries for versions that aren't in `package.json` yet.
 
 ## Upstream PRs
 
@@ -147,7 +152,7 @@ To PR changes to `qwibitai/nanoclaw` from Ethan's fork (`glifocat/nanoclaw-glifo
 
 ## Token Count
 
-Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated). Currently ~42.4k tokens. Update `introduction.mdx` and `integrations/skills-system.mdx` if the badge value changes significantly.
+Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated). Currently ~43.3k tokens. Update `introduction.mdx` and `integrations/skills-system.mdx` if the badge value changes significantly.
 
 ## Writing Standards
 
