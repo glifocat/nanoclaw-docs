@@ -236,6 +236,10 @@ git fetch discord main
 git merge discord/main
 ```
 
+### Breaking change detection
+
+After a successful merge, `/update-nanoclaw` scans the changelog diff for `[BREAKING]` entries. If any are found, Claude shows each breaking change and offers to run the referenced migration skills (e.g., `/init-onecli`). You can select which migrations to run or skip them entirely.
+
 ### Checking for skill updates
 
 Run `/update-skills` or let `/update-nanoclaw` check after a core update. For each previously-merged skill branch or channel fork that has new commits, Claude offers to merge the updates.
