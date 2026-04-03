@@ -103,13 +103,13 @@ cd /tmp/validate-prN && mint broken-links
 git worktree remove /tmp/validate-prN
 ```
 
-Then validate the **full merge chain** in proposed order — this catches cross-PR conflicts that per-PR validation misses:
+**Merge chain test (2+ merge candidates only):** Skip if there's only one merge candidate — the individual validation above is sufficient. For multiple candidates, test the full chain in proposed order to catch cross-PR conflicts:
 
 ```bash
 git worktree add /tmp/chain-test main
 cd /tmp/chain-test
-git merge --no-commit origin/BRANCH-A
-git merge --no-commit origin/BRANCH-B
+git merge --no-edit origin/BRANCH-A
+git merge --no-edit origin/BRANCH-B
 # ... continue for all merge candidates in order
 mint validate
 # If conflict at any step: note which PRs conflict and adjust merge order
@@ -120,13 +120,15 @@ Record results:
 
 | PR | mint validate | broken-links | Conflicts with |
 |----|---------------|--------------|----------------|
-| Full chain | | | |
+| Full chain (if applicable) | | | |
 
 ### Phase 4 — Action plan
 
-Produce a structured plan with these sections:
+Produce a structured plan. **Omit sections that have no items** — don't output empty tables or "N/A" sections. Only include what's actionable.
 
-**4a. Overlap map** — table showing which PRs touch the same files.
+Available sections (include only when relevant):
+
+**4a. Overlap map** — table showing which PRs touch the same files. Skip if no overlaps or ≤1 PR.
 
 **4b. Close list** — PRs to close, with reason and unique content to cherry-pick:
 
@@ -161,16 +163,46 @@ gh api -X DELETE repos/glifocat/nanoclaw-docs/git/refs/heads/BRANCH-NAME
 
 ### Phase 5 — Execute (with user approval)
 
-Present the complete action plan and **STOP**. Ask the user: "Ready to execute? Which actions should I proceed with?" Do NOT take any actions until the user confirms. They may want to modify the plan, skip certain steps, or execute only partially.
+Present the complete action plan and **STOP**. Use `AskUserQuestion` to get approval before executing. Build the options dynamically from the action plan:
 
-Once confirmed, execute only the approved actions:
-1. Closing PRs (with comment explaining why)
-2. Merging PRs (in the specified order)
-3. Adding labels
-4. Cleaning up branches
+- One option per actionable item (e.g., "Merge PR #174", "Close PR #165 (superseded)", "Add labels", "Clean up branches")
+- Always include "Execute all" as the first option
+- Always include "Skip — I'll handle manually" as the last option
+- Set `multiSelect: true` so the user can pick a subset of actions
+
+Example:
+```
+AskUserQuestion(
+  question: "Which triage actions should I execute?",
+  options: [
+    "Execute all recommended actions",
+    "Merge PR #174 (breaking change detection docs)",
+    "Close PR #165 (superseded by #174)",
+    "Add missing labels",
+    "Clean up orphan branches",
+    "Update changelogs",
+    "Skip — I'll handle manually"
+  ],
+  multiSelect: true
+)
+```
+
+Do NOT take any actions until the user responds. Execute only the selected actions.
+
+Execution order:
+1. Adding labels to PRs
+2. Closing PRs (with comment explaining why)
+3. Merging PRs (in the specified order, using `--delete-branch` to auto-clean)
+4. Cleaning up orphan branches
 5. Creating follow-up PRs for cherry-picked content
 
 After each merge, re-check subsequent PRs for conflicts introduced by the merge.
+
+**Post-merge steps** (run after all merges complete):
+1. `git pull origin main` to get merged changes locally
+2. Update `changelog/docs-updates.mdx` with new entries (newest first)
+3. Run `mint validate` to verify the changelog edit
+4. Commit and push the changelog update directly to main
 
 ## Common mistakes
 
@@ -183,6 +215,9 @@ After each merge, re-check subsequent PRs for conflicts introduced by the merge.
 | Closing "superseded" PRs without diffing | Always diff line-by-line — superseded PRs may have unique changes |
 | Recommending code snippet changes that rename source terms | Code blocks must match actual `src/` files, not marketing language |
 | Assuming Telegram is a core channel | Telegram is fork-only (`nanoclaw-telegram`); only stubs exist on main |
+| Skipping changelog update after merges | Post-merge steps are part of execution — pull, update changelog, validate, commit, push |
+| Running chain test for a single PR | Chain test is only needed for 2+ merge candidates |
+| Outputting empty "N/A" sections in Phase 4 | Omit sections with no items — keep the plan scannable |
 
 ## Output format
 
