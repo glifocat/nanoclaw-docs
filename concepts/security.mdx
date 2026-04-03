@@ -272,6 +272,10 @@ For the full file format and API details, see the [security deep dive](/advanced
     Only use long-lived OAuth tokens from `claude setup-token` or API keys from [console.anthropic.com](https://console.anthropic.com). Short-lived tokens from the system keychain or `~/.claude/.credentials.json` share the same `sk-ant-oat01-` prefix but expire within hours, causing recurring container 401 errors. See [troubleshooting](/advanced/troubleshooting#container-401-errors).
     </Warning>
 
+    <Note>
+    **Apple Container users**: the credential proxy must bind to `0.0.0.0` (`CREDENTIAL_PROXY_HOST=0.0.0.0`) because Apple Container's bridge network doesn't exist until containers start. On public networks, a macOS `pf` firewall rule blocks external access to port 3001. See [container runtime — credential proxy network binding](/advanced/container-runtime#credential-proxy-network-binding).
+    </Note>
+
     <Warning>
     The credential proxy prevents credential exposure to containers. However, the proxy URL is accessible from within the container's network. The container cannot extract the real credentials, but it can make authenticated API requests through the proxy.
     </Warning>

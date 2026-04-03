@@ -3,6 +3,7 @@ title: "Releases"
 description: "NanoClaw release history, changelog, and version-by-version feature and fix notes."
 icon: "tag"
 rss: true
+tag: "UPDATED"
 ---
 
 <Update label="v1.2.45" description="2026-04-02" tags={["Skill", "Maintenance"]}>
@@ -43,15 +44,15 @@ rss: true
   - Fixed `.env` parser crash on single-character values (contributed by @foxsky)
 </Update>
 
-<Update label="v1.2.36" description="2026-03-27" tags={["Maintenance", "Fix"]}>
-  - Replaced `pino` logger with built-in logger module — removes 2 runtime dependencies
+<Update label="v1.2.36" description="2026-03-27" tags={["Maintenance", "Fix", "Breaking"]}>
+  - **[BREAKING]** Replaced `pino` logger with built-in logger module — removes 2 runtime dependencies. WhatsApp users must re-merge the WhatsApp fork to pick up the Baileys logger compatibility fix: `git fetch whatsapp main && git merge whatsapp/main`. If the `whatsapp` remote is not configured: `git remote add whatsapp https://github.com/qwibitai/nanoclaw-whatsapp.git`
   - Removed `yaml` and `zod` dependencies — core runtime now uses only 3 packages
   - Updated Ollama skill with admin model management tools
   - Channel-formatting text-style fixes for WhatsApp and Telegram (contributed by @kenbolton)
 </Update>
 
 <Update label="v1.2.35" description="2026-03-26" tags={["Breaking"]}>
-  - **[BREAKING]** OneCLI Agent Vault replaces the built-in credential proxy. Run `/init-onecli` to install OneCLI and migrate credentials. The legacy credential proxy is available as an opt-in skill via `/use-native-credential-proxy`.
+  - **[BREAKING]** OneCLI Agent Vault replaces the built-in credential proxy. Check your runtime: `grep CONTAINER_RUNTIME_BIN src/container-runtime.ts` — if it shows `'container'` you are on Apple Container, if `'docker'` you are on Docker. **Docker users**: run `/init-onecli` to install OneCLI and migrate `.env` credentials to the vault. **Apple Container users**: re-merge the skill branch (`git fetch upstream skill/apple-container && git merge upstream/skill/apple-container`) then run `/convert-to-apple-container` — do NOT run `/init-onecli` (it requires Docker). The legacy credential proxy is available as an opt-in skill via `/use-native-credential-proxy`.
   - Channel tokens (Telegram, Slack, Discord) remain in `.env` — only container-facing credentials (Anthropic, OpenAI, etc.) are migrated to the vault.
 </Update>
 
