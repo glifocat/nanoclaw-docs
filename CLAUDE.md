@@ -28,6 +28,8 @@ mint update                     # Update the CLI to the latest version
 
 Deployment is automatic after merge to `main` (via Mintlify GitHub app).
 
+**macOS gotcha**: `grep -oP` (Perl regex) is not available on macOS. Use `grep -oE` with POSIX extended regex instead (e.g., `grep -oE '[0-9.]+k'`).
+
 ## NanoClaw Architecture Context
 
 When editing docs, keep these architectural facts current:
@@ -40,6 +42,7 @@ When editing docs, keep these architectural facts current:
 
 ## PR Workflow
 
+- **Post-merge push race**: After `gh pr merge`, the Mintlify deploy bot pushes to main almost immediately. Always `git pull --rebase origin main` before pushing local follow-up commits (e.g., changelog updates). If you have unstaged changes, stash first.
 - Always run `mint validate` before creating PRs
 - **Validating PR branches**: `git worktree add /tmp/validate-prN origin/BRANCH && cd /tmp/validate-prN && mint validate` — validates without switching branches. Clean up with `git worktree remove /tmp/validate-prN`.
 - Run `mint broken-links` when adding or changing internal links
@@ -133,6 +136,9 @@ Mintlify workflows generate automated PRs (`mintlify/*` branches) on upstream ch
 - **"Superseded" PRs may have unique changes**: Always diff line-by-line before closing — never rely solely on PR descriptions
 - **After large manual docs PRs**: Check for and close overlapping automated `mintlify/*` PRs immediately after merge — they pile up fast on upstream releases
 - **Finding the upstream version**: `gh api 'repos/qwibitai/nanoclaw/commits?path=package.json&per_page=5' --jq '.[] | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"'` — version bumps show in commit messages
+- **Changelog conflicts are the #1 blocker**: Automated PRs insert changelog entries relative to their base, which goes stale fast. Close conflicting PRs and recreate with correct insertion order rather than attempting conflict resolution.
+- **Use `/triage-docs-prs` skill**: Project-level skill at `.claude/skills/triage-docs-prs/` — structured 5-phase workflow for batch PR triage with upstream validation, build checks, and executable action plans.
+- **Chain testing gotcha**: `git merge --no-commit` after a fast-forward produces nothing to commit. Use `git merge --no-edit` for merge chain validation in worktrees.
 
 ## Changelogs
 
