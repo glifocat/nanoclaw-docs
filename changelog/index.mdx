@@ -6,6 +6,17 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v1.2.47" description="2026-04-03" tags={["Feature"]}>
+  - Main agent now has direct read-write access to the SQLite database — `store/` is mounted separately at `/workspace/project/store` so the main group can query and write data directly
+  - Added `requiresTrigger` parameter to the `register_group` MCP tool (defaults to `false`) — controls whether messages must start with the trigger word for the group to respond
+</Update>
+
+<Update label="v1.2.46" description="2026-04-03" tags={["Feature", "Channel"]}>
+  - Added reply/quoted message context support — channels can now pass `reply_to_message_id`, `reply_to_message_content`, and `reply_to_sender_name` fields with messages
+  - Reply context is rendered as `<quoted_message>` XML in agent prompts, giving agents full awareness of which message a user is responding to
+  - Database migration adds reply context columns to the messages table (nullable for backward compatibility)
+</Update>
+
 <Update label="v1.2.45" description="2026-04-02" tags={["Skill", "Maintenance"]}>
   - Added `/add-macos-statusbar` utility skill — macOS menu bar status indicator with start/stop/restart controls
   - Added Telegram channel contributors (contributed by @cschmidt, @leonalfredbot-ship-it, @moktamd, @gurixs-carson)
