@@ -5,6 +5,11 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Breaking change detection docs" description="2026-04-03" tags={["Updated"]}>
+  - **`quickstart`**: Added breaking change changelog scan to `/update-nanoclaw` step list
+  - **`integrations/skills-system`**: Added "Breaking change detection" subsection documenting the `[BREAKING]` entry scan and migration skill prompts
+</Update>
+
 <Update label="v1.2.45 sync: container timeout fix, new skill" description="2026-04-02" tags={["Updated", "Fixed"]}>
   ## Fixed
   - **`concepts/containers`**: Removed incorrect "15-second exec timeout" claim from `stopContainer` — the source uses `execSync` with no timeout, falling back to `SIGKILL` on failure
