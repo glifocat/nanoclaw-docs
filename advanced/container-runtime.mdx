@@ -58,10 +58,26 @@ Run the `/convert-to-apple-container` skill in Claude Code:
 /convert-to-apple-container
 ```
 
-The skill modifies `src/container-runtime.ts` to change the binary from `docker` to `container` and adjusts mount syntax, stop commands, and health check commands accordingly. To revert, use `git revert`.
+The skill modifies `src/container-runtime.ts` to change the binary from `docker` to `container` and adjusts mount syntax, stop commands, and health check commands accordingly. The skill also configures credential proxy network binding (Phase 3) — see below. To revert, use `git revert`.
 
 <Warning>
 Apple Container uses the same `container/Dockerfile` to build the agent image. If you switch runtimes, rebuild the image with `container build` instead of `docker build`.
+</Warning>
+
+### Credential proxy network binding
+
+Apple Container uses a bridge network (`bridge100`) that only exists while containers are running. The credential proxy must start before any container, so it cannot bind to the bridge IP — it must bind to `0.0.0.0` via `CREDENTIAL_PROXY_HOST=0.0.0.0` in `.env`. This exposes port 3001 on all network interfaces.
+
+On shared or public networks, add a macOS `pf` firewall rule to block external access:
+
+```bash
+echo "block in on en0 proto tcp to any port 3001" | sudo pfctl -ef -
+```
+
+The `/convert-to-apple-container` skill handles this configuration automatically (Phase 3), including persisting the firewall rule to `/etc/pf.conf`.
+
+<Warning>
+Without the firewall rule, anyone on your local network can route API requests through the credential proxy using your credentials. On private/home networks this is typically acceptable; on public networks, always enable the firewall rule.
 </Warning>
 
 ## Container image

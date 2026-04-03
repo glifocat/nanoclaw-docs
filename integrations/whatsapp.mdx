@@ -85,6 +85,16 @@ claude
 
 This merges the `skill/whatsapp` branch into your fork, adding the WhatsApp channel code and its dependencies (including `@whiskeysockets/baileys`). The skill will then guide you through authentication.
 
+<Warning>
+If you updated NanoClaw core to v1.2.36+, you must re-merge the WhatsApp fork to pick up the Baileys logger compatibility fix (pino was replaced with a built-in logger):
+
+```bash
+git fetch whatsapp main && git merge whatsapp/main
+```
+
+If the `whatsapp` remote is not configured: `git remote add whatsapp https://github.com/qwibitai/nanoclaw-whatsapp.git`
+</Warning>
+
 ### Authentication methods
 
 The skill offers two authentication methods:

@@ -238,7 +238,7 @@ git merge discord/main
 
 ### Breaking change detection
 
-After a successful merge, `/update-nanoclaw` scans the changelog diff for `[BREAKING]` entries. If any are found, Claude shows each breaking change and offers to run the referenced migration skills (e.g., `/init-onecli`). You can select which migrations to run or skip them entirely.
+After a successful merge, `/update-nanoclaw` scans the changelog diff for `[BREAKING]` entries. If any are found, Claude shows each breaking change and offers to run the referenced migration skills (e.g., `/init-onecli` for Docker users, `/convert-to-apple-container` for Apple Container users). Some breaking changes are runtime-specific — the migration instructions differentiate between Docker and Apple Container environments. You can select which migrations to run or skip them entirely.
 
 ### Checking for skill updates
 
