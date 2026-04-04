@@ -68,14 +68,16 @@ The mount allowlist is cached in memory after first successful load. Changes to 
 
 **Read-only project root**
 
-The main group's project root is mounted read-only. Writable paths the agent needs (group folder, IPC, `.claude/`) are mounted separately. This prevents the agent from modifying host application code (`src/`, `dist/`, `package.json`, etc.) which would bypass the sandbox entirely on next restart.
+The main group's project root is mounted read-only. Writable paths the agent needs (store, group folder, IPC, `.claude/`) are mounted separately. This prevents the agent from modifying host application code (`src/`, `dist/`, `package.json`, etc.) which would bypass the sandbox entirely on next restart.
+
+The `store/` directory is mounted separately as read-write at `/workspace/project/store`, giving the main agent direct access to the SQLite database. All other project files remain read-only.
 
 From `src/container-runner.ts`:
 
 ```typescript
 if (isMain) {
   // Main gets the project root read-only. Writable paths the agent needs
-  // (group folder, IPC, .claude/) are mounted separately below.
+  // (store, group folder, IPC, .claude/) are mounted separately below.
   // Read-only prevents the agent from modifying host application code
   // (src/, dist/, package.json, etc.) which would bypass the sandbox
   // entirely on next restart.
@@ -256,6 +258,7 @@ The sender allowlist complements container isolation. Containers protect against
 | Capability | Main Group | Non-Main Group |
 |------------|------------|----------------|
 | Project root access | `/workspace/project` (ro) | None |
+| Store (SQLite DB) | `/workspace/project/store` (rw) | None |
 | Group folder | `/workspace/group` (rw) | `/workspace/group` (rw) |
 | Global memory | Via project mount | `/workspace/global` (ro, if exists) |
 | Additional mounts | Configurable | Read-only unless allowed |

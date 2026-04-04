@@ -361,6 +361,7 @@ Mounts are built per-group in `src/container-runner.ts`:
 | Path | Main Group | Non-Main Group | Mode |
 |------|------------|----------------|------|
 | Project root | `/workspace/project` | Not mounted | Read-only |
+| Store (SQLite DB) | `/workspace/project/store` | Not mounted | Read-write |
 | Group folder | `/workspace/group` | `/workspace/group` | Read-write |
 | Global memory | Via project mount | `/workspace/global` (if exists) | Read-only |
 | Claude sessions | `/home/node/.claude` | `/home/node/.claude` | Read-write |
