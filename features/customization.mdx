@@ -305,6 +305,14 @@ if (isMain) {
     containerPath: '/workspace/project',
     readonly: true,
   });
+
+  // Store mounted read-write so the main agent can
+  // query and write to the SQLite database directly
+  mounts.push({
+    hostPath: path.join(projectRoot, 'store'),
+    containerPath: '/workspace/project/store',
+    readonly: false,
+  });
   
   mounts.push({
     hostPath: groupDir,

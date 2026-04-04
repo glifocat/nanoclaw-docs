@@ -5,6 +5,19 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v1.2.46–v1.2.47 sync: store mount, reply context, requiresTrigger" description="2026-04-04" tags={["Updated"]}>
+  Triaged 3 automated Mintlify PRs (#175–#177). Merged #177 (most comprehensive), closed #175 and #176 (superseded). Cherry-picked unique content from closed PRs.
+
+  ## Updated
+  - **Store mount (rw)**: Documented `store/` read-write mount for main agent across containers, container-runtime, security, security-model, groups, customization pages
+  - **`requiresTrigger` parameter**: Added to `register_group` MCP tool description in containers and messaging pages
+  - **Reply context**: Updated architecture database section with `reply_to_message_id`, `reply_to_message_content`, `reply_to_sender_name` columns
+  - **`isMain` preservation**: Updated register_group handler snippet in messaging page
+  - **`CONTAINER_MAX_OUTPUT_SIZE`**: Added truncation behavior note to configuration reference
+  - **Token count**: Updated from 43.3k to 43.4k in introduction and skills-system pages
+  - **Changelog**: Added v1.2.46 and v1.2.47 product release entries
+</Update>
+
 <Update label="Breaking change detection docs" description="2026-04-03" tags={["Updated"]}>
   - **`quickstart`**: Added breaking change changelog scan to `/update-nanoclaw` step list
   - **`integrations/skills-system`**: Added "Breaking change detection" subsection documenting the `[BREAKING]` entry scan and migration skill prompts
