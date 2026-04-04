@@ -110,6 +110,7 @@ Each group has a dedicated directory structure:
 |------|------------|----------------|
 | Own group folder | Read-write | Read-write |
 | Project root | Read-only | Not mounted |
+| Store (SQLite DB) | Read-write | Not mounted |
 | Global memory (`groups/global/`) | Via project mount | Read-only mount (if exists) |
 | Other groups' folders | Via project root (ro) | Not accessible |
 | Additional mounts | Configurable | Read-only unless allowed |
