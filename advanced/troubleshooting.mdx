@@ -485,6 +485,28 @@ ls -la data/ipc/family-chat/
   ```
 </Accordion>
 
+## Session artifact auto-pruning
+
+NanoClaw automatically cleans up stale session artifacts on startup and then every 24 hours. This prevents disk usage from growing unbounded as sessions accumulate.
+
+**Retention policy:**
+
+| Artifact | Retention | Notes |
+|----------|-----------|-------|
+| Session JSONLs and tool results | 7 days | Active sessions (from DB) are never deleted |
+| Debug logs | 3 days | Active sessions skipped |
+| Todo files | 3 days | Active sessions skipped |
+| Telemetry | 7 days | Active sessions skipped |
+| Group logs | 7 days | — |
+
+The cleanup script reads active session IDs from SQLite and never deletes files belonging to active sessions. It runs 30 seconds after startup to avoid competing with initialization, then repeats on a 24-hour interval.
+
+You can run the cleanup manually with `--dry-run` to preview what would be deleted:
+
+```bash
+bash scripts/cleanup-sessions.sh --dry-run
+```
+
 ## Stale session auto-recovery
 
 NanoClaw automatically detects and recovers from stale or corrupt sessions. When a container fails because the session transcript file (`.jsonl`) is missing — due to a crash mid-write, manual deletion, or disk-full condition — NanoClaw clears the broken session ID and lets the existing backoff mechanism in the group queue retry with a fresh session.

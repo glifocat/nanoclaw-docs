@@ -266,7 +266,7 @@ Each group maintains an isolated Claude conversation session:
 
 - Sessions stored at `data/sessions/{group}/.claude/`
 - Include full message history and file contents read
-- Auto-compact when context gets too long
+- Auto-compact triggers at 165k tokens to preserve context fidelity
 - Settings configured per group:
   - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (enable subagent orchestration)
   - `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1` (load memory from mounts)

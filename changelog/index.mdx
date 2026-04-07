@@ -6,6 +6,34 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v1.2.52" description="2026-04-05" tags={["Fix"]}>
+  - Fixed Gmail OneCLI credential mode detection — properly detects when running under OneCLI Agent Vault
+  - Reduced setup friction and improved diagnostics output
+  - Added `.npmrc` with 7-day minimum release age for dependency safety
+</Update>
+
+<Update label="v1.2.51" description="2026-04-05" tags={["Fix"]}>
+  - Fixed writable global memory mount for main agent — corrected the path in container `CLAUDE.md`
+  - Fixed three issues in the Karpathy wiki skill
+  - Updated `init-onecli` skill to use `ONECLI_URL` variable
+</Update>
+
+<Update label="v1.2.50" description="2026-04-05" tags={["Feature", "Skill"]}>
+  - Lowered auto-compact threshold to 165k tokens for better context fidelity
+  - Added `/add-karpathy-llm-wiki` skill — persistent wiki knowledge base per group, based on Karpathy's LLM Wiki pattern
+  - Added `/migrate-nanoclaw` skill — intent-based upgrade that extracts customizations into a migration guide and reapplies them on a clean upstream base
+  - Added `/migrate-from-openclaw` skill — guided migration from OpenClaw installations
+  - NanoClaw now suggests `/migrate-nanoclaw` when the user's fork is far behind upstream
+</Update>
+
+<Update label="v1.2.49" description="2026-04-04" tags={["Feature"]}>
+  - Added automatic session artifact pruning on startup and daily — cleans up stale session JSONLs (7 days), debug logs (3 days), todo files (3 days), and telemetry (7 days) while preserving active sessions
+</Update>
+
+<Update label="v1.2.48" description="2026-04-04" tags={["Feature"]}>
+  - Upgraded agent SDK to 0.2.92 with auto-compact at 165k tokens
+</Update>
+
 <Update label="v1.2.47" description="2026-04-03" tags={["Feature"]}>
   - Main agent now has direct read-write access to the SQLite database — `store/` is mounted separately at `/workspace/project/store` so the main group can query and write data directly
   - Added `requiresTrigger` parameter to the `register_group` MCP tool (defaults to `false`) — controls whether messages must start with the trigger word for the group to respond
