@@ -15,7 +15,7 @@ From the NanoClaw README:
 
 This approach means:
 
-- The base NanoClaw codebase stays small (~43.4k tokens)
+- The base NanoClaw codebase stays small (~43.7k tokens)
 - Each installation is customized to your exact needs
 - No configuration sprawl or unused features
 - The code remains understandable and modifiable
@@ -82,7 +82,7 @@ The channel fork architecture keeps the upstream `main` branch minimal. Core Nan
 - Live in `.claude/skills/<name>/` on `main`
 
 **Operational skills** (on `main`, always available):
-- `/setup`, `/debug`, `/update-nanoclaw`, `/customize`, `/update-skills`, `/init-onecli`, `/get-qodo-rules`, `/qodo-pr-resolver`, `/x-integration`
+- `/setup`, `/debug`, `/update-nanoclaw`, `/customize`, `/update-skills`, `/init-onecli`, `/migrate-nanoclaw`, `/migrate-from-openclaw`, `/get-qodo-rules`, `/qodo-pr-resolver`, `/x-integration`
 - Instruction-only `SKILL.md` files — no code changes, just workflows
 - Live in `.claude/skills/` on `main`
 
@@ -205,6 +205,7 @@ Dependencies are implicit in git history — no separate dependency file is need
 - **`/convert-to-apple-container`** — Switch from Docker to Apple Container on macOS
 - **`/add-emacs`** — Emacs channel with interactive chat buffer and org-mode integration (local HTTP bridge, no bot token needed)
 - **`/add-macos-statusbar`** — macOS menu bar status indicator with start/stop/restart controls
+- **`/add-karpathy-llm-wiki`** — Persistent wiki knowledge base per group, based on Karpathy's LLM Wiki pattern
 - **`/use-native-credential-proxy`** — Replace OneCLI Agent Vault with built-in `.env`-based credential proxy
 
 ### Channel-specific skills (from channel fork branches)
