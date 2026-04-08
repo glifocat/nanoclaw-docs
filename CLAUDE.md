@@ -139,6 +139,7 @@ Mintlify workflows generate automated PRs (`mintlify/*` branches) on upstream ch
 - **Changelog conflicts are the #1 blocker**: Automated PRs insert changelog entries relative to their base, which goes stale fast. Close conflicting PRs and recreate with correct insertion order rather than attempting conflict resolution.
 - **Use `/triage-docs-prs` skill**: Project-level skill at `.claude/skills/triage-docs-prs/` — structured 5-phase workflow for batch PR triage with upstream validation, build checks, and executable action plans.
 - **Chain testing gotcha**: `git merge --no-commit` after a fast-forward produces nothing to commit. Use `git merge --no-edit` for merge chain validation in worktrees.
+- **Merge follow-up PRs immediately**: Cherry-pick/consolidation PRs created during triage should be merged in the same session — they get forgotten if left open.
 
 ## Changelogs
 
@@ -158,7 +159,7 @@ To PR changes to `qwibitai/nanoclaw` from Ethan's fork (`glifocat/nanoclaw-glifo
 
 ## Token Count
 
-Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated). Currently ~43.4k tokens. Update `introduction.mdx` and `integrations/skills-system.mdx` if the badge value changes significantly.
+Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated). Currently ~43.7k tokens. Update `introduction.mdx` and `integrations/skills-system.mdx` if the badge value changes significantly.
 
 ## Writing Standards
 
