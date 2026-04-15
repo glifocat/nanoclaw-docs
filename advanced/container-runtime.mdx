@@ -249,6 +249,9 @@ From the `buildContainerArgs` function in `src/container-runner.ts`:
 <Tabs>
   <Tab title="OneCLI Agent Vault (v1.2.35+)">
     ```typescript
+    // OneCLI SDK initialized with optional API key for authenticated vault access
+    const onecli = new OneCLI({ url: ONECLI_URL, apiKey: ONECLI_API_KEY });
+
     async function buildContainerArgs(
       mounts: VolumeMount[],
       containerName: string,
@@ -298,7 +301,7 @@ From the `buildContainerArgs` function in `src/container-runner.ts`:
     - `--name` - Unique container name for management
     - `--add-host` - Maps `host.docker.internal` on Linux (automatic on macOS)
     - `--user` - Run as host UID/GID for file permissions
-    - OneCLI SDK configures container networking for credential injection (no explicit env vars)
+    - OneCLI SDK (authenticated via `ONECLI_API_KEY` when set) configures container networking for credential injection
   </Tab>
 
   <Tab title="Credential Proxy (legacy)">

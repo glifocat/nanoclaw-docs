@@ -39,6 +39,10 @@ Configuration is read from `.env` file or `process.env`.
     <ParamField path="ONECLI_URL" type="string" default="http://localhost:10254">
       URL for the OneCLI Agent Vault that handles credential injection for containers.
     </ParamField>
+
+    <ParamField path="ONECLI_API_KEY" type="string">
+      API key for authenticated communication with the OneCLI Agent Vault. When set, the OneCLI SDK includes this key in requests to the vault, enabling authenticated container configuration. Read from `.env` or `process.env`.
+    </ParamField>
   </Tab>
 
   <Tab title="Credential Proxy (legacy)">
@@ -150,10 +154,11 @@ Each candidate is validated as a real IANA timezone identifier before being acce
     MAX_CONCURRENT_CONTAINERS=5
     TZ=America/Los_Angeles
     ONECLI_URL=http://127.0.0.1:10254
+    ONECLI_API_KEY=your-onecli-api-key
     ```
 
     <Note>
-    With the OneCLI Agent Vault, API keys and OAuth tokens are no longer stored in `.env`. Secrets are managed via `onecli secrets create` and injected by the vault at request time. The only credential-related variable is `ONECLI_URL`.
+    With the OneCLI Agent Vault, API keys and OAuth tokens are no longer stored in `.env`. Secrets are managed via `onecli secrets create` and injected by the vault at request time. The credential-related variables are `ONECLI_URL` and `ONECLI_API_KEY` (for authenticated vault communication).
     </Note>
   </Tab>
 
@@ -216,6 +221,7 @@ Each candidate is validated as a real IANA timezone identifier before being acce
 <Tabs>
   <Tab title="OneCLI Agent Vault (v1.2.35+)">
     - **Secrets** are never read by NanoClaw — OneCLI manages them externally
+    - `ONECLI_API_KEY` authenticates the host's communication with the vault — it is never passed to containers
     - The OneCLI Agent Vault injects credentials into container API traffic at request time
     - Containers cannot extract real credentials from the vault
     - Mount allowlist is stored OUTSIDE project root and never mounted into containers
