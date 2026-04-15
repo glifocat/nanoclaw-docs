@@ -6,6 +6,11 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v1.2.53" description="2026-04-15" tags={["Fix"]}>
+  - Added `ONECLI_API_KEY` configuration variable for authenticated communication with the OneCLI Agent Vault
+  - OneCLI SDK is now initialized with both `ONECLI_URL` and `ONECLI_API_KEY`, enabling authenticated container credential configuration
+</Update>
+
 <Update label="v1.2.52" description="2026-04-05" tags={["Fix"]}>
   - Fixed Gmail OneCLI credential mode detection — properly detects when running under OneCLI Agent Vault
   - Reduced setup friction and improved diagnostics output

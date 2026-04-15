@@ -298,7 +298,7 @@ From the `buildContainerArgs` function in `src/container-runner.ts`:
     - `--name` - Unique container name for management
     - `--add-host` - Maps `host.docker.internal` on Linux (automatic on macOS)
     - `--user` - Run as host UID/GID for file permissions
-    - OneCLI SDK configures container networking for credential injection (no explicit env vars)
+    - OneCLI SDK configures container networking for credential injection (no explicit env vars). The SDK is initialized with `ONECLI_URL` and optionally `ONECLI_API_KEY` for authenticated vault access
   </Tab>
 
   <Tab title="Credential Proxy (legacy)">

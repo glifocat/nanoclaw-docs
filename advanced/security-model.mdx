@@ -205,6 +205,13 @@ The sender allowlist complements container isolation. Containers protect against
     - The vault intercepts HTTPS traffic to `api.anthropic.com` and injects the registered secret
     - Each non-main group receives an `agentIdentifier` (derived from its folder name) for per-group credential scoping
     - `ONECLI_URL` (default `http://localhost:10254`) configures the vault address
+    - `ONECLI_API_KEY` (optional) authenticates the SDK's requests to the vault
+
+    **OneCLI SDK initialization** (from `src/container-runner.ts`):
+
+    ```typescript
+    const onecli = new OneCLI({ url: ONECLI_URL, apiKey: ONECLI_API_KEY });
+    ```
 
     **Container environment** (from `src/container-runner.ts`):
 
