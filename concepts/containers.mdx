@@ -449,7 +449,7 @@ The agent runner passes an explicit allowlist to the Claude Agent SDK. Only thes
 | Utilities | `TodoWrite`, `ToolSearch`, `Skill`, `NotebookEdit` |
 | MCP | `mcp__nanoclaw__*` (all tools from the built-in NanoClaw MCP server) |
 
-The SDK runs with `permissionMode: 'bypassPermissions'` since containers already provide the security boundary. Settings are loaded from both project and user sources (`settingSources: ['project', 'user']`), allowing `.claude/settings.json` at both levels to configure SDK behavior.
+The SDK runs with `permissionMode: 'bypassPermissions'` and `allowDangerouslySkipPermissions: true` since containers already provide the security boundary. Settings are loaded from both project and user sources (`settingSources: ['project', 'user']`), allowing `.claude/settings.json` at both levels to configure SDK behavior.
 
 ### Conversation archival
 

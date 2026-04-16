@@ -39,6 +39,10 @@ Configuration is read from `.env` file or `process.env`.
     <ParamField path="ONECLI_URL" type="string" default="http://localhost:10254">
       URL for the OneCLI Agent Vault that handles credential injection for containers.
     </ParamField>
+
+    <ParamField path="ONECLI_API_KEY" type="string">
+      API key for authenticating with the OneCLI Agent Vault. When set, the OneCLI SDK includes this key in requests to the vault. Optional — only needed if your OneCLI instance requires authentication.
+    </ParamField>
   </Tab>
 
   <Tab title="Credential Proxy (legacy)">
