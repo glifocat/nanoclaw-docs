@@ -123,15 +123,29 @@ export IDLE_TIMEOUT=600000  # 10 minutes in milliseconds
 
 While NanoClaw avoids config files, it does support a minimal `.env` file for secrets and deployment settings:
 
-```bash
-# .env
-ASSISTANT_NAME=Andy
-ASSISTANT_HAS_OWN_NUMBER=false
-ANTHROPIC_API_KEY=sk-ant-...
-MAX_CONCURRENT_CONTAINERS=5
-IDLE_TIMEOUT=1800000
-CONTAINER_TIMEOUT=1800000
-```
+<Tabs>
+  <Tab title="OneCLI Agent Vault (v1.2.35+)">
+    ```bash
+    # .env
+    ASSISTANT_NAME=Andy
+    ASSISTANT_HAS_OWN_NUMBER=false
+    ONECLI_URL=http://127.0.0.1:10254
+    ```
+
+    Credentials are managed by the OneCLI Agent Vault. Only identity and connection settings go in `.env`.
+  </Tab>
+
+  <Tab title="Credential Proxy (legacy)">
+    ```bash
+    # .env
+    ASSISTANT_NAME=Andy
+    ASSISTANT_HAS_OWN_NUMBER=false
+    ANTHROPIC_API_KEY=sk-ant-...
+    ```
+
+    Requires the `/use-native-credential-proxy` skill. The API key is passed to containers via the built-in credential proxy.
+  </Tab>
+</Tabs>
 
 ### Environment variable precedence
 
@@ -157,10 +171,13 @@ The main configuration file:
 ```typescript
 // Trigger pattern
 export const ASSISTANT_NAME = 'Andy';
-export const TRIGGER_PATTERN = new RegExp(
-  `^@${escapeRegex(ASSISTANT_NAME)}\\b`,
-  'i',
-);
+
+export function buildTriggerPattern(trigger: string): RegExp {
+  return new RegExp(`^${escapeRegex(trigger.trim())}\\b`, 'i');
+}
+
+export const DEFAULT_TRIGGER = `@${ASSISTANT_NAME}`;
+export const TRIGGER_PATTERN = buildTriggerPattern(DEFAULT_TRIGGER);
 
 // Polling intervals
 export const POLL_INTERVAL = 2000;

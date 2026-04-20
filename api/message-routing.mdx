@@ -147,18 +147,19 @@ function formatOutbound(rawText: string): string
 ```typescript
 import { formatOutbound } from './router.js';
 
-// Without channel formatting
 const raw = `<internal>Debug info</internal>Response to user`;
 const outbound = formatOutbound(raw);
 // "Response to user"
-
-// With channel formatting (requires /channel-formatting skill)
-const formatted = formatOutbound(raw, 'whatsapp');
-// Markdown markers converted to WhatsApp-native syntax
 ```
 
 <Note>
-The `channel` parameter is added by the `/channel-formatting` skill (`skill/channel-formatting` branch). On base NanoClaw without the skill applied, `formatOutbound` only accepts `rawText`.
+The `/channel-formatting` skill (`skill/channel-formatting` branch) extends this function with a second `channel` parameter for converting Markdown to channel-native syntax:
+
+```typescript
+const formatted = formatOutbound(raw, 'whatsapp');
+```
+
+On base NanoClaw without the skill applied, `formatOutbound` only accepts `rawText`.
 </Note>
 
 ### routeOutbound
