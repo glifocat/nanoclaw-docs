@@ -3,6 +3,7 @@ title: Installation
 description: Detailed installation requirements and setup for macOS, Linux, and Windows (WSL)
 icon: "download"
 keywords: ["requirements", "docker", "node", "apple container", "windows", "wsl", "onecli"]
+tag: "UPDATED"
 ---
 
 # Installation
@@ -306,6 +307,10 @@ Run `onecli --help` to see all available commands for managing secrets and vault
 <Info>
 OneCLI is also installed automatically by the `/setup` skill if not already present. It's listed here so you know about the dependency upfront.
 </Info>
+
+<Note>
+**Existing OneCLI installs are preserved.** If the setup flow detects a running OneCLI gateway (via `onecli version` and `onecli config get api-host`), it asks whether to reuse it or install a fresh instance. Picking **Use the existing instance** (recommended) skips the installer, reads the configured `api-host`, writes it to `.env` as `ONECLI_URL`, and leaves the running gateway alone — so other apps bound to that listener keep working. Picking **Install a fresh instance for NanoClaw** re-runs the installer and may rebind the listener.
+</Note>
 
 <Note>
 **What `/setup` handles for you:** OneCLI installation, npm dependencies, container image build, channel configuration, and service setup. **What you need beforehand:** Node.js, Claude Code, a container runtime, and build tools.
