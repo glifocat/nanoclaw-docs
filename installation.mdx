@@ -2,6 +2,7 @@
 title: Installation
 description: Detailed installation requirements and setup for macOS, Linux, and Windows (WSL)
 icon: "download"
+tag: "UPDATED"
 keywords: ["requirements", "docker", "node", "apple container", "windows", "wsl", "onecli"]
 ---
 
@@ -390,7 +391,7 @@ Channel-specific dependencies (e.g., `@whiskeysockets/baileys` for WhatsApp, `gr
 </Note>
 
 <Info>
-All dependencies are installed automatically by `/setup` via `npm install`.
+All dependencies are installed automatically by `/setup` via `pnpm install --frozen-lockfile`. The bootstrap script enables `pnpm` through corepack when available, and falls back to installing the pinned pnpm version with `npm install -g pnpm@<pinned>` on Node distributions that don't ship corepack (older nvm, keg-only `node@22` on Homebrew, minimal distro packages).
 </Info>
 
 ## Container image
