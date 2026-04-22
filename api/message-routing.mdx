@@ -1,268 +1,152 @@
 ---
 title: Message routing
-description: API reference for message formatting, XML escaping, internal tag stripping, and outbound channel routing
+description: API reference for the v2 inbound routing pipeline, engage evaluation, and outbound delivery
 tag: "UPDATED"
 ---
 
-The message router handles formatting messages for agents and routing outbound messages to the correct channel.
+The v2 message router handles inbound message evaluation, fan-out to wired agents, and outbound delivery through session databases.
 
-## Core functions
+## Inbound routing pipeline
 
-### escapeXml
+The router (`src/router.ts`) processes inbound messages through these stages:
 
-Escapes special XML characters in strings.
+### 1. Thread policy
 
-```typescript
-function escapeXml(s: string): string
-```
-
-<ParamField path="s" type="string" required>
-  String to escape
-</ParamField>
-
-<ResponseField name="return" type="string">
-  XML-escaped string with `&`, `<`, `>`, and `"` replaced with entities
-</ResponseField>
-
-**Example:**
+Non-threaded adapters collapse `threadId` to null:
 
 ```typescript
-import { escapeXml } from './router.js';
-
-const escaped = escapeXml('Hello <world> & "friends"');
-// 'Hello &lt;world&gt; &amp; &quot;friends&quot;'
-```
-
-### formatMessages
-
-Formats an array of messages as XML for agent consumption.
-
-```typescript
-function formatMessages(messages: NewMessage[], timezone: string): string
-```
-
-<ParamField path="messages" type="NewMessage[]" required>
-  Array of messages to format
-</ParamField>
-
-<ParamField path="timezone" type="string" required>
-  IANA timezone identifier (e.g., `"America/New_York"`). Used to format timestamps in local time and included in the output `<context>` header.
-</ParamField>
-
-<ResponseField name="return" type="string">
-  A `<context>` header followed by XML-formatted messages wrapped in `<messages>` tags
-</ResponseField>
-
-**Output format:**
-
-```xml
-<context timezone="America/New_York" />
-<messages>
-<message sender="John Doe" time="2:34 PM">Hello!</message>
-<message sender="Jane Smith" time="2:35 PM" reply_to="msg-001">
-  <quoted_message from="John Doe">Hello!</quoted_message>Hi there!</message>
-</messages>
-```
-
-When a message includes reply context (`reply_to_message_id`), a `reply_to` attribute is added to the `<message>` element. If `reply_to_message_content` and `reply_to_sender_name` are also present, a nested `<quoted_message>` element is included with the original sender and content.
-
-**Example:**
-
-```typescript
-import { formatMessages } from './router.js';
-
-const messages = [
-  {
-    id: '1',
-    chat_jid: '123@g.us',
-    sender: '456@s.whatsapp.net',
-    sender_name: 'John',
-    content: 'Hello!',
-    timestamp: '2026-02-28T12:34:56.789Z',
-  },
-  {
-    id: '2',
-    chat_jid: '123@g.us',
-    sender: '789@s.whatsapp.net',
-    sender_name: 'Jane',
-    content: 'Hi there!',
-    timestamp: '2026-02-28T12:35:00.000Z',
-    reply_to_message_id: '1',
-    reply_to_message_content: 'Hello!',
-    reply_to_sender_name: 'John',
-  },
-];
-
-const formatted = formatMessages(messages, 'America/New_York');
-```
-
-### stripInternalTags
-
-Removes `<internal>...</internal>` blocks from agent output.
-
-```typescript
-function stripInternalTags(text: string): string
-```
-
-<ParamField path="text" type="string" required>
-  Text containing potential `<internal>` tags
-</ParamField>
-
-<ResponseField name="return" type="string">
-  Text with all `<internal>` blocks removed and trimmed
-</ResponseField>
-
-**Purpose:**
-
-Agents use `<internal>` tags for internal reasoning that should not be shown to users.
-
-**Example:**
-
-```typescript
-import { stripInternalTags } from './router.js';
-
-const raw = `<internal>Analyzing request...</internal>Here's your answer!`;
-const clean = stripInternalTags(raw);
-// "Here's your answer!"
-```
-
-### formatOutbound
-
-Prepares agent output for sending to users. Strips internal tags and optionally converts Markdown to the target channel's native text syntax.
-
-```typescript
-function formatOutbound(rawText: string): string
-```
-
-<ParamField path="rawText" type="string" required>
-  Raw text from agent
-</ParamField>
-
-<ResponseField name="return" type="string">
-  Cleaned text ready for user display (empty string if no content after stripping)
-</ResponseField>
-
-**Example:**
-
-```typescript
-import { formatOutbound } from './router.js';
-
-// Without channel formatting
-const raw = `<internal>Debug info</internal>Response to user`;
-const outbound = formatOutbound(raw);
-// "Response to user"
-
-// With channel formatting (requires /channel-formatting skill)
-const formatted = formatOutbound(raw, 'whatsapp');
-// Markdown markers converted to WhatsApp-native syntax
-```
-
-<Note>
-The `channel` parameter is added by the `/channel-formatting` skill (`skill/channel-formatting` branch). On base NanoClaw without the skill applied, `formatOutbound` only accepts `rawText`.
-</Note>
-
-### routeOutbound
-
-Routes a message to the appropriate channel.
-
-```typescript
-function routeOutbound(
-  channels: Channel[],
-  jid: string,
-  text: string,
-): Promise<void>
-```
-
-<ParamField path="channels" type="Channel[]" required>
-  Array of available channels
-</ParamField>
-
-<ParamField path="jid" type="string" required>
-  Chat JID to send to
-</ParamField>
-
-<ParamField path="text" type="string" required>
-  Text to send
-</ParamField>
-
-**Throws:** Error if no connected channel owns the JID
-
-**Example:**
-
-```typescript
-import { routeOutbound } from './router.js';
-
-await routeOutbound(channels, '123@g.us', 'Hello!');
-```
-
-### findChannel
-
-Finds the channel that owns a given JID.
-
-```typescript
-function findChannel(
-  channels: Channel[],
-  jid: string,
-): Channel | undefined
-```
-
-<ParamField path="channels" type="Channel[]" required>
-  Array of available channels
-</ParamField>
-
-<ParamField path="jid" type="string" required>
-  Chat JID to look up
-</ParamField>
-
-<ResponseField name="return" type="Channel | undefined">
-  Channel that owns the JID, or `undefined` if none found
-</ResponseField>
-
-**Example:**
-
-```typescript
-import { findChannel } from './router.js';
-
-const channel = findChannel(channels, '123@g.us');
-if (channel) {
-  await channel.sendMessage('123@g.us', 'Hello!');
+// Telegram, WhatsApp, iMessage don't support threads
+if (!adapter.supportsThreads) {
+  message.threadId = null;
 }
 ```
+
+### 2. Messaging group lookup
+
+Combined query for messaging group and wired agent count. Messaging groups are auto-created only on mentions or DMs — plain chatter is silent.
+
+### 3. Unwired channel handling
+
+If no agents are wired and it's a mention, the channel-request gate escalates to the owner for approval.
+
+### 4. Sender resolution
+
+The permissions module extracts a namespaced user ID and upserts the users row:
+
+```typescript
+// User ID format: channelType:handle
+// Examples: phone:+15551234567, tg:123456, discord:789012
+```
+
+### 5. Fan-out
+
+Each wired agent is evaluated independently. Message IDs are namespaced by agent group ID to prevent collisions.
+
+### 6. Engage evaluation
+
+Per-agent decision based on the wiring's `engage_mode`:
+
+| Mode | Condition |
+|------|-----------|
+| `pattern` | Message matches `engage_pattern` regex (`'.'` = always) |
+| `mention` | Platform-level mention required |
+| `mention-sticky` | Platform mention OR existing active session |
+
+### 7. Delivery
+
+Engaging agents get a session write and container wake. Non-engaging agents with `ignored_message_policy='accumulate'` get the message stored with `trigger=0`.
+
+## Module hooks
+
+The router accepts optional pluggable hooks:
+
+| Hook | Purpose |
+|------|---------|
+| `setSenderResolver` | Runs before agent resolution — extracts user ID |
+| `setAccessGate` | Runs after agent resolution — enforces `unknown_sender_policy` |
+| `setSenderScopeGate` | Per-wiring sender scope enforcement |
+| `setChannelRequestGate` | Escalation for unwired channels |
+
+All hooks are optional. Without the permissions module, the system is allow-all.
+
+## Outbound delivery
+
+### Delivery polls
+
+| Poll | Interval | Scope |
+|------|----------|-------|
+| Active | 1 second | Sessions with running containers |
+| Sweep | 60 seconds | All active sessions |
+
+### Delivery pipeline
+
+For each session with due outbound messages:
+
+1. Read from `outbound.db` (read-only)
+2. Filter already-delivered via `inbound.db`'s `delivered` table
+3. Route by `kind`:
+   - `system` — dispatch to registered delivery action handlers
+   - `channel_type='agent'` — agent-to-agent module
+   - Normal — permission check, then channel adapter delivery
+4. Mark delivered in `inbound.db`
+5. Clean up `outbox/` files (best-effort)
+
+### Delivery actions
+
+Modules register handlers via `registerDeliveryAction(action, handler)`:
+
+```typescript
+registerDeliveryAction('schedule_task', handleScheduleTask);
+registerDeliveryAction('cancel_task', handleCancelTask);
+// etc.
+```
+
+### Retry behavior
+
+- 3 attempts per message
+- Permanently failed after exhausting retries
+- Attempt counter resets on process restart
 
 ## Types
 
-### NewMessage
+### EngageMode
 
 ```typescript
-interface NewMessage {
-  id: string;                       // Unique message ID
-  chat_jid: string;                 // Chat identifier (e.g., "123@g.us")
-  sender: string;                   // Sender JID (e.g., "456@s.whatsapp.net")
-  sender_name: string;              // Display name
-  content: string;                  // Message text
-  timestamp: string;                // ISO 8601 timestamp
-  is_from_me?: boolean;             // Whether sent by the bot
-  is_bot_message?: boolean;         // Whether this is a bot message
-  thread_id?: string;               // Thread/topic ID (channel-specific)
-  reply_to_message_id?: string;     // ID of the message being replied to
-  reply_to_message_content?: string; // Content of the quoted message
-  reply_to_sender_name?: string;    // Display name of the quoted message sender
-}
+type EngageMode = 'pattern' | 'mention' | 'mention-sticky';
 ```
 
-The `thread_id` and `reply_to_*` fields allow any channel to pass quoted message context to the agent. These fields are optional — channels that don't support replies simply omit them.
-
-### Channel
+### SenderScope
 
 ```typescript
-interface Channel {
-  name: string;
-  connect(): Promise<void>;
-  sendMessage(jid: string, text: string): Promise<void>;
-  isConnected(): boolean;
-  ownsJid(jid: string): boolean;
-  disconnect(): Promise<void>;
-  setTyping?(jid: string, isTyping: boolean): Promise<void>;   // Optional
-  syncGroups?(force: boolean): Promise<void>;                   // Optional
-}
+type SenderScope = 'all' | 'known';
+```
+
+### IgnoredMessagePolicy
+
+```typescript
+type IgnoredMessagePolicy = 'drop' | 'accumulate';
+```
+
+### SessionMode
+
+```typescript
+type SessionMode = 'shared' | 'per-thread' | 'agent-shared';
+```
+
+### MessageInKind
+
+```typescript
+type MessageInKind = 'chat' | 'chat-sdk' | 'task' | 'webhook' | 'system';
+```
+
+### MessageInStatus
+
+```typescript
+type MessageInStatus = 'pending' | 'processing' | 'completed' | 'failed';
+```
+
+### UnknownSenderPolicy
+
+```typescript
+type UnknownSenderPolicy = 'strict' | 'request_approval' | 'public';
 ```

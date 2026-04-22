@@ -4,39 +4,36 @@ description: Container execution architecture and runtime details
 tag: "UPDATED"
 ---
 
-NanoClaw runs agents in isolated Linux containers to provide security through OS-level process and filesystem isolation. The container runtime is abstracted to support multiple backends.
+NanoClaw runs agents in isolated Linux containers to provide security through OS-level process and filesystem isolation. In v2, the container runtime uses a two-database IO model instead of stdin/stdout piping, and the agent-runner runs on Bun instead of Node.js.
 
 ## Runtime abstraction
 
-All runtime-specific logic lives in `src/container-runtime.ts`, making it easy to swap runtimes. Currently supported:
+All runtime-specific logic lives in `src/container-runtime.ts`:
 
-- **Docker** (default) - Cross-platform support (macOS, Linux, Windows via WSL2)
-- **Apple Container** (macOS only) - Lightweight native runtime
+- **Docker** (default) — cross-platform support (macOS, Linux, Windows via WSL2)
+- **Apple Container** (macOS only) — lightweight native runtime
 
-The runtime binary is specified by `CONTAINER_RUNTIME_BIN` in `src/container-runtime.ts`:
+The runtime binary is specified by `CONTAINER_RUNTIME_BIN`:
 
 ```typescript
-/** The container runtime binary name. */
 export const CONTAINER_RUNTIME_BIN = 'docker';
 ```
 
 ## Apple Container vs Docker
 
-Apple Container is Apple's native virtualization framework (macOS 15+). It runs Linux containers without a VM layer like Docker Desktop, making it lighter weight and faster to start.
+Apple Container is Apple's native virtualization framework (macOS 15+). It runs Linux containers without a VM layer like Docker Desktop.
 
 ### When to use Apple Container
 
 - You're on **macOS 15 (Sequoia) or later**
-- You want to **avoid installing Docker Desktop** (and its licensing)
-- You want **faster container startup** — no VM boot overhead
-- You're running NanoClaw on a personal Mac, not a shared server
+- You want to **avoid installing Docker Desktop**
+- You want **faster container startup**
 
 ### When to stick with Docker
 
-- You're on **Linux or Windows (WSL2)** — Apple Container is macOS-only
-- You need **cross-platform parity** — Docker behaves identically across OS
-- You're deploying to a **production server** (Linux VPS, Hetzner, etc.)
-- You rely on Docker-specific tooling (Docker Compose, Portainer, etc.)
+- You're on **Linux or Windows (WSL2)**
+- You need **cross-platform parity**
+- You're deploying to a **production server**
 
 ### Key differences
 
@@ -46,475 +43,150 @@ Apple Container is Apple's native virtualization framework (macOS 15+). It runs 
 | Bind mounts | `-v host:container:ro` | `--mount type=bind,source=...,target=...,readonly` |
 | Stop command | `docker stop -t 1 name` | `container stop name` |
 | Health check | `docker info` | `container system status` |
-| Orphan cleanup | Parses `docker ps --format` JSON | Parses `container ls --format json` |
-| Host gateway | Built-in on macOS, `--add-host` on Linux | Built-in (`host.docker.internal`) |
 | Platform | macOS, Linux, Windows (WSL2) | macOS 15+ only |
 
 ### Switching runtimes
 
-Run the `/convert-to-apple-container` skill in Claude Code:
-
-```
-/convert-to-apple-container
-```
-
-The skill modifies `src/container-runtime.ts` to change the binary from `docker` to `container` and adjusts mount syntax, stop commands, and health check commands accordingly. The skill also configures credential proxy network binding (Phase 3) — see below. To revert, use `git revert`.
-
-<Warning>
-Apple Container uses the same `container/Dockerfile` to build the agent image. If you switch runtimes, rebuild the image with `container build` instead of `docker build`.
-</Warning>
-
-### Credential proxy network binding
-
-Apple Container uses a bridge network (`bridge100`) that only exists while containers are running. The credential proxy must start before any container, so it cannot bind to the bridge IP — it must bind to `0.0.0.0` via `CREDENTIAL_PROXY_HOST=0.0.0.0` in `.env`. This exposes port 3001 on all network interfaces.
-
-On shared or public networks, add a macOS `pf` firewall rule to block external access:
-
-```bash
-echo "block in on en0 proto tcp to any port 3001" | sudo pfctl -ef -
-```
-
-The `/convert-to-apple-container` skill handles this configuration automatically (Phase 3), including persisting the firewall rule to `/etc/pf.conf`.
-
-<Warning>
-Without the firewall rule, anyone on your local network can route API requests through the credential proxy using your credentials. On private/home networks this is typically acceptable; on public networks, always enable the firewall rule.
-</Warning>
+Run the `/convert-to-apple-container` skill in Claude Code. To revert, use `git revert`.
 
 ## Container image
 
 The agent container is built from `container/Dockerfile` and includes:
 
-- **Node.js 22** - Runtime for the agent runner
-- **Chromium** - Browser automation via agent-browser
-- **Claude Code SDK** - Installed globally as `@anthropic-ai/claude-code`
-- **System tools** - `curl` and `git` for network requests and version control
-- **System fonts** - Emoji and international character support
+- **Node.js 22** — base image runtime
+- **Bun** (pinned to 1.3.12) — runs agent-runner TypeScript directly (no compilation)
+- **Chromium** — browser automation via agent-browser
+- **Claude Code SDK** — `@anthropic-ai/claude-code` installed globally via pnpm
+- **tini** — PID 1 signal forwarding (ensures outbound.db writes finalize on SIGTERM)
+- **pnpm** (via corepack) — for global Node CLI installs
+- **System tools** — `curl`, `git`, `ca-certificates`, `unzip`
+- **Optional CJK fonts** — `fonts-noto-cjk` (~200 MB, opt-in via `INSTALL_CJK_FONTS=true`)
 
-### Dockerfile breakdown
+### Key design decisions
 
-<Accordion title="Base image and system dependencies">
-  ```dockerfile
-  FROM node:22-slim
-
-  # Install system dependencies for Chromium
-  RUN apt-get update && apt-get install -y \
-      chromium \
-      fonts-liberation \
-      fonts-noto-cjk \
-      fonts-noto-color-emoji \
-      libgbm1 \
-      libnss3 \
-      # ... additional libraries
-      && rm -rf /var/lib/apt/lists/*
-  ```
-  
-  The slim Node.js base keeps the image small while providing the necessary runtime.
-</Accordion>
-
-<Accordion title="Browser configuration">
-  ```dockerfile
-  # Set Chromium path for agent-browser
-  ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
-  ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
-
-  # Install agent-browser and claude-code globally
-  RUN npm install -g agent-browser @anthropic-ai/claude-code
-  ```
-  
-  Browser automation is available to all agents via the `agent-browser` command.
-</Accordion>
-
-<Accordion title="Agent runner compilation">
-  ```dockerfile
-  # Copy package files first for better caching
-  COPY agent-runner/package*.json ./
-  RUN npm install
-
-  # Copy source code
-  COPY agent-runner/ ./
-  RUN npm run build
-  ```
-  
-  The agent runner is pre-built during image creation for faster startup.
-</Accordion>
-
-<Accordion title="Workspace setup">
-  ```dockerfile
-  # Create workspace directories
-  RUN mkdir -p /workspace/group /workspace/global /workspace/extra \
-               /workspace/ipc/messages /workspace/ipc/tasks /workspace/ipc/input
-
-  # Set ownership to node user (non-root) for writable directories
-  RUN chown -R node:node /workspace && chmod 777 /home/node
-
-  # Switch to non-root user
-  USER node
-
-  # Set working directory to group workspace
-  WORKDIR /workspace/group
-  ```
-  
-  Containers run as the unprivileged `node` user (uid 1000) for security.
-</Accordion>
-
-<Accordion title="Entrypoint script">
-  ```dockerfile
-  # Create entrypoint script
-  RUN printf '#!/bin/bash\nset -e\ncd /app && npx tsc --outDir /tmp/dist 2>&1 >&2\nln -s /app/node_modules /tmp/dist/node_modules\nchmod -R a-w /tmp/dist\ncat > /tmp/input.json\nnode /tmp/dist/index.js < /tmp/input.json\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
-
-  ENTRYPOINT ["/app/entrypoint.sh"]
-  ```
-  
-  The entrypoint:
-  1. Recompiles the agent runner from `/app/src` (allows per-group customization)
-  2. Reads input JSON from stdin
-  3. Executes the agent runner with the input
-</Accordion>
+- **Source is NOT baked in** — `/app/src` is a read-only bind mount from the host. Source changes never require an image rebuild.
+- **`only-built-dependencies` allowlist** in `.npmrc` for `agent-browser` and `@anthropic-ai/claude-code`
+- **Runs as `node` user** (non-root) with `/workspace/group` as working directory
+- **Entrypoint**: `tini -> entrypoint.sh -> exec bun run /app/src/index.ts`
 
 ### Building the image
 
-Rebuild the container image after modifying the Dockerfile or agent-runner:
-
 ```bash
 ./container/build.sh
 ```
 
-<Warning>
-The container buildkit caches the build context aggressively. `--no-cache` alone does NOT invalidate COPY steps. To force a clean rebuild, prune the builder:
+### Per-agent-group images
 
-```bash
-docker builder prune -af
-./container/build.sh
-```
-</Warning>
+Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image:
+
+- Tag: `nanoclaw-agent:{agentGroupId}`
+- Built on top of `nanoclaw-agent:latest`
+- Adds custom apt and npm packages
+
+## Two-database IO model
+
+In v2, all communication between host and container uses two SQLite databases per session. There is no stdin/stdout piping, no IPC files, and no output markers.
+
+### inbound.db (host writes, container reads)
+
+| Table | Purpose |
+|-------|---------|
+| `messages_in` | Inbound messages, tasks, system notifications |
+| `delivered` | Tracks delivery outcomes for outbound message IDs |
+| `destinations` | Live destination map (channels and other agents) |
+| `session_routing` | Default reply routing (channel_type, platform_id, thread_id) |
+
+### outbound.db (container writes, host reads)
+
+| Table | Purpose |
+|-------|---------|
+| `messages_out` | Outbound messages with `deliver_after` and recurrence |
+| `processing_ack` | Tracks which inbound messages the container has processed |
+| `session_state` | Persistent key/value store (e.g., SDK session ID for resume) |
+| `container_state` | Tool-in-flight state for stuck-detection |
+
+### Cross-mount invariants
+
+Three invariants are critical for correctness:
+
+1. **`journal_mode=DELETE`** — WAL's mmapped `-shm` doesn't refresh across Docker mounts
+2. **Host opens-writes-closes per operation** — closing invalidates the container's page cache
+3. **One writer per file** — DELETE-mode journal unlink isn't atomic across the mount
 
 ## Container lifecycle
 
 ### Spawning containers
 
-Containers are spawned by the `runContainerAgent` function in `src/container-runner.ts`:
-
-```typescript
-export async function runContainerAgent(
-  group: RegisteredGroup,
-  input: ContainerInput,
-  onProcess: (proc: ChildProcess, containerName: string) => void,
-  onOutput?: (output: ContainerOutput) => Promise<void>,
-): Promise<ContainerOutput>
-```
+Containers are spawned by the `spawnContainer` function. Wake calls are deduplicated via an in-flight promise map.
 
 <Steps>
-  <Step title="Build volume mounts">
-    The host determines which directories to mount based on group privileges (main vs. non-main) and the group's `containerConfig.additionalMounts`.
+  <Step title="Read agent group config">
+    The host reads `container.json` and resolves provider contributions.
   </Step>
-  
-  <Step title="Generate container name">
-    Each container gets a unique name: `nanoclaw-{group}-{timestamp}`
-  </Step>
-  
-  <Step title="Spawn container process">
-    ```typescript
-    const container = spawn(CONTAINER_RUNTIME_BIN, containerArgs, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    ```
-    
-    The container runs with stdin/stdout/stderr piped to the host.
-  </Step>
-  
-  <Step title="Pass input via stdin">
-    ```typescript
-    container.stdin.write(JSON.stringify(input));
-    container.stdin.end();
-    ```
-    
-    The input JSON contains the prompt, session ID, group folder, and metadata. Credentials are handled by the secret injection layer (OneCLI Agent Vault or credential proxy) — never passed via stdin or mounted as files.
-  </Step>
-  
-  <Step title="Stream output">
-    The host parses output markers (`---NANOCLAW_OUTPUT_START---` and `---NANOCLAW_OUTPUT_END---`) from stdout and calls the `onOutput` callback for each complete message.
-  </Step>
-  
-  <Step title="Handle completion">
-    When the container exits, logs are written to `groups/{name}/logs/container-{timestamp}.log` and the promise resolves with the final output. Error logs include only input metadata (prompt length and session ID) rather than the full prompt to avoid persisting user conversation content on disk.
 
-    If the container exits with an error indicating a stale or missing session (e.g., missing `.jsonl` file or "no conversation found"), the session is automatically cleared from the database so the next retry starts fresh. See [stale session recovery](/advanced/troubleshooting#stale-session-auto-recovery) for details.
+  <Step title="Build volume mounts">
+    Mounts are built based on the session, agent group, and validated additional mounts.
+  </Step>
+
+  <Step title="Sync skill symlinks">
+    Skill symlinks at `/home/node/.claude/skills/` are updated to point to `/app/skills/{name}`. These are dangling on the host but valid inside the container.
+  </Step>
+
+  <Step title="Compose CLAUDE.md">
+    A composed `CLAUDE.md` is regenerated and mounted read-only.
+  </Step>
+
+  <Step title="Spawn container">
+    Docker container is spawned with `tini` as PID 1.
+  </Step>
+
+  <Step title="Track container state">
+    Session is marked as running in the central DB.
   </Step>
 </Steps>
 
-### Container arguments
-
-From the `buildContainerArgs` function in `src/container-runner.ts`:
-
-<Tabs>
-  <Tab title="OneCLI Agent Vault (v1.2.35+)">
-    ```typescript
-    async function buildContainerArgs(
-      mounts: VolumeMount[],
-      containerName: string,
-      agentIdentifier?: string,
-    ): Promise<string[]> {
-      const args: string[] = ['run', '-i', '--rm', '--name', containerName];
-
-      // Pass host timezone so container's local time matches the user's
-      args.push('-e', `TZ=${TIMEZONE}`);
-
-      // OneCLI gateway handles credential injection
-      const onecliApplied = await onecli.applyContainerConfig(args, {
-        addHostMapping: false,
-        agent: agentIdentifier,
-      });
-      if (!onecliApplied) {
-        logger.warn({ containerName }, 'OneCLI gateway not reachable');
-      }
-
-      // Runtime-specific args for host gateway resolution
-      args.push(...hostGatewayArgs());
-
-      // Run as host user so bind-mounted files are accessible
-      const hostUid = process.getuid?.();
-      const hostGid = process.getgid?.();
-      if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
-        args.push('--user', `${hostUid}:${hostGid}`);
-        args.push('-e', 'HOME=/home/node');
-      }
-
-      for (const mount of mounts) {
-        if (mount.readonly) {
-          args.push(...readonlyMountArgs(mount.hostPath, mount.containerPath));
-        } else {
-          args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
-        }
-      }
-
-      args.push(CONTAINER_IMAGE);
-      return args;
-    }
-    ```
-
-    **Key flags:**
-    - `-i` - Interactive (keeps stdin open)
-    - `--rm` - Remove container after exit (ephemeral)
-    - `--name` - Unique container name for management
-    - `--add-host` - Maps `host.docker.internal` on Linux (automatic on macOS)
-    - `--user` - Run as host UID/GID for file permissions
-    - OneCLI SDK configures container networking for credential injection (no explicit env vars)
-  </Tab>
-
-  <Tab title="Credential Proxy (legacy)">
-    ```typescript
-    function buildContainerArgs(
-      mounts: VolumeMount[],
-      containerName: string,
-    ): string[] {
-      const args: string[] = ['run', '-i', '--rm', '--name', containerName];
-
-      // Pass host timezone so container's local time matches the user's
-      args.push('-e', `TZ=${TIMEZONE}`);
-
-      // Route API traffic through the credential proxy
-      args.push('-e', `ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}`);
-
-      // Mirror the host's auth method with a placeholder value
-      const authMode = detectAuthMode();
-      if (authMode === 'api-key') {
-        args.push('-e', 'ANTHROPIC_API_KEY=placeholder');
-      } else {
-        args.push('-e', 'CLAUDE_CODE_OAUTH_TOKEN=placeholder');
-      }
-
-      // Run as host user so bind-mounted files are accessible
-      const hostUid = process.getuid?.();
-      const hostGid = process.getgid?.();
-      if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
-        args.push('--user', `${hostUid}:${hostGid}`);
-        args.push('-e', 'HOME=/home/node');
-      }
-
-      for (const mount of mounts) {
-        if (mount.readonly) {
-          args.push(...readonlyMountArgs(mount.hostPath, mount.containerPath));
-        } else {
-          args.push('-v', `${mount.hostPath}:${mount.containerPath}`);
-        }
-      }
-
-      args.push(CONTAINER_IMAGE);
-      return args;
-    }
-    ```
-
-    **Key flags:**
-    - `-i` - Interactive (keeps stdin open)
-    - `--rm` - Remove container after exit (ephemeral)
-    - `--name` - Unique container name for management
-    - `--user` - Run as host UID/GID for file permissions
-    - `-e ANTHROPIC_BASE_URL` - Routes API calls through the credential proxy
-    - `-e ANTHROPIC_API_KEY` or `-e CLAUDE_CODE_OAUTH_TOKEN` - Placeholder credential (replaced by proxy)
-  </Tab>
-</Tabs>
-
 ### Volume mounts
 
-Mounts are built per-group in `src/container-runner.ts`:
+| Path | Container path | Mode | Purpose |
+|------|---------------|------|---------|
+| Session folder | `/workspace` | RW | inbound.db, outbound.db, outbox/, inbox/ |
+| Agent group folder | `/workspace/agent` | RW | Working files |
+| container.json | `/workspace/agent/container.json` | RO | Nested read-only config |
+| Composed CLAUDE.md | `/workspace/agent/CLAUDE.md` | RO | Regenerated each spawn |
+| Global memory | `/workspace/global` | RO | Shared instructions |
+| Agent-runner source | `/app/src` | RO | Bind mount from host |
+| Container skills | `/app/skills` | RO | Shared skill definitions |
+| Claude SDK state | `/home/node/.claude` | RW | SDK state + skill symlinks |
+| Additional mounts | `/workspace/extra/{name}` | Per-config | Validated against allowlist |
+| Provider mounts | Various | Per-provider | Provider-contributed |
 
-| Path | Main Group | Non-Main Group | Mode |
-|------|------------|----------------|------|
-| Project root | `/workspace/project` | Not mounted | Read-only |
-| Store (SQLite DB) | `/workspace/project/store` | Not mounted | Read-write |
-| Group folder | `/workspace/group` | `/workspace/group` | Read-write |
-| Global memory | Via project mount | `/workspace/global` (if exists) | Read-only |
-| Claude sessions | `/home/node/.claude` | `/home/node/.claude` | Read-write |
-| IPC namespace | `/workspace/ipc` | `/workspace/ipc` | Read-write |
-| Agent runner src | `/app/src` | `/app/src` | Read-write |
-| Additional mounts | Configurable | Configurable | Per-config |
+### Timeouts and stale detection
 
-<Tip>
-Each group gets its own copy of the agent-runner source in `data/sessions/{group}/agent-runner-src/`, allowing per-group customization without affecting other groups. The cached copy is automatically refreshed when the upstream source file's modification time is newer than the cached version.
-</Tip>
+Containers have two timeout/detection mechanisms:
 
-### Timeouts
+1. **Container timeout** — maximum runtime before force kill (default: 30 minutes)
+2. **Stale detection** — host sweep checks `.heartbeat` mtime and `processing_ack` age to detect stuck containers
 
-Containers have two timeout mechanisms:
+### Container shutdown
 
-1. **Hard timeout** - Maximum runtime before force kill (default: 30 minutes 30 seconds with default settings)
-2. **Idle timeout** - Graceful shutdown after period of inactivity (default: 30 minutes)
+- `killContainer(sessionId, reason)` stops the container via `docker stop`, falls back to SIGKILL
+- On close/error, the session is marked stopped and typing indicators are cleared
 
-From the timeout logic in `src/container-runner.ts`:
+## Credential injection
 
-```typescript
-const configTimeout = group.containerConfig?.timeout || CONTAINER_TIMEOUT;
-const timeoutMs = Math.max(configTimeout, IDLE_TIMEOUT + 30_000);
-
-const killOnTimeout = () => {
-  timedOut = true;
-  logger.error(
-    { group: group.name, containerName },
-    'Container timeout, stopping gracefully',
-  );
-  try {
-    stopContainer(containerName);
-  } catch (err) {
-    logger.warn(
-      { group: group.name, containerName, err },
-      'Graceful stop failed, force killing',
-    );
-    container.kill('SIGKILL');
-  }
-};
-
-let timeout = setTimeout(killOnTimeout, timeoutMs);
-
-// Reset timeout on activity (streaming output)
-const resetTimeout = () => {
-  clearTimeout(timeout);
-  timeout = setTimeout(killOnTimeout, timeoutMs);
-};
-```
-
-<Note>
-The hard timeout is calculated as `Math.max(configTimeout, IDLE_TIMEOUT + 30_000)`, ensuring a 30-second gap between idle shutdown and the hard kill. With default settings (both 30 minutes), the hard timeout is 30 minutes 30 seconds, giving the `_close` sentinel time to trigger graceful shutdown before the hard kill fires.
-</Note>
-
-## Runtime management
-
-### Ensuring runtime is available
-
-On startup, NanoClaw verifies the container runtime is accessible via `ensureContainerRuntimeRunning` in `src/container-runtime.ts`:
+The OneCLI SDK's `applyContainerConfig()` configures each container's network to route through the vault:
 
 ```typescript
-export function ensureContainerRuntimeRunning(): void {
-  try {
-    execSync(`${CONTAINER_RUNTIME_BIN} info`, {
-      stdio: 'pipe',
-      timeout: 10000,
-    });
-    logger.debug('Container runtime already running');
-  } catch (err) {
-    logger.error({ err }, 'Failed to reach container runtime');
-    // Display error banner
-    throw new Error('Container runtime is required but failed to start');
-  }
-}
-```
-
-### Cleaning up orphans
-
-Orphaned containers from previous runs are cleaned up at startup via `cleanupOrphans` in `src/container-runtime.ts`:
-
-```typescript
-export function cleanupOrphans(): void {
-  try {
-    const output = execSync(
-      `${CONTAINER_RUNTIME_BIN} ps --filter name=nanoclaw- --format '{{.Names}}'`,
-      { stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' },
-    );
-    const orphans = output.trim().split('\n').filter(Boolean);
-    for (const name of orphans) {
-      try {
-        stopContainer(name);
-      } catch {
-        /* already stopped */
-      }
-    }
-    if (orphans.length > 0) {
-      logger.info(
-        { count: orphans.length, names: orphans },
-        'Stopped orphaned containers',
-      );
-    }
-  } catch (err) {
-    logger.warn({ err }, 'Failed to clean up orphaned containers');
-  }
-}
-```
-
-## Output streaming
-
-Containers use sentinel markers to enable robust streaming output parsing:
-
-- `---NANOCLAW_OUTPUT_START---` - Marks the beginning of a JSON output block
-- `---NANOCLAW_OUTPUT_END---` - Marks the end of a JSON output block
-
-From the stdout handler in `src/container-runner.ts`:
-
-```typescript
-container.stdout.on('data', (data) => {
-  const chunk = data.toString();
-
-  // Stream-parse for output markers
-  if (onOutput) {
-    parseBuffer += chunk;
-    let startIdx: number;
-    while ((startIdx = parseBuffer.indexOf(OUTPUT_START_MARKER)) !== -1) {
-      const endIdx = parseBuffer.indexOf(OUTPUT_END_MARKER, startIdx);
-      if (endIdx === -1) break; // Incomplete pair, wait for more data
-
-      const jsonStr = parseBuffer
-        .slice(startIdx + OUTPUT_START_MARKER.length, endIdx)
-        .trim();
-      parseBuffer = parseBuffer.slice(endIdx + OUTPUT_END_MARKER.length);
-
-      try {
-        const parsed: ContainerOutput = JSON.parse(jsonStr);
-        if (parsed.newSessionId) {
-          newSessionId = parsed.newSessionId;
-        }
-        hadStreamingOutput = true;
-        resetTimeout(); // Reset timeout on activity
-        outputChain = outputChain.then(() => onOutput(parsed));
-      } catch (err) {
-        logger.warn(
-          { group: group.name, error: err },
-          'Failed to parse streamed output chunk',
-        );
-      }
-    }
-  }
+const onecliApplied = await onecli.applyContainerConfig(args, {
+  addHostMapping: false,
+  agent: agentIdentifier,
 });
 ```
 
-This allows the host to receive and act on agent output in real-time, rather than waiting for the container to exit.
+- Injects `HTTPS_PROXY` and CA certs into Docker args
+- All container API calls route through the vault
+- No raw API keys are passed via environment variables
+- Each agent group gets its own `agentIdentifier` for credential scoping
 
 ## Debugging containers
 
@@ -526,43 +198,29 @@ This allows the host to receive and act on agent output in real-time, rather tha
 
 <Accordion title="View container logs">
   ```bash
-  docker logs nanoclaw-main-1234567890
+  docker logs nanoclaw-{session-id}
   ```
 </Accordion>
 
 <Accordion title="Inspect container mounts">
   ```bash
-  docker inspect nanoclaw-main-1234567890 | jq '.[0].Mounts'
+  docker inspect nanoclaw-{session-id} | jq '.[0].Mounts'
   ```
 </Accordion>
 
 <Accordion title="Execute commands in running container">
   ```bash
-  docker exec -it nanoclaw-main-1234567890 /bin/bash
+  docker exec -it nanoclaw-{session-id} /bin/bash
   ```
 </Accordion>
 
 <Accordion title="Stop a running container">
   ```bash
-  docker stop -t 1 nanoclaw-main-1234567890
+  docker stop -t 1 nanoclaw-{session-id}
   ```
-</Accordion>
-
-<Accordion title="Review container run logs">
-  ```bash
-  cat groups/main/logs/container-2026-02-28T12-00-00-000Z.log
-  ```
-  
-  Logs include:
-  - Input summary (prompt length and session ID) — full prompt only at verbose level
-  - Container arguments
-  - Volume mounts
-  - Stdout/stderr (when verbose logging is enabled)
-  - Exit code and duration
 </Accordion>
 
 ## Related pages
 
-- [Security model](/advanced/security-model) - Container isolation and security boundaries
-- [IPC system](/advanced/ipc-system) - How agents communicate with the host
-- [Troubleshooting](/advanced/troubleshooting) - Common container issues
+- [Security model](/advanced/security-model) — container isolation and security boundaries
+- [Troubleshooting](/advanced/troubleshooting) — common container issues

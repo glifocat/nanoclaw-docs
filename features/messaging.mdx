@@ -6,130 +6,80 @@ tag: "UPDATED"
 
 ## Overview
 
-NanoClaw processes messages through a polling-based architecture that connects messaging channels to isolated Claude agent containers. Each group has its own message queue, session state, and isolated filesystem.
+In v2, NanoClaw processes messages through an event-driven adapter architecture. Channel adapters receive messages and route them through a centralized inbound router that evaluates engage modes, resolves senders, and fans out to wired agents. Responses flow back through a delivery system that polls session databases.
 
 ## Message flow
 
 <Steps>
   <Step title="Message arrives">
-    Incoming messages are stored in SQLite with metadata (sender, timestamp, chat JID)
+    A channel adapter receives a message and calls the `onInbound` callback.
   </Step>
-  
-  <Step title="Trigger detection">
-    NanoClaw checks if the message contains the trigger pattern (default: `@Andy`)
+
+  <Step title="Thread policy">
+    Non-threaded adapters (Telegram, WhatsApp, iMessage) collapse `threadId` to null.
   </Step>
-  
-  <Step title="Context gathering">
-    All messages since the last agent response are gathered for context
+
+  <Step title="Messaging group lookup">
+    The router finds or auto-creates a messaging group based on the channel type and platform ID.
   </Step>
-  
-  <Step title="Agent invocation">
-    Messages are formatted and sent to a Claude agent running in an isolated container
+
+  <Step title="Sender resolution">
+    The permissions module extracts a namespaced user ID (e.g., `tg:123456`) and upserts the user record.
   </Step>
-  
-  <Step title="Response routing">
-    The agent's response is stripped of internal tags, optionally formatted for the target channel's native syntax, and sent back to the channel
+
+  <Step title="Fan-out to agents">
+    Each wired agent is evaluated independently against engage mode, sender scope, and access gates.
+  </Step>
+
+  <Step title="Session write">
+    For engaging agents, the message is written to `inbound.db` and the container is woken.
+  </Step>
+
+  <Step title="Response delivery">
+    The delivery system polls `outbound.db` and routes responses back through channel adapters.
   </Step>
 </Steps>
 
-## Trigger patterns
+## Engage modes
 
-Trigger patterns determine when the agent should respond. Each group can define its own trigger word. If no custom trigger is set, the default `@{ASSISTANT_NAME}` is used.
+Engage modes control when an agent responds to messages. Each wiring has its own engage mode:
 
-```typescript
-// From src/config.ts
-export const DEFAULT_TRIGGER = `@${ASSISTANT_NAME}`;
+### Pattern mode
 
-export function getTriggerPattern(trigger?: string): RegExp {
-  const normalizedTrigger = trigger?.trim();
-  return buildTriggerPattern(normalizedTrigger || DEFAULT_TRIGGER);
-}
-```
+The agent responds whenever a message matches the `engage_pattern` regex:
 
-During message processing, the trigger pattern is resolved per-group:
+- `'.'` — matches all messages (always respond)
+- `'^@Andy\\b'` — matches messages starting with `@Andy`
+- Custom regex — any valid regex pattern
 
-```typescript
-// Per-group trigger resolution in src/index.ts
-const triggerPattern = getTriggerPattern(group.trigger);
-const hasTrigger = missedMessages.some(
-  (m) => triggerPattern.test(m.content.trim()) && /* sender check */
-);
-```
+### Mention mode
 
-### Usage examples
+The agent only responds when explicitly mentioned at the platform level (e.g., `@bot` in Discord, direct reply in WhatsApp).
 
-```
-@Andy what's on my calendar today?
-@Andy search for recent AI developments
-@ANDY help me debug this error (case-insensitive)
-```
+### Mention-sticky mode
+
+The agent responds to a platform mention OR if there's an existing active session for this agent, messaging group, and thread combination. Once activated by a mention, the agent continues responding in that thread.
 
 <Note>
-The main channel (your self-chat) doesn't require a trigger — every message is processed automatically. Non-main groups can set a custom trigger word during registration (e.g., `@Bot` instead of `@Andy`).
+Messages that don't trigger an agent can still be stored if the wiring has `ignored_message_policy='accumulate'`. These messages provide context when the agent is eventually triggered.
 </Note>
+
+## Sender scope
+
+Per-wiring `sender_scope` controls who can trigger the agent:
+
+| Scope | Behavior |
+|-------|----------|
+| `all` | Any user can trigger the agent |
+| `known` | Only owner, admin, or group members can trigger |
+
+<Info>
+`sender_scope='known'` provides an additional access layer on top of `unknown_sender_policy`. Even if a messaging group is `public`, a wiring with `sender_scope='known'` restricts its agent to authorized users.
+</Info>
 
 ## Message formatting
 
-Messages are formatted as XML before being sent to the agent, preserving sender information, timestamps, and reply context:
-
-```typescript
-// From src/router.ts
-function formatMessages(
-  messages: NewMessage[],
-  timezone: string,
-): string {
-  const lines = messages.map((m) => {
-    const displayTime = formatLocalTime(m.timestamp, timezone);
-    const replyAttr = m.reply_to_message_id
-      ? ` reply_to="${escapeXml(m.reply_to_message_id)}"`
-      : '';
-    const replySnippet =
-      m.reply_to_message_content && m.reply_to_sender_name
-        ? `\n  <quoted_message from="${escapeXml(m.reply_to_sender_name)}">${escapeXml(m.reply_to_message_content)}</quoted_message>`
-        : '';
-    return `<message sender="${escapeXml(m.sender_name)}" time="${escapeXml(displayTime)}"${replyAttr}>${replySnippet}${escapeXml(m.content)}</message>`;
-  });
-  const header = `<context timezone="${escapeXml(timezone)}" />\n`;
-  return `${header}<messages>\n${lines.join('\n')}\n</messages>`;
-}
-```
-
-When a message is a reply to another message, the formatter adds a `reply_to` attribute with the original message ID and nests a `<quoted_message>` element containing the quoted sender and content. This gives the agent full context about which message the user is responding to.
-
-### Example formatted output
-
-```xml
-<context timezone="America/Los_Angeles" />
-<messages>
-<message sender="Alice" time="2026-02-28 10:30 AM">@Andy what's the weather?</message>
-<message sender="Bob" time="2026-02-28 10:31 AM">I think it's sunny</message>
-<message sender="Alice" time="2026-02-28 10:32 AM" reply_to="msg-001">
-  <quoted_message from="Bob">I think it's sunny</quoted_message>Can you check?</message>
-</messages>
-```
-
-## Internal tags
-
-Agents can use `<internal>...</internal>` tags for reasoning that won't be sent to users:
-
-```typescript
-// From src/router.ts
-export function stripInternalTags(text: string): string {
-  return text.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
-}
-```
-
-### Agent output example
-
-```
-<internal>
-User asked about weather. I should check the forecast API.
-</internal>
-
-The weather today is sunny with a high of 75°F.
-```
-
-Only the visible text is sent to the user.
+Messages are formatted for the agent with sender information, timestamps, and metadata. The agent-runner inside the container handles formatting for the configured provider.
 
 ## Channel-aware formatting
 
@@ -141,81 +91,29 @@ git merge upstream/skill/channel-formatting
 ```
 </Note>
 
-When the channel-formatting skill is applied, outbound messages are automatically converted from Claude's Markdown output to each channel's native text syntax. This happens in the `formatOutbound` pipeline before delivery.
+When the channel-formatting skill is applied, outbound messages are automatically converted from Claude's Markdown output to each channel's native text syntax.
 
 | Channel | Transformation |
 |---------|---------------|
-| WhatsApp | `**bold**` → `*bold*`, `*italic*` → `_italic_`, headings → bold, links → `text (url)` |
-| Telegram | Same as WhatsApp, but `[text](url)` links are preserved (Markdown v1 renders them natively) |
+| WhatsApp | `**bold**` → `*bold*`, `*italic*` → `_italic_`, headings → bold |
+| Telegram | Same as WhatsApp, but links preserved (Markdown v1) |
 | Slack | Same as WhatsApp, but links become `<url\|text>` |
-| Discord | Passthrough (Discord already renders Markdown) |
-| Signal | Passthrough for `parseTextStyles`; native `textStyle` ranges via `parseSignalStyles` |
+| Discord | Passthrough (Discord renders Markdown) |
 
-Code blocks (fenced and inline) are always protected — their content is never transformed.
+Code blocks are always protected — their content is never transformed.
 
-Without this skill, `formatOutbound` only strips internal tags. With it, the function accepts an optional `channel` parameter and calls `parseTextStyles` to convert Markdown markers to each platform's native syntax.
+## Concurrency
 
-## Group message queues
+Container concurrency is managed globally:
 
-NanoClaw uses a per-group queue system with global concurrency limits to prevent resource exhaustion:
-
-```typescript
-// From src/config.ts
-export const MAX_CONCURRENT_CONTAINERS = Math.max(
-  1,
-  parseInt(process.env.MAX_CONCURRENT_CONTAINERS || '5', 10) || 5,
-);
-```
-
-### How it works
-
-- Each group gets its own message queue
-- Multiple groups can have active containers simultaneously (up to `MAX_CONCURRENT_CONTAINERS`)
-- When a container is idle, new messages are sent via IPC files without spawning a new container
-- Idle timeout: 30 minutes by default (configurable via `IDLE_TIMEOUT`)
-
-<Accordion title="Advanced: Message piping to active containers">
-When an agent container is already running and idle, NanoClaw writes follow-up messages as JSON files to the group's IPC input directory instead of spawning a new container:
-
-```typescript
-// From the message loop in src/index.ts
-if (queue.sendMessage(chatJid, formatted)) {
-  logger.debug(
-    { chatJid, count: messagesToSend.length },
-    'Piped messages to active container',
-  );
-  lastAgentTimestamp[chatJid] =
-    messagesToSend[messagesToSend.length - 1].timestamp;
-  saveState();
-  channel
-    .setTyping?.(chatJid, true)
-    ?.catch((err) =>
-      logger.warn({ chatJid, err }, 'Failed to set typing indicator'),
-    );
-} else {
-  queue.enqueueMessageCheck(chatJid);
-}
-```
-
-This optimization reduces latency and container churn for active conversations.
-</Accordion>
+- Maximum concurrent containers: 5 by default (`MAX_CONCURRENT_CONTAINERS`)
+- Wake deduplication: concurrent wake calls for the same session share a single in-flight promise
+- Sessions with running containers are polled every 1 second for outbound messages
+- All active sessions are swept every 60 seconds
 
 ## Channel routing
 
-NanoClaw supports multiple messaging channels through a unified `Channel` interface:
-
-```typescript
-// From src/router.ts
-export function routeOutbound(
-  channels: Channel[],
-  jid: string,
-  text: string,
-): Promise<void> {
-  const channel = channels.find((c) => c.ownsJid(jid) && c.isConnected());
-  if (!channel) throw new Error(`No channel for JID: ${jid}`);
-  return channel.sendMessage(jid, text);
-}
-```
+NanoClaw supports multiple messaging channels through a unified adapter interface. Each adapter registers `onInbound`, `onInboundEvent`, `onMetadata`, and `onAction` callbacks.
 
 ### Supported channels
 
@@ -229,136 +127,35 @@ export function routeOutbound(
 Channels are added via skills, not configuration files. Use `/add-telegram` or similar skills to add new channels. See the [integrations overview](/integrations/overview).
 </Warning>
 
-## Message persistence
+## Delivery system
 
-All messages are stored in SQLite (`store/messages.db`) with full history, including reply context:
+The delivery system uses a two-poll architecture:
 
-```typescript
-// From src/db.ts
-function storeMessage(msg: NewMessage): void {
-  db.prepare(
-    `INSERT OR REPLACE INTO messages (id, chat_jid, sender, sender_name, content, timestamp, is_from_me, is_bot_message, reply_to_message_id, reply_to_message_content, reply_to_sender_name)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(msg.id, msg.chat_jid, msg.sender, msg.sender_name, msg.content, msg.timestamp, msg.is_from_me ? 1 : 0, msg.is_bot_message ? 1 : 0, msg.reply_to_message_id ?? null, msg.reply_to_message_content ?? null, msg.reply_to_sender_name ?? null);
-}
-```
+- **Active poll** (1s) — polls `outbound.db` for all running-container sessions
+- **Sweep poll** (60s) — polls all active sessions (catches messages from exited containers)
 
-The reply context columns (`reply_to_message_id`, `reply_to_message_content`, `reply_to_sender_name`) are added via a database migration and are nullable for backward compatibility.
+**Delivery pipeline per message:**
 
-### Message retrieval
-
-```typescript
-// Get messages since a specific timestamp
-const messages = getMessagesSince(
-  chatJid,
-  lastTimestamp,
-  ASSISTANT_NAME
-);
-```
+1. Read due outbound messages from `outbound.db`
+2. Filter already-delivered via `inbound.db`'s `delivered` table
+3. Route by kind: `system` → delivery action handlers, `agent` → agent-to-agent module, normal → channel adapter
+4. Permission check for cross-channel delivery
+5. Retry up to 3 times on failure
 
 <Note>
-Both `getNewMessages` and `getMessagesSince` accept a limit parameter (the DB function signature defaults to 200). In practice, the host passes `MAX_MESSAGES_PER_PROMPT` (default 10, minimum 1) so the agent only sees the most recent messages per invocation. Older messages remain in the database but are not included in the agent's prompt. This prevents unbounded result sets and keeps prompt sizes manageable.
+Typing indicators are paused after each real user-facing delivery to avoid visual flicker.
 </Note>
 
-## Configuration
+## Channel approval
 
-### Polling interval
+When a message arrives on an unwired channel (no agent wirings exist):
 
-```typescript
-// From src/config.ts
-export const POLL_INTERVAL = 2000; // 2 seconds
-```
-
-Messages are polled every 2 seconds by default. This can be adjusted by modifying the source code.
-
-### Trigger customization
-
-There are two ways to customize trigger behavior:
-
-- **Global default**: Change `ASSISTANT_NAME` in `.env` to update the default trigger for all groups (e.g., `ASSISTANT_NAME=Bob` makes the default `@Bob`).
-- **Per-group trigger**: Set a custom `trigger` value during group registration. Each group can have its own trigger word, independent of the global default.
-
-## Group registration
-
-Groups must be registered before the agent can respond. The main channel can register groups via IPC:
-
-```typescript
-// From src/ipc.ts — register_group handler (simplified)
-case 'register_group':
-  if (!isMain) {
-    logger.warn({ sourceGroup }, 'Unauthorized register_group attempt blocked');
-    break;
-  }
-  if (!isValidGroupFolder(data.folder)) {
-    logger.warn({ folder: data.folder }, 'Invalid group folder name');
-    break;
-  }
-  if (data.jid && data.name && data.folder && data.trigger) {
-    // Defense in depth: isMain preserved from existing registration,
-    // never set via IPC
-    const existingGroup = registeredGroups[data.jid];
-    deps.registerGroup(data.jid, {
-      name: data.name,
-      folder: data.folder,
-      trigger: data.trigger,
-      added_at: new Date().toISOString(),
-      containerConfig: data.containerConfig,
-      requiresTrigger: data.requiresTrigger,
-      isMain: existingGroup?.isMain,
-    });
-  }
-```
-
-### Example
-
-From the main channel:
-
-```
-@Andy join the Family Chat group
-```
-
-The agent will discover available groups and register to the one you specify.
-
-## Session commands
-
-Session commands are slash commands sent as messages that the host process intercepts before the agent sees them. They control the agent session itself rather than asking the agent to do something.
-
-### /compact
-
-The `/compact` command triggers manual context compaction to fight "context rot" in long-running sessions. When an agent has been active for a while, its context window fills up with old messages that may no longer be relevant.
-
-**How to use it:**
-
-```
-@Andy /compact
-```
-
-**What happens:**
-
-1. The full session transcript is archived (non-destructive — nothing is lost)
-2. Claude Agent SDK's built-in `/compact` command runs, summarizing the conversation context
-3. The session continues with a condensed context, freeing space for new messages
-
-**Authorization:**
-
-| Sender | Allowed? |
-|--------|----------|
-| Main group (any sender) | Yes |
-| Admin/trusted sender (`is_from_me`) in any group | Yes |
-| Other senders in non-main groups | No — receives "Session commands require admin access" |
-
-<Note>
-The `/compact` command is installed via the `skill/compact` branch. It's not available on `main` by default. Apply it with:
-```bash
-git fetch upstream skill/compact
-git merge upstream/skill/compact
-```
-</Note>
-
-The implementation lives in `src/index.ts`, where incoming messages are intercepted in the `onMessage` callback and routed to the container runner.
+1. The router's channel-request gate sends an approval card to the owner
+2. **Approve** — creates a wiring with defaults (`mention-sticky` for groups, `pattern='.'` for DMs)
+3. **Deny** — future mentions on this channel are silently dropped
 
 ## Related documentation
 
-- [Scheduled tasks](/features/scheduled-tasks) - Automate recurring agent tasks
-- [Agent Swarms](/features/agent-swarms) - Multi-agent collaboration
-- [Customization](/features/customization) - Modify trigger patterns and behavior
+- [Scheduled tasks](/features/scheduled-tasks) — automate recurring agent tasks
+- [Agent Swarms](/features/agent-swarms) — multi-agent collaboration
+- [Customization](/features/customization) — modify trigger patterns and behavior

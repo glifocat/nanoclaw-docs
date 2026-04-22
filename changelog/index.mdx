@@ -6,6 +6,24 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
+  - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
+  - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention
+  - Agent-runner moved from Node.js to Bun — runs TypeScript directly without compilation
+  - Shared-source agent-runner — `/app/src` is a read-only bind mount, source changes never require image rebuild
+  - `tini` as PID 1 for proper signal forwarding
+  - Three-level channel isolation model with `unknown_sender_policy` (strict, request_approval, public)
+  - Per-wiring engage modes: `pattern`, `mention`, `mention-sticky`
+  - Sender scope enforcement per wiring (`all` or `known`)
+  - Channel and sender approval flows with interactive cards
+  - Tasks stored as `messages_in` rows with cron-based recurrence and series tracking
+  - Delivery system with two-poll architecture (active 1s, sweep 60s)
+  - Module system for permissions, scheduling, agent-to-agent, approvals, and self-modification
+  - OneCLI Agent Vault is the sole credential path
+  - Channels moved to separate branches (trunk ships no adapters)
+  - Per-agent-group custom Docker images with additional packages
+</Update>
+
 <Update label="v1.2.53" description="2026-04-15" tags={["Maintenance"]}>
   - Updated token count to 43.8k tokens (22% of context window)
   - Added `.claude/settings.json` with default SDK configuration

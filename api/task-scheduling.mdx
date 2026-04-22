@@ -1,413 +1,163 @@
 ---
 title: Task scheduling
-description: API reference for task scheduling including cron, interval, and one-time automated agent execution
+description: API reference for task scheduling including cron-based recurrence and one-time automated agent execution
+tag: "UPDATED"
 ---
 
-The task scheduler enables automated execution of agent prompts on a schedule (cron, interval, or one-time).
+The task scheduler enables automated execution of agent prompts on a schedule. In v2, tasks are stored as `messages_in` rows with `kind='task'` — there is no separate task table. Task operations flow through the MCP tool / delivery action pipeline.
 
-## Core functions
+## Task model
 
-### startSchedulerLoop
+Tasks in v2 are `messages_in` rows in `inbound.db` with:
 
-Starts the task scheduler loop.
+- `kind='task'`
+- `process_after` — ISO timestamp for when the task should run
+- `recurrence` — optional cron expression for recurring tasks
+- `series_id` — links all occurrences of a recurring task
 
-```typescript
-function startSchedulerLoop(deps: SchedulerDependencies): void
-```
+## MCP tools (container-side)
 
-<ParamField path="deps" type="SchedulerDependencies" required>
-  Dependency injection object with required services
-</ParamField>
+Tasks are managed via MCP tools inside the container. Each tool writes a `kind='system'` outbound message that the host's delivery pipeline routes to the appropriate handler.
 
-**Behavior:**
+### schedule_task
 
-- Polls database every `SCHEDULER_POLL_INTERVAL` (60 seconds) for due tasks
-- Enqueues tasks in the group queue
-- Only starts once (ignores duplicate calls)
-
-**Example:**
+Creates a new task:
 
 ```typescript
-import { startSchedulerLoop } from './task-scheduler.js';
-
-startSchedulerLoop({
-  registeredGroups: () => registeredGroups,
-  getSessions: () => sessions,
-  queue: groupQueue,
-  onProcess: (groupJid, proc, containerName, groupFolder) => {
-    queue.registerProcess(groupJid, proc, containerName, groupFolder);
-  },
-  sendMessage: async (jid, text) => {
-    await channel.sendMessage(jid, text);
-  },
-});
-```
-
-### runTask (internal)
-
-Executes a scheduled task. This function is module-private and called internally by `startSchedulerLoop` — it is not exported.
-
-```typescript
-async function runTask(
-  task: ScheduledTask,
-  deps: SchedulerDependencies,
-): Promise<void>
-```
-
-<ParamField path="task" type="ScheduledTask" required>
-  Task to execute
-</ParamField>
-
-<ParamField path="deps" type="SchedulerDependencies" required>
-  Dependency injection object
-</ParamField>
-
-**Behavior:**
-
-1. Validates group folder exists
-2. Creates group directory if needed
-3. Loads session ID based on context mode:
-   - `"group"`: Uses group's current session
-   - `"isolated"`: No session (fresh context)
-4. Passes `script` field to container input (if present)
-5. Spawns agent container with task prompt
-6. Streams results to chat via `sendMessage`
-7. Logs execution to `task_run_logs` table
-8. Calculates next run time based on schedule type
-9. Updates task status (`"completed"` for one-time tasks)
-10. Closes container after result (10-second delay for final MCP calls)
-
-## Database operations
-
-### createTask
-
-Creates a new scheduled task.
-
-```typescript
-function createTask(
-  task: Omit<ScheduledTask, 'last_run' | 'last_result'>
-): void
-```
-
-<ParamField path="task" type="Omit<ScheduledTask, 'last_run' | 'last_result'>" required>
-  Task definition (without runtime fields)
-</ParamField>
-
-**Example:**
-
-```typescript
-import { createTask } from './db.js';
-import { randomUUID } from 'crypto';
-
-createTask({
-  id: randomUUID(),
-  group_folder: 'main',
-  chat_jid: '123@g.us',
+// Agent writes to outbound.db
+{
+  action: 'schedule_task',
   prompt: 'Check server status',
-  schedule_type: 'cron',
-  schedule_value: '0 */6 * * *', // Every 6 hours
-  context_mode: 'group',
-  next_run: new Date(Date.now() + 3600000).toISOString(),
-  status: 'active',
-  created_at: new Date().toISOString(),
-});
-```
-
-### getTaskById
-
-Retrieves a task by ID.
-
-```typescript
-function getTaskById(id: string): ScheduledTask | undefined
-```
-
-### getTasksForGroup
-
-Retrieves all tasks for a group folder.
-
-```typescript
-function getTasksForGroup(groupFolder: string): ScheduledTask[]
-```
-
-### getAllTasks
-
-Retrieves all tasks.
-
-```typescript
-function getAllTasks(): ScheduledTask[]
-```
-
-### updateTask
-
-Updates task fields.
-
-```typescript
-function updateTask(
-  id: string,
-  updates: Partial<Pick<ScheduledTask, 'prompt' | 'script' | 'schedule_type' | 'schedule_value' | 'next_run' | 'status'>>
-): void
-```
-
-**Example:**
-
-```typescript
-import { updateTask } from './db.js';
-
-// Pause a task
-updateTask('task-id', { status: 'paused' });
-
-// Update schedule
-updateTask('task-id', {
-  schedule_type: 'interval',
-  schedule_value: '3600000', // 1 hour in ms
-});
-```
-
-### deleteTask
-
-Deletes a task and its run logs.
-
-```typescript
-function deleteTask(id: string): void
-```
-
-### getDueTasks
-
-Returns tasks that are due for execution.
-
-```typescript
-function getDueTasks(): ScheduledTask[]
-```
-
-**Behavior:**
-
-- Filters for `status = 'active'`
-- Filters for `next_run <= NOW()`
-- Orders by `next_run` ascending
-
-### updateTaskAfterRun
-
-Updates task state after execution.
-
-```typescript
-function updateTaskAfterRun(
-  id: string,
-  nextRun: string | null,
-  lastResult: string,
-): void
-```
-
-<ParamField path="id" type="string" required>
-  Task ID
-</ParamField>
-
-<ParamField path="nextRun" type="string | null" required>
-  Next run time (null for one-time tasks)
-</ParamField>
-
-<ParamField path="lastResult" type="string" required>
-  Result summary (truncated to 200 chars)
-</ParamField>
-
-**Behavior:**
-
-- Updates `last_run` to current time
-- Updates `next_run` to calculated next time
-- Updates `last_result` with result summary
-- Sets `status = 'completed'` if `next_run` is null
-
-### logTaskRun
-
-Logs a task execution.
-
-```typescript
-function logTaskRun(log: TaskRunLog): void
-```
-
-## Types
-
-### ScheduledTask
-
-```typescript
-interface ScheduledTask {
-  id: string;                           // Unique task ID
-  group_folder: string;                 // Group folder name
-  chat_jid: string;                     // Chat to send results to
-  prompt: string;                       // Agent prompt
-  script?: string | null;               // Optional pre-execution bash script
-  schedule_type: 'cron' | 'interval' | 'once';
-  schedule_value: string;               // Cron expression, interval ms, or ISO timestamp
-  context_mode: 'group' | 'isolated';   // Session mode
-  next_run: string | null;              // ISO timestamp of next run
-  last_run: string | null;              // ISO timestamp of last run
-  last_result: string | null;           // Result summary
-  status: 'active' | 'paused' | 'completed';
-  created_at: string;                   // ISO timestamp
+  process_after: '2026-03-01T09:00:00Z',
+  recurrence: '0 */6 * * *',  // Optional cron expression
+  script: '...',               // Optional pre-execution script
 }
 ```
 
-### TaskRunLog
+The host creates a `kind='task'` row in `inbound.db` with the specified `process_after` and `recurrence`. A `series_id` is set to the task's own ID.
+
+### cancel_task
+
+Marks all live rows in the task's series as `completed` and nulls the recurrence:
 
 ```typescript
-interface TaskRunLog {
-  task_id: string;       // Foreign key to scheduled_tasks
-  run_at: string;        // ISO timestamp of execution
-  duration_ms: number;   // Execution time in milliseconds
-  status: 'success' | 'error';
-  result: string | null; // Agent output
-  error: string | null;  // Error message if failed
+{ action: 'cancel_task', task_id: 'abc123' }
+```
+
+### pause_task
+
+Toggles a pending task to `paused` status:
+
+```typescript
+{ action: 'pause_task', task_id: 'abc123' }
+```
+
+### resume_task
+
+Toggles a paused task back to `pending` status:
+
+```typescript
+{ action: 'resume_task', task_id: 'abc123' }
+```
+
+### update_task
+
+Merges content updates in-place. Matches by ID or `series_id`:
+
+```typescript
+{
+  action: 'update_task',
+  task_id: 'abc123',
+  prompt: 'Updated prompt',
+  process_after: '2026-03-01T10:00:00Z',
+  recurrence: '0 */12 * * *',
 }
 ```
 
-### SchedulerDependencies
+<Note>
+`update_task` returns 0 when no live row matches, triggering a system notification back to the agent ("no live task matched").
+</Note>
 
-```typescript
-interface SchedulerDependencies {
-  registeredGroups: () => Record<string, RegisteredGroup>;
-  getSessions: () => Record<string, string>;
-  queue: GroupQueue;
-  onProcess: (
-    groupJid: string,
-    proc: ChildProcess,
-    containerName: string,
-    groupFolder: string,
-  ) => void;
-  sendMessage: (jid: string, text: string) => Promise<void>;
-}
-```
+## Host-side processing
+
+### Host sweep
+
+The host sweep (60s interval) handles task lifecycle:
+
+1. **Due-message wake** — finds tasks where `process_after <= now` and wakes containers
+2. **Processing_ack sync** — reads acknowledgments from `outbound.db` to mark tasks completed
+3. **Recurrence advancement** — `getCompletedRecurring()` finds completed rows with non-null recurrence; `insertRecurrence()` creates the next-run row
+
+### Sequence numbers
+
+All host-written messages (including tasks) use even-parity sequence numbers via `nextEvenSeq()`. Container-written messages use odd parity. This prevents sequence number collisions.
+
+## Recurring task series
+
+Each recurring task occurrence gets a new `messages_in` row:
+
+- All rows in a series share the same `series_id`
+- When a recurring task completes, the host creates a new pending row with the next `process_after`
+- `cancel_task` marks all live rows in the series as completed and nulls recurrence
+- `update_task` matches by `series_id` to hit the live next-occurrence row
 
 ## Schedule types
 
-### Cron
+### Cron (via recurrence)
 
 ```typescript
-schedule_type: 'cron'
-schedule_value: '0 */6 * * *'  // Cron expression
+recurrence: '0 */6 * * *'  // Cron expression
 ```
 
 Uses `cron-parser` with the configured `TIMEZONE` environment variable.
 
-**Examples:**
-
-- `"0 */6 * * *"` - Every 6 hours
-- `"0 9 * * 1-5"` - 9 AM weekdays
-- `"*/15 * * * *"` - Every 15 minutes
-
-### Interval
+### One-time (no recurrence)
 
 ```typescript
-schedule_type: 'interval'
-schedule_value: '3600000'  // Milliseconds
+process_after: '2026-03-01T14:30:00Z'
+recurrence: null
 ```
 
-Runs every N milliseconds, anchored to the scheduled time (not the actual run time) to prevent cumulative drift.
-
-**Examples:**
-
-- `"3600000"` - Every hour
-- `"86400000"` - Every day
-- `"300000"` - Every 5 minutes
-
-### One-time
-
-```typescript
-schedule_type: 'once'
-schedule_value: '2026-03-01T14:30:00Z'  // ISO timestamp
-```
-
-The `schedule_value` must be a valid ISO 8601 timestamp. Runs once at the specified time, then sets `status = 'completed'`.
-
-## Context modes
-
-### Group context
-
-```typescript
-context_mode: 'group'
-```
-
-Uses the group's current session ID, preserving conversation history.
-
-### Isolated context
-
-```typescript
-context_mode: 'isolated'
-```
-
-Starts with no session, providing a fresh context for each execution.
+Runs once when `process_after` is reached. After completion, no new row is created.
 
 ## Task scripts
 
-Frequent agent invocations consume API credits and can risk account restrictions. If a simple check can determine whether action is needed, add a `script` to your task — it runs first, and the agent is only called when the check passes.
+When a task has a `script` field, the agent-runner executes it before invoking the agent:
 
-### Script execution
-
-When a scheduled task has a `script` field, the agent runner:
-
-1. Writes the script to a temporary file and executes it with `bash`
-2. Parses the last line of stdout as JSON
-3. If the script returns `{"wakeAgent": false}`, the container exits without invoking the agent
-4. If the script returns `{"wakeAgent": true, "data": ...}`, the agent is invoked with the script's data injected into the prompt
+1. Script runs with a 30-second timeout
+2. Script outputs JSON: `{ "wakeAgent": true/false, "data": {...} }`
+3. If `wakeAgent` is `false`, the task completes silently
+4. If `wakeAgent` is `true`, the agent is invoked with script data
 
 ### Script contract
 
-The script must output a JSON object on its last line with the following shape:
-
 ```typescript
 interface ScriptResult {
-  wakeAgent: boolean;  // Whether to invoke the agent
-  data?: unknown;      // Optional data to pass to the agent prompt
+  wakeAgent: boolean;
+  data?: unknown;
 }
 ```
-
-### Always test your script first
-
-Before scheduling, run the script in the sandbox to verify it works:
-
-```bash
-bash -c 'node --input-type=module -e "
-  const r = await fetch(\"https://api.github.com/repos/owner/repo/pulls?state=open\");
-  const prs = await r.json();
-  console.log(JSON.stringify({ wakeAgent: prs.length > 0, data: prs.slice(0, 5) }));
-"'
-```
-
-### When NOT to use scripts
-
-If a task requires agent judgment every time (daily briefings, reminders, reports), skip the script — just use a regular prompt.
-
-### Constraints
-
-- **Timeout**: Scripts are killed after 30 seconds (`SCRIPT_TIMEOUT_MS`)
-- **Output buffer**: Maximum 1 MB of stdout
-- **Only for scheduled tasks**: The `script` field is only evaluated when `isScheduledTask` is true
 
 ### Example
 
 ```json
 {
-  "type": "schedule_task",
-  "prompt": "Summarize the new issues and notify me",
-  "script": "curl -s https://api.github.com/repos/org/repo/issues?since=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) | jq '{wakeAgent: (length > 0), data: .}'",
-  "schedule_type": "interval",
-  "schedule_value": "3600000"
+  "action": "schedule_task",
+  "prompt": "Summarize new issues",
+  "script": "curl -s https://api.github.com/repos/org/repo/issues?state=open | jq '{wakeAgent: (length > 0), data: .}'",
+  "recurrence": "0 */1 * * *"
 }
 ```
 
-In this example, the script checks for new GitHub issues. If there are none, `wakeAgent` is `false` and the agent never starts — saving resources. If there are new issues, the agent wakes up with the issue data pre-loaded in its prompt.
-
 <Note>
-For tasks running more than roughly twice a day, always include a script to minimize agent wake-ups. If the task needs an LLM to evaluate data, consider using direct Anthropic API calls inside the script instead of waking the agent.
+Scripts have a 30-second timeout and 1 MB output limit. For tasks running more than roughly twice a day, always include a script to minimize agent wake-ups.
 </Note>
 
 ## Configuration
 
 ```typescript
-// Scheduler poll interval (1 minute)
-export const SCHEDULER_POLL_INTERVAL = 60000;
-
 // Timezone for cron expressions (validated IANA identifier; falls back to UTC)
 export const TIMEZONE = resolveConfigTimezone();
-
-// Container close delay after task result (10 seconds)
-const TASK_CLOSE_DELAY_MS = 10000;
 ```
+
+The timezone is resolved from `process.env.TZ`, then `.env` file, then system default, with IANA validation.

@@ -4,11 +4,11 @@ description: Environment variables and configuration options for NanoClaw contai
 tag: "UPDATED"
 ---
 
-NanoClaw configuration is managed through environment variables and the `config.ts` module.
+NanoClaw configuration is managed through environment variables, the `.env` file, and the `src/config.ts` module. In v2, some configuration has moved to `container.json` per agent group.
 
 ## Environment variables
 
-Configuration is read from `.env` file or `process.env`.
+Configuration is read from `.env` file or `process.env`, with hardcoded fallbacks.
 
 <ParamField path="ASSISTANT_NAME" type="string" default="Andy">
   Name of the assistant. Used in trigger pattern and message routing.
@@ -19,7 +19,7 @@ Configuration is read from `.env` file or `process.env`.
 </ParamField>
 
 <ParamField path="CONTAINER_IMAGE" type="string" default="nanoclaw-agent:latest">
-  Docker image to use for agent containers.
+  Docker image to use for agent containers. Per-agent-group images are tagged as `nanoclaw-agent:{agentGroupId}`.
 </ParamField>
 
 <ParamField path="CONTAINER_TIMEOUT" type="number" default="1800000">
@@ -27,33 +27,23 @@ Configuration is read from `.env` file or `process.env`.
 </ParamField>
 
 <ParamField path="CONTAINER_MAX_OUTPUT_SIZE" type="number" default="10485760">
-  Maximum container output size in bytes (default: 10MB). Stdout beyond this limit is truncated.
+  Maximum container output size in bytes (default: 10 MB).
 </ParamField>
 
 <ParamField path="IDLE_TIMEOUT" type="number" default="1800000">
   How long to keep container alive after last result in milliseconds (default: 30 minutes).
 </ParamField>
 
-<Tabs>
-  <Tab title="OneCLI Agent Vault (v1.2.35+)">
-    <ParamField path="ONECLI_URL" type="string" default="http://localhost:10254">
-      URL for the OneCLI Agent Vault that handles credential injection for containers.
-    </ParamField>
+<ParamField path="ONECLI_URL" type="string" default="http://localhost:10254">
+  URL for the OneCLI Agent Vault that handles credential injection for containers.
+</ParamField>
 
-    <ParamField path="ONECLI_API_KEY" type="string">
-      API key for authenticating with the OneCLI Agent Vault. When set, the OneCLI SDK includes this key in requests to the vault. Optional — only needed if your OneCLI instance requires authentication.
-    </ParamField>
-  </Tab>
-
-  <Tab title="Credential Proxy (legacy)">
-    <ParamField path="CREDENTIAL_PROXY_PORT" type="number" default="3001">
-      Port for the credential proxy that containers route API calls through.
-    </ParamField>
-  </Tab>
-</Tabs>
+<ParamField path="ONECLI_API_KEY" type="string">
+  API key for authenticating with the OneCLI Agent Vault. Optional — only needed if your OneCLI instance requires authentication.
+</ParamField>
 
 <ParamField path="MAX_MESSAGES_PER_PROMPT" type="number" default="10">
-  Maximum number of messages sent to container agents per prompt. Minimum value is 1. The database retrieval function defaults to 200 but in practice receives this value.
+  Maximum number of messages sent to container agents per prompt.
 </ParamField>
 
 <ParamField path="MAX_CONCURRENT_CONTAINERS" type="number" default="5">
@@ -61,45 +51,46 @@ Configuration is read from `.env` file or `process.env`.
 </ParamField>
 
 <ParamField path="LOG_LEVEL" type="string" default="info">
-  Logging verbosity. Valid values: `debug`, `info`, `warn`, `error`, `fatal`. The value `trace` is also recognized by the container runner for verbose container output.
+  Logging verbosity. Valid values: `debug`, `info`, `warn`, `error`, `fatal`.
 </ParamField>
 
 <ParamField path="TZ" type="string" default="system timezone">
-  Timezone for scheduled tasks (cron expressions). Uses `Intl.DateTimeFormat().resolvedOptions().timeZone` by default.
+  Timezone for scheduled tasks (cron expressions). Resolved from `TZ` env, `.env` file, then system default. Validated as a real IANA timezone identifier. Falls back to `UTC` if no valid timezone is found.
 </ParamField>
 
-## Configuration constants
+## Timezone configuration
 
-Defined in `src/config.ts`:
+The timezone is resolved through a priority chain:
 
-```typescript
-export const POLL_INTERVAL = 2000; // Message loop interval (ms)
-export const SCHEDULER_POLL_INTERVAL = 60000; // Task scheduler interval (ms)
-export const IPC_POLL_INTERVAL = 1000; // IPC watcher interval (ms)
-```
+1. `process.env.TZ`
+2. `TZ` from `.env` file
+3. `Intl.DateTimeFormat().resolvedOptions().timeZone` (system default)
+4. `'UTC'` (fallback)
+
+Each candidate is validated as a real IANA timezone identifier before being accepted. This affects cron expression evaluation for scheduled tasks.
 
 ## Directory paths
 
 All paths are absolute and resolved from the project root:
 
-<ResponseField name="STORE_DIR" type="string">
-  `{PROJECT_ROOT}/store` - Database and persistent storage
+<ResponseField name="DATA_DIR" type="string">
+  `{PROJECT_ROOT}/data` — runtime data directory (central DB, sessions)
+</ResponseField>
+
+<ResponseField name="Central DB" type="string">
+  `{PROJECT_ROOT}/data/v2.db` — central database with entity model
+</ResponseField>
+
+<ResponseField name="Sessions" type="string">
+  `{PROJECT_ROOT}/data/v2-sessions/{agent_group_id}/{session_id}/` — per-session databases and files
 </ResponseField>
 
 <ResponseField name="GROUPS_DIR" type="string">
-  `{PROJECT_ROOT}/groups` - Group folders and memory files
-</ResponseField>
-
-<ResponseField name="DATA_DIR" type="string">
-  `{PROJECT_ROOT}/data` - Runtime data directory (sessions, IPC namespaces, remote-control state)
+  `{PROJECT_ROOT}/groups` — agent group folders and memory files
 </ResponseField>
 
 <ResponseField name="MOUNT_ALLOWLIST_PATH" type="string">
-  `~/.config/nanoclaw/mount-allowlist.json` - Mount security allowlist (never mounted into containers)
-</ResponseField>
-
-<ResponseField name="SENDER_ALLOWLIST_PATH" type="string">
-  `~/.config/nanoclaw/sender-allowlist.json` - Sender-based access control. JSON file with a `default` entry and optional per-chat overrides in `chats`. Each entry specifies `allow` (`"*"` or array of sender JIDs) and `mode` (`"trigger"` to store but block activation, or `"drop"` to discard silently). Reloaded on every message cycle. See [security overview](/concepts/security#5-sender-allowlist).
+  `~/.config/nanoclaw/mount-allowlist.json` — mount security allowlist (never mounted into containers)
 </ResponseField>
 
 ## Trigger pattern
@@ -107,128 +98,42 @@ All paths are absolute and resolved from the project root:
 The default trigger pattern is generated from `ASSISTANT_NAME`:
 
 ```typescript
-export const DEFAULT_TRIGGER = `@${ASSISTANT_NAME}`;
-export const TRIGGER_PATTERN = buildTriggerPattern(DEFAULT_TRIGGER);
+const DEFAULT_TRIGGER = `@${ASSISTANT_NAME}`;
+const TRIGGER_PATTERN = new RegExp(`^${DEFAULT_TRIGGER}\\b`, 'i');
 ```
 
-Each group can override the trigger with a custom value. During message processing, the per-group trigger is resolved via `getTriggerPattern(group.trigger)`, which falls back to the default if no custom trigger is set.
-
-```typescript
-export function getTriggerPattern(trigger?: string): RegExp {
-  const normalizedTrigger = trigger?.trim();
-  return buildTriggerPattern(normalizedTrigger || DEFAULT_TRIGGER);
-}
-```
-
-Matches messages starting with the trigger word (case-insensitive, word-boundary).
-
-## Timezone configuration
-
-Scheduled tasks use the configured timezone:
-
-```typescript
-function resolveConfigTimezone(): string {
-  const candidates = [
-    process.env.TZ,
-    envConfig.TZ,  // from .env file
-    Intl.DateTimeFormat().resolvedOptions().timeZone,
-  ];
-  for (const tz of candidates) {
-    if (tz && isValidTimezone(tz)) return tz;
-  }
-  return 'UTC';
-}
-export const TIMEZONE = resolveConfigTimezone();
-```
-
-Each candidate is validated as a real IANA timezone identifier before being accepted. This affects cron expression evaluation for scheduled tasks.
+In v2, trigger behavior is controlled per-wiring via `engage_mode` and `engage_pattern` rather than a global trigger pattern.
 
 ## Example .env file
 
-<Tabs>
-  <Tab title="OneCLI Agent Vault (v1.2.35+)">
-    ```bash
-    ASSISTANT_NAME=Andy
-    ASSISTANT_HAS_OWN_NUMBER=false
-    CONTAINER_TIMEOUT=1800000
-    MAX_CONCURRENT_CONTAINERS=5
-    TZ=America/Los_Angeles
-    ONECLI_URL=http://127.0.0.1:10254
-    ```
+```bash
+ASSISTANT_NAME=Andy
+ASSISTANT_HAS_OWN_NUMBER=false
+CONTAINER_TIMEOUT=1800000
+MAX_CONCURRENT_CONTAINERS=5
+TZ=America/Los_Angeles
+ONECLI_URL=http://127.0.0.1:10254
+```
 
-    <Note>
-    With the OneCLI Agent Vault, API keys and OAuth tokens are no longer stored in `.env`. Secrets are managed via `onecli secrets create` and injected by the vault at request time. The only credential-related variable is `ONECLI_URL`.
-    </Note>
-  </Tab>
+<Note>
+With the OneCLI Agent Vault, API keys and OAuth tokens are no longer stored in `.env`. Secrets are managed via `onecli secrets create` and injected by the vault at request time.
+</Note>
 
-  <Tab title="Credential Proxy (legacy)">
-    ```bash
-    ASSISTANT_NAME=Andy
-    ASSISTANT_HAS_OWN_NUMBER=false
-    CONTAINER_TIMEOUT=1800000
-    MAX_CONCURRENT_CONTAINERS=5
-    TZ=America/Los_Angeles
-    ```
-  </Tab>
-</Tabs>
+## Credential management
 
-## Credential environment variables
+Credentials are managed externally via OneCLI — no credential environment variables are needed in `.env`.
 
-<Tabs>
-  <Tab title="OneCLI Agent Vault (v1.2.35+)">
-    Credentials are managed externally via OneCLI — no credential environment variables are needed in `.env`.
+Register secrets with OneCLI:
+```bash
+onecli secrets create --name Anthropic --type anthropic --value YOUR_KEY --host-pattern api.anthropic.com
+```
 
-    Register secrets with OneCLI using the CLI or dashboard:
-    ```bash
-    onecli secrets create --name Anthropic --type anthropic --value YOUR_KEY --host-pattern api.anthropic.com
-    ```
-
-    See `onecli secrets list` to verify registered secrets. Run `onecli --help` for the full list of available commands.
-  </Tab>
-
-  <Tab title="Credential Proxy (legacy)">
-    The credential proxy reads these from `.env` at startup (never exposed to containers):
-
-    <ParamField path="ANTHROPIC_API_KEY" type="string">
-      Anthropic API key. If set, the proxy uses API key mode.
-    </ParamField>
-
-    <ParamField path="CLAUDE_CODE_OAUTH_TOKEN" type="string">
-      OAuth token for Claude Code authentication. Used when `ANTHROPIC_API_KEY` is not set. Must be a long-lived token from `claude setup-token` — short-lived tokens from the system keychain expire within hours and cause container 401 errors.
-    </ParamField>
-
-    <ParamField path="ANTHROPIC_AUTH_TOKEN" type="string">
-      Fallback OAuth token. Used when neither `ANTHROPIC_API_KEY` nor `CLAUDE_CODE_OAUTH_TOKEN` is set.
-    </ParamField>
-
-    <ParamField path="ANTHROPIC_BASE_URL" type="string">
-      Upstream API URL for the credential proxy to forward requests to. Defaults to the Anthropic API endpoint. Set this to use third-party Anthropic-compatible endpoints (Together AI, Fireworks, custom deployments). See [Ollama integration](/integrations/ollama#third-party-model-endpoints).
-    </ParamField>
-  </Tab>
-</Tabs>
-
-<ParamField path="OLLAMA_HOST" type="string" default="http://host.docker.internal:11434">
-  Ollama API endpoint. Only used when the `/add-ollama-tool` skill is installed. The MCP server inside the container uses this to reach the host's Ollama instance. Falls back to `localhost` if `host.docker.internal` fails. See [Ollama integration](/integrations/ollama).
-</ParamField>
-
-<ParamField path="OLLAMA_ADMIN_TOOLS" type="string" default="false">
-  When set to `true`, enables admin model management tools (`ollama_pull_model`, `ollama_delete_model`, `ollama_show_model`, `ollama_list_running`) in the Ollama MCP server. Only used when the `/add-ollama-tool` skill is installed.
-</ParamField>
+The `@onecli-sh/sdk` package's `applyContainerConfig()` configures each container's network to route through the vault, injecting credentials at request time.
 
 ## Security notes
 
-<Tabs>
-  <Tab title="OneCLI Agent Vault (v1.2.35+)">
-    - **Secrets** are never read by NanoClaw — OneCLI manages them externally
-    - The OneCLI Agent Vault injects credentials into container API traffic at request time
-    - Containers cannot extract real credentials from the vault
-    - Mount allowlist is stored OUTSIDE project root and never mounted into containers
-  </Tab>
-
-  <Tab title="Credential Proxy (legacy)">
-    - **Secrets** (API keys, credentials) are NOT read in `config.ts`
-    - Secrets are loaded only by the credential proxy once at startup, never exposed to containers
-    - This prevents leaking secrets to child processes
-    - Mount allowlist is stored OUTSIDE project root and never mounted into containers
-  </Tab>
-</Tabs>
+- **Secrets** are never read by NanoClaw directly — OneCLI manages them externally
+- The OneCLI Agent Vault injects credentials into container API traffic at request time
+- Containers cannot extract real credentials from the vault
+- Mount allowlist is stored outside the project root and never mounted into containers
+- The `.env` file is read by the config module for NanoClaw settings only (not for API keys)
