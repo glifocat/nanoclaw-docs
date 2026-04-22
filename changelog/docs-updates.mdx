@@ -5,6 +5,23 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.0: architectural rewrite docs" description="2026-04-22" tags={["Updated"]}>
+  Merged PR #187 — comprehensive rewrite of concepts, advanced, api, and features pages for the v2.0.0 ground-up architectural rewrite ([qwibitai/nanoclaw#1919](https://github.com/qwibitai/nanoclaw/pull/1919)). Closed PRs #184, #185, #186 as superseded.
+
+  ## Updated
+  - **Two-database session model**: `inbound.db` (host writes) + `outbound.db` (container writes) replace stdin/stdout piping and filesystem IPC — documented across `concepts/architecture`, `advanced/ipc-system`, `advanced/container-runtime`
+  - **Entity model**: agent groups, messaging groups, wirings (many-to-many), users, and roles replace the v1 group/channel model — new `concepts/groups` and `api/group-management`
+  - **Bun-based agent runner**: runs TypeScript directly (no compilation), shared source via read-only bind mount, `tini` as PID 1 — `concepts/containers`, `advanced/container-runtime`
+  - **Permissions system**: engage modes (pattern/mention/mention-sticky), sender scope (all/known), unknown sender policies (strict/request_approval/public), approval flows — `concepts/security`, `advanced/security-model`
+  - **Delivery system**: two-poll architecture (active 1s, sweep 60s) with delivery action registry — `features/messaging`
+  - **Task model**: tasks as `messages_in` rows with cron recurrence and series tracking — `concepts/tasks`, `features/scheduled-tasks`, `api/task-scheduling`
+  - **OneCLI Agent Vault** is the sole credential path; legacy credential proxy removed — `advanced/security-model`, `api/configuration`
+  - **Changelog**: v2.0.0 release entry
+
+  ## Archived
+  - v1 docs frozen at branch [`v1-docs`](https://github.com/glifocat/nanoclaw-docs/tree/v1-docs) (public-facing, docs only) and tag [`v1-docs-final`](https://github.com/glifocat/nanoclaw-docs/tree/v1-docs-final) (full repo snapshot)
+</Update>
+
 <Update label="v1.2.53 sync: token count, ONECLI_API_KEY, SDK config" description="2026-04-15" tags={["Updated"]}>
   ## Updated
   - **Token count**: Updated from 43.7k to 43.8k in introduction and skills-system pages
