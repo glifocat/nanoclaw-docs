@@ -128,7 +128,8 @@ Here's what Claude Code does when you run `/setup`:
 
 <Accordion title="1. Bootstrap dependencies">
   - Verifies Node.js 20+ is installed
-  - Runs `npm install` to install dependencies
+  - Enables `pnpm` via corepack (preferred), or falls back to `npm install -g pnpm@<pinned>` when corepack isn't available
+  - Runs `pnpm install --frozen-lockfile` to install dependencies
   - Tests that native modules (better-sqlite3) load correctly
   - Detects your platform (macOS/Linux) and environment (WSL, headless)
 </Accordion>

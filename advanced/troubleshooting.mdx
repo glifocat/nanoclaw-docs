@@ -179,6 +179,38 @@ cat groups/{group}/logs/container-{timestamp}.log
   ```
 </Accordion>
 
+## Setup fails with `corepack: command not found`
+
+### Symptoms
+- `bash setup.sh` or `/setup` exits before installing dependencies
+- Bootstrap log shows `corepack: command not found` or `pnpm: command not found`
+- Common on older nvm installs, keg-only `node@22` from Homebrew, or minimal distro Node packages
+
+### Cause
+
+The bootstrap prefers `pnpm` via corepack, but some Node distributions don't ship corepack, so the `pnpm` shim never lands on `PATH`.
+
+### Solution
+
+The setup script now falls back automatically to `npm install -g pnpm@<pinned>`, reading the pinned version from `package.json`'s `packageManager` field. On Linux it will retry with `sudo` if the global install requires root.
+
+If the fallback still fails (e.g., no `npm` on `PATH`, or global install blocked), install pnpm manually and re-run setup:
+
+```bash
+# Read the pinned version from package.json
+grep packageManager package.json
+# "packageManager": "pnpm@<version>"
+
+npm install -g pnpm@<version>
+bash setup.sh
+```
+
+Check the bootstrap log for the exact failure point:
+
+```bash
+tail -50 logs/bootstrap.log
+```
+
 ## Service stops after SSH logout (Linux)
 
 ### Symptoms
