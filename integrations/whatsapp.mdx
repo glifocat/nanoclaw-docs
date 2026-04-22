@@ -4,7 +4,11 @@ description: WhatsApp support via the /add-whatsapp skill using the Baileys libr
 tag: "UPDATED"
 ---
 
-WhatsApp is a messaging channel for NanoClaw, installed via the `/add-whatsapp` skill. It uses the Baileys library and merges the `skill/whatsapp` branch into your fork.
+<Warning>
+This page is pending a v2 rewrite. The `/add-whatsapp` skill flow still works, but some mechanics described below (e.g., per-channel `skill/*` branch merges) reflect v1 architecture — in v2, channel adapters live on a single `channels` branch, and session IO uses two databases per session. See [Integrations overview](/integrations/overview) for current context.
+</Warning>
+
+WhatsApp is a messaging channel for NanoClaw, installed via the `/add-whatsapp` skill. It uses the Baileys library.
 
 ## Overview
 
