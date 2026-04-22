@@ -1,60 +1,38 @@
 ---
 title: Setting up scheduled tasks
-description: Set up recurring and one-time tasks with cron expressions, intervals, or specific timestamps
+description: Set up recurring and one-time tasks with cron expressions or specific timestamps
+tag: "UPDATED"
 ---
 
 ## Overview
 
-NanoClaw's task scheduler runs Claude agents on a schedule, allowing you to automate recurring tasks like daily reports, weekly summaries, or periodic checks. Tasks can message you with results or update files in their group folder.
+NanoClaw's task scheduler runs agents on a schedule, allowing you to automate recurring tasks like daily reports, weekly summaries, or periodic checks. In v2, tasks are stored as messages in the session database and managed through MCP tools.
 
 ## Task types
 
-NanoClaw supports three types of scheduled tasks:
-
 <Tabs>
-  <Tab title="Cron">
+  <Tab title="Recurring (cron)">
     Use cron expressions for complex recurring schedules:
 
-    ```typescript
-    // Every weekday at 9am
-    schedule_type: 'cron'
-    schedule_value: '0 9 * * 1-5'
+    ```
+    0 9 * * *     — Daily at 9am
+    0 9 * * 1-5   — Weekdays at 9am
+    0 */6 * * *   — Every 6 hours
+    0 0 * * 0     — Sundays at midnight
+    0 8 1 * *     — First day of each month at 8am
     ```
 
-    Common cron patterns:
-    - `0 9 * * *` - Daily at 9am
-    - `0 9 * * 1-5` - Weekdays at 9am
-    - `0 */6 * * *` - Every 6 hours
-    - `0 0 * * 0` - Sundays at midnight
-    - `0 8 1 * *` - First day of each month at 8am
+    Each occurrence creates a new row in the session database sharing a `series_id`.
   </Tab>
-  
-  <Tab title="Interval">
-    Run tasks at regular intervals (in milliseconds):
 
-    ```typescript
-    // Every hour
-    schedule_type: 'interval'
-    schedule_value: '3600000'
-    ```
-
-    Common intervals:
-    - `60000` - Every minute
-    - `3600000` - Every hour
-    - `86400000` - Every 24 hours
-    - `604800000` - Every week
-  </Tab>
-  
-  <Tab title="Once">
+  <Tab title="One-time">
     Run a task at a specific future time:
 
-    ```typescript
-    // Specific timestamp
-    schedule_type: 'once'
-    schedule_value: '2026-03-01T10:00:00Z'
+    ```
+    2026-03-01T10:00:00Z
     ```
 
-    One-time tasks are set to `completed` status after execution and remain in the database for reference.
+    One-time tasks are marked `completed` after execution. No new rows are created.
   </Tab>
 </Tabs>
 
@@ -69,153 +47,42 @@ Tasks are created through natural language requests to the agent:
 @Andy compile AI news from Hacker News every Monday at 8am
 ```
 
-### Task creation flow
+### How it works
 
 When you request a scheduled task, the agent:
 
 1. Parses your request to extract the schedule and prompt
-2. Determines the schedule type (cron, interval, or once)
-3. Writes an IPC command to create the task
-4. Receives confirmation when the task is scheduled
-
-<Note>
-Only the main channel can create tasks for other groups. Non-main groups can only schedule tasks for themselves.
-</Note>
+2. Calls the `schedule_task` MCP tool (writes to `outbound.db`)
+3. The host's delivery system creates the task in `inbound.db`
+4. The host sweep picks up the task when it's due
 
 ## Task execution
 
-The scheduler runs as a background loop:
+The host sweep runs every 60 seconds and:
 
-```typescript
-// From src/task-scheduler.ts — startSchedulerLoop
-export function startSchedulerLoop(deps: SchedulerDependencies): void {
-  schedulerRunning = true;
-  logger.info('Scheduler loop started');
+1. Finds tasks where `process_after <= now`
+2. Wakes the session's container (or spawns a new one)
+3. The agent-runner's poll loop picks up the task
+4. Agent executes the task prompt
+5. Host sweep syncs `processing_ack` and marks the task completed
+6. For recurring tasks, creates the next occurrence with updated `process_after`
 
-  const loop = async () => {
-    try {
-      const dueTasks = getDueTasks();
-      if (dueTasks.length > 0) {
-        logger.info({ count: dueTasks.length }, 'Found due tasks');
-      }
-
-      for (const task of dueTasks) {
-        const currentTask = getTaskById(task.id);
-        if (!currentTask || currentTask.status !== 'active') {
-          continue;
-        }
-
-        deps.queue.enqueueTask(currentTask.chat_jid, currentTask.id, () =>
-          runTask(currentTask, deps),
-        );
-      }
-    } catch (err) {
-      logger.error({ err }, 'Error in scheduler loop');
-    }
-
-    setTimeout(loop, SCHEDULER_POLL_INTERVAL);
-  };
-
-  loop();
-}
-```
-
-### Polling interval
-
-```typescript
-// From src/config.ts
-export const SCHEDULER_POLL_INTERVAL = 60000; // 60 seconds
-```
-
-The scheduler checks for due tasks every 60 seconds.
-
-## Context modes
-
-Tasks can run in two context modes:
-
-<CodeGroup>
-```typescript Isolated (default)
-// Each task run gets a fresh session
-context_mode: 'isolated'
-```
-
-```typescript Group context
-// Task uses the group's ongoing session
-context_mode: 'group'
-```
-</CodeGroup>
-
-**Isolated mode** is recommended for most tasks - each run is independent and won't be affected by previous conversations.
-
-**Group context mode** allows tasks to build on previous context and remember information across runs. Useful for tasks that need continuity.
-
-## Task lifecycle
-
-<Steps>
-  <Step title="Task created">
-    Task is stored in SQLite with status `active` and calculated `next_run` timestamp
-  </Step>
-  
-  <Step title="Scheduler picks up task">
-    When `next_run` is in the past and status is `active`, the task is enqueued
-  </Step>
-  
-  <Step title="Agent executes">
-    The agent runs in an isolated container with the task prompt
-  </Step>
-  
-  <Step title="Results sent">
-    Agent output is sent to the chat via IPC
-  </Step>
-  
-  <Step title="Next run scheduled">
-    For recurring tasks, `next_run` is updated based on the schedule
-  </Step>
-</Steps>
-
-### Next run calculation
-
-```typescript
-// From src/task-scheduler.ts — computeNextRun function
-let nextRun: string | null = null;
-if (task.schedule_type === 'cron') {
-  const interval = CronExpressionParser.parse(task.schedule_value, {
-    tz: TIMEZONE,
-  });
-  nextRun = interval.next().toISOString();
-} else if (task.schedule_type === 'interval') {
-  const ms = parseInt(task.schedule_value, 10);
-  // Anchor to the scheduled time, not now, to prevent drift
-  let next = new Date(task.next_run).getTime() + ms;
-  while (next <= Date.now()) {
-    next += ms;
-  }
-  nextRun = new Date(next).toISOString();
-}
-// 'once' tasks have no next run
-```
+<Note>
+Tasks share the container concurrency pool with interactive messages. If all container slots are busy (default: 5), tasks wait until a slot is available.
+</Note>
 
 ## Timezone configuration
 
-Tasks use the system timezone by default. The resolver checks `process.env.TZ`, then the `.env` file's `TZ` value, then the system locale — each candidate is validated as a real IANA timezone before being accepted. If none are valid, it falls back to `UTC`.
+Tasks use the configured timezone for cron evaluation. The resolver checks:
 
-```typescript
-// From src/config.ts
-function resolveConfigTimezone(): string {
-  const candidates = [
-    process.env.TZ,
-    envConfig.TZ,
-    Intl.DateTimeFormat().resolvedOptions().timeZone,
-  ];
-  for (const tz of candidates) {
-    if (tz && isValidTimezone(tz)) return tz;
-  }
-  return 'UTC';
-}
-export const TIMEZONE = resolveConfigTimezone();
-```
+1. `process.env.TZ`
+2. `.env` file's `TZ` value
+3. System locale
+4. Falls back to `UTC`
 
-To override, set the `TZ` environment variable:
+Each candidate is validated as a real IANA timezone identifier.
+
+To override:
 
 ```bash
 export TZ="America/New_York"
@@ -223,187 +90,76 @@ export TZ="America/New_York"
 
 ## Task management
 
-Manage tasks through natural language commands:
+Manage tasks through natural language:
 
 ```
 @Andy list all scheduled tasks
 @Andy pause the Monday briefing task
 @Andy resume the calendar summary task
 @Andy cancel the reminder about the meeting
+@Andy update the PR monitor to check every 30 minutes instead
 ```
 
-### IPC commands
+### Available operations
 
-Tasks are managed through IPC messages written to `data/ipc/{group}/tasks/`:
-
-<CodeGroup>
-```json schedule_task
-{
-  "type": "schedule_task",
-  "prompt": "Send me a summary of today's events",
-  "script": "optional-bash-script-here",
-  "schedule_type": "cron",
-  "schedule_value": "0 9 * * *",
-  "context_mode": "isolated",
-  "targetJid": "user@s.whatsapp.net or tg:12345 or similar"
-}
-```
-
-```json pause_task
-{
-  "type": "pause_task",
-  "taskId": "task-1234567890-abc123"
-}
-```
-
-```json resume_task
-{
-  "type": "resume_task",
-  "taskId": "task-1234567890-abc123"
-}
-```
-
-```json cancel_task
-{
-  "type": "cancel_task",
-  "taskId": "task-1234567890-abc123"
-}
-```
-
-```json update_task
-{
-  "type": "update_task",
-  "taskId": "task-1234567890-abc123",
-  "prompt": "Updated prompt",
-  "script": "optional-updated-script",
-  "schedule_type": "interval",
-  "schedule_value": "7200000"
-}
-```
-</CodeGroup>
-
-<Info>
-After any task mutation via IPC, the `current_tasks.json` snapshot is refreshed immediately for all groups. This means `list_tasks` always returns up-to-date results, even within the same agent session.
-</Info>
+| Operation | What it does |
+|-----------|-------------|
+| `schedule_task` | Creates a new task with `process_after` and optional `recurrence` |
+| `cancel_task` | Marks all rows in the series as completed, nulls recurrence |
+| `pause_task` | Toggles task to `paused` (skipped by host sweep) |
+| `resume_task` | Toggles task back to `pending` |
+| `update_task` | Updates prompt, script, schedule, or recurrence in-place |
 
 ## Task scripts
 
-For any recurring task, use `schedule_task`. Frequent agent invocations — especially multiple times a day — consume API credits and can risk account restrictions. If a simple check can determine whether action is needed, add a `script` — it runs first, and the agent is only called when the check passes.
+For recurring tasks, add a `script` to minimize unnecessary agent wake-ups. The script runs first, and the agent is only invoked when the script determines action is needed.
 
 ### How it works
 
-1. You provide a bash `script` alongside the `prompt` when scheduling
-2. When the task fires, the script runs first (30-second timeout)
-3. The script prints JSON to stdout: `{ "wakeAgent": true/false, "data": {...} }`
-4. If `wakeAgent` is `false` — nothing happens, the task waits for the next run
-5. If `wakeAgent` is `true` — the agent wakes up and receives the script's data plus the prompt
+1. The script runs first (30-second timeout)
+2. It prints JSON to stdout: `{ "wakeAgent": true/false, "data": {...} }`
+3. If `wakeAgent` is `false` — task completes silently, no agent invocation
+4. If `wakeAgent` is `true` — the agent wakes with the script's data in its prompt
 
-### Creating a task with a script
+### Example
 
-```json
-{
-  "type": "schedule_task",
-  "prompt": "Summarize the new issues and notify me",
-  "script": "curl -s https://api.github.com/repos/org/repo/issues?since=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) | jq '{wakeAgent: (length > 0), data: .}'",
-  "schedule_type": "interval",
-  "schedule_value": "3600000"
-}
 ```
-
-The script must output a JSON object on its last line with a `wakeAgent` boolean:
-
-- `{"wakeAgent": false}` — the container exits silently, no agent invocation
-- `{"wakeAgent": true, "data": {...}}` — the agent runs with the script data injected into its prompt
+@Andy every hour, check for new GitHub PRs needing my review. Use this script to check first:
+curl -s https://api.github.com/repos/org/repo/pulls?state=open | jq '{wakeAgent: (length > 0), data: .}'
+```
 
 ### Always test your script first
 
-Before scheduling, run the script in the sandbox to verify it works:
+Before scheduling, run the script in the sandbox:
 
 ```bash
-bash -c 'node --input-type=module -e "
-  const r = await fetch(\"https://api.github.com/repos/owner/repo/pulls?state=open\");
-  const prs = await r.json();
-  console.log(JSON.stringify({ wakeAgent: prs.length > 0, data: prs.slice(0, 5) }));
-"'
+bash -c 'curl -s https://api.github.com/repos/owner/repo/pulls?state=open | jq "{wakeAgent: (length > 0), data: .}"'
 ```
 
 ### When NOT to use scripts
 
-If a task requires agent judgment every time (daily briefings, reminders, reports), skip the script — just use a regular prompt.
+If a task requires agent judgment every time (daily briefings, reminders, reports), skip the script.
 
 ### Frequent task guidance
 
-If a task needs to run more than roughly twice a day and a script can't reduce agent wake-ups:
+If a task runs more than roughly twice a day and a script can't reduce agent wake-ups:
 
-- Each wake-up uses API credits and risks rate limits
-- Restructure with a script that checks the condition first
-- If the task needs an LLM to evaluate data, consider using an API key with direct Anthropic API calls inside the script
+- Each wake-up uses API credits
+- Restructure with a script that checks conditions first
 - Find the minimum viable frequency
 
 <Note>
 Scripts have a 30-second timeout and 1 MB output limit. If the script fails or produces no output, the agent is not invoked.
 </Note>
 
-### Updating a task's script
+## Recurring task series
 
-You can add, change, or remove a task's script via `update_task`:
+Recurring tasks use a series model:
 
-```json
-{
-  "type": "update_task",
-  "taskId": "task-1234567890-abc123",
-  "script": "new-script-here"
-}
-```
-
-Set `script` to an empty string or omit it to remove the script.
-
-## Task isolation
-
-Each task runs in its own container with:
-
-- The group's filesystem mounted
-- Access to the group's `CLAUDE.md` memory
-- A task-specific session (in isolated mode) or the group session (in group mode)
-- A 10-second close delay after completion (vs 30-minute idle timeout for conversations)
-
-```typescript
-// From src/task-scheduler.ts — task close delay
-const TASK_CLOSE_DELAY_MS = 10000;
-let closeTimer: ReturnType<typeof setTimeout> | null = null;
-
-const scheduleClose = () => {
-  if (closeTimer) return;
-  closeTimer = setTimeout(() => {
-    logger.debug({ taskId: task.id }, 'Closing task container after result');
-    deps.queue.closeStdin(task.chat_jid);
-  }, TASK_CLOSE_DELAY_MS);
-};
-```
-
-## Task history
-
-All task runs are logged in SQLite:
-
-```typescript
-// From src/task-scheduler.ts — run logging
-logTaskRun({
-  task_id: task.id,
-  run_at: new Date().toISOString(),
-  duration_ms: durationMs,
-  status: error ? 'error' : 'success',
-  result,
-  error,
-});
-```
-
-Query task history:
-
-```sql
-SELECT * FROM task_run_logs 
-WHERE task_id = 'task-1234567890-abc123'
-ORDER BY run_at DESC;
-```
+- Each occurrence gets a new `messages_in` row sharing the same `series_id`
+- When an occurrence completes, the host creates the next one
+- `cancel_task` stops the entire series
+- `update_task` matches by `series_id` to hit the live next-occurrence row
 
 ## Example use cases
 
@@ -413,23 +169,17 @@ ORDER BY run_at DESC;
 @Andy every weekday at 9am, compile my calendar events for the day and send me a brief summary
 ```
 
-Schedule: `0 9 * * 1-5` (cron)
-
-### GitHub PR monitor
+### GitHub PR monitor (with script)
 
 ```
-@Andy check for new pull requests every hour and notify me if there are any requiring my review
+@Andy check for PRs needing review every hour. Script: curl -s https://api.github.com/repos/org/repo/pulls?state=open | jq '{wakeAgent: (length > 0), data: .}'
 ```
-
-Schedule: `3600000` (interval - 1 hour)
 
 ### Weekly report
 
 ```
-@Andy every Friday at 5pm, review the git history for the past week and compile a summary of changes
+@Andy every Friday at 5pm, review the git history for the past week and compile a summary
 ```
-
-Schedule: `0 17 * * 5` (cron)
 
 ### One-time reminder
 
@@ -437,42 +187,17 @@ Schedule: `0 17 * * 5` (cron)
 @Andy remind me tomorrow at 2pm to review the budget proposal
 ```
 
-Schedule: `2026-03-01T14:00:00Z` (once)
-
 ## Error handling
 
 If a task fails:
 
-1. The error is logged in `task_run_logs` table
-2. For recurring tasks, the next run is still scheduled (no automatic pause)
-3. For one-time tasks, the task is marked complete even if it failed
-4. If a group folder is invalid, the task is automatically paused to prevent retry churn
-
-```typescript
-// From src/task-scheduler.ts — invalid group folder handling
-try {
-  groupDir = resolveGroupFolderPath(task.group_folder);
-} catch (err) {
-  const error = err instanceof Error ? err.message : String(err);
-  updateTask(task.id, { status: 'paused' });
-  logger.error(
-    { taskId: task.id, groupFolder: task.group_folder, error },
-    'Task has invalid group folder',
-  );
-  logTaskRun({
-    task_id: task.id,
-    run_at: new Date().toISOString(),
-    duration_ms: Date.now() - startTime,
-    status: 'error',
-    result: null,
-    error,
-  });
-  return;
-}
-```
+1. Processing is acknowledged with error state
+2. For recurring tasks, the next occurrence is still created
+3. For one-time tasks, the task is marked completed even if it failed
+4. Check container logs for error details
 
 ## Related documentation
 
-- [Messaging](/features/messaging) - How messages trigger agent responses
-- [Agent Swarms](/features/agent-swarms) - Use multiple agents in scheduled tasks
-- [Customization](/features/customization) - Modify task behavior
+- [Messaging](/features/messaging) — how messages trigger agent responses
+- [Agent Swarms](/features/agent-swarms) — use multiple agents in scheduled tasks
+- [Customization](/features/customization) — modify task behavior

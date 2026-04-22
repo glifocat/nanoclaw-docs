@@ -1,363 +1,184 @@
 ---
 title: Group isolation
-description: How NanoClaw isolates groups and manages per-group contexts
+description: How NanoClaw isolates agent groups and messaging groups
 tag: "UPDATED"
 ---
 
-Groups in NanoClaw represent isolated contexts, typically corresponding to group chats or individual conversations on any connected messaging platform. Each group has its own filesystem, memory, and session.
+In v2, NanoClaw uses a new entity model that separates **agent groups** (workspaces where agents run) from **messaging groups** (platform chats and channels). These are connected through **wirings** — many-to-many relationships that control how messages are routed to agents.
 
-## What is a group?
+## Entity model
 
-A group is:
+### Agent groups
 
-- A group chat or individual conversation on any channel (identified by `jid`)
-- A dedicated folder under `groups/{name}/`
-- An isolated Claude conversation session
-- A set of permissions and mount configurations
-- A separate IPC namespace for container communication
+An agent group is:
+
+- A workspace with its own folder under `groups/{name}/`
+- An optional provider configuration
+- A container configuration (`container.json`) with custom packages and mounts
+- The unit of credential scoping (each gets its own OneCLI agent)
+
+### Messaging groups
+
+A messaging group is:
+
+- A platform chat or channel identified by `(channel_type, platform_id)`
+- Has an `unknown_sender_policy`: `strict`, `request_approval`, or `public`
+- Can be denied (sets `denied_at` to silently drop future mentions)
+- Auto-created on first mention or DM
+
+### Wirings (messaging_group_agents)
+
+Wirings connect messaging groups to agent groups with four orthogonal axes:
+
+| Axis | Options | Purpose |
+|------|---------|---------|
+| `engage_mode` | `pattern`, `mention`, `mention-sticky` | When the agent responds |
+| `engage_pattern` | Regex (e.g., `'.'` = always) | Pattern to match against messages |
+| `sender_scope` | `all`, `known` | Who can trigger the agent |
+| `ignored_message_policy` | `drop`, `accumulate` | What happens to non-triggering messages |
+
+Additional wiring properties:
+
+- `session_mode` — `shared` (one per messaging group), `per-thread` (one per thread), or `agent-shared` (one per agent group)
+- `priority` — controls evaluation order when multiple agents are wired
 
 <Info>
-Groups are the fundamental isolation boundary in NanoClaw. Each group operates independently with its own context and history.
+The many-to-many model allows a single messaging group to be wired to multiple agent groups, and a single agent group to serve multiple messaging groups.
 </Info>
 
-## Group types
+## Engage modes
 
-### Main group (admin)
+### Pattern mode
 
-The main group is special:
+The agent responds whenever a message matches the `engage_pattern` regex. Use `'.'` to match all messages (equivalent to the old "no trigger required").
 
-- Typically a self-chat or DM with the bot on your primary platform
-- Has full administrative privileges
-- Can manage other groups
-- Can schedule tasks for any group
-- Has read-write access to project root (read-only mount)
-- Folder is always `main`
+### Mention mode
 
-**Identifying main group:**
+The agent only responds when explicitly mentioned at the platform level (e.g., `@bot` in Discord, reply in WhatsApp).
 
-```typescript
-const isMain = group.isMain === true;
-```
+### Mention-sticky mode
 
-### Non-main groups
-
-All other groups:
-
-- One per group chat or conversation across any connected channel
-- Limited to their own context and operations
-- Cannot access other groups' data
-- Cannot send messages to other chats
-- Require trigger pattern (`@{ASSISTANT_NAME}`) unless disabled
-
-## Group registration
-
-Groups must be registered before the agent will respond to messages.
-
-### Registration process
-
-1. Main group sends command to register a new group
-2. Agent calls `register_group` via IPC
-3. Host validates folder name and creates directory structure
-4. Group added to SQLite database
-5. Group folder and logs directory created
-
-### Registration data structure
-
-```typescript
-interface RegisteredGroup {
-  name: string;              // Display name
-  folder: string;            // Filesystem folder name (alphanumeric + dash/underscore)
-  trigger: string;           // Trigger pattern regex
-  added_at: string;          // ISO timestamp of registration
-  requiresTrigger?: boolean; // Default: true (false for main)
-  isMain?: boolean;          // True for the main control group
-  containerConfig?: {
-    timeout?: number;                    // Container timeout (ms)
-    additionalMounts?: AdditionalMount[]; // Extra directories to mount
-  };
-}
-```
-
-### Folder naming rules
-
-- Must be alphanumeric with dashes/underscores only
-- Cannot contain `..` or `/`
-- Main group always uses `main`
-- Typically derived from group name (e.g., "Family Chat" → `family-chat`)
-
-<Warning>
-Folder names cannot be changed after registration. The folder name becomes the group's stable identifier across sessions.
-</Warning>
-
-## Group isolation mechanisms
-
-### 1. Filesystem isolation
-
-Each group has a dedicated directory structure:
-
-<Tree>
-  <Tree.Folder name="groups" defaultOpen>
-    <Tree.Folder name="{group-folder}" defaultOpen>
-      <Tree.File name="CLAUDE.md" />
-      <Tree.Folder name="logs" />
-    </Tree.Folder>
-  </Tree.Folder>
-</Tree>
-
-**What groups can access:**
-
-| Path | Main Group | Non-Main Group |
-|------|------------|----------------|
-| Own group folder | Read-write | Read-write |
-| Project root | Read-only | Not mounted |
-| Store (SQLite DB) | Read-write | Not mounted |
-| Global memory (`groups/global/`) | Via project mount | Read-only mount (if exists) |
-| Other groups' folders | Via project root (ro) | Not accessible |
-| Additional mounts | Configurable | Read-only unless allowed |
+The agent responds to an explicit mention OR if there's an existing active session for this combination of agent, messaging group, and thread. Once activated by a mention, the agent continues responding in that conversation.
 
 <Note>
-Main group can technically access other groups' folders via the project root mount, but non-main groups cannot access anything outside their own folder.
+In `mention-sticky` mode, the adapter's `subscribe()` method is called for platform-side bookkeeping (e.g., subscribing to a Discord thread). This is fire-and-forget.
 </Note>
 
-### 2. Session isolation
+## Session management
 
-Each group maintains a separate Claude conversation session:
+### Session resolution
 
-<Tree>
-  <Tree.Folder name="data/sessions" defaultOpen>
-    <Tree.Folder name="{group-folder}" defaultOpen>
-      <Tree.Folder name=".claude" defaultOpen>
-        <Tree.File name="settings.json" />
-        <Tree.Folder name="skills" />
-      </Tree.Folder>
-      <Tree.Folder name="agent-runner-src" />
-    </Tree.Folder>
-  </Tree.Folder>
-</Tree>
+Sessions are resolved based on the wiring's `session_mode`:
 
-**Session isolation ensures:**
+| Mode | Behavior |
+|------|----------|
+| `shared` | One session per messaging group (ignores thread) |
+| `per-thread` | One session per (messaging group, thread) pair |
+| `agent-shared` | One session per agent group (all messaging groups share it) |
 
-- Groups cannot see other groups' conversation history
-- Groups cannot access files read by other groups
-- Groups cannot see other groups' user preferences (memory)
-- Each group starts with fresh session on first invocation
+### Session directory structure
 
-### 3. IPC namespace isolation
-
-Each group has its own IPC directory:
-
-<Tree>
-  <Tree.Folder name="data/ipc" defaultOpen>
-    <Tree.Folder name="{group-folder}" defaultOpen>
-      <Tree.Folder name="messages" />
-      <Tree.Folder name="tasks" />
-      <Tree.Folder name="input" />
-      <Tree.File name="current_tasks.json" />
-      <Tree.File name="available_groups.json" />
-    </Tree.Folder>
-  </Tree.Folder>
-</Tree>
-
-**IPC isolation prevents:**
-
-- Groups from sending messages on behalf of other groups
-- Groups from scheduling tasks for other groups
-- Groups from seeing other groups' task lists
-- Cross-group privilege escalation via IPC
-
-### 4. Message cursor isolation
-
-Each group has its own message processing cursor:
-
-```typescript
-// Per-group cursor tracks last processed message
-lastAgentTimestamp[chatJid] = messages[messages.length - 1].timestamp;
+```
+data/v2-sessions/{agent_group_id}/{session_id}/
+├── inbound.db      # Host writes, container reads
+├── outbound.db     # Container writes, host reads
+├── outbox/         # File attachments for outbound messages
+├── inbox/          # File attachments from inbound messages
+├── .heartbeat      # Container liveness indicator
+└── .claude/        # SDK state
 ```
 
-**Cursor isolation ensures:**
+### Two-database invariants
 
-- Messages to one group don't affect others
-- Each group processes messages independently
-- Crash recovery works per-group (no cross-contamination)
-- Groups can have different processing states
+Three critical invariants ensure correctness across Docker mount boundaries:
+
+1. **`journal_mode=DELETE`** — WAL's mmapped `-shm` file doesn't refresh host-to-guest
+2. **Host opens-writes-closes per operation** — closing invalidates the container's page cache
+3. **One writer per file** — DELETE-mode journal unlink isn't atomic across the mount
+
+## Users and roles
+
+### User model
+
+Users are identified by namespaced platform identifiers:
+
+- `phone:+15551234567` (WhatsApp, iMessage)
+- `tg:123456789` (Telegram)
+- `discord:123456789` (Discord)
+- `email:user@example.com` (Gmail)
+
+### Role hierarchy
+
+| Role | Scope | Capabilities |
+|------|-------|------------|
+| Owner | Always global | Full system access, approves channels and senders |
+| Admin | Global or per-agent-group | Approves senders within scope |
+| Member | Per-agent-group | Can interact with agents in their assigned group |
+
+<Info>
+The owner is the system administrator. There is always exactly one owner. Admins can be scoped to a specific agent group or have global access.
+</Info>
+
+## Channel approval
+
+When a message arrives on an unwired channel (no agent wirings exist), the channel-request gate escalates to the owner:
+
+1. Owner receives an approval card
+2. **Approve** — creates a wiring with defaults (`mention-sticky` for groups, `pattern='.'` for DMs), admits the triggering sender, replays the original event
+3. **Deny** — sets `denied_at` on the messaging group; future mentions drop silently
 
 ## Global memory
 
-The global memory directory (`groups/global/`) is special:
+The global memory directory (`groups/global/`) provides shared context:
 
-- Writable only by main group
-- Read-only for all other groups
-- Contains shared knowledge and context
-- Typically includes a `CLAUDE.md` file loaded by all agents
-
-**Use cases:**
-
-- Shared instructions for all agents
-- Common reference information
-- Cross-group context (user preferences, facts)
-- Coordination data between groups
-
-<Accordion title="How global memory is loaded">
-Claude Agent SDK automatically loads `CLAUDE.md` files from all mounted directories when `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1` is set.
-
-Mount structure:
-- `/workspace/group/CLAUDE.md` (per-group, read-write)
-- `/workspace/global/CLAUDE.md` (global, read-only for non-main)
-- `/workspace/project/CLAUDE.md` (project context, main only)
-
-All three are merged into the agent's context.
-</Accordion>
-
-## Group queue and concurrency
-
-The GroupQueue manages per-group execution:
-
-- **Max concurrent containers**: 5 by default (`MAX_CONCURRENT_CONTAINERS`)
-- **Per-group queueing**: Each group has independent message and task queues
-- **Priority**: Tasks before messages (tasks won't be re-discovered from DB)
-- **Idle containers**: Kept alive for 30 minutes to handle follow-ups
-- **Message piping**: Follow-up messages sent to active containers via IPC
-
-**State tracking per group:**
-
-```typescript
-interface GroupState {
-  active: boolean;                // Container currently running?
-  idleWaiting: boolean;           // Container idle, waiting for input?
-  isTaskContainer: boolean;       // Running a task vs. message?
-  runningTaskId: string | null;   // ID of currently running task (for deduplication)
-  pendingMessages: boolean;       // Messages queued?
-  pendingTasks: QueuedTask[];     // Tasks queued
-  process: ChildProcess | null;   // Container process
-  containerName: string | null;   // Docker container name
-  groupFolder: string | null;     // Group folder identifier
-  retryCount: number;             // Failed run retry counter
-}
-```
-
-<Info>
-When a group's container is already active, new messages are piped directly to the running container instead of spawning a new one. This preserves conversation flow.
-</Info>
-
-## Trigger pattern
-
-Non-main groups require a trigger pattern to activate:
-
-- **Default pattern**: `@{ASSISTANT_NAME}` (case insensitive)
-- **Per-group override**: Each group can set its own `trigger` value during registration
-- **Configured via**: `ASSISTANT_NAME` environment variable (sets the default)
-- **Example**: `@Andy` if `ASSISTANT_NAME=Andy`, or `@Bot` if the group registered with `trigger: "@Bot"`
-- **Can be disabled**: Set `requiresTrigger: false` in group config
-
-When processing messages, NanoClaw resolves the trigger pattern per-group using `getTriggerPattern(group.trigger)`. If the group has no custom trigger, the default `@{ASSISTANT_NAME}` is used.
-
-**Why triggers are required:**
-
-1. Prevents agent from responding to every message in group chats
-2. Allows selective activation ("@Andy what's the weather?")
-3. Reduces noise in active group conversations
-4. Main group doesn't need trigger (private self-chat)
-
-**Messages without trigger:**
-
-- Stored in database
-- Included as context when trigger eventually arrives
-- Not processed immediately
-- Accumulate between triggered responses
-
-<Note>
-Triggers check both message content and sender authorization. A message must match the trigger pattern **and** the sender must be allowed by the [sender allowlist](/concepts/security#5-sender-allowlist) (specifically, `isTriggerAllowed` checks against the allowlist configuration). Messages from the bot itself (`is_from_me`) always pass the sender check.
-</Note>
+- Contains `CLAUDE.md` loaded by all non-main agent groups
+- Injected into the system prompt via `systemPrompt.append`
+- Read-only for all agents
 
 ## Additional mounts
 
-Groups can have extra directories mounted via `containerConfig.additionalMounts`:
-
-```typescript
-interface AdditionalMount {
-  hostPath: string;         // Absolute path on host
-  containerPath?: string;   // Relative path (mounted at /workspace/extra/{value}). Defaults to basename of hostPath
-  readonly?: boolean;       // Force read-only (default: true)
-}
-```
-
-**Example:**
+Agent groups can have extra directories mounted via `container.json`:
 
 ```json
 {
-  "name": "Website Team",
-  "folder": "website-team",
-  "containerConfig": {
-    "additionalMounts": [
-      {
-        "hostPath": "/Users/you/projects/website",
-        "containerPath": "website",
-        "readonly": true
-      }
-    ]
-  }
+  "additionalMounts": [
+    {
+      "hostPath": "/Users/you/projects/website",
+      "containerPath": "website",
+      "readonly": true
+    }
+  ]
 }
 ```
-
-<Note>
-The `containerPath` must be relative (no leading `/`). It is automatically prefixed with `/workspace/extra/`, so `"website"` becomes `/workspace/extra/website` inside the container.
-</Note>
 
 **Security validation:**
 
 - Checked against mount allowlist (`~/.config/nanoclaw/mount-allowlist.json`)
 - Symlinks resolved before validation
-- Blocked patterns rejected (`.ssh`, `.env`, etc.)
-- `nonMainReadOnly` setting enforced for non-main groups
+- Blocked patterns rejected
+- RW requires both mount config AND allowed root to permit it
+
+Validated mounts appear at `/workspace/extra/{name}` inside the container and are auto-discovered as `additionalDirectories` by the SDK.
 
 <Warning>
-Additional mounts bypass group isolation. Only mount directories that are safe for the group to access.
+Additional mounts bypass group isolation. Only mount directories that are safe for the agent to access.
 </Warning>
 
-## Group lifecycle
+## Concurrency
 
-### Creation
+Container concurrency is managed globally:
 
-1. Main group sends registration command
-2. Folder created under `groups/{folder}/`
-3. `CLAUDE.md` template copied from `groups/main/CLAUDE.md` (for main groups) or `groups/global/CLAUDE.md` (for non-main groups), with the assistant name substituted if different from the default
-4. Session directory created under `data/sessions/{folder}/`
-5. IPC directory created under `data/ipc/{folder}/`
-6. Skills synced to `.claude/skills/`
-7. Agent runner source copied to `agent-runner-src/`
-8. Group added to database
-
-### Active operation
-
-1. Messages arrive via a connected channel (WhatsApp, Telegram, Discord, etc.)
-2. Stored in database with chat JID
-3. Router checks for trigger (if required)
-4. GroupQueue spawns container or pipes to active one
-5. Container mounts group folder and session
-6. Agent processes messages and generates response
-7. Response routed back via the originating channel
-
-### Deactivation
-
-- No explicit deactivation needed
-- Groups remain registered until explicitly removed
-- Inactive groups simply don't receive messages
-- Sessions and folders persist across restarts
-
-### Removal
-
-- Must be done manually (no built-in unregister)
-- Delete group from database: `DELETE FROM registered_groups WHERE folder = '{folder}'`
-- Optionally delete folders: `groups/{folder}/`, `data/sessions/{folder}/`, `data/ipc/{folder}/`
+- **Max concurrent containers**: 5 by default (`MAX_CONCURRENT_CONTAINERS`)
+- **Wake deduplication**: concurrent wake calls for the same session share a single in-flight promise
+- **Delivery polls**: active poll (1s) for running containers, sweep poll (60s) for all sessions
 
 ## Best practices
 
-1. **Use descriptive folder names**: `project-x` instead of `group1`
-2. **Set requiresTrigger: false carefully**: Only for private contexts
-3. **Limit additional mounts**: Only mount what's necessary
-4. **Use global memory for shared context**: Avoid duplicating common knowledge
-5. **Monitor group logs**: Check `groups/{folder}/logs/` for issues
-6. **Keep main group secure**: It has full access to everything
+1. **Use descriptive agent group names**: `project-x` instead of `group1`
+2. **Choose engage mode carefully**: `mention` for noisy groups, `pattern` for private contexts
+3. **Limit additional mounts**: only mount what's necessary
+4. **Use global memory for shared context**: avoid duplicating common knowledge
+5. **Set `sender_scope=known` for sensitive groups**: restricts to authorized users
 
 ## Related topics
 

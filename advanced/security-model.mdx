@@ -4,43 +4,36 @@ description: Deep dive into NanoClaw's security architecture and trust boundarie
 tag: "UPDATED"
 ---
 
-NanoClaw's security model is built on OS-level isolation rather than application-level permission checks. Agents run in isolated Linux containers with explicit filesystem mounts, creating a security boundary that's enforced by the kernel.
+NanoClaw's security model is built on OS-level isolation rather than application-level permission checks. In v2, a new permissions module adds user roles, sender scope enforcement, channel approval, and delivery authorization.
 
 ## Trust model
 
-NanoClaw operates with different trust levels for different entities:
+NanoClaw operates with different trust levels:
 
 | Entity | Trust Level | Rationale |
 |--------|-------------|-----------|
-| Main group | Trusted | Private self-chat, admin control |
-| Non-main groups | Untrusted | Other users may be malicious |
+| Owner | Fully trusted | System administrator |
+| Admins | Trusted | Can approve senders (global or scoped) |
+| Known users | Permitted | Members of agent groups |
+| Unknown senders | Untrusted | Policy-controlled per messaging group |
 | Container agents | Sandboxed | Isolated execution environment |
-| Incoming messages | User input | Potential prompt injection |
 
 ## Security boundaries
 
 ### Container isolation (primary boundary)
 
-Agents execute in containers (lightweight Linux VMs), providing:
+Agents execute in containers, providing:
 
-- **Process isolation** - Container processes cannot affect the host
-- **Filesystem isolation** - Only explicitly mounted directories are visible
-- **Non-root execution** - Runs as unprivileged `node` user (uid 1000)
-- **Ephemeral containers** - Fresh environment per invocation (`--rm`)
-
-This is the primary security boundary. Rather than relying on application-level permission checks, the attack surface is limited by what's mounted.
-
-<Note>
-The container runtime is abstracted through `src/container-runtime.ts`, making it easy to swap runtimes. Docker is the default, but you can switch to Apple Container on macOS for a lighter-weight native runtime.
-</Note>
+- **Process isolation** — container processes cannot affect the host
+- **Filesystem isolation** — only explicitly mounted directories are visible
+- **Non-root execution** — runs as unprivileged `node` user (uid 1000)
+- **Signal forwarding** — `tini` as PID 1 ensures clean shutdown and database finalization
 
 ### Mount security
 
-**External allowlist**
+**External allowlist** at `~/.config/nanoclaw/mount-allowlist.json`:
 
-Mount permissions are stored at `~/.config/nanoclaw/mount-allowlist.json`, which is:
-- Outside the project root
-- Never mounted into containers
+- Outside the project root, never mounted into containers
 - Cannot be modified by agents
 
 **Default blocked patterns:**
@@ -55,265 +48,143 @@ Mount permissions are stored at `~/.config/nanoclaw/mount-allowlist.json`, which
 
 **Protections:**
 
-- Symlink resolution before validation (prevents traversal attacks)
-- Container path validation (rejects `..` and absolute paths)
-- Container path colon rejection (prevents Docker `-v` option injection, e.g. `repo:rw` overriding readonly flags)
-- `nonMainReadOnly` option forces read-only for non-main groups
+- Symlink resolution before validation (prevents traversal)
+- Container path validation (rejects `..`, absolute paths, colons)
+- RW gating — requires both mount request AND allowed root to permit read-write
+- Missing allowlist file blocks all additional mounts (not cached — create without restart)
+- Parse errors are permanently cached for the process lifetime
 
-See `src/mount-security.ts` for the validation implementation.
+### Permissions module
 
-<Warning>
-The mount allowlist is cached in memory after first successful load. Changes to `mount-allowlist.json` require a restart to take effect. However, if the file does not exist at startup, it is not permanently cached as missing — NanoClaw will detect the file if it is created later without a restart.
-</Warning>
+The permissions module (`src/modules/permissions/`) registers hooks into the core router:
 
-**Read-only project root**
-
-The main group's project root is mounted read-only. Writable paths the agent needs (store, group folder, IPC, `.claude/`) are mounted separately. This prevents the agent from modifying host application code (`src/`, `dist/`, `package.json`, etc.) which would bypass the sandbox entirely on next restart.
-
-The `store/` directory is mounted separately as read-write at `/workspace/project/store`, giving the main agent direct access to the SQLite database. All other project files remain read-only.
-
-From `src/container-runner.ts`:
+**Sender resolver** — extracts namespaced user ID from message content and upserts the `users` row on first sight:
 
 ```typescript
-if (isMain) {
-  // Main gets the project root read-only. Writable paths the agent needs
-  // (store, group folder, IPC, .claude/) are mounted separately below.
-  // Read-only prevents the agent from modifying host application code
-  // (src/, dist/, package.json, etc.) which would bypass the sandbox
-  // entirely on next restart.
-  mounts.push({
-    hostPath: projectRoot,
-    containerPath: '/workspace/project',
-    readonly: true,
-  });
-}
+// User ID format: channelType:handle
+// Examples: phone:+15551234567, tg:123456, discord:789012
 ```
+
+**Access gate** — enforces `unknown_sender_policy` per messaging group:
+
+| Policy | Behavior |
+|--------|----------|
+| `public` | Skip access check entirely |
+| `strict` | Unknown senders silently dropped |
+| `request_approval` | Approval card sent to admin |
+
+**Sender scope gate** — per-wiring enforcement:
+
+- `sender_scope='known'` requires the user to be an owner, admin, or group member even on public channels
+
+**Channel request gate** — for unwired channels:
+
+- Escalates to owner for approval
+- Approve: creates wiring with defaults, admits sender, replays message
+- Deny: sets `denied_at`, future mentions silently dropped
 
 ### Session isolation
 
-Each group has isolated Claude sessions at `data/sessions/{group}/.claude/`:
+Each session has isolated databases:
 
-- Groups cannot see other groups' conversation history
-- Session data includes full message history and file contents read
-- Prevents cross-group information disclosure
+- `data/v2-sessions/{agent_group_id}/{session_id}/inbound.db`
+- `data/v2-sessions/{agent_group_id}/{session_id}/outbound.db`
 
-Sessions are mounted per-group in `src/container-runner.ts`:
+Sessions cannot see other sessions' data. Cross-session information disclosure is prevented by mount isolation.
 
-```typescript
-const groupSessionsDir = path.join(
-  DATA_DIR,
-  'sessions',
-  group.folder,
-  '.claude',
-);
-fs.mkdirSync(groupSessionsDir, { recursive: true });
-```
+### Delivery authorization
 
-### IPC authorization
+The delivery system enforces per-agent permissions:
 
-Messages and task operations are verified against group identity. The IPC system uses per-group namespaces in `data/ipc/{group}/` to prevent privilege escalation.
-
-| Operation | Main Group | Non-Main Group |
-|-----------|------------|----------------|
-| Send message to own chat | ✓ | ✓ |
-| Send message to other chats | ✓ | ✗ |
-| Schedule task for self | ✓ | ✓ |
-| Schedule task for others | ✓ | ✗ |
-| Update own tasks | ✓ | ✓ |
-| Update other groups' tasks | ✓ | ✗ |
-| View all tasks | ✓ | Own only |
-| Manage other groups | ✓ | ✗ |
-
-Authorization is enforced in `src/ipc.ts`:
-
-```typescript
-// Authorization: verify this group can send to this chatJid
-const targetGroup = registeredGroups[data.chatJid];
-if (
-  isMain ||
-  (targetGroup && targetGroup.folder === sourceGroup)
-) {
-  await deps.sendMessage(data.chatJid, data.text);
-  logger.info(
-    { chatJid: data.chatJid, sourceGroup },
-    'IPC message sent',
-  );
-} else {
-  logger.warn(
-    { chatJid: data.chatJid, sourceGroup },
-    'Unauthorized IPC message attempt blocked',
-  );
-}
-```
-
-### Sender allowlist
-
-The sender allowlist (`~/.config/nanoclaw/sender-allowlist.json`) filters who can interact with the agent on a per-chat basis. Like the mount allowlist, it lives outside the project root and cannot be modified by agents.
-
-**File format** (`SenderAllowlistConfig`):
-
-```typescript
-interface ChatAllowlistEntry {
-  allow: '*' | string[];  // '*' = everyone, or array of sender JIDs
-  mode: 'trigger' | 'drop';
-}
-
-interface SenderAllowlistConfig {
-  default: ChatAllowlistEntry;
-  chats: Record<string, ChatAllowlistEntry>;  // Per-chat overrides, keyed by JID
-  logDenied: boolean;  // Default: true
-}
-```
-
-**How it works:**
-
-1. On every message cycle, the file is read from disk (hot-reloaded, no restart needed)
-2. For each incoming message, the system checks `chats[chatJid]` first, then falls back to `default`
-3. If the sender is not in the `allow` list:
-   - **`trigger` mode**: the message is stored in the database but cannot activate the agent
-   - **`drop` mode**: the message is silently discarded before reaching the database
-4. If `logDenied` is `true`, denied attempts are logged at debug level
-
-**Fallback behavior**: if the file is missing, unreadable, or contains invalid JSON, the system defaults to `{ allow: "*", mode: "trigger" }` — all senders permitted. Invalid per-chat entries are skipped with a warning; valid entries are still applied.
-
-From `src/sender-allowlist.ts`:
-
-```typescript
-export function isSenderAllowed(
-  chatJid: string,
-  sender: string,
-  cfg: SenderAllowlistConfig,
-): boolean {
-  const entry = cfg.chats[chatJid] ?? cfg.default;
-  if (entry.allow === '*') return true;
-  return entry.allow.includes(sender);
-}
-```
-
-<Note>
-The sender allowlist complements container isolation. Containers protect against what an agent *can do*; the allowlist controls who *can invoke* an agent. Both are enforced on the host, outside the agent's reach.
-</Note>
+- Messages to the origin chat are always permitted
+- Cross-channel delivery requires an explicit `agent_destinations` row
+- System messages (scheduling, approvals) are routed through registered delivery action handlers
+- File attachments are read from `outbox/{messageId}/`
+- 3 retry attempts per message, then permanently failed
 
 ### Credential handling
 
-<Tabs>
-  <Tab title="OneCLI Agent Vault (v1.2.35+)">
-    NanoClaw delegates all credential management to the [OneCLI](https://github.com/onecli/onecli) Agent Vault. The host process never reads API keys — secrets are registered with OneCLI and injected into container traffic by the vault.
+NanoClaw delegates all credential management to the OneCLI Agent Vault:
 
-    **How it works:**
-    - The `@onecli-sh/sdk` package's `applyContainerConfig()` configures each container's network to route through the vault
-    - The vault intercepts HTTPS traffic to `api.anthropic.com` and injects the registered secret
-    - Each non-main group receives an `agentIdentifier` (derived from its folder name) for per-group credential scoping
-    - `ONECLI_URL` (default `http://localhost:10254`) configures the vault address
+- The `@onecli-sh/sdk` package's `applyContainerConfig()` configures each container's network
+- The vault intercepts HTTPS traffic and injects registered secrets
+- Each agent group receives a unique `agentIdentifier` for per-group credential scoping
+- `ONECLI_URL` (default `http://localhost:10254`) configures the vault address
 
-    **Container environment** (from `src/container-runner.ts`):
+**Not mounted:**
 
-    ```typescript
-    // OneCLI SDK configures container networking — no explicit env vars needed
-    const onecliApplied = await onecli.applyContainerConfig(args, {
-      addHostMapping: false, // NanoClaw already handles host gateway
-      agent: agentIdentifier,
-    });
-    ```
-
-    <Note>
-    If the OneCLI Agent Vault is unreachable at container start, the container launches with no credentials. The agent will fail on API calls, and a warning is logged. Re-run after ensuring OneCLI is running (`curl http://127.0.0.1:10254/api/health`).
-    </Note>
-  </Tab>
-
-  <Tab title="Credential Proxy (legacy)">
-    **Credential proxy** (restored via the `/use-native-credential-proxy` skill):
-    - Runs on the host as an HTTP proxy (default port 3001, configurable via `CREDENTIAL_PROXY_PORT`)
-    - Containers send API requests to the proxy with a placeholder token
-    - Reads credentials from `.env` once at startup
-    - Supports API key mode (`ANTHROPIC_API_KEY`) and OAuth mode (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN`). OAuth tokens must be long-lived (from `claude setup-token`) — short-lived keychain tokens expire within hours and cause recurring 401 errors
-    - **Apple Container users**: the proxy must bind to `0.0.0.0` (`CREDENTIAL_PROXY_HOST=0.0.0.0` in `.env`) because Apple Container's bridge network (`bridge100`) doesn't exist until containers start. On public networks, add a macOS `pf` firewall rule to block external access to port 3001. The `/convert-to-apple-container` skill configures this automatically
-
-    **Credential injection behavior differs by auth mode:**
-    - **API key mode**: The proxy replaces the `x-api-key` header on every outbound request
-    - **OAuth mode**: The proxy replaces the `Authorization` header only on requests that include one (during the initial token exchange). The Claude CLI exchanges the placeholder token for a temporary API key, and subsequent requests use that key directly without further injection
-
-    **Container environment** (from `src/container-runner.ts`):
-
-    ```typescript
-    // Containers get a placeholder token and proxy URL — never real credentials
-    ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}
-    CLAUDE_CODE_OAUTH_TOKEN=placeholder
-    ```
-
-    <Note>
-    Containers cannot extract real credentials. The credential proxy intercepts all API requests and replaces the placeholder token with real authentication before forwarding to `api.anthropic.com`.
-    </Note>
-  </Tab>
-</Tabs>
-
-**NOT mounted:**
-- Channel sessions (e.g., `store/auth/` for WhatsApp) - host only
-- Mount allowlist - external, never mounted
-- Real API keys or OAuth tokens - injected by secret injection layer, never in containers
-- Any credentials matching blocked patterns
+- Real API keys or OAuth tokens — injected by vault, never in containers
+- Mount allowlist — external, never mounted
+- `.env` file — configuration only (no credentials)
 
 ## Privilege comparison
 
-| Capability | Main Group | Non-Main Group |
-|------------|------------|----------------|
-| Project root access | `/workspace/project` (ro) | None |
-| Store (SQLite DB) | `/workspace/project/store` (rw) | None |
-| Group folder | `/workspace/group` (rw) | `/workspace/group` (rw) |
-| Global memory | Via project mount | `/workspace/global` (ro, if exists) |
-| Additional mounts | Configurable | Read-only unless allowed |
-| Network access | Unrestricted | Unrestricted |
-| MCP tools | Allowlisted | Allowlisted |
+| Capability | Owner | Admin (scoped) | Member | Unknown (public) | Unknown (strict) |
+|------------|-------|---------------|--------|-------------------|-------------------|
+| All operations | ✓ | — | — | — | — |
+| Approve senders | ✓ | Within scope | — | — | — |
+| Approve channels | ✓ | — | — | — | — |
+| Interact with agents | ✓ | ✓ | ✓ | ✓ | Dropped |
+| Cross-agent messaging | ✓ | ✓ | ✓ | — | — |
 
 ## Security architecture diagram
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        UNTRUSTED ZONE                             │
-│  Incoming Messages (potentially malicious)                         │
-└────────────────────────────────┬─────────────────────────────────┘
-                                 │
-                                 ▼ Trigger check, input escaping
-┌──────────────────────────────────────────────────────────────────┐
-│                     HOST PROCESS (TRUSTED)                        │
-│  • Message routing                                                │
-│  • IPC authorization                                              │
-│  • Mount validation (external allowlist)                          │
-│  • Container lifecycle                                            │
-│  • Secret injection (OneCLI or credential proxy)                  │
-└────────────────────────────────┬─────────────────────────────────┘
-                                 │
-                                 ▼ Explicit mounts only
-┌──────────────────────────────────────────────────────────────────┐
-│                CONTAINER (ISOLATED/SANDBOXED)                     │
-│  • Agent execution                                                │
-│  • Bash commands (sandboxed)                                      │
-│  • File operations (limited to mounts)                            │
-│  • Network access (unrestricted)                                  │
-│  • Cannot modify security config                                  │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph "Untrusted Zone"
+        MSG[Incoming Messages]
+    end
+
+    subgraph "Host Process"
+        RT[Router: engage evaluation]
+        PERM[Permissions: sender resolution, access gate]
+        MV[Mount validation]
+        DL[Delivery: authorization checks]
+        OC[OneCLI Vault: credential injection]
+    end
+
+    subgraph "Container (Sandboxed)"
+        AG[Agent execution]
+        IDB[(inbound.db)]
+        ODB[(outbound.db)]
+    end
+
+    MSG --> RT
+    RT --> PERM
+    PERM --> MV
+    MV --> IDB
+    IDB --> AG
+    AG --> ODB
+    ODB --> DL
+    DL --> OC
+
+    style MSG fill:#fca5a5,color:#1e1e1e
+    style AG fill:#6ee7b7,color:#1e1e1e
 ```
 
 ## Best practices
+
+<Accordion title="Use request_approval for public groups">
+  Set `unknown_sender_policy='request_approval'` to require admin approval for new senders. This prevents unauthorized access while allowing legitimate users to be admitted.
+</Accordion>
+
+<Accordion title="Scope admin roles">
+  Create per-agent-group admins instead of global admins. Scoped admins can only approve senders for their assigned group.
+</Accordion>
 
 <Accordion title="Review mount allowlist regularly">
   Check `~/.config/nanoclaw/mount-allowlist.json` to ensure only necessary directories are mounted. Remove entries you no longer need.
 </Accordion>
 
-<Accordion title="Use read-only mounts for sensitive data">
-  When mounting directories containing sensitive data, use the `readonly` option in `containerConfig.additionalMounts` to prevent modifications.
+<Accordion title="Use sender_scope=known for sensitive wirings">
+  Even on public channels, `sender_scope='known'` restricts interaction to group members, admins, and owner.
 </Accordion>
 
-<Accordion title="Keep secrets out of mounted directories">
-  Never place API keys, passwords, or other secrets in directories that are mounted to non-main groups.
-</Accordion>
-
-<Accordion title="Monitor container logs">
-  Check `groups/{name}/logs/container-*.log` files to review what agents are doing. Enable verbose logging with `LOG_LEVEL=debug` for detailed output. Note that error logs only include input metadata (prompt length and session ID) rather than full prompt content.
+<Accordion title="Monitor delivery authorization">
+  Check logs for unauthorized delivery attempts. The delivery system logs rejected cross-channel messages.
 </Accordion>
 
 ## Related pages
 
-- [IPC system](/advanced/ipc-system) - Inter-process communication and authorization
-- [Container runtime](/advanced/container-runtime) - Container execution details
-- [Troubleshooting](/advanced/troubleshooting) - Common security-related issues
+- [Container runtime](/advanced/container-runtime) — container execution details
+- [Troubleshooting](/advanced/troubleshooting) — common security-related issues

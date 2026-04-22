@@ -1,204 +1,182 @@
 ---
 title: Group management
-description: API reference for group registration, retrieval, privilege management, and container configuration
+description: API reference for agent groups, messaging groups, wirings, and the v2 entity model
+tag: "UPDATED"
 ---
 
-Group management functions for registering groups, retrieving group lists, and managing group state.
+In v2, NanoClaw uses a new entity model that separates agent groups (workspaces) from messaging groups (platform chats). These are connected through wirings — many-to-many relationships stored in `messaging_group_agents`.
 
-## Core functions
+## Entity model
 
-### registerGroup
+### Agent groups
 
-Registers a new group with NanoClaw.
-
-```typescript
-function registerGroup(jid: string, group: RegisteredGroup): void
-```
-
-<ParamField path="jid" type="string" required>
-  Chat JID (e.g., `"123456789@g.us"` for WhatsApp groups)
-</ParamField>
-
-<ParamField path="group" type="RegisteredGroup" required>
-  Group configuration object
-</ParamField>
-
-**Behavior:**
-
-- Validates the group folder path
-- Creates the group directory structure (`groups/{folder}/logs/`)
-- Copies a `CLAUDE.md` template into the new group folder if one doesn't already exist (from `groups/main/CLAUDE.md` for main groups or `groups/global/CLAUDE.md` for non-main groups), substituting the assistant name if it differs from the default
-- Ensures a corresponding OneCLI agent exists (best-effort, non-blocking)
-- Stores group configuration in database
-- Rejects registration if folder is invalid
-
-**Example:**
+Agent groups are workspaces where agents run:
 
 ```typescript
-registerGroup('123@g.us', {
-  name: 'Team Chat',
-  folder: 'team',
-  trigger: '^@Andy\\b',
-  added_at: new Date().toISOString(),
-  requiresTrigger: true,
-});
-```
-
-### getAvailableGroups
-
-Returns list of all available groups ordered by most recent activity.
-
-```typescript
-function getAvailableGroups(): AvailableGroup[]
-```
-
-<ResponseField name="return" type="AvailableGroup[]">
-  Array of available groups with metadata
-</ResponseField>
-
-**Returns:**
-
-```typescript
-interface AvailableGroup {
-  jid: string;           // Chat JID
-  name: string;          // Chat display name
-  lastActivity: string;  // ISO timestamp of last message
-  isRegistered: boolean; // Whether group is registered
+interface AgentGroup {
+  id: string;             // Unique identifier
+  name: string;           // Display name
+  folder: string;         // Filesystem folder name
+  agent_provider?: string; // Optional provider override
+  created_at: string;     // ISO timestamp
 }
 ```
 
-**Example:**
+- Each agent group has a folder under `groups/{folder}/`
+- Container configuration lives on disk (`container.json`), not in the database
+- Each gets its own OneCLI agent identifier for credential scoping
+
+### Messaging groups
+
+Messaging groups represent platform chats and channels:
 
 ```typescript
-import { getAvailableGroups } from './index.js';
-
-const groups = getAvailableGroups();
-console.log(`Found ${groups.length} groups`);
-
-for (const group of groups) {
-  console.log(`${group.name} (${group.isRegistered ? 'registered' : 'not registered'})`);
+interface MessagingGroup {
+  id: string;                    // Unique identifier
+  channel_type: string;          // e.g., 'whatsapp', 'telegram', 'discord'
+  platform_id: string;           // Platform-specific chat ID
+  name?: string;                 // Display name
+  unknown_sender_policy: UnknownSenderPolicy; // 'strict' | 'request_approval' | 'public'
+  denied_at?: string;            // ISO timestamp if denied
 }
 ```
 
-## State management
+- Unique on `(channel_type, platform_id)`
+- Auto-created on first mention or DM
+- `denied_at` silently drops future mentions
 
-### loadState
+### Wirings (messaging_group_agents)
 
-Loads router state from database.
-
-```typescript
-function loadState(): void
-```
-
-**Loads:**
-
-- Last timestamp cursor (`last_timestamp`)
-- Last agent timestamp per group (`last_agent_timestamp`)
-- Session IDs by group folder
-- Registered groups configuration
-
-### saveState
-
-Saves router state to database.
+Wirings connect messaging groups to agent groups:
 
 ```typescript
-function saveState(): void
-```
-
-**Saves:**
-
-- Last timestamp cursor
-- Last agent timestamp per group
-
-### recoverPendingMessages
-
-Recovery function that checks for unprocessed messages on startup.
-
-```typescript
-function recoverPendingMessages(): void
-```
-
-**Purpose:**
-
-Handles crash recovery by detecting messages that were stored in the database but not yet processed by the agent (e.g., if the process crashed between advancing `lastTimestamp` and processing messages).
-
-## Types
-
-### RegisteredGroup
-
-```typescript
-interface RegisteredGroup {
-  name: string;                    // Display name
-  folder: string;                  // Folder name (alphanumeric + hyphens/underscores)
-  trigger: string;                 // Trigger pattern regex
-  added_at: string;                // ISO timestamp of registration
-  containerConfig?: ContainerConfig; // Optional container configuration
-  requiresTrigger?: boolean;       // Whether trigger is required (default: true)
-  isMain?: boolean;                // True for the main control group (elevated privileges)
+interface MessagingGroupAgent {
+  messaging_group_id: string;
+  agent_group_id: string;
+  engage_mode: EngageMode;           // 'pattern' | 'mention' | 'mention-sticky'
+  engage_pattern: string;            // Regex (e.g., '.' = always match)
+  sender_scope: SenderScope;         // 'all' | 'known'
+  ignored_message_policy: IgnoredMessagePolicy; // 'drop' | 'accumulate'
+  session_mode: SessionMode;         // 'shared' | 'per-thread' | 'agent-shared'
+  priority: number;                  // Evaluation order
 }
 ```
 
-### ContainerConfig
+## Users and roles
+
+### Users
 
 ```typescript
-interface ContainerConfig {
-  additionalMounts?: AdditionalMount[]; // Extra filesystem mounts
-  timeout?: number;                     // Container timeout in ms
+interface User {
+  id: string;          // Namespaced: 'channelType:handle'
+  kind: string;        // phone, email, discord, telegram, matrix, etc.
+  created_at: string;
 }
 ```
 
-### AdditionalMount
+### User roles
 
 ```typescript
-interface AdditionalMount {
-  hostPath: string;       // Absolute path on host (supports ~)
-  containerPath?: string; // Optional container path (defaults to basename)
-  readonly?: boolean;     // Default: true for safety
+interface UserRole {
+  user_id: string;
+  role: 'owner' | 'admin';
+  agent_group_id?: string;  // null = global scope
 }
 ```
 
-## Database operations
+- **Owner** — always global, full system access
+- **Admin** — global or scoped to a specific agent group
 
-Group data is persisted in the SQLite database:
-
-### setRegisteredGroup
-
-```typescript
-function setRegisteredGroup(jid: string, group: RegisteredGroup): void
-```
-
-Stores or updates a registered group in the database.
-
-### getRegisteredGroup
+### Agent group members
 
 ```typescript
-function getRegisteredGroup(jid: string): (RegisteredGroup & { jid: string }) | undefined
+interface AgentGroupMember {
+  user_id: string;
+  agent_group_id: string;
+}
 ```
 
-Retrieves a registered group by JID.
+Members can interact with agents in their assigned group when `sender_scope='known'` is set on a wiring.
 
-### getAllRegisteredGroups
+## Sessions
 
 ```typescript
-function getAllRegisteredGroups(): Record<string, RegisteredGroup>
+interface Session {
+  id: string;
+  agent_group_id: string;
+  messaging_group_id?: string;
+  thread_id?: string;
+  status: 'active' | 'closed';
+  container_status: 'running' | 'idle' | 'stopped';
+  last_active: string;
+  created_at: string;
+}
 ```
 
-Returns all registered groups as a map from JID to group configuration.
+Session resolution depends on the wiring's `session_mode`:
 
-## Folder validation
+| Mode | Resolution |
+|------|-----------|
+| `shared` | One session per messaging group (ignores thread) |
+| `per-thread` | One session per (messaging group, thread) pair |
+| `agent-shared` | One session per agent group (all messaging groups share) |
 
-Group folders must:
+## Database schema
 
-- Contain only alphanumeric characters, hyphens, and underscores
-- Not be empty
-- Not contain path traversal characters (`..`, `/`)
+### Central database (data/v2.db)
 
-Invalid folders are rejected during registration and skipped when loading from database.
+| Table | Purpose |
+|-------|---------|
+| `agent_groups` | Agent workspaces |
+| `messaging_groups` | Platform chats/channels |
+| `messaging_group_agents` | Wirings with engage/scope/session config |
+| `users` | Namespaced platform identifiers |
+| `user_roles` | Owner and admin roles |
+| `agent_group_members` | Unprivileged membership |
+| `user_dms` | Cached DM channel mapping |
+| `sessions` | Session status and container tracking |
+| `pending_questions` | Interactive question cards |
+| `pending_sender_approvals` | Unknown sender approval flow |
 
-## Main group
+### Session databases
 
-The "main" group (folder name `"main"`) has special privileges:
+Each session has two databases in `data/v2-sessions/{agent_group_id}/{session_id}/`:
 
-- Can see all available groups
-- Does not require trigger by default
-- Has access to group management functions via IPC
+**inbound.db** (host writes):
+
+| Table | Purpose |
+|-------|---------|
+| `messages_in` | Inbound messages, tasks, system notifications |
+| `delivered` | Delivery tracking |
+| `destinations` | Live destination map |
+| `session_routing` | Default reply routing |
+
+**outbound.db** (container writes):
+
+| Table | Purpose |
+|-------|---------|
+| `messages_out` | Outbound messages |
+| `processing_ack` | Processing acknowledgments |
+| `session_state` | Persistent key/value store |
+| `container_state` | Tool-in-flight tracking |
+
+## Channel approval flow
+
+When a message arrives on an unwired channel:
+
+1. Router detects no wirings exist for this messaging group
+2. Channel-request gate sends approval card to the owner
+3. **Approve** — creates wiring with defaults:
+   - Groups: `mention-sticky` engage mode
+   - DMs: `pattern='.'` (always respond)
+   - Triggering sender is auto-admitted as a member
+   - Original event is replayed
+4. **Deny** — sets `denied_at` on the messaging group
+
+## Sender approval flow
+
+When an unknown sender messages on a `request_approval` channel:
+
+1. Approval card sent to the designated approver
+2. **Approve** — adds sender to `agent_group_members`, replays original message
+3. **Deny** — deletes pending row (future messages re-trigger)

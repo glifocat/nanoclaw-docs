@@ -10,11 +10,11 @@ NanoClaw runs all agents inside containers (lightweight Linux VMs) to provide tr
 
 Containers provide:
 
-- **Process isolation** - Agent processes can't affect the host system
-- **Filesystem isolation** - Agents only see explicitly mounted directories
-- **Resource limits** - CPU/memory can be constrained (future)
-- **Ephemeral execution** - Fresh environment per invocation, no persistence
-- **Non-root execution** - Agents run as unprivileged user
+- **Process isolation** — agent processes can't affect the host system
+- **Filesystem isolation** — agents only see explicitly mounted directories
+- **Resource limits** — CPU/memory can be constrained (future)
+- **Non-root execution** — agents run as unprivileged user
+- **Signal forwarding** — `tini` as PID 1 ensures clean shutdown
 
 <Info>
 NanoClaw uses Docker by default for cross-platform compatibility. On macOS, you can use Apple Container instead (via `/convert-to-apple-container` skill).
@@ -26,169 +26,71 @@ NanoClaw uses Docker by default for cross-platform compatibility. On macOS, you 
 
 The container is built from `container/Dockerfile`:
 
-```dockerfile
-FROM node:22-slim
-
-# System dependencies for Chromium
-RUN apt-get update && apt-get install -y \
-    chromium \
-    fonts-liberation \
-    fonts-noto-cjk \
-    fonts-noto-color-emoji \
-    # ... other dependencies
-    && rm -rf /var/lib/apt/lists/*
-
-# Browser executable paths
-ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
-ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
-
-# Install global tools
-RUN npm install -g agent-browser @anthropic-ai/claude-code
-
-# Copy and build agent-runner
-WORKDIR /app
-COPY agent-runner/package*.json ./
-RUN npm install
-COPY agent-runner/ ./
-RUN npm run build
-
-# Create workspace directories
-RUN mkdir -p /workspace/group /workspace/global /workspace/extra /workspace/ipc/messages /workspace/ipc/tasks /workspace/ipc/input
-
-# Entrypoint script
-RUN printf '#!/bin/bash\nset -e\ncd /app && npx tsc --outDir /tmp/dist 2>&1 >&2\nln -s /app/node_modules /tmp/dist/node_modules\nchmod -R a-w /tmp/dist\ncat > /tmp/input.json\nnode /tmp/dist/index.js < /tmp/input.json\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
-
-# Set ownership for writable directories
-RUN chown -R node:node /workspace && chmod 777 /home/node
-
-# Switch to non-root user
-USER node
-
-WORKDIR /workspace/group
-ENTRYPOINT ["/app/entrypoint.sh"]
-```
-
 **Key components:**
 
 - **Base**: `node:22-slim` (Debian-based, minimal)
+- **Runtime**: Bun (runs agent-runner TypeScript directly — no compilation step)
 - **Browser**: Chromium with all dependencies
-- **Tools**: `agent-browser` for browser automation, `curl`, `git`
-- **Runtime**: `@anthropic-ai/claude-code` (Claude Agent SDK)
+- **Tools**: `agent-browser` for browser automation, `vercel` CLI, `curl`, `git`
+- **SDK**: `@anthropic-ai/claude-code` installed globally via pnpm
+- **PID 1**: `tini` for proper signal forwarding so `outbound.db` writes finalize on SIGTERM
 - **User**: `node` (uid 1000, non-root)
 - **Working directory**: `/workspace/group`
 
+<Note>
+Source code is NOT baked into the image. `/app/src` is a read-only bind mount from the host. Source-only changes never require an image rebuild.
+</Note>
+
 ### Entrypoint flow
 
-The entrypoint script (`/app/entrypoint.sh`):
+The entrypoint uses `tini` for signal forwarding:
 
-1. **Recompile agent-runner**: `npx tsc --outDir /tmp/dist`
-   - Allows per-group customization of agent runner code
-   - Compiled output is read-only to prevent runtime tampering
-2. **Read input from stdin**: `cat > /tmp/input.json`
-   - Input contains prompt, session ID, and group metadata (not secrets)
-3. **Execute agent**: `node /tmp/dist/index.js < /tmp/input.json`
-   - Runs agent-runner with input
-   - Credentials handled by the secret injection layer (OneCLI Agent Vault or credential proxy), never passed via stdin
-   - Outputs JSON results to stdout
-4. **Container exits**: Cleaned up automatically via `--rm` flag
+1. **tini** starts as PID 1 (forwards signals cleanly)
+2. **entrypoint.sh** runs setup scripts
+3. **Bun executes agent-runner**: `exec bun run /app/src/index.ts`
+4. Agent-runner polls `inbound.db` for messages and writes responses to `outbound.db`
+5. Container exits when stopped by the host
 
-<Note>
-The agent-runner is recompiled on every container start from `/app/src` (mounted from `data/sessions/{group}/agent-runner-src/`). This allows agents to modify their own tools and behavior by editing their agent-runner source. The agent-runner source is automatically re-copied from `container/agent-runner/src/` when the upstream `index.ts` is newer than the group's cached copy, so upstream changes propagate to existing groups on the next container spawn.
-</Note>
+### Two-database IO model
+
+In v2, all communication between host and container uses two SQLite databases per session. There is no stdin/stdout piping, no IPC files, and no output markers.
+
+- **inbound.db** — host writes, container reads (messages, routing, destinations)
+- **outbound.db** — container writes, host reads (responses, acknowledgments, state)
+
+This eliminates cross-mount SQLite write contention by ensuring each database has exactly one writer.
+
+<Warning>
+The two-DB model requires `journal_mode=DELETE` (not WAL). WAL mode's memory-mapped shared memory file doesn't refresh across Docker bind mounts, which would cause the container to miss messages.
+</Warning>
 
 ## Volume mounts
 
-Containers only see what's explicitly mounted:
+Containers only see what's explicitly mounted. The v2 mount structure is different from v1:
 
-### Main group mounts
+### Per-session mounts
 
-```typescript
-mounts = [
-  {
-    hostPath: '/path/to/nanoclaw',
-    containerPath: '/workspace/project',
-    readonly: true
-  },
-  {
-    hostPath: '/path/to/nanoclaw/store',
-    containerPath: '/workspace/project/store',
-    readonly: false
-  },
-  {
-    hostPath: '/path/to/nanoclaw/groups/main',
-    containerPath: '/workspace/group',
-    readonly: false
-  },
-  {
-    hostPath: '/path/to/nanoclaw/data/sessions/main/.claude',
-    containerPath: '/home/node/.claude',
-    readonly: false
-  },
-  {
-    hostPath: '/path/to/nanoclaw/data/ipc/main',
-    containerPath: '/workspace/ipc',
-    readonly: false
-  },
-  {
-    hostPath: '/path/to/nanoclaw/data/sessions/main/agent-runner-src',
-    containerPath: '/app/src',
-    readonly: false
-  }
-]
-```
-
-<Note>
-The `store/` directory is mounted separately as read-write, overriding the read-only project root. This gives the main agent direct access to the SQLite database for querying and writing data.
-</Note>
-
-When the project root is mounted for the main group and a `.env` file exists on the host, it is shadowed with `/dev/null` to prevent agents from reading secrets:
-
-```typescript
-// Shadow .env so the agent cannot read secrets from the mounted project root
-if (fs.existsSync(envFile)) {
-  mounts.push({ hostPath: '/dev/null', containerPath: '/workspace/project/.env', readonly: true });
-}
-```
-
-### Non-main group mounts
-
-```typescript
-mounts = [
-  {
-    hostPath: '/path/to/nanoclaw/groups/{group-folder}',
-    containerPath: '/workspace/group',
-    readonly: false
-  },
-  {
-    hostPath: '/path/to/nanoclaw/groups/global',
-    containerPath: '/workspace/global',
-    readonly: true
-  },
-  {
-    hostPath: '/path/to/nanoclaw/data/sessions/{group-folder}/.claude',
-    containerPath: '/home/node/.claude',
-    readonly: false
-  },
-  {
-    hostPath: '/path/to/nanoclaw/data/ipc/{group-folder}',
-    containerPath: '/workspace/ipc',
-    readonly: false
-  },
-  {
-    hostPath: '/path/to/nanoclaw/data/sessions/{group-folder}/agent-runner-src',
-    containerPath: '/app/src',
-    readonly: false
-  }
-]
-```
+| Mount | Container path | Mode | Purpose |
+|-------|---------------|------|---------|
+| Session folder | `/workspace` | Read-write | `inbound.db`, `outbound.db`, `outbox/`, `.claude/` |
+| Agent group folder | `/workspace/agent` | Read-write | Working files, `CLAUDE.local.md` |
+| Container config | `/workspace/agent/container.json` | Read-only | Nested RO mount (agent can't modify config) |
+| Composed CLAUDE.md | `/workspace/agent/CLAUDE.md` | Read-only | Regenerated each spawn |
+| CLAUDE.md fragments | `/workspace/agent/.claude-fragments` | Read-only | Fragment files for composition |
+| Global memory | `/workspace/global` | Read-only | `groups/global/` directory |
+| Shared CLAUDE.md | `/app/CLAUDE.md` | Read-only | Base CLAUDE.md |
+| Agent-runner source | `/app/src` | Read-only | Shared source (bind mount from host) |
+| Container skills | `/app/skills` | Read-only | Shared skill definitions |
+| Claude SDK state | `/home/node/.claude` | Read-write | SDK state + skill symlinks |
+| Additional mounts | `/workspace/extra/{name}` | Per-config | From `container.json` (validated against allowlist) |
 
 <Warning>
-Notice that non-main groups do NOT have `/workspace/project` mounted. They cannot access the NanoClaw source code or other groups' folders.
+The `container.json` file is mounted read-only as a nested mount inside the read-write agent group folder. This prevents the agent from modifying its own container configuration.
 </Warning>
 
 ### Mount security
 
-All mounts are validated against the allowlist at `~/.config/nanoclaw/mount-allowlist.json`:
+All additional mounts are validated against the allowlist at `~/.config/nanoclaw/mount-allowlist.json`:
 
 ```json
 {
@@ -199,296 +101,101 @@ All mounts are validated against the allowlist at `~/.config/nanoclaw/mount-allo
       "description": "Development projects"
     }
   ],
-  "blockedPatterns": ["password", "secret", "token"],
-  "nonMainReadOnly": true
+  "blockedPatterns": ["password", "secret", "token"]
 }
 ```
 
-**Validation steps:**
+**Validation rules:**
 
-1. Resolve symlinks to real path
-2. Check against blocked patterns (`.ssh`, `.env`, etc.)
-3. Verify path is under an allowed root
-4. Enforce `nonMainReadOnly` for non-main groups
-5. Enforce per-root `allowReadWrite` setting
-6. Reject container paths with `..` or absolute paths
+1. If no allowlist file exists, all additional mounts are blocked
+2. Blocked patterns are merged with hardcoded defaults (`.ssh`, `.gnupg`, `.aws`, `.kube`, `.docker`, `credentials`, `.env`, `.netrc`, `.npmrc`, `id_rsa`, `id_ed25519`, `private_key`, `.secret`, etc.)
+3. Paths are resolved through symlinks before validation
+4. A path must be under an `allowedRoot` and not match any blocked pattern
+5. Read-write access requires both the mount and the allowed root to permit it; otherwise forced read-only
+6. Container paths must be relative, non-empty, no `..`, no `:` (prevents Docker option injection)
+
+<Note>
+Missing-file state is NOT cached — you can create the allowlist without restarting. However, parse errors are permanently cached for the process lifetime.
+</Note>
 
 ## Container lifecycle
 
-### Spawn
+### Wake and spawn
 
-```typescript
-const container = spawn('docker', [
-  'run',
-  '-i',                    // Interactive (stdin)
-  '--rm',                  // Remove on exit
-  '--name', containerName, // Unique name
-  '-e', `TZ=${TIMEZONE}`,  // Pass timezone
-  '--user', `${uid}:${gid}`, // Run as host user (if not root/1000)
-  '-v', 'host:container',  // Volume mounts
-  // ... more mounts
-  'nanoclaw-agent:latest'  // Image name
-]);
-```
+Container spawning is deduplicated — concurrent wake calls for the same session share a single in-flight promise:
 
-**User mapping:**
+1. `wakeContainer(session)` checks for existing running container or in-flight spawn
+2. `spawnContainer(session)` reads agent group config, resolves provider contributions, builds mounts
+3. Skill symlinks are synced before every spawn
+4. Docker container is spawned with `tini` as PID 1
 
-- If host uid is 0 (root): No `--user` flag set; Dockerfile default (`node`, uid 1000) applies
-- If host uid is 1000: No `--user` flag set (already matches container default)
-- If `process.getuid` is unavailable (native Windows without WSL): No `--user` flag set
-- Otherwise: Run as host uid/gid (via `--user` flag), with `HOME=/home/node` explicitly set
+### Execution
 
-This ensures bind-mounted files are accessible (same uid on both sides).
+1. **Agent-runner starts**: `bun run /app/src/index.ts`
+2. **Polls inbound.db**: discovers new messages via the poll loop
+3. **Processes messages**: runs through the configured provider (Claude by default)
+4. **Writes outbound.db**: responses, acknowledgments, task operations
+5. **Heartbeat**: `.heartbeat` file mtime updated periodically
 
-### Execute
+### Shutdown
 
-1. **Input passed**: Prompt and group metadata via stdin JSON
-2. **Stdout streaming**: Parsed for output markers in real-time
-3. **Stderr logging**: Logged at debug level (SDK writes lots of debug info)
-4. **Timeout tracking**: Hard timeout with activity-based reset
-5. **Graceful shutdown**: `docker stop -t 1` (SIGTERM with 1-second grace). If the stop command fails, the process is force-killed via `SIGKILL`
-
-### Cleanup
-
-Containers are ephemeral:
-
-- **`--rm` flag**: Docker removes container on exit
-- **Logs persisted**: Written to `groups/{folder}/logs/` before removal
-- **Sessions persisted**: `.claude/` mounted, survives container death
-- **Group files persisted**: `/workspace/group` mounted, survives restart
+- **Host-initiated**: `docker stop` sends SIGTERM; `tini` forwards to Bun process
+- **Stale detection**: host sweep detects containers with old heartbeats or stuck processing_ack
+- **Fallback**: SIGKILL if graceful stop fails
 
 <Info>
-Even if the container crashes, all data in mounted directories persists. Only the container itself is ephemeral.
+Even if the container crashes, all data in session databases and mounted directories persists. Only the container process itself is ephemeral.
 </Info>
 
-## Output streaming
+## Per-agent-group images
 
-The container uses sentinel markers for robust output parsing:
+Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image with additional apt and npm packages:
 
-```typescript
-const OUTPUT_START_MARKER = '---NANOCLAW_OUTPUT_START---';
-const OUTPUT_END_MARKER = '---NANOCLAW_OUTPUT_END---';
-
-// Container writes:
-console.log(OUTPUT_START_MARKER);
-console.log(JSON.stringify({ status: 'success', result: 'Hello!' }));
-console.log(OUTPUT_END_MARKER);
-
-// Host parses:
-const output = extractBetweenMarkers(stdout, OUTPUT_START_MARKER, OUTPUT_END_MARKER);
-const parsed = JSON.parse(output);
-```
-
-**Why markers?**
-
-- SDK writes debug logs to stdout
-- Markers ensure JSON isn't corrupted by debug output
-- Supports multiple outputs per container (streaming)
-- Robust against stderr bleeding into stdout
-
-**Streaming mode:**
-
-When `onOutput` callback is provided:
-
-1. Parse buffer accumulates stdout chunks
-2. Each complete marker pair triggers `onOutput(parsed)`
-3. Session ID tracked across multiple outputs
-4. Container stays alive between outputs (idle timeout)
-5. `_close` sentinel in IPC signals graceful shutdown
+- Image tag: `nanoclaw-agent:{agentGroupId}`
+- Built on top of the base `nanoclaw-agent:latest` image
+- Cached — only rebuilt when package lists change
 
 ## Timeouts
 
-Two timeout mechanisms:
-
-### Hard timeout (container timeout)
+### Container timeout
 
 - **Default**: 30 minutes (`CONTAINER_TIMEOUT`)
-- **Configurable**: Per-group via `containerConfig.timeout`
-- **Grace period**: At least `IDLE_TIMEOUT + 30s`
-- **Reset on activity**: Resets whenever output markers are parsed
-- **Enforcement**: `docker stop -t 1` (SIGTERM with 1-second grace). Falls back to `SIGKILL` if the stop command fails
+- **Configurable**: per-agent-group via container config
+- **Enforcement**: `docker stop` (SIGTERM), falls back to SIGKILL
 
-**Timeout after output:**
+### Stale detection
 
-If a container times out after producing output, it's considered idle cleanup (not an error):
+The host sweep detects stuck containers by checking:
 
-```typescript
-if (timedOut && hadStreamingOutput) {
-  // Idle cleanup, not failure
-  return { status: 'success', result: null };
-}
-```
-
-### Idle timeout (stdin close)
-
-- **Default**: 30 minutes (`IDLE_TIMEOUT`)
-- **Purpose**: Close container when no follow-up messages arrive
-- **Mechanism**: Write `_close` sentinel to IPC input directory
-- **Agent behavior**: Exit gracefully when `_close` detected
-- **Reset on**: New messages piped to container
-
-**For tasks:**
-
-- Tasks use shorter close delay: 10 seconds
-- Tasks are single-turn (no follow-ups expected)
-- Closes automatically after producing result
-
-<Note>
-Idle timeout is agent-cooperative (relies on agent checking IPC). Hard timeout is enforced by the container runtime (kills process if exceeded).
-</Note>
-
-## Resource limits
-
-Currently no CPU/memory limits enforced. Future enhancement:
-
-```typescript
-args.push('--memory', '2g');      // 2GB RAM limit
-args.push('--cpus', '2');         // 2 CPU cores
-args.push('--pids-limit', '100'); // Max 100 processes
-```
-
-## Logging
-
-All container runs are logged:
-
-**Log location**: `groups/{folder}/logs/container-{timestamp}.log`
-
-**Log contents** (verbose mode or errors):
-
-```
-=== Container Run Log ===
-Timestamp: 2026-02-28T10:30:45.123Z
-Group: Family Chat
-IsMain: false
-Duration: 12345ms
-Exit Code: 0
-Stdout Truncated: false
-Stderr Truncated: false
-
-=== Input Summary ===
-Prompt length: 142 chars
-Session ID: abc123
-
-=== Container Args ===
-docker run -i --rm --name nanoclaw-family-chat-1234567890 ...
-
-=== Mounts ===
-/path/to/groups/family-chat -> /workspace/group
-/path/to/sessions/family-chat/.claude -> /home/node/.claude
-...
-
-=== Stderr ===
-[SDK debug logs]
-
-=== Stdout ===
----NANOCLAW_OUTPUT_START---
-{"status":"success","result":"Hello!"}
----NANOCLAW_OUTPUT_END---
-```
-
-**Log verbosity:**
-
-- **Success + non-verbose**: Summary only (input length, mount paths)
-- **Success + verbose** (`LOG_LEVEL=debug`): Full input/output including prompt content
-- **Error**: Input metadata only (prompt length and session ID), plus full stderr/stdout
-
-<Info>
-User prompt content is never written to error logs. Only verbose mode (`LOG_LEVEL=debug`) includes the full prompt. This prevents sensitive conversation content from persisting on disk during normal error handling.
-</Info>
-
-<Info>
-Set `LOG_LEVEL=debug` in `.env` to enable verbose logging for all container runs.
-</Info>
-
-## Container runtime
-
-NanoClaw detects and uses the available container runtime:
-
-```typescript
-// src/container-runtime.ts
-export const CONTAINER_RUNTIME_BIN = 'docker';
-```
-
-The runtime binary is a constant. To switch to Apple Container on macOS, use the `/convert-to-apple-container` skill.
-
-**Supported runtimes:**
-
-- **Docker** (default): Cross-platform, well-tested
-- **Apple Container** (macOS): Lightweight, native virtualization
+- `.heartbeat` file modification time
+- Age of unacknowledged `processing_ack` entries
+- Container state tracking in the session table
 
 ## Skills and MCP servers
 
-Skills synced to each container:
+Skills are synced to each container via symlinks:
 
-1. **Copy from project**: Skills from `container/skills/` are synced to `data/sessions/{group}/.claude/skills/` on every container spawn (overwriting existing files)
-2. **Available to agent**: Claude Agent SDK loads from `.claude/skills/`
-3. **Per-group customization**: Each group gets a copy, but changes are overwritten on next container spawn (unlike agent-runner source, which is copied once)
+1. **Symlink sync**: before every spawn, skill symlinks at `/home/node/.claude/skills/` are updated to point to `/app/skills/{name}`
+2. **Container-valid paths**: symlinks are dangling on the host but valid inside the container
+3. **Available to agent**: Claude Agent SDK loads from `.claude/skills/`
 
-### Built-in container skills
+### Built-in MCP server
 
-| Skill | Description | Access |
-|-------|-------------|--------|
-| `/agent-browser` | Browse the web, fill forms, extract data | All groups |
-| `/capabilities` | Report installed skills, available tools, MCP tools, container utilities, and group info | Main channel only |
-| `/slack-formatting` | Format messages for Slack using mrkdwn syntax | All groups |
-| `/status` | Quick health check — session context, workspace mounts, tool availability, and scheduled task snapshot | Main channel only |
+The `nanoclaw` MCP server provides tools for container-to-host communication via the database:
 
-<Note>
-`/capabilities` and `/status` are restricted to the main channel. They detect this by checking for the `/workspace/project` mount, which is only present for main groups. Non-main groups receive a redirect message.
-</Note>
+- `send_message` — write outbound messages
+- `schedule_task`, `cancel_task`, `pause_task`, `resume_task`, `update_task` — task management
+- `list_tasks` — view scheduled tasks
 
-### Allowed tools
-
-The agent runner passes an explicit allowlist to the Claude Agent SDK. Only these tools are available inside containers:
-
-| Category | Tools |
-|----------|-------|
-| File operations | `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep` |
-| Web access | `WebSearch`, `WebFetch` |
-| Agent teams | `Task`, `TaskOutput`, `TaskStop`, `TeamCreate`, `TeamDelete`, `SendMessage` |
-| Utilities | `TodoWrite`, `ToolSearch`, `Skill`, `NotebookEdit` |
-| MCP | `mcp__nanoclaw__*` (all tools from the built-in NanoClaw MCP server) |
-
-The SDK runs with `permissionMode: 'bypassPermissions'` and `allowDangerouslySkipPermissions: true` since containers already provide the security boundary. Settings are loaded from both project and user sources (`settingSources: ['project', 'user']`), allowing `.claude/settings.json` at both levels to configure SDK behavior.
-
-### Conversation archival
-
-Before the SDK compacts context (when the conversation gets long), a `PreCompact` hook archives the full transcript to `/workspace/group/conversations/` as a markdown file. Files are named `{date}-{summary}.md` where the summary is derived from the session context. This preserves conversation history that would otherwise be lost during compaction.
+Additional MCP servers can be configured in `container.json`.
 
 ### Global memory injection
 
-For non-main groups, if `/workspace/global/CLAUDE.md` exists, its contents are appended to the system prompt via `systemPrompt.append`. This lets you define shared instructions in `groups/global/CLAUDE.md` that apply to all non-main groups without duplicating the file.
+For non-main groups, if `/workspace/global/CLAUDE.md` exists, its contents are appended to the system prompt. This provides shared instructions across all agent groups.
 
 ### Additional directory auto-discovery
 
-Directories mounted at `/workspace/extra/*` (via additional mounts) are automatically passed to the SDK as `additionalDirectories`. This means any `CLAUDE.md` file in those directories is loaded automatically, giving the agent context about the mounted project.
-
-**MCP servers:**
-
-- Configured in agent-runner source (`container/agent-runner/src/index.ts`)
-- Built-in: `nanoclaw` MCP server (8 tools: `send_message`, `schedule_task`, `list_tasks`, `pause_task`, `resume_task`, `cancel_task`, `update_task`, `register_group`). The `send_message` tool accepts an optional `sender` parameter for named bot identities on supported channels (e.g., Telegram). The `register_group` tool accepts an optional `requiresTrigger` parameter (defaults to `false`) to control whether messages must start with the trigger word
-- Custom: Add by modifying agent-runner code
-
-<Accordion title="Adding a custom MCP server">
-1. Edit `data/sessions/{group}/agent-runner-src/index.ts`
-2. Add the MCP server to the `mcpServers` config dictionary passed to the SDK `query()` call:
-   ```typescript
-   mcpServers: {
-     nanoclaw: {
-       command: 'node',
-       args: [mcpServerPath],
-       env: { /* ... */ },
-     },
-     'my-custom-server': {
-       command: 'node',
-       args: ['/path/to/custom-server.js'],
-       env: {},
-     },
-   },
-   ```
-3. Next container spawn will recompile with new server
-4. Tools available to agent immediately
-</Accordion>
+Directories mounted at `/workspace/extra/*` are automatically passed to the SDK as `additionalDirectories`, so any `CLAUDE.md` files in those directories are loaded automatically.
 
 ## Browser automation
 
@@ -496,33 +203,26 @@ Chromium runs inside the container:
 
 - **Executable**: `/usr/bin/chromium`
 - **CLI**: `agent-browser` (installed globally)
-- **Headless**: Always (no display in container)
-- **User data**: Stored in group folder (persists across runs)
-- **Network**: Full access (same as host, no restrictions)
-
-**Example usage:**
-
-```bash
-agent-browser snapshot https://example.com
-agent-browser click @e1  # Click element 1
-agent-browser pdf https://example.com output.pdf
-```
+- **Headless**: always (no display in container)
+- **User data**: stored in group folder (persists across runs)
+- **Network**: full access (same as host, no restrictions)
+- **Optional CJK fonts**: install via `INSTALL_CJK_FONTS=true` build arg (~200 MB)
 
 ## Security implications
 
 ### What containers protect against
 
-- **Filesystem access**: Agents can't read `~/.ssh` or other sensitive paths
-- **Process interference**: Agents can't kill host processes or inject code
-- **Persistence**: Containers are ephemeral, no state survives unless mounted
-- **Privilege escalation**: Non-root execution limits kernel attack surface
+- **Filesystem access** — agents can't read `~/.ssh` or other sensitive paths
+- **Process interference** — agents can't kill host processes or inject code
+- **Persistence** — containers are ephemeral, no state survives unless mounted
+- **Privilege escalation** — non-root execution limits kernel attack surface
 
 ### What containers DON'T protect against
 
-- **Network access**: Agents have full network access (can exfiltrate data)
-- **Mounted directory tampering**: Agents can modify anything in mounted directories
-- **Vault-based API access**: Containers can make authenticated API requests through the secret injection layer (though they cannot extract real credentials)
-- **Resource exhaustion**: No CPU/memory limits (can DoS host)
+- **Network access** — agents have full network access (can exfiltrate data)
+- **Mounted directory tampering** — agents can modify anything in mounted read-write directories
+- **Vault-based API access** — containers can make authenticated API requests through the OneCLI vault (though they cannot extract real credentials)
+- **Resource exhaustion** — no CPU/memory limits enforced (can DoS host)
 
 <Warning>
 Containers provide filesystem isolation, not network isolation. Agents can make arbitrary HTTP requests and exfiltrate data over the network.
@@ -535,28 +235,19 @@ Containers provide filesystem isolation, not network isolation. Agents can make 
 1. Check Docker is running: `docker ps`
 2. Check image exists: `docker images | grep nanoclaw-agent`
 3. Rebuild image: `./container/build.sh`
-4. Check logs: `groups/{folder}/logs/`
 
 ### Container timeout
 
 1. Check timeout setting: `CONTAINER_TIMEOUT` in `.env`
 2. Check if task is legitimately slow (increase timeout)
-3. Check idle timeout: `IDLE_TIMEOUT` (controls stdin close)
-4. Review logs for last activity timestamp
+3. Review host sweep logs for stale detection
 
 ### Permission errors
 
 1. Check mount paths are readable by host user
-2. Check uid/gid mapping (logged in verbose mode)
+2. Check uid/gid mapping
 3. Verify allowlist includes path (for additional mounts)
 4. Check symlink resolution didn't change path
-
-### Output not parsed
-
-1. Check for output markers in logs
-2. Verify agent-runner is writing markers correctly
-3. Check stdout isn't truncated (`CONTAINER_MAX_OUTPUT_SIZE`)
-4. Review stderr for SDK errors
 
 ## Related topics
 

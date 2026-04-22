@@ -1,306 +1,158 @@
 ---
 title: Task scheduling concepts
 description: How NanoClaw's task scheduler works and how tasks are executed
+tag: "UPDATED"
 ---
 
-NanoClaw includes a built-in task scheduler that runs Claude agents on a schedule. Tasks have full agent capabilities and can optionally send results to group chats.
+NanoClaw includes a built-in task scheduler that runs agents on a schedule. In v2, tasks are stored as `messages_in` rows with `kind='task'` — there is no separate task table. Tasks support cron-based recurrence with series tracking.
 
 ## What is a scheduled task?
 
 A scheduled task is:
 
-- A prompt that runs on a schedule (cron, interval, or one-time)
-- Executed in the context of a specific group
+- A `messages_in` row with `kind='task'` and a `process_after` timestamp
+- Executed in the context of a specific agent group session
 - Has access to all agent tools (Bash, browser, MCP, etc.)
-- Can send messages to the group chat or complete silently
-- Tracked in the database with run history
+- Can send messages via the `send_message` MCP tool
+- Supports recurring execution via cron expressions
 
 <Info>
-Tasks are essentially automated agent invocations. They run the same Claude Agent SDK as interactive messages, just triggered by time instead of user input.
+Tasks use the same message infrastructure as interactive messages. They are written to `inbound.db` and processed by the agent-runner's poll loop.
 </Info>
 
 ## Schedule types
 
-Three schedule types are supported:
+### Cron expressions (recurrence)
 
-### Cron expressions
-
-Standard cron syntax with timezone support:
+Tasks can have a `recurrence` field containing a cron expression:
 
 ```
 ┌───────────── minute (0 - 59)
 │ ┌───────────── hour (0 - 23)
 │ │ ┌───────────── day of month (1 - 31)
 │ │ │ ┌───────────── month (1 - 12)
-│ │ │ │ ┌───────────── day of week (0 - 6) (Sunday to Saturday)
+│ │ │ │ ┌───────────── day of week (0 - 6)
 │ │ │ │ │
 * * * * *
 ```
 
 **Examples:**
 
-- `0 9 * * *` - Every day at 9:00 AM
-- `0 */2 * * *` - Every 2 hours
-- `0 0 * * 1` - Every Monday at midnight
-- `30 14 1 * *` - 2:30 PM on the 1st of each month
+- `0 9 * * *` — every day at 9:00 AM
+- `0 */2 * * *` — every 2 hours
+- `0 0 * * 1` — every Monday at midnight
 
 **Timezone:**
 
-- Defaults to system timezone (`process.env.TZ` or `Intl.DateTimeFormat().resolvedOptions().timeZone`)
-- Configurable via `TZ` environment variable
-- Uses `cron-parser` with timezone support
+Tasks use the configured timezone (resolved from `TZ` env, `.env`, or system default, validated as IANA). Cron expressions are evaluated in this timezone.
 
-<Note>
-Cron expressions are evaluated in the configured timezone, not UTC. This ensures tasks run at the expected local time even across daylight saving changes.
-</Note>
+### One-time tasks
 
-### Interval
+Tasks without a `recurrence` field run once when `process_after` is reached:
 
-Repeat every N milliseconds:
-
-- `3600000` - Every hour (3600 * 1000 ms)
-- `86400000` - Every day (24 * 60 * 60 * 1000 ms)
-- `60000` - Every minute
-
-**Next run calculation:**
-
-```typescript
-// Anchor to the scheduled time, not now, to prevent drift.
-// Skip past any missed intervals so we always land in the future.
-let next = new Date(task.next_run).getTime() + ms;
-while (next <= now) {
-  next += ms;
-}
-const nextRun = new Date(next).toISOString();
-```
-
-Intervals are anchored to the **scheduled time** of the previous run, not the current time. This prevents cumulative drift. If intervals are missed (e.g., system was down), they are skipped to the next future occurrence.
-
-### One-time
-
-Run once at a specific ISO 8601 timestamp:
-
-- `2026-03-01T14:30:00Z` - March 1st, 2026 at 2:30 PM UTC
-- `2026-02-28T09:00:00-08:00` - Feb 28th, 2026 at 9 AM Pacific
-
-**After execution:**
-
-- `next_run` set to `null`
-- Task status set to `completed`
-- Will not run again unless `next_run` is manually updated and status reset to `active`
+- After completion, the task row is marked `completed`
+- No new rows are created
 
 ## Task lifecycle
 
 ### Creation
 
-1. Agent calls `schedule_task` MCP tool (or user creates via IPC)
-2. Task inserted into database with status `active`
-3. `next_run` calculated based on schedule type
-4. Task becomes eligible for execution when `next_run <= NOW()`
+Tasks are created via the `schedule_task` MCP tool inside the container:
+
+1. Agent calls `schedule_task` which writes a `kind='system'` outbound message with action fields
+2. The delivery path routes this to `handleScheduleTask` on the host
+3. Host creates a `kind='task'` row in `inbound.db` with `process_after` and optional `recurrence`
+4. A `series_id` is set to the task's own ID (for tracking recurring instances)
 
 ### Execution
 
 ```mermaid
 sequenceDiagram
-    participant SCH as Scheduler Loop
-    participant DB as Database
-    participant GQ as GroupQueue
-    participant CR as ContainerRunner
-    participant AG as Agent
-    participant CH as Channel
-    
-    SCH->>DB: getDueTasks()
-    DB-->>SCH: tasks where next_run <= NOW()
-    SCH->>GQ: enqueueTask()
-    GQ->>GQ: Check concurrency
-    GQ->>CR: runContainerAgent(isScheduledTask: true)
-    CR->>AG: Spawn container
+    participant HS as Host Sweep (60s)
+    participant SM as Session Manager
+    participant CR as Container Runner
+    participant AG as Agent (Bun)
+    participant DB as inbound.db
+
+    HS->>DB: Find tasks where process_after <= now
+    HS->>CR: wakeContainer(session)
+    CR->>AG: Spawn/wake container
+    AG->>DB: Poll for pending messages
     AG->>AG: Execute task prompt
-    AG-->>CR: Stream output
-    CR->>CH: Auto-forward result to chat (if output present)
-    CR->>DB: logTaskRun()
-    CR->>DB: updateTaskAfterRun(next_run)
+    AG->>AG: Write result to outbound.db
+    HS->>DB: Sync processing_ack
+    HS->>DB: Mark task completed
+    HS->>DB: Create next occurrence (if recurring)
 ```
 
 **Execution flow:**
 
-1. Scheduler polls database every 60 seconds (`SCHEDULER_POLL_INTERVAL`)
-2. Finds tasks where `next_run <= NOW()` and `status = 'active'`
-3. Re-checks status (in case task was paused between poll and execution)
-4. Enqueues task in GroupQueue
-5. GroupQueue respects concurrency limits (tasks and messages share the pool)
-6. Container spawned with `isScheduledTask: true` flag
-7. Agent executes task prompt
-8. Results automatically forwarded to the group chat when the agent produces output
-9. Run logged to `task_run_logs` table with duration and result
-10. `next_run` recalculated based on schedule type
-11. Container closes after 10-second grace period
+1. Host sweep runs every 60 seconds and finds tasks where `process_after <= now`
+2. Wakes the session's container (or spawns a new one)
+3. Agent-runner's poll loop picks up the task as a pending message
+4. Agent executes the task prompt
+5. Host sweep syncs `processing_ack` from `outbound.db` to mark the task completed
+6. For recurring tasks, a new row is created with the next `process_after`
 
 <Info>
-Tasks respect the same concurrency limits as interactive messages. If all 5 container slots are busy, tasks wait in queue.
+Tasks share the container concurrency pool with interactive messages. If all container slots are busy, tasks wait until a slot is available.
 </Info>
+
+### Recurring tasks
+
+Recurring tasks use a series model:
+
+- Each occurrence gets a new `messages_in` row sharing the same `series_id`
+- When a recurring task completes, the host sweep calls `getCompletedRecurring()` to find it
+- `insertRecurrence()` creates the next-run row with the updated `process_after`
+- The `series_id` links all occurrences together
 
 ### Post-execution
 
 After a task completes:
 
-1. **Run logged**: Duration, result summary, error (if any) written to `task_run_logs` table
-2. **Next run calculated**: 
-   - Cron: Next matching time according to cron expression
-   - Interval: Scheduled time + interval milliseconds (anchored to prevent drift)
-   - Once: Set to `null`
-3. **Last result updated**: First 200 chars of result stored in `tasks.last_result`
-4. **Container closes**: 10-second grace period, then stdin closed (container exits)
-
-### Completion
-
-Task containers close automatically after producing output:
-
-```typescript
-const TASK_CLOSE_DELAY_MS = 10000; // 10 seconds
-
-// After task produces result:
-setTimeout(() => {
-  queue.closeStdin(chatJid); // Signal container to exit
-}, TASK_CLOSE_DELAY_MS);
-```
-
-**Why 10 seconds?**
-
-- Tasks are single-turn (no follow-up messages)
-- Grace period allows final MCP calls to complete
-- Much faster than idle timeout (30 minutes for interactive sessions)
-- Prevents resource waste from long-lived task containers
-
-## Task context modes
-
-Tasks can run in two context modes:
-
-### Isolated context (default)
-
-- Fresh Claude session for each run
-- No conversation history from previous runs
-- No conversation history from group chat
-- Stateless execution (each run is independent)
-
-**Use cases:**
-
-- Status checks that don't need history
-- Periodic data fetching
-- Health monitoring
-- Any task that should start fresh each time
-
-### Group context
-
-- Uses the group's current Claude session
-- Has access to conversation history
-- Sees previous task runs in same group context
-- Can reference files and context from interactive messages
-
-**Use cases:**
-
-- Reminders that need conversation context
-- Tasks that build on previous interactions
-- Context-aware notifications
-- Any task that should feel like part of the conversation
-
-**Database field:**
-
-```typescript
-interface ScheduledTask {
-  context_mode: 'isolated' | 'group';
-  // ... other fields
-}
-```
-
-<Note>
-Group context tasks share the session with interactive messages. This means the task's actions (files read, tools used) become part of the group's conversation history.
-</Note>
+1. **Processing acknowledged** — host sweep syncs `processing_ack` from `outbound.db`
+2. **Status updated** — task row marked `completed`
+3. **Next occurrence** — for recurring tasks, a new pending row is created
+4. **Container continues** — the container stays alive for other messages (no immediate shutdown)
 
 ## Task management operations
 
-Tasks are managed via MCP tools (available in `container/skills/nanoclaw.md`):
+Tasks are managed via MCP tools available inside the container:
 
 ### schedule_task
 
-Create a new task:
-
-```typescript
-await claudeCode.tools.schedule_task({
-  prompt: "Check if example.com is up and notify if down",
-  schedule_type: "interval",
-  schedule_value: "300000", // 5 minutes
-  context_mode: "isolated"
-});
-```
-
-### list_tasks
-
-View tasks (filtered by group):
-
-```typescript
-const tasks = await claudeCode.tools.list_tasks();
-// Main group: sees all tasks
-// Non-main groups: only see own tasks
-```
-
-Task snapshots are refreshed immediately after any IPC task mutation (`schedule_task`, `pause_task`, `resume_task`, `cancel_task`, `update_task`), so `list_tasks` always reflects the latest state — even within the same agent session that made the change.
-
-### pause_task
-
-Temporarily disable a task:
-
-```typescript
-await claudeCode.tools.pause_task({ task_id: "abc123" });
-// Sets status to 'paused', task won't run until resumed
-```
-
-### resume_task
-
-Re-enable a paused task:
-
-```typescript
-await claudeCode.tools.resume_task({ task_id: "abc123" });
-// Sets status to 'active', task runs on next schedule
-```
-
-### update_task
-
-Modify an existing task's prompt or schedule:
-
-```typescript
-await claudeCode.tools.update_task({
-  task_id: "abc123",
-  prompt: "Updated prompt text",
-  schedule_type: "interval",
-  schedule_value: "7200000"
-});
-// Only include the fields you want to change
-// next_run is automatically recalculated if schedule changes
-```
+Creates a new task. The agent writes a system message to `outbound.db`, and the host creates the task in `inbound.db`.
 
 ### cancel_task
 
-Permanently delete a task:
+Marks all live rows in the task's series as `completed` and nulls the recurrence. This stops the task permanently.
 
-```typescript
-await claudeCode.tools.cancel_task({ task_id: "abc123" });
-// Deletes from database, including all run history
-```
+### pause_task
 
-<Warning>
-Canceling a task deletes all run history. Pause the task instead if you want to preserve logs.
-</Warning>
+Toggles a pending task to `paused` status. Paused tasks are not picked up by the host sweep.
+
+### resume_task
+
+Toggles a paused task back to `pending` status. The task resumes on the next sweep cycle.
+
+### update_task
+
+Merges content updates in-place (prompt, script). Can also update `process_after` and `recurrence` independently. Matches by ID or `series_id` so recurring task updates hit the live next-occurrence row.
+
+<Note>
+`update_task` returns 0 when no live row matches, triggering a system notification back to the agent ("no live task matched").
+</Note>
 
 ## Task scripts
 
-For any recurring task, use `schedule_task`. Frequent agent invocations — especially multiple times a day — consume API credits and can risk account restrictions. If a simple check can determine whether action is needed, add a `script` — it runs first, and the agent is only called when the check passes. This keeps invocations to a minimum.
+For recurring tasks, you can add a `script` — a bash command that runs before the agent. If the script determines no action is needed, the agent is never invoked.
 
 ### How scripts work
 
 ```mermaid
 flowchart TD
-    A[Scheduler triggers task] --> B[Container starts]
+    A[Host sweep triggers task] --> B[Container wakes]
     B --> C{Has script?}
     C -->|No| D[Run agent with prompt]
     C -->|Yes| E[Execute bash script]
@@ -311,210 +163,35 @@ flowchart TD
     F -->|Error / no output| G
 ```
 
-1. You provide a bash `script` alongside the `prompt` when scheduling
-2. When the task fires, the script runs first (30-second timeout)
-3. The script prints JSON to stdout: `{ "wakeAgent": true/false, "data": {...} }`
-4. If `wakeAgent` is `false` — nothing happens, the task waits for the next run
-5. If `wakeAgent` is `true` — the agent wakes up and receives the script's data plus the prompt
-
-### Always test your script first
-
-Before scheduling, run the script in the sandbox to verify it works:
-
-```bash
-bash -c 'node --input-type=module -e "
-  const r = await fetch(\"https://api.github.com/repos/owner/repo/pulls?state=open\");
-  const prs = await r.json();
-  console.log(JSON.stringify({ wakeAgent: prs.length > 0, data: prs.slice(0, 5) }));
-"'
-```
+1. The script runs first (30-second timeout)
+2. It prints JSON to stdout: `{ "wakeAgent": true/false, "data": {...} }`
+3. If `wakeAgent` is `false`, the task completes silently
+4. If `wakeAgent` is `true`, the agent wakes with the script's data plus the prompt
 
 ### When NOT to use scripts
 
 If a task requires agent judgment every time (daily briefings, reminders, reports), skip the script — just use a regular prompt.
 
-### Frequent task guidance
-
-If a task needs to run more than roughly twice a day and a script can't reduce agent wake-ups:
-
-- Each wake-up uses API credits and risks rate limits
-- Restructure with a script that checks the condition first
-- If the task needs an LLM to evaluate data, consider using an API key with direct Anthropic API calls inside the script
-- Find the minimum viable frequency
-
-### Use cases
-
-- **Conditional execution**: Only wake the agent when there's new data (e.g., new GitHub issues, new emails)
-- **Data pre-fetching**: Fetch data via `curl` or CLI tools before the agent runs, reducing agent token usage
-- **Cost optimization**: Avoid billing for agent invocations when there's nothing to act on
-
-<Info>
-Task scripts only run for scheduled tasks (`isScheduledTask: true`). Interactive messages never execute scripts.
-</Info>
-
 ## Sending messages from tasks
 
-Tasks can send messages to their group chat using the `send_message` tool:
-
-```typescript
-// Inside task prompt:
-await claudeCode.tools.send_message({
-  text: "Website is down! Last checked: " + new Date().toISOString()
-});
-```
-
-**Authorization:**
-
-- Tasks can only send to their own group's chat
-- Same IPC authorization as interactive messages
-- Main group tasks can send to any chat
-- Non-main group tasks limited to own chat
+Tasks can send messages using the `send_message` MCP tool. The delivery system routes these through the standard delivery pipeline with the same authorization checks as interactive messages.
 
 **Silent tasks:**
 
-If a task doesn't call `send_message`, it completes silently:
+If a task doesn't call `send_message`, it completes silently — the result is tracked via `processing_ack` but no message is sent to any channel.
 
-- Result logged to database
-- No message sent to chat
-- Useful for background data collection or status checks
+## Sequence numbers
 
-<Info>
-Task results are always logged to the database, whether or not they send a message. Check `task_run_logs` table for execution history.
-</Info>
-
-## Task run history
-
-All task executions are logged to `task_run_logs` table:
-
-```typescript
-interface TaskRunLog {
-  task_id: string;       // Foreign key to scheduled_tasks
-  run_at: string;        // ISO timestamp of execution
-  duration_ms: number;   // Execution time in milliseconds
-  status: 'success' | 'error';
-  result: string | null; // Agent output
-  error: string | null;  // Error message if failed
-}
-```
-
-The `id` column is an auto-incrementing integer primary key in the database.
-
-**Querying history:**
-
-```sql
--- Last 10 runs for a task
-SELECT * FROM task_run_logs 
-WHERE task_id = 'abc123' 
-ORDER BY run_at DESC 
-LIMIT 10;
-
--- Failed runs in the last 24 hours
-SELECT * FROM task_run_logs 
-WHERE status = 'error' 
-AND run_at > datetime('now', '-1 day')
-ORDER BY run_at DESC;
-```
-
-## Group privileges for tasks
-
-| Operation | Main Group | Non-Main Group |
-|-----------|------------|----------------|
-| Schedule task for self | ✓ | ✓ |
-| Schedule task for others | ✓ | ✗ |
-| View all tasks | ✓ | Own only |
-| Pause/resume own tasks | ✓ | ✓ |
-| Pause/resume others' tasks | ✓ | ✗ |
-| Cancel own tasks | ✓ | ✓ |
-| Cancel others' tasks | ✓ | ✗ |
-| Send message to own chat | ✓ | ✓ |
-| Send message to other chats | ✓ | ✗ |
-
-<Note>
-Task privileges match the group's general privilege model. Main group can manage all tasks, non-main groups can only manage their own.
-</Note>
-
-## Task scheduling best practices
-
-1. **Use scripts for frequent tasks**: Tasks running more than roughly twice a day should include a script to minimize unnecessary agent wake-ups and conserve API credits
-2. **Use cron for wall-clock times**: "Every day at 9 AM" should be cron, not interval
-3. **Use interval for frequency-based**: "Every 5 minutes" should be interval, not cron
-4. **Start with isolated context**: Add group context only if needed
-5. **Include error handling**: Tasks should handle failures gracefully
-6. **Use descriptive prompts**: "Check website uptime" not "check status"
-7. **Monitor task_run_logs**: Failed tasks may indicate issues
-8. **Avoid very short intervals**: Respect container startup overhead (minimum ~5s)
-9. **Clean up completed one-time tasks**: Cancel or pause them to reduce clutter
-10. **Test scripts before scheduling**: Always verify your script produces valid JSON output in the sandbox before deploying
-
-## Common patterns
-
-### Daily summary task
-
-```typescript
-await claudeCode.tools.schedule_task({
-  prompt: "Read today's messages and send a summary of important topics",
-  schedule_type: "cron",
-  schedule_value: "0 18 * * *", // 6 PM daily
-  context_mode: "group"
-});
-```
-
-### Health monitoring
-
-```typescript
-await claudeCode.tools.schedule_task({
-  prompt: "Check if https://example.com returns 200 OK. If not, send alert.",
-  schedule_type: "interval",
-  schedule_value: "300000", // Every 5 minutes
-  context_mode: "isolated"
-});
-```
-
-### One-time reminder
-
-```typescript
-await claudeCode.tools.schedule_task({
-  prompt: "Remind me about the team meeting tomorrow",
-  schedule_type: "once",
-  schedule_value: "2026-03-01T09:00:00-08:00",
-  context_mode: "group"
-});
-```
-
-### Background data collection
-
-```typescript
-await claudeCode.tools.schedule_task({
-  prompt: "Fetch latest crypto prices and store in prices.json (no message)",
-  schedule_type: "interval",
-  schedule_value: "60000", // Every minute
-  context_mode: "isolated"
-});
-```
+All host-written messages (including tasks) use even-parity sequence numbers allocated via `nextEvenSeq()`. This ensures host writes and container writes never collide on sequence numbers.
 
 ## Error handling
 
-Task errors are logged but don't stop the schedule:
+Task errors don't stop the recurring schedule:
 
 1. Task fails during execution
-2. Error logged to `task_run_logs` with `status: 'error'`
-3. `last_result` updated with error summary
-4. `next_run` still calculated (task will retry on next schedule)
-5. No message sent to chat (unless task explicitly sends before error)
-
-**Persistent failures:**
-
-If a task fails repeatedly:
-
-- Check `task_run_logs` for error messages
-- Review container logs at `groups/{folder}/logs/`
-- Pause the task to stop the retry loop
-- Fix the underlying issue (permissions, network, etc.)
-- Resume the task
-
-<Warning>
-Tasks with invalid group folders are automatically paused to prevent retry churn.
-</Warning>
+2. Processing acknowledged with error state
+3. For recurring tasks, next occurrence is still created
+4. No message sent to chat unless task explicitly sends before error
 
 ## Related topics
 
