@@ -52,7 +52,7 @@ Channels (WhatsApp, Telegram, Discord, Slack, Gmail) live in **separate fork rep
 | `qwibitai/nanoclaw-whatsapp` | WhatsApp | @whiskeysockets/baileys |
 | `qwibitai/nanoclaw-telegram` | Telegram | grammy |
 | `qwibitai/nanoclaw-discord` | Discord | discord.js |
-| `qwibitai/nanoclaw-slack` | Slack | @slack/bolt (Socket Mode) |
+| `qwibitai/nanoclaw-slack` | Slack | @chat-adapter/slack (Event Subscriptions / webhook) |
 | `qwibitai/nanoclaw-gmail` | Gmail | googleapis |
 
 Channels self-register at startup using the channel registry (`src/channels/registry.ts`). Each channel module calls `registerChannel()` with a factory function — the host process discovers available channels dynamically via `getRegisteredChannelNames()`.
@@ -197,7 +197,7 @@ Dependencies are implicit in git history — no separate dependency file is need
 | WhatsApp | `/add-whatsapp` | `nanoclaw-whatsapp` | @whiskeysockets/baileys |
 | Telegram | `/add-telegram` | `nanoclaw-telegram` | grammy |
 | Discord | `/add-discord` | `nanoclaw-discord` | discord.js |
-| Slack | `/add-slack` | `nanoclaw-slack` | @slack/bolt (Socket Mode) |
+| Slack | `/add-slack` | `nanoclaw-slack` | @chat-adapter/slack (Event Subscriptions / webhook) |
 | Gmail | `/add-gmail` | `nanoclaw-gmail` | googleapis |
 
 ### Upstream skills (from skill branches)

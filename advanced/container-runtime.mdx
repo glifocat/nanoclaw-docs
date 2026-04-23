@@ -188,9 +188,33 @@ const onecliApplied = await onecli.applyContainerConfig(args, {
 - No raw API keys are passed via environment variables
 - Each agent group gets its own `agentIdentifier` for credential scoping
 
+## Install-scoped orphan reaper
+
+On startup, NanoClaw kills orphaned containers left behind by previous runs. As of v2.0.5, the reaper is **scoped by install label** so peers on the same host don't trash each other's containers.
+
+Every spawned container is tagged with `--label nanoclaw-install=<slug>`, where `<slug>` is derived from the install's project directory. The host's `cleanupOrphans` routine filters `docker ps` by that label — only containers from *this* install are candidates for reaping. Two installs running side by side (for example, a legacy v1 plist crash-looping alongside a healthy v2 install) can no longer delete each other's sessions.
+
+The install slug is exposed via `INSTALL_SLUG` in `src/config.ts`; the full label string is `CONTAINER_INSTALL_LABEL`.
+
+### Peer cleanup at setup
+
+Setup's preflight enumerates `com.nanoclaw*` launchd plists (macOS) and nanoclaw-scoped user systemd units (Linux), probes their state and restart counts, and unloads any that are crash-looping (not running AND restarted more than 10 times) before installing this install's service. This keeps a broken sibling from racing the healthy install at boot.
+
 ## Debugging containers
 
-<Accordion title="List running containers">
+<Accordion title="List running containers (this install only)">
+  ```bash
+  docker ps --filter label=nanoclaw-install=<slug>
+  ```
+
+  Find your slug by inspecting a running container:
+
+  ```bash
+  docker inspect nanoclaw-{session-id} --format '{{ index .Config.Labels "nanoclaw-install" }}'
+  ```
+</Accordion>
+
+<Accordion title="List all NanoClaw containers on the host (all installs)">
   ```bash
   docker ps --filter name=nanoclaw-
   ```

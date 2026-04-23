@@ -38,16 +38,20 @@ Install with a skill invocation in Claude Code. The skill copies the adapter fro
   </Card>
 
   <Card title="Slack" icon="hashtag" href="/integrations/slack">
-    `/add-slack` — Socket Mode (no public URL required)
+    `/add-slack` — Chat SDK + Event Subscriptions (public URL required, experimental)
   </Card>
 </CardGroup>
+
+<Note>
+Setup includes a driver for **iMessage** (experimental) alongside the four documented channels above. Local mode runs on macOS via the signed-in iMessage account; remote mode talks to a Photon server on another Mac. Pick it at the channel prompt in `/setup` or run `/add-imessage` directly.
+</Note>
 
 ### Also available on the `channels` branch
 
 | Skill | Platform | Notes |
 |-------|----------|-------|
 | `/add-teams` | Microsoft Teams | Bot framework |
-| `/add-imessage` | Apple iMessage | macOS-only; uses AppleScript bridge |
+| `/add-imessage` | Apple iMessage | macOS (local, signed-in account) or remote via Photon server |
 | `/add-matrix` | Matrix | Federated; supports Element and self-hosted homeservers |
 | `/add-gchat` | Google Chat | Workspace accounts |
 | `/add-webex` | Cisco Webex | Bot token |
