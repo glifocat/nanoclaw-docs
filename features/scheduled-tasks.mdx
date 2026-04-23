@@ -1,12 +1,15 @@
 ---
 title: Setting up scheduled tasks
-description: Set up recurring and one-time tasks with cron expressions or specific timestamps
+description: A scheduled task is a message with a timestamp — same inbox, same flow, same tools as any other message.
 tag: "UPDATED"
+keywords: ["scheduled tasks", "cron", "recurring", "process_after", "series_id", "scripts"]
 ---
 
 ## Overview
 
-NanoClaw's task scheduler runs agents on a schedule, allowing you to automate recurring tasks like daily reports, weekly summaries, or periodic checks. In v2, tasks are stored as messages in the session database and managed through MCP tools.
+v2 has no separate task scheduler. A scheduled task is a row in `messages_in` with a `process_after` timestamp (and optionally a `recurrence` cron expression). The host sweep runs every 60 seconds, finds rows whose time has come, wakes the session's container, and the agent picks it up like any other inbound message.
+
+That means everything scheduled — daily briefings, weekly reports, per-hour polls, one-time reminders — goes through the same pipeline as a user message. You only learn one model.
 
 ## Task types
 
@@ -198,6 +201,5 @@ If a task fails:
 
 ## Related documentation
 
-- [Messaging](/features/messaging) — how messages trigger agent responses
-- [Agent Swarms](/features/agent-swarms) — use multiple agents in scheduled tasks
-- [Customization](/features/customization) — modify task behavior
+- [Messaging](/features/messaging) — the inbox/outbox pattern that scheduling rides on
+- [Customization](/features/customization) — sweep interval, timezone, and concurrency
