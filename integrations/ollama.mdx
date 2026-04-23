@@ -5,6 +5,10 @@ tag: "UPDATED"
 keywords: ["ollama", "local models", "llm", "mcp", "self-hosted"]
 ---
 
+<Warning>
+In v2, Ollama moved from a core integration to a skill on the `providers` branch. Install via `/add-ollama-provider` (run Ollama as a full provider for an agent group) or `/add-ollama-tool` (keep Claude as the agent, expose Ollama as a tool). The MCP setup described below reflects v1 mechanics; a v2 rewrite is pending. See [Integrations overview](/integrations/overview#providers) for the v2 provider model.
+</Warning>
+
 NanoClaw can delegate tasks to local models running on [Ollama](https://ollama.com), while Claude remains the orchestrator. This lets you offload cheaper tasks (summarization, translation, general queries) to local models and reduce API costs.
 
 ## How it works

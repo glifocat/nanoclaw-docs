@@ -1,94 +1,121 @@
 ---
 title: Integrations overview
-description: Connect NanoClaw to your favorite messaging platforms and services
-keywords: ["integrations", "whatsapp", "telegram", "discord", "slack"]
+description: Channels and providers as skills — add only what you need.
+tag: "UPDATED"
+keywords: ["integrations", "channels", "providers", "skills", "add-telegram", "add-whatsapp", "add-codex", "add-opencode"]
 ---
 
-NanoClaw supports multiple communication channels and integrations, allowing you to interact with your AI assistant wherever you work.
+NanoClaw trunk ships the registry and infrastructure. Channel adapters and alternative AI providers live on long-lived skill branches — you install them on demand with `/add-<name>` skills. This keeps your fork lean and your code legible: nothing you didn't ask for.
 
-## Available channels
-
-All channels are installed via the [skills system](/integrations/skills-system). During `/setup`, you choose which platforms to connect — pick one or many:
+## Two kinds of integration
 
 <CardGroup cols={2}>
-  <Card title="WhatsApp" icon="message" href="/integrations/whatsapp">
-    Add WhatsApp with `/add-whatsapp`. Uses the Baileys library for WhatsApp Web API.
+  <Card title="Channels" icon="plug" href="#channels">
+    Where messages come from: WhatsApp, Telegram, Discord, Slack, Teams, email, the terminal — 15+ adapters live on the `channels` branch
   </Card>
-
-  <Card title="Telegram" icon="paper-plane" href="/integrations/telegram">
-    Add Telegram with `/add-telegram`. Uses the grammy framework.
-  </Card>
-
-  <Card title="Discord" icon="comments" href="/integrations/discord">
-    Add Discord with `/add-discord`. Perfect for team collaboration and community management.
-  </Card>
-
-  <Card title="Slack" icon="hashtag" href="/integrations/slack">
-    Connect to Slack workspaces with `/add-slack`. Uses Socket Mode — no public URL needed.
-  </Card>
-
-  <Card title="Gmail" icon="envelope" href="/integrations/gmail">
-    Add Gmail with `/add-gmail`. Use as a tool or full channel for email monitoring.
+  <Card title="Providers" icon="robot" href="#providers">
+    Which AI runs the agent: Claude (default), OpenAI Codex, OpenCode (OpenRouter/Google/DeepSeek), Ollama (local). Configurable per agent group.
   </Card>
 </CardGroup>
 
-## How the skills system works
+## Channels
 
-NanoClaw uses a skills-based architecture instead of bundling all integrations into the core codebase. This approach:
+Install with a skill invocation in Claude Code. The skill copies the adapter from the `channels` branch into your fork and walks you through platform-specific auth.
 
-- **Keeps your installation lean** - Only add what you need
-- **Maintains clean code** - No unused features cluttering the codebase
-- **Enables customization** - Each installation is tailored to your needs
-- **Prevents bloat** - The base system stays minimal and understandable
+### Documented channels
 
-Learn more about the [skills system](/integrations/skills-system).
+<CardGroup cols={2}>
+  <Card title="WhatsApp" icon="message" href="/integrations/whatsapp">
+    `/add-whatsapp` (Baileys, WhatsApp Web API) or `/add-whatsapp-cloud` (Cloud API, DMs only)
+  </Card>
 
-## Channel capabilities
+  <Card title="Telegram" icon="paper-plane" href="/integrations/telegram">
+    `/add-telegram` — grammy framework, BotFather token
+  </Card>
 
-All channel integrations support:
+  <Card title="Discord" icon="comments" href="/integrations/discord">
+    `/add-discord` — discord.js, bot application token
+  </Card>
 
-- **Isolated contexts** - Each chat/channel has its own memory and filesystem
-- **Trigger patterns** - Configure when the assistant responds (`@Andy`, etc.)
-- **Scheduled tasks** - Set up recurring jobs that can message you
-- **Container isolation** - Every context runs in its own sandboxed environment
-- **Multi-channel support** - Run multiple channels simultaneously
+  <Card title="Slack" icon="hashtag" href="/integrations/slack">
+    `/add-slack` — Socket Mode (no public URL required)
+  </Card>
+</CardGroup>
 
-## Adding an integration
+### Also available on the `channels` branch
 
-To add an integration, use the corresponding skill command in Claude Code:
+| Skill | Platform | Notes |
+|-------|----------|-------|
+| `/add-teams` | Microsoft Teams | Bot framework |
+| `/add-imessage` | Apple iMessage | macOS-only; uses AppleScript bridge |
+| `/add-matrix` | Matrix | Federated; supports Element and self-hosted homeservers |
+| `/add-gchat` | Google Chat | Workspace accounts |
+| `/add-webex` | Cisco Webex | Bot token |
+| `/add-linear` | Linear | Issue comments, triage workflows |
+| `/add-github` | GitHub | PR comments, issue reactions, webhooks |
+| `/add-wechat` | WeChat | WeChat Work API |
+| `/add-emacs` | Emacs | Talk to your agent from inside your editor |
+| `/add-resend` | Email (outbound) | Transactional sends via Resend |
+| `/claw` | Local terminal | Talk to your agent from a CLI — no platform account required |
 
-```bash
-/add-whatsapp    # Add WhatsApp
-/add-telegram    # Add Telegram
-/add-discord     # Add Discord
-/add-slack       # Add Slack
-/add-gmail       # Add Gmail
+Documentation for these is rolling out post-v2 launch. The skill itself is self-documenting via `SKILL.md` on the `channels` branch — ask Claude Code to walk you through any of them.
+
+## Providers
+
+By default, NanoClaw uses Claude via the official [Claude Agent SDK](https://docs.anthropic.com/en/api/agent-sdk). Other providers drop in as skills from the `providers` branch and can be configured per agent group:
+
+| Skill | Provider | Use case |
+|-------|----------|----------|
+| `/add-codex` | OpenAI Codex | ChatGPT subscription or OpenAI API key |
+| `/add-opencode` | OpenCode | OpenRouter, Google, DeepSeek, and more via OpenCode |
+| `/add-ollama-provider` | Ollama | Local open-weight models — no cloud calls |
+| `/add-ollama-tool` | Ollama (tool mode) | Use local Ollama as a tool inside Claude agents |
+
+`agent_provider` is a column on `agent_groups` in the central database — each agent group can run a different provider. Mix and match in the same install.
+
+## How channel skills work
+
+1. **Skill invocation** — you run `/add-<channel>` in Claude Code from your NanoClaw directory
+2. **Copy, don't merge** — the skill reads the adapter source from the `channels` branch (not your trunk) and copies only the files for that channel into your fork
+3. **Platform auth** — the skill prompts for the tokens, OAuth flows, or QR pairing each platform requires
+4. **First messaging group** — the skill registers your first chat/channel/group from that platform so you can test immediately
+5. **Verify** — a round-trip test confirms inbound + outbound work before the skill exits
+
+To update installed channel skills when the `channels` branch gets improvements:
+
+```
+/update-skills
 ```
 
-Each skill will:
+To remove a channel, revert the skill's commit:
 
-1. Merge the skill's git branch into your fork
-2. Guide you through platform-specific setup
-3. Help you configure authentication
-4. Register your first chat/channel
-5. Verify the connection works
+```
+git revert <skill-commit-sha>
+```
 
-<Tip>
-  Skills can be combined. For example, you can run WhatsApp, Telegram, and Discord simultaneously, each with its own registered chats.
-</Tip>
+## Running multiple channels
 
-## Choosing your channels
+Channels are peers — none is privileged. Run one, or run Telegram + Discord + GitHub + a local CLI all at once. For each channel you add, decide how it relates to existing agents:
 
-There is no default channel — you choose what you need during `/setup`. You can run a single platform or combine several simultaneously. All channels are peers; none is privileged over the others.
+- **Separate agent groups** — each channel has its own workspace, memory, and personality
+- **Same agent, separate sessions** — one workspace; per-channel conversation threads
+- **Shared session** — multiple channels feed one conversation (webhook + chat is the classic case)
+
+The choice is per channel, configurable via `/manage-channels`. See [Channel isolation model](/concepts/groups) for details.
 
 ## Next steps
 
 <CardGroup cols={2}>
   <Card title="Skills system" icon="puzzle-piece" href="/integrations/skills-system">
-    Learn how the skills system works and how to manage installed skills
+    How skill branches work, how to update, and how to author your own
   </Card>
-  
-  <Card title="WhatsApp" icon="message" href="/integrations/whatsapp">
-    Set up WhatsApp integration
+  <Card title="Customization" icon="wrench" href="/features/customization">
+    Trigger words, timeouts, engage modes, sender scope
+  </Card>
+  <Card title="Security" icon="shield" href="/concepts/security">
+    Sender policies, user roles, OneCLI credentials
+  </Card>
+  <Card title="Channel isolation" icon="layer-group" href="/concepts/groups">
+    Decide how channels relate to agent groups
   </Card>
 </CardGroup>

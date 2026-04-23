@@ -1,12 +1,18 @@
 ---
 title: Message handling and routing
-description: Learn how NanoClaw processes messages, triggers agent responses, and routes communication across channels
+description: Every message is a row in an inbox, every response a row in an outbox — the pattern that drives channels, scheduling, and agent-to-agent routing.
 tag: "UPDATED"
+keywords: ["messaging", "inbox", "outbox", "routing", "engage modes", "session db"]
 ---
 
-## Overview
+## The inbox/outbox model
 
-In v2, NanoClaw processes messages through an event-driven adapter architecture. Channel adapters receive messages and route them through a centralized inbound router that evaluates engage modes, resolves senders, and fans out to wired agents. Responses flow back through a delivery system that polls session databases.
+Every agent session has two SQLite files:
+
+- **`inbound.db`** — anything the agent needs to see. User messages, webhooks, scheduled tasks when they come due, agent-to-agent requests. The host writes; the container reads.
+- **`outbound.db`** — anything the agent wants to do. Replies, tool calls, schedule requests, sub-agent spawns. The container writes; the host reads.
+
+One writer per file means no SQLite cross-mount contention, no stdin piping, no IPC coordination layer. Every inbound source uses the same `messages_in` table; every outbound action uses the same `messages_out` table. Scheduling, channels, and agent-to-agent routing are the same pattern with different metadata.
 
 ## Message flow
 
@@ -113,18 +119,12 @@ Container concurrency is managed globally:
 
 ## Channel routing
 
-NanoClaw supports multiple messaging channels through a unified adapter interface. Each adapter registers `onInbound`, `onInboundEvent`, `onMetadata`, and `onAction` callbacks.
+Every channel is a thin adapter over [Vercel's Chat SDK](https://chat-sdk.dev/docs/adapters). Adapters implement the same four callbacks (`onInbound`, `onInboundEvent`, `onMetadata`, `onAction`), so routing, fan-out, and delivery don't know or care which platform a message came from.
 
-### Supported channels
-
-- WhatsApp (via `/add-whatsapp` skill)
-- Telegram (via `/add-telegram` skill)
-- Discord (via `/add-discord` skill)
-- Slack (via `/add-slack` skill)
-- Gmail (via `/add-gmail` skill)
+15+ adapters live on the `channels` branch (Discord, Slack, Telegram, Teams, Google Chat, WhatsApp, Matrix, iMessage, GitHub, Linear, and more). Install one per fork with `/add-<name>`. See the [integrations overview](/integrations/overview) for the full list.
 
 <Warning>
-Channels are added via skills, not configuration files. Use `/add-telegram` or similar skills to add new channels. See the [integrations overview](/integrations/overview).
+Channels are installed as skills, not configured through env vars or files. Use `/add-telegram`, `/add-discord`, etc. to copy an adapter module into your fork.
 </Warning>
 
 ## Delivery system
@@ -156,6 +156,6 @@ When a message arrives on an unwired channel (no agent wirings exist):
 
 ## Related documentation
 
-- [Scheduled tasks](/features/scheduled-tasks) — automate recurring agent tasks
-- [Agent Swarms](/features/agent-swarms) — multi-agent collaboration
-- [Customization](/features/customization) — modify trigger patterns and behavior
+- [Scheduled tasks](/features/scheduled-tasks) — a scheduled task is a message row with a timestamp
+- [Integrations overview](/integrations/overview) — channels and providers available as skills
+- [Customization](/features/customization) — modify trigger patterns, engage modes, and delivery polling

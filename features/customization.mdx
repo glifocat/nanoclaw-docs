@@ -1,195 +1,145 @@
 ---
 title: Customize NanoClaw
-description: Learn how to modify NanoClaw's behavior by changing code, not configuration files
+description: Change behavior by editing code, wiring agent groups, and installing skills — no config-file sprawl.
 tag: "UPDATED"
+keywords: ["customize", "config", "trigger", "engage mode", "mount allowlist", "env vars", "buildTriggerPattern"]
 ---
 
-## Philosophy
+NanoClaw doesn't rely on large configuration files. Instead, customizations fall into four lanes:
 
-NanoClaw doesn't use configuration files. Instead, it's designed to be customized by modifying the code directly. The codebase is small enough (a few thousand lines) that you can safely make changes.
+1. **Code changes** — for behavior baked into the orchestrator (trigger pattern, polling, timeouts)
+2. **Wiring settings** — per-messaging-group config stored in the central DB (engage mode, sender scope, session mode)
+3. **Skills** — for features and integrations (install via `/add-<name>`, uninstall via `git revert`)
+4. **Mount allowlist** — for which host directories an agent can see
+
+## Philosophy
 
 <Note>
 **From the README:**
 
-"NanoClaw doesn't use configuration files. To make changes, just tell Claude Code what you want... The codebase is small enough that Claude can safely modify it."
+> NanoClaw doesn't use configuration files. To make changes, just tell Claude Code what you want... The codebase is small enough that Claude can safely modify it.
 </Note>
 
-## Why no config files?
+The result: your fork does exactly what you asked for, and nothing else. No generic system to learn — just the code you want, readable by you and by Claude Code.
 
-Configuration files lead to sprawl - dozens of options, complex validation, and bloat. NanoClaw takes a different approach:
+## Change the trigger word
 
-- **Small codebase**: ~5,000 lines across a handful of files
-- **AI-native**: Claude Code understands and modifies the code for you
-- **Bespoke**: Your fork does exactly what you need, not what a generic system supports
-- **No feature bloat**: Customizations are skills, not core features
-
-## Common customizations
-
-Here are the most common ways to customize NanoClaw:
-
-### Change the trigger word
-
-The default trigger is `@Andy`. To change it:
-
-```
-Change the trigger word to @Bob
-```
-
-Claude Code will update:
-- `ASSISTANT_NAME` in `src/config.ts`
-- The `.env` file
-- Trigger pattern regex in `src/config.ts`
-
-### Adjust response style
-
-To change how the agent responds:
-
-```
-Remember in the future to make responses shorter and more direct
-```
-
-This updates the agent's memory (stored in `groups/main/CLAUDE.md`).
-
-### Add a custom greeting
-
-```
-Add a custom greeting when I say good morning
-```
-
-Claude Code will modify the message processing logic to detect "good morning" and respond appropriately.
-
-### Change polling intervals
-
-Adjust how often NanoClaw checks for messages or due tasks:
+The default is `@Andy`, derived from `ASSISTANT_NAME` in `src/config.ts`:
 
 ```typescript
-// src/config.ts
-export const POLL_INTERVAL = 2000; // Message polling (2 seconds)
-export const SCHEDULER_POLL_INTERVAL = 60000; // Task polling (60 seconds)
+// src/config.ts (verified v2)
+export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';
+
+export function buildTriggerPattern(trigger: string): RegExp {
+  return new RegExp(`^${escapeRegex(trigger.trim())}\\b`, 'i');
+}
+
+export const DEFAULT_TRIGGER = `@${ASSISTANT_NAME}`;
+export const TRIGGER_PATTERN = buildTriggerPattern(DEFAULT_TRIGGER);
 ```
 
-To change:
-
-```
-Reduce the message polling interval to 1 second for faster responses
-```
-
-### Modify container limits
-
-Control how many agent containers can run simultaneously:
-
-```typescript
-// src/config.ts
-export const MAX_CONCURRENT_CONTAINERS = Math.max(
-  1,
-  parseInt(process.env.MAX_CONCURRENT_CONTAINERS || '5', 10) || 5,
-);
-```
-
-To change:
-
-```
-Increase the max concurrent containers to 10
-```
-
-Or set the environment variable:
+To change it, update `.env`:
 
 ```bash
-export MAX_CONCURRENT_CONTAINERS=10
+ASSISTANT_NAME=Bob
 ```
 
-### Adjust idle timeout
-
-Change how long containers stay alive after the last response:
-
-```typescript
-// src/config.ts
-export const IDLE_TIMEOUT = parseInt(process.env.IDLE_TIMEOUT || '1800000', 10); // 30 minutes
-```
-
-To change:
+Or ask Claude Code:
 
 ```
-Set the idle timeout to 10 minutes
+@Andy change the trigger word to @Bob
 ```
 
-Or:
+Claude updates `.env`, restarts the service, and verifies the new pattern matches.
+
+## Environment variables
+
+`src/config.ts` reads `ASSISTANT_NAME`, `ASSISTANT_HAS_OWN_NUMBER`, `ONECLI_URL`, `ONECLI_API_KEY`, and `TZ` from `.env` (with `process.env` taking precedence). Everything else is `process.env` only.
+
+<Tabs>
+  <Tab title="OneCLI Agent Vault (default)">
+    ```bash
+    # .env
+    ASSISTANT_NAME=Andy
+    ASSISTANT_HAS_OWN_NUMBER=false
+    ONECLI_URL=http://127.0.0.1:10254
+    # ONECLI_API_KEY=...  # only if your OneCLI instance requires auth
+    TZ=America/Los_Angeles
+    ```
+
+    Credentials are managed by the OneCLI Agent Vault. No API keys live in `.env`.
+  </Tab>
+
+  <Tab title="Legacy credential proxy (opt-in)">
+    ```bash
+    # .env
+    ASSISTANT_NAME=Andy
+    ASSISTANT_HAS_OWN_NUMBER=false
+    ANTHROPIC_API_KEY=sk-ant-...
+    ```
+
+    Requires the `/use-native-credential-proxy` skill (lives at `skill/native-credential-proxy` on upstream). The skill restores the v1-style credential proxy — the host reads `ANTHROPIC_API_KEY` from `.env` and injects it into container traffic via a local proxy on port 3001. Containers never see the raw key.
+  </Tab>
+</Tabs>
+
+### Runtime-tunable settings (process.env only)
+
+| Variable | Default | What it controls |
+|---|---|---|
+| `CONTAINER_IMAGE` | `nanoclaw-agent:latest` | Which image to spawn |
+| `CONTAINER_TIMEOUT` | `1800000` (30 min) | Hard upper bound on a single container run |
+| `CONTAINER_MAX_OUTPUT_SIZE` | `10485760` (10 MB) | Truncation threshold for container stdout |
+| `MAX_MESSAGES_PER_PROMPT` | `10` | How many queued inbound messages join one Claude turn |
+| `IDLE_TIMEOUT` | `1800000` (30 min) | How long a container stays alive after the last response |
+| `MAX_CONCURRENT_CONTAINERS` | `5` | Global cap on active containers |
+
+Bump them like:
 
 ```bash
-export IDLE_TIMEOUT=600000  # 10 minutes in milliseconds
+MAX_CONCURRENT_CONTAINERS=10 systemctl --user restart nanoclaw
 ```
 
-## Configuration via environment
+Or persist in your systemd / launchd service definition.
 
-While NanoClaw avoids config files, it does support a minimal `.env` file for secrets and deployment settings:
+## Per-wiring behavior (engage mode, sender scope, session mode)
 
-```bash
-# .env
-ASSISTANT_NAME=Andy
-ASSISTANT_HAS_OWN_NUMBER=false
-ANTHROPIC_API_KEY=sk-ant-...
-MAX_CONCURRENT_CONTAINERS=5
-IDLE_TIMEOUT=1800000
-CONTAINER_TIMEOUT=1800000
-```
+Every messaging group × agent group wiring (stored in `messaging_group_agents`) has orthogonal settings:
 
-### Environment variable precedence
+| Setting | Values | Meaning |
+|---|---|---|
+| `engage_mode` | `mention` (default) \| `pattern` \| `mention-sticky` | When the agent reacts: trigger-only, regex match, or trigger-and-then-sticky |
+| `engage_pattern` | regex string | Used when `engage_mode='pattern'`. Sentinel `.` means "match every message" |
+| `sender_scope` | `all` (default) \| `known` | Respond to anyone vs. only users in the agent group's member list |
+| `ignored_message_policy` | `drop` (default) \| `accumulate` | What happens to messages that didn't trigger — forgotten, or carried into the next prompt |
+| `session_mode` | `shared` (default) \| `per-thread` \| `agent-shared` | How sessions are carved: one per messaging group, one per thread, or one across multiple messaging groups |
+
+Change them with the `/manage-channels` skill — it reads/writes the wiring directly without requiring SQL.
+
+## Polling and delivery loops (source-verified)
+
+If you need to tune the delivery cadence, the constants live in `src/delivery.ts` and `src/host-sweep.ts`:
 
 ```typescript
-// From src/config.ts
-export const ASSISTANT_NAME =
-  process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';
-export const ASSISTANT_HAS_OWN_NUMBER =
-  (process.env.ASSISTANT_HAS_OWN_NUMBER ||
-    envConfig.ASSISTANT_HAS_OWN_NUMBER) === 'true';
+// src/delivery.ts
+const ACTIVE_POLL_MS = 1000;    // running sessions checked every 1s
+const SWEEP_POLL_MS = 60_000;   // liveness/recovery sweep every 60s
+
+// src/host-sweep.ts
+const SWEEP_INTERVAL_MS = 60_000;
+export const CLAIM_STUCK_MS = 60 * 1000;
+export const ABSOLUTE_CEILING_MS = 30 * 60 * 1000;
 ```
 
-1. `process.env` (runtime environment variables)
-2. `.env` file values
-3. Hardcoded defaults
+Most users never change these. If you do, remember: tighter active-poll = more CPU for idle-but-active sessions; looser sweep = slower stuck-detection.
 
-## Key configuration files
+## Memory and per-agent-group prompts
 
-### src/config.ts
-
-The main configuration file:
-
-```typescript
-// Trigger pattern
-export const ASSISTANT_NAME = 'Andy';
-export const TRIGGER_PATTERN = new RegExp(
-  `^@${escapeRegex(ASSISTANT_NAME)}\\b`,
-  'i',
-);
-
-// Polling intervals
-export const POLL_INTERVAL = 2000;
-export const SCHEDULER_POLL_INTERVAL = 60000;
-
-// Container settings
-export const CONTAINER_IMAGE = 'nanoclaw-agent:latest';
-export const CONTAINER_TIMEOUT = 1800000;
-export const IDLE_TIMEOUT = 1800000;
-export const MAX_CONCURRENT_CONTAINERS = 5;
-
-// Paths
-export const GROUPS_DIR = path.resolve(PROJECT_ROOT, 'groups');
-export const DATA_DIR = path.resolve(PROJECT_ROOT, 'data');
-
-// Timezone (validated IANA identifier; falls back to UTC)
-export const TIMEZONE = resolveConfigTimezone();
-```
-
-See the full file at `src/config.ts`.
-
-### groups/main/CLAUDE.md
-
-Memory for the main channel (your private self-chat). Edit this to change the agent's behavior:
+Agent-group memory lives in `groups/<folder>/CLAUDE.md`. Edit it to change the agent's persona, style, or pinned context:
 
 ```markdown
 # NanoClaw Assistant
 
-You are Andy, a helpful AI assistant...
+You are Andy, a helpful AI assistant.
 
 ## Preferences
 
@@ -198,156 +148,11 @@ You are Andy, a helpful AI assistant...
 - Always confirm before making changes
 ```
 
-### .claude/settings.json
+`CLAUDE.md` is composed at session start — a shared base plus the per-group fragment. Per-group changes don't affect other agent groups.
 
-Per-group Claude Code settings (auto-generated):
+## Mount allowlist
 
-```json
-{
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1",
-    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "0"
-  }
-}
-```
-
-Generated in `src/container-runner.ts` during the `buildVolumeMounts` function.
-
-## Customization workflow
-
-<Steps>
-  <Step title="Identify what to change">
-    Describe what you want in natural language:
-    
-    ```
-    I want the agent to respond faster
-    ```
-  </Step>
-  
-  <Step title="Ask Claude Code">
-    Either:
-    - Tell Claude directly: `"Reduce the polling interval to 1 second"`
-    - Use guided mode: `/customize`
-  </Step>
-  
-  <Step title="Review changes">
-    Claude shows you the diff before applying:
-    
-    ```diff
-    - export const POLL_INTERVAL = 2000;
-    + export const POLL_INTERVAL = 1000;
-    ```
-  </Step>
-  
-  <Step title="Test and iterate">
-    Run NanoClaw and verify the change works as expected
-  </Step>
-</Steps>
-
-## The /customize skill
-
-Run `/customize` for guided customization:
-
-```
-/customize
-```
-
-Claude will ask:
-- What channel you want to add (WhatsApp, Telegram, Discord, etc.)
-- What integrations you need (Gmail, Calendar, etc.)
-- How you want to change behavior
-- What features to modify
-
-## Adding channels
-
-Channels are added via skills, not by modifying core code:
-
-```
-/add-telegram
-/add-slack
-/add-discord
-```
-
-Each skill teaches Claude how to transform your NanoClaw installation to support that channel.
-
-<Warning>
-**Don't add features via PRs.**
-
-Contribute skills instead. This keeps the base system minimal and lets users customize cleanly.
-</Warning>
-
-## Adding integrations
-
-Same pattern - use skills:
-
-```
-/add-gmail
-/add-calendar
-/add-notion
-```
-
-The skill modifies your codebase to add the integration.
-
-## Mount configuration
-
-Control what directories agents can access:
-
-### Main channel
-
-Gets read-only access to the project root:
-
-```typescript
-// From src/container-runner.ts — main group mounts
-if (isMain) {
-  mounts.push({
-    hostPath: projectRoot,
-    containerPath: '/workspace/project',
-    readonly: true,
-  });
-
-  // Store mounted read-write so the main agent can
-  // query and write to the SQLite database directly
-  mounts.push({
-    hostPath: path.join(projectRoot, 'store'),
-    containerPath: '/workspace/project/store',
-    readonly: false,
-  });
-  
-  mounts.push({
-    hostPath: groupDir,
-    containerPath: '/workspace/group',
-    readonly: false,
-  });
-}
-```
-
-### Other channels
-
-Only get their own group folder:
-
-```typescript
-// From src/container-runner.ts — non-main group mounts
-mounts.push({
-  hostPath: groupDir,
-  containerPath: '/workspace/group',
-  readonly: false,
-});
-```
-
-### Mount allowlist
-
-Groups can request additional mounts via `containerConfig.additionalMounts` in their registration:
-
-```typescript
-containerConfig: {
-  additionalMounts: [
-    { hostPath: '/Users/you/Documents/vault', readonly: true }
-  ]
-}
-```
-
-Requests are validated against `~/.config/nanoclaw/mount-allowlist.json`:
+Agents only see what you mount. The allowlist lives at `~/.config/nanoclaw/mount-allowlist.json` (outside the project root, never mounted into containers):
 
 ```json
 {
@@ -368,84 +173,68 @@ Requests are validated against `~/.config/nanoclaw/mount-allowlist.json`:
 }
 ```
 
-See `src/mount-security.ts` for validation logic.
+Per-agent-group mount requests live in `groups/<folder>/container.json`. The host validates each request against the allowlist before mounting. See [Security model](/advanced/security-model) for the full picture.
+
+## The `/customize` skill
+
+For guided changes without memorizing file paths:
+
+```
+/customize
+```
+
+Claude Code asks what you want to change — trigger, behavior, integrations, mounts — and applies the diff after showing it to you.
+
+## Adding channels, providers, and features
+
+Channels and AI providers are skills, not core features. Install from the `channels` or `providers` branch:
+
+```
+/add-telegram       # channel
+/add-codex          # alternate provider (OpenAI)
+/add-ollama-provider  # alternate provider (local models)
+```
+
+See [Integrations overview](/integrations/overview) for the full list.
+
+To remove a channel or provider, `git revert` the skill's commit — restores the previous state cleanly.
+
+## Customization workflow
+
+<Steps>
+  <Step title="Describe what you want">
+    Natural language — `@Andy I want the agent to respond to every message, not just mentions` — works fine.
+  </Step>
+
+  <Step title="Claude suggests the change">
+    For wiring changes: `/manage-channels` + update `engage_mode`. For code changes: a diff against `src/config.ts` or elsewhere.
+  </Step>
+
+  <Step title="Review the diff">
+    Claude shows the exact lines before applying.
+  </Step>
+
+  <Step title="Test">
+    Run NanoClaw, verify the change works. If not: `/debug`.
+  </Step>
+</Steps>
 
 ## Debugging customizations
 
-If a customization doesn't work:
-
-### Check logs
-
 ```bash
-tail -f groups/main/logs/agent.log
+tail -f logs/nanoclaw.log
 ```
 
-### Ask Claude Code
+Or ask the agent itself:
 
 ```
-Why isn't the polling interval change working?
-Show me the current value of POLL_INTERVAL
+@Andy why did my engage mode change not take effect?
+@Andy /debug
 ```
 
-### Use the /debug skill
+## Related
 
-```
-/debug
-```
-
-Claude will:
-- Check recent logs
-- Verify configuration values
-- Identify common issues
-- Suggest fixes
-
-## Contributing customizations
-
-If your customization would benefit others, contribute it as a skill:
-
-- **Feature skills** (code changes): Branch from `main`, make your code changes, and submit a PR. Maintainers will create a `skill/<name>` branch and add the SKILL.md to the marketplace.
-- **Utility skills** (standalone tools): Create `.claude/skills/{name}/` with a SKILL.md and code files, then submit a PR to `main`.
-- **Operational skills** (workflows, guides): Create `.claude/skills/{name}/SKILL.md` and submit a PR to `main`.
-- **Container skills** (agent runtime): Create `container/skills/{name}/SKILL.md` and submit a PR to `main`.
-
-**Don't submit PRs that add features to the core codebase.** Only bug fixes, security fixes, and clear improvements are accepted.
-
-## Advanced: Direct code modification
-
-For complex customizations, you can modify the code directly:
-
-### Example: Custom message filtering
-
-Add logic to filter messages before processing:
-
-```typescript
-// src/index.ts (in processGroupMessages)
-const missedMessages = getMessagesSince(
-  chatJid,
-  sinceTimestamp,
-  ASSISTANT_NAME,
-).filter(m => {
-  // Custom filter: ignore messages from specific users
-  return !m.sender_name.includes('spam');
-});
-```
-
-### Example: Custom IPC handlers
-
-Add new IPC message types:
-
-```typescript
-// src/ipc.ts (in processTaskIpc)
-case 'custom_action':
-  if (data.customData) {
-    // Your custom logic here
-    logger.info({ data }, 'Custom action received');
-  }
-  break;
-```
-
-## Related documentation
-
-- [Messaging](/features/messaging) - Customize trigger patterns
-- [Scheduled tasks](/features/scheduled-tasks) - Customize task behavior
-- [Agent Swarms](/features/agent-swarms) - Adjust container limits for swarms
+- [Messaging](/features/messaging) — inbound routing and engage evaluation
+- [Scheduled tasks](/features/scheduled-tasks) — task model and cron
+- [Security](/concepts/security) — sender policies, user roles
+- [Architecture](/concepts/architecture) — two-DB session model
