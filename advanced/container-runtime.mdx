@@ -79,9 +79,26 @@ The agent container is built from `container/Dockerfile` and includes:
 
 Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image:
 
-- Tag: `nanoclaw-agent:{agentGroupId}`
-- Built on top of `nanoclaw-agent:latest`
+- Tag: `{CONTAINER_IMAGE_BASE}:{agentGroupId}`
+- Built on top of the base image (default `nanoclaw-agent-v2-{slug}:latest`)
 - Adds custom apt and npm packages
+
+### Per-install isolation
+
+Every install gets a deterministic slug — `sha1(projectRoot)[:8]` — that namespaces its service and image references so two NanoClaw checkouts on the same host don't clobber each other:
+
+| Resource | Template | Example |
+|---|---|---|
+| launchd label / plist | `com.nanoclaw-v2-{slug}` | `com.nanoclaw-v2-ab12cd34.plist` |
+| systemd unit | `nanoclaw-v2-{slug}.service` | `nanoclaw-v2-ab12cd34.service` |
+| Base image tag | `nanoclaw-agent-v2-{slug}:latest` | `nanoclaw-agent-v2-ab12cd34:latest` |
+| Per-group image tag | `nanoclaw-agent-v2-{slug}:{agentGroupId}` | `nanoclaw-agent-v2-ab12cd34:main` |
+
+Legacy v1 `com.nanoclaw` services left on the host are untouched and coexist with v2 installs.
+
+### Scoped orphan reaper
+
+Every container is stamped with `--label nanoclaw-install={slug}` at spawn time. `cleanupOrphans` filters by that label, so a crash-looping peer install (for example, a legacy v1 plist respawning thousands of times) cannot reap containers belonging to a healthy install — and vice versa.
 
 ## Two-database IO model
 
@@ -192,7 +209,11 @@ const onecliApplied = await onecli.applyContainerConfig(args, {
 
 <Accordion title="List running containers">
   ```bash
+  # All nanoclaw containers on the host
   docker ps --filter name=nanoclaw-
+
+  # Only this install's containers (recommended when multiple installs coexist)
+  docker ps --filter label=nanoclaw-install
   ```
 </Accordion>
 

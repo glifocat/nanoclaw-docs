@@ -187,12 +187,14 @@ For the step-by-step breakdown of what each phase does, see [Quick start](/quick
 |------|---------|
 | `~/.config/nanoclaw/mount-allowlist.json` | Which host directories agents can mount |
 | `~/.config/nanoclaw/sender-allowlist.json` | Optional per-channel sender access control |
-| `~/Library/LaunchAgents/com.nanoclaw.plist` (macOS) | launchd service definition |
-| `~/.config/systemd/user/nanoclaw.service` (Linux) | systemd user-service definition |
+| `~/Library/LaunchAgents/com.nanoclaw-v2-{slug}.plist` (macOS) | launchd service definition (per-checkout slug) |
+| `~/.config/systemd/user/nanoclaw-v2-{slug}.service` (Linux) | systemd user-service definition (per-checkout slug) |
+
+The slug is `sha1(projectRoot)[:8]`, so multiple NanoClaw installs on the same host register distinct services and coexist without clobbering each other. Legacy v1 `com.nanoclaw` / `nanoclaw.service` names remain untouched.
 
 ## Container image contents
 
-The agent container (`nanoclaw-agent:latest`) is built from `container/Dockerfile`:
+The agent container (default tag `nanoclaw-agent-v2-{slug}:latest`, namespaced per install) is built from `container/Dockerfile`:
 
 - **Base**: `node:22-slim`
 - **tini** as PID 1 — reaps Chromium zombies, forwards signals so `outbound.db` writes finalize on SIGTERM

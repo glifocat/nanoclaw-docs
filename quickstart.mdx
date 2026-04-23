@@ -104,7 +104,7 @@ If something looks wrong after install, `logs/setup.log` is the first file to re
     Driven by `setup/auto.ts`. Each sub-step emits a structured status block and writes its raw output to `logs/setup-steps/NN-<name>.log`:
 
     - **environment** — Docker / Apple Container detection, runtime selection
-    - **container** — builds `nanoclaw-agent:latest` via `container/build.sh`
+    - **container** — builds the agent image (default tag `nanoclaw-agent-v2-{slug}:latest`, per-checkout) via `container/build.sh`
     - **onecli** — installs OneCLI Agent Vault and registers your Anthropic secret
     - **channel pairing** — runs the `add-<channel>` skill you picked
     - **service** — launchd (macOS) / systemd (Linux) / `start-nanoclaw.sh` wrapper (WSL without systemd)
@@ -116,8 +116,8 @@ If something looks wrong after install, `logs/setup.log` is the first file to re
   </Accordion>
 
   <Accordion title="Service installation">
-    - **macOS** — creates launchd service at `~/Library/LaunchAgents/com.nanoclaw.plist`
-    - **Linux (systemd)** — user service at `~/.config/systemd/user/nanoclaw.service`; enables `loginctl linger` so the service survives SSH logout
+    - **macOS** — creates a per-checkout launchd service at `~/Library/LaunchAgents/com.nanoclaw-v2-{slug}.plist`
+    - **Linux (systemd)** — per-checkout user service at `~/.config/systemd/user/nanoclaw-v2-{slug}.service`; enables `loginctl linger` so the service survives SSH logout
     - **WSL without systemd** — creates a `start-nanoclaw.sh` wrapper; you run it manually on login or wire it to `.bashrc`
   </Accordion>
 </AccordionGroup>

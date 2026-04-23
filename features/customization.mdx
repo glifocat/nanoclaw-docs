@@ -86,7 +86,8 @@ Claude updates `.env`, restarts the service, and verifies the new pattern matche
 
 | Variable | Default | What it controls |
 |---|---|---|
-| `CONTAINER_IMAGE` | `nanoclaw-agent:latest` | Which image to spawn |
+| `CONTAINER_IMAGE` | `nanoclaw-agent-v2-{slug}:latest` | Which image to spawn (slug is per-checkout; override to pin a specific tag) |
+| `CONTAINER_IMAGE_BASE` | `nanoclaw-agent-v2-{slug}` | Base tag used for per-agent-group image builds |
 | `CONTAINER_TIMEOUT` | `1800000` (30 min) | Hard upper bound on a single container run |
 | `CONTAINER_MAX_OUTPUT_SIZE` | `10485760` (10 MB) | Truncation threshold for container stdout |
 | `MAX_MESSAGES_PER_PROMPT` | `10` | How many queued inbound messages join one Claude turn |
@@ -96,7 +97,8 @@ Claude updates `.env`, restarts the service, and verifies the new pattern matche
 Bump them like:
 
 ```bash
-MAX_CONCURRENT_CONTAINERS=10 systemctl --user restart nanoclaw
+# Replace <slug> with this install's slug — see `systemctl --user list-units 'nanoclaw*'`
+MAX_CONCURRENT_CONTAINERS=10 systemctl --user restart nanoclaw-v2-<slug>
 ```
 
 Or persist in your systemd / launchd service definition.
