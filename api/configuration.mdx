@@ -22,6 +22,10 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
   Docker image to use for agent containers. Per-agent-group images are tagged as `nanoclaw-agent:{agentGroupId}`.
 </ParamField>
 
+<ParamField path="CONTAINER_IMAGE_BASE" type="string" default="nanoclaw-agent">
+  Base name for per-install container images. Derived from the install slug so two installs on the same host don't collide on `nanoclaw-agent:latest`.
+</ParamField>
+
 <ParamField path="CONTAINER_TIMEOUT" type="number" default="1800000">
   Container timeout in milliseconds (default: 30 minutes).
 </ParamField>
@@ -92,6 +96,12 @@ All paths are absolute and resolved from the project root:
 <ResponseField name="MOUNT_ALLOWLIST_PATH" type="string">
   `~/.config/nanoclaw/mount-allowlist.json` — mount security allowlist (never mounted into containers)
 </ResponseField>
+
+## Install isolation
+
+Each NanoClaw install has an **install slug** derived from its project directory. The slug is exposed via `INSTALL_SLUG` (and a composed `CONTAINER_INSTALL_LABEL` in the form `nanoclaw-install=<slug>`) in `src/config.ts`.
+
+Every spawned container is tagged with `--label nanoclaw-install=<slug>`. The orphan reaper filters `docker ps` by this label so two installs on the same host cannot reap each other's containers. See [Container runtime → Install-scoped orphan reaper](/advanced/container-runtime#install-scoped-orphan-reaper) for details.
 
 ## Trigger pattern
 

@@ -99,15 +99,19 @@ Messages sent to the agent receive no response.
 
 <Accordion title="Queue at concurrency limit">
   Check if the queue is blocked:
-  
+
   ```bash
   grep 'concurrency limit' logs/nanoclaw.log | tail -5
   ```
-  
-  Stop stuck containers:
-  
+
+  Stop stuck containers for this install only (v2.0.5+ uses install-scoped labels so this won't touch peer installs):
+
   ```bash
-  docker stop -t 1 $(docker ps -q --filter name=nanoclaw-)
+  # Find your install slug from a running container
+  SLUG=$(docker inspect $(docker ps -q --filter name=nanoclaw- | head -1) \
+    --format '{{ index .Config.Labels "nanoclaw-install" }}')
+
+  docker stop -t 1 $(docker ps -q --filter label=nanoclaw-install=$SLUG)
   ```
 </Accordion>
 
@@ -257,6 +261,14 @@ grep -E "image found|image NOT found|image missing" logs/nanoclaw.log
 ```
 
 If you need Kubernetes enabled, set `CONTAINER_IMAGE` to an image stored in a registry that the kubelet won't garbage-collect, or raise the kubelet's GC thresholds.
+
+### Peer installs killing each other's containers
+
+**Symptoms (pre-v2.0.5):** Session containers die within seconds of spawning, with no error in the current install's logs. A second NanoClaw install on the same host — often a crash-looping v1 service — respawns every few seconds and reaps this install's containers.
+
+**Cause:** Before v2.0.5, the orphan reaper used a substring name filter (`docker ps --filter name=nanoclaw-`) which matched every install's containers. Any booting peer would call `cleanupOrphans()` and wipe out the healthy install.
+
+**Fix:** Upgrade to v2.0.5 or later. Every spawned container now carries a `nanoclaw-install=<slug>` label, and the reaper filters on that label. Setup also unloads crash-looping sibling services automatically during preflight.
 
 ### Resume branches from stale tree position
 
