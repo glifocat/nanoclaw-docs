@@ -133,6 +133,7 @@
               "integrations/discord",
               "integrations/slack",
               "integrations/ollama",
+              "integrations/atomic-chat",
               "integrations/x-twitter",
               "integrations/parallel-ai"
             ]
