@@ -108,12 +108,12 @@ The host sweep (`src/host-sweep.ts`) runs every 60 seconds:
 
 **Central database** (`data/v2.db`) stores the entity model:
 
-- **agent_groups** — workspaces with folder, name, and optional provider
+- **agent_groups** — workspaces with folder, name, and optional `agent_provider` override
 - **messaging_groups** — platform chats with `unknown_sender_policy` (`strict`, `request_approval`, or `public`)
 - **messaging_group_agents** — many-to-many wirings with engage mode, pattern, sender scope, ignored message policy, session mode, and priority
 - **users** — namespaced platform identifiers (e.g., `phone:+1555...`, `tg:123`, `discord:456`)
 - **user_roles** — owner (always global) or admin (global or scoped to agent group)
-- **sessions** — status tracking for both session and container
+- **sessions** — status tracking for both session and container, plus optional `agent_provider` override that wins over the group default
 
 **Session inbound.db** (host writes, container reads):
 

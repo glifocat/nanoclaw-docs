@@ -17,7 +17,7 @@ interface AgentGroup {
   id: string;             // Unique identifier
   name: string;           // Display name
   folder: string;         // Filesystem folder name
-  agent_provider?: string; // Optional provider override
+  agent_provider?: string; // Optional provider override (nullable)
   created_at: string;     // ISO timestamp
 }
 ```
@@ -25,6 +25,15 @@ interface AgentGroup {
 - Each agent group has a folder under `groups/{folder}/`
 - Container configuration lives on disk (`container.json`), not in the database
 - Each gets its own OneCLI agent identifier for credential scoping
+
+**Provider resolution precedence** (first non-empty value wins):
+
+1. `sessions.agent_provider` — per-session override
+2. `agent_groups.agent_provider` — group default
+3. `provider` in `container.json` — on-disk fallback
+4. `'claude'` — built-in default
+
+Empty strings are treated as unset. The resolved name is lowercased before dispatch.
 
 ### Messaging groups
 
