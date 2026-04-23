@@ -1,7 +1,18 @@
 ---
-title: Gmail integration
-description: Add Gmail as a tool or full channel using the /add-gmail skill for email reading, sending, and monitoring
+title: Gmail integration (v1 only)
+description: The /add-gmail skill shipped on v1. v2 does not include a Gmail adapter — use /add-resend for outbound email.
+hidden: true
 ---
+
+<Warning>
+**Gmail is not a v2 channel.** v2 ships with no `src/channels/gmail.ts` and no `/add-gmail` skill on the `channels` branch. This page describes the v1 integration for users still running v1.
+
+For v2:
+- **Outbound email** — `/add-resend` (transactional sends via Resend)
+- **Google Chat** — `/add-gchat`
+
+See the [integrations overview](/integrations/overview) for the current v2 channel list.
+</Warning>
 
 Add Gmail to NanoClaw as a tool (read, send, search, draft) or as a full channel that monitors your inbox and triggers the agent on new emails.
 

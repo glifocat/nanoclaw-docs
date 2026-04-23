@@ -5,6 +5,26 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
+  Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
+
+  ## Rewritten
+  - **`introduction.mdx`**: v2 positioning — two-DB session IO, entity model, Node + Bun runtime split, OneCLI-only credentials. Token count updated to ~127k (~64% of context window). Source file table aligned with `src/` as of v2.0.1.
+  - **`quickstart.mdx`**: one-command `bash nanoclaw.sh` flow replaces the v1 fork-and-clone + Claude Code + `/setup` dance. Documents the three-level setup log contract (terminal, `logs/setup.log`, per-step raw logs) and the Anthropic OAuth exception.
+  - **`installation.mdx`**: simplified to system requirements + platform prerequisites + `bash nanoclaw.sh`. Service management retained (launchd / systemd / WSL wrapper). File-structure tree updated for `data/v2-sessions/`, `store/v2.db`, and the per-session `inbound.db` + `outbound.db` layout.
+  - **`integrations/overview.mdx`**: reframed around channels (13+) and providers (4), both living on dedicated branches (`channels`, `providers`). Expanded channel list to cover Teams, iMessage, Matrix, Google Chat, Webex, Linear, GitHub, WeChat, Resend, and the local `/claw` CLI.
+  - **`features/customization.mdx`**: full v2 rewrite — verified trigger pattern code against `src/config.ts`, replaced nonexistent `POLL_INTERVAL` / `SCHEDULER_POLL_INTERVAL` with actual `ACTIVE_POLL_MS` / `SWEEP_POLL_MS` from `src/delivery.ts`, documented per-wiring engage config (`engage_mode`, `sender_scope`, `ignored_message_policy`, `session_mode`), kept OneCLI / legacy credential proxy as version tabs.
+
+  ## v2 update banners
+  Added `<Warning>` banners to pages pending a v2 rewrite (channel adapters moved to a single `channels` branch in v2, not per-channel `skill/*` branches):
+  - `integrations/whatsapp.mdx`, `telegram.mdx`, `discord.mdx`, `slack.mdx`, `gmail.mdx`, `x-twitter.mdx`, `skills-system.mdx`
+  - `integrations/ollama.mdx` (Ollama now lives on the `providers` branch — `/add-ollama-provider` or `/add-ollama-tool`)
+
+  ## Token count sync
+  - `integrations/skills-system.mdx`: 43.8k → 127k
+  - `CLAUDE.md`: maintenance note updated to reflect the v1.2.53 → v2.0.0 jump
+</Update>
+
 <Update label="v2.0.0: architectural rewrite docs" description="2026-04-22" tags={["Updated"]}>
   Merged PR #187 — comprehensive rewrite of concepts, advanced, api, and features pages for the v2.0.0 ground-up architectural rewrite ([qwibitai/nanoclaw#1919](https://github.com/qwibitai/nanoclaw/pull/1919)). Closed PRs #184, #185, #186 as superseded.
 
