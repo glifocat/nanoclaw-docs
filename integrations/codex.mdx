@@ -1,0 +1,119 @@
+---
+title: "Codex integration"
+description: "Run OpenAI Codex as the full agent provider — planning, tool orchestration, native compaction, MCP tools — in place of the Claude Agent SDK."
+tag: "NEW"
+keywords: ["codex", "openai", "chatgpt", "agent provider", "add-codex", "app-server"]
+---
+
+NanoClaw can run agents on OpenAI Codex instead of Claude. Codex is a full agent backend — planning, tool orchestration, session resume, MCP tools, and native compaction — not just a tool called from inside a Claude agent. The `/add-codex` skill installs the provider from the `providers` branch.
+
+<Note>
+This is distinct from using OpenAI as an MCP tool. As a provider, Codex *is* the agent. Claude is not involved.
+</Note>
+
+## How it works
+
+Codex runs as `codex app-server`, a child process spawned per query by the agent-runner. The runner speaks JSON-RPC over stdio and gets:
+
+- Native session resume via stable thread IDs
+- Streaming `init` / `activity` / `progress` / `result` events
+- MCP tool access (shared with all providers via `mcpServers`)
+- Native compaction at 40K cumulative input tokens via `thread/compact/start`
+
+Per-group selection via `agent_provider = 'codex'` on `agent_groups`. Per-session override via `sessions.agent_provider`.
+
+## Prerequisites
+
+Choose one auth path:
+
+- **ChatGPT subscription** — run `codex login` on the host (writes `~/.codex/auth.json`).
+- **OpenAI API key** — set `OPENAI_API_KEY` in `.env`.
+- **BYO OpenAI-compatible endpoint** — Groq, Together, self-hosted vLLM, or any OpenAI-compat proxy via `OPENAI_BASE_URL`.
+
+## Installation
+
+Apply the skill in Claude Code:
+
+```
+/add-codex
+```
+
+The skill is idempotent — safe to re-run. It copies the Codex provider files from the `providers` branch, wires self-registration imports, and adds the Codex CLI to the Dockerfile's pinned pnpm install block.
+
+After the skill completes, rebuild the container image:
+
+```bash
+./container/build.sh
+```
+
+## Configuration
+
+### ChatGPT subscription (recommended for individuals)
+
+```bash
+codex login
+```
+
+The host-side provider copies `~/.codex/auth.json` into a per-session `~/.codex` directory mounted into the container — your host's own Codex CLI is never touched. No `.env` variables required.
+
+### API key (recommended for CI or API billing)
+
+```env
+OPENAI_API_KEY=sk-...
+CODEX_MODEL=gpt-5.4-mini
+```
+
+Both variables forward into the container. If subscription and `OPENAI_API_KEY` are both present, Codex prefers the subscription.
+
+### BYO OpenAI-compatible endpoint (experimental)
+
+Codex honors `OPENAI_BASE_URL`. Point it at any OpenAI-compatible endpoint:
+
+```env
+OPENAI_API_KEY=...
+OPENAI_BASE_URL=https://api.groq.com/openai/v1
+CODEX_MODEL=llama-3.3-70b-versatile
+```
+
+Codex also ships local-runner flags (`--oss --local-provider ollama` / `lmstudio`) that auto-detect a local server. See the Codex CLI docs for the full `model_provider = oss` configuration.
+
+<Warning>
+Tool-calling quality depends on the model and endpoint. Smaller models (< 30B) often struggle with multi-step tool orchestration. Test before committing to production use.
+</Warning>
+
+### Per group and per session
+
+Set `agent_provider = 'codex'` on `agent_groups` for groups that should use Codex, or on `sessions` to override per-session. The container receives `AGENT_PROVIDER` from the resolved value — session overrides group.
+
+`CODEX_MODEL` applies process-wide via `.env`. For different models per group, set `container_config.env` on the group.
+
+Extra MCP servers still come from `NANOCLAW_MCP_SERVERS` / `container_config.mcpServers` on the host — merged into the same `mcpServers` object passed to all providers.
+
+## Operational notes
+
+- **Spawn-per-query** — the app-server is spawned fresh per query invocation (matches the OpenCode pattern). No long-lived daemon to keep healthy across sessions.
+- **Per-session `~/.codex` isolation** — each group gets its own copy of the host's `auth.json`. The container rewrites `config.toml` freely on every wake without touching the host's Codex config.
+- **Native compaction** — triggers automatically at 40K cumulative input tokens between turns. If compaction fails, the provider logs and continues uncompacted — no fatal error.
+- **Approvals** — auto-accepted inside the container (the container is the sandbox; same posture as Claude and OpenCode).
+- **Mid-turn input** — Codex turns don't accept mid-turn messages. Follow-up pushes queue and drain between turns. The poll-loop only pushes between turns, so no messages are dropped.
+- **Stale thread recovery** — a cold-started app-server recovers cleanly when it sees a stored continuation it no longer has, by matching on stale-thread-ID errors.
+
+## Verify
+
+After rebuild, set `agent_provider = 'codex'` on a test group and send a message. A successful round-trip produces:
+
+1. An `init` event with a stable thread ID as continuation
+2. One or more `activity` / `progress` events during the turn
+3. A `result` event with the model's reply
+
+If the agent hangs or errors:
+
+- **Subscription mode** — confirm `~/.codex/auth.json` exists on the host.
+- **API-key mode** — `docker exec` into a running container and check `env | grep -i openai` to confirm forwarding.
+
+## Related pages
+
+- [Integrations overview](/integrations/overview#providers) — all provider options
+- [Skills system](/integrations/skills-system) — how `/add-*` skills work
+- [Container runtime](/advanced/container-runtime) — how agent containers are spawned
+- [Configuration](/api/configuration) — environment variable reference
