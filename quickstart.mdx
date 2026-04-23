@@ -40,7 +40,7 @@ This guide covers the default installer. If you want to customize the install pa
     - Pairing your first channel (Telegram, Discord, WhatsApp, or the local CLI)
     - Installing a systemd or launchd service so NanoClaw starts with your machine
 
-    If any step fails, Claude Code is invoked automatically to diagnose and resume from where it broke. You don't have to debug the installer yourself.
+    If any step fails, Claude Code is offered to diagnose and resume from where it broke. The "Run this command?" prompt defaults to Yes — Claude has already explained the fix, so pressing Enter executes it. Across multiple failures in the same setup run, Claude resumes the same session so it sees prior attempts as conversation history instead of a blank-slate ticket.
   </Step>
 
   <Step title="Answer the setup prompts">
@@ -58,6 +58,17 @@ This guide covers the default installer. If you want to customize the install pa
     The one step that hands off from the scripted flow: `claude setup-token` opens a browser for OAuth and prints a long-lived token back into your terminal. The installer captures the status and returns to the clack flow once the token is stored in OneCLI.
 
     If you chose to skip Anthropic auth or use an API key instead, this step is skipped or replaced with a password prompt.
+  </Step>
+
+  <Step title="Confirm the agent is alive">
+    Before moving on, the installer sends a quick ping to your assistant and waits for the pong. First startup typically takes 30–60 seconds while the sandbox warms up.
+
+    Once the agent replies, you're offered two choices:
+
+    - **Continue with setup** (default, recommended) — moves straight on to channel pairing and service install
+    - **Pause here and chat with your agent from the terminal** — opt-in free-text chat loop against the local CLI socket
+
+    If the ping fails, Claude Code is offered to diagnose the stall. The prompt to run its suggested fix defaults to Yes — after Claude has already explained what it plans to do, pressing Enter runs it.
   </Step>
 
   <Step title="Send your first message">

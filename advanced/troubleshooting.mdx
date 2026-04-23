@@ -606,7 +606,7 @@ npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
 
 If you're still experiencing issues:
 
-1. **Ask Claude Code directly:** Run `claude` and describe the problem. Claude can read logs, check database state, and diagnose issues.
+1. **Ask Claude Code directly:** Run `claude` and describe the problem. Claude can read logs, check database state, and diagnose issues. During `nanoclaw.sh`, Claude is also offered automatically on any step that fails — it keeps the same session across multiple failures in one setup run so it carries context between attempts, and its suggested fix prompt defaults to Yes.
 
 2. **Run the debug skill:** `claude` → `/debug` for guided troubleshooting.
 
