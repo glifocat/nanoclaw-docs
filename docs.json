@@ -33,6 +33,10 @@
   "styling": {
     "eyebrows": "breadcrumbs"
   },
+  "banner": {
+    "content": "**These docs are being updated for NanoClaw v2.** Hit something that looks outdated? [Ping us on Discord](https://discord.gg/VDdww8qS42).",
+    "dismissible": true
+  },
   "navbar": {
     "primary": {
       "type": "github",
