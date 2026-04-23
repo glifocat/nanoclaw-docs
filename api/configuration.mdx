@@ -18,8 +18,12 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
   Whether the assistant has its own phone number or dedicated account. Set to `"true"` to enable.
 </ParamField>
 
-<ParamField path="CONTAINER_IMAGE" type="string" default="nanoclaw-agent:latest">
-  Docker image to use for agent containers. Per-agent-group images are tagged as `nanoclaw-agent:{agentGroupId}`.
+<ParamField path="CONTAINER_IMAGE_BASE" type="string" default="nanoclaw-agent-v2-{slug}">
+  Base name for agent container images, with no tag. Defaults to `nanoclaw-agent-v2-<slug>` where `<slug>` is `sha1(projectRoot).slice(0, 8)`. Each checkout gets its own namespace so two installs on the same host don't overwrite each other's images.
+</ParamField>
+
+<ParamField path="CONTAINER_IMAGE" type="string" default="nanoclaw-agent-v2-{slug}:latest">
+  Full image reference used as the base for every agent container. Defaults to `${CONTAINER_IMAGE_BASE}:latest`. Per-agent-group images are tagged as `${CONTAINER_IMAGE_BASE}:{agentGroupId}`.
 </ParamField>
 
 <ParamField path="CONTAINER_TIMEOUT" type="number" default="1800000">

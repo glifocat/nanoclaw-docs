@@ -1,6 +1,7 @@
 ---
 title: Creating skills
 description: Learn how to create custom NanoClaw skills — four types for different purposes
+tag: "UPDATED"
 ---
 
 Skills are NanoClaw's approach to extending functionality. Instead of adding features to the core codebase, you create skills that teach Claude Code how to transform a user's fork to add exactly what they need.
@@ -198,8 +199,9 @@ Handle platform differences (macOS, Linux, Windows/WSL2):
 
 ```bash
 npm run build
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
-# Linux: systemctl --user restart nanoclaw
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>  # macOS
+# Linux: systemctl --user restart nanoclaw-v2-<slug>
+# <slug> is sha1(projectRoot)[:8] — unique to each checkout (v2.0.3+).
 ```
 ```
 

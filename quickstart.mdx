@@ -175,7 +175,7 @@ Here's what Claude Code does when you run `/setup`:
 </Accordion>
 
 <Accordion title="7. Service installation">
-  - **macOS**: Creates launchd service at `~/Library/LaunchAgents/com.nanoclaw.plist`
+  - **macOS**: Creates a per-checkout launchd service at `~/Library/LaunchAgents/com.nanoclaw-v2-<slug>.plist`, where `<slug>` is `sha1(projectRoot).slice(0, 8)`. Installs from different directories coexist without clobbering each other.
   - **Linux**: Creates systemd service (user or system level); enables `loginctl linger` for non-root users so the service survives SSH logout
   - **WSL without systemd**: Creates `start-nanoclaw.sh` wrapper script
   - Starts the service

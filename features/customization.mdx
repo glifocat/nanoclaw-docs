@@ -167,7 +167,12 @@ export const POLL_INTERVAL = 2000;
 export const SCHEDULER_POLL_INTERVAL = 60000;
 
 // Container settings
-export const CONTAINER_IMAGE = 'nanoclaw-agent:latest';
+// Default is `nanoclaw-agent-v2-<slug>:latest` where <slug> is sha1(projectRoot)[:8].
+// Override via CONTAINER_IMAGE or CONTAINER_IMAGE_BASE env vars.
+export const CONTAINER_IMAGE_BASE =
+  process.env.CONTAINER_IMAGE_BASE || getContainerImageBase(PROJECT_ROOT);
+export const CONTAINER_IMAGE =
+  process.env.CONTAINER_IMAGE || getDefaultContainerImage(PROJECT_ROOT);
 export const CONTAINER_TIMEOUT = 1800000;
 export const IDLE_TIMEOUT = 1800000;
 export const MAX_CONCURRENT_CONTAINERS = 5;

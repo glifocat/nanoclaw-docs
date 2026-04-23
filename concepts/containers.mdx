@@ -151,9 +151,11 @@ Even if the container crashes, all data in session databases and mounted directo
 
 Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image with additional apt and npm packages:
 
-- Image tag: `nanoclaw-agent:{agentGroupId}`
-- Built on top of the base `nanoclaw-agent:latest` image
+- Image tag: `${CONTAINER_IMAGE_BASE}:{agentGroupId}`
+- Built on top of the base `${CONTAINER_IMAGE_BASE}:latest` image
 - Cached — only rebuilt when package lists change
+
+`CONTAINER_IMAGE_BASE` defaults to `nanoclaw-agent-v2-<slug>`, where `<slug>` is the first 8 hex characters of `sha1(projectRoot)`. Each checkout on the same host gets its own image namespace, so running two NanoClaw installs side-by-side won't rebuild images on top of each other.
 
 ## Timeouts
 

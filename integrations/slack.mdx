@@ -332,7 +332,7 @@ export class SlackChannel implements Channel {
     3. **Reinstall the app** to workspace (scope changes require reinstall)
     4. Copy the new Bot Token (it changes on reinstall)
     5. Update `.env` and sync: `cp .env data/env/env`
-    6. Restart: `launchctl kickstart -k gui/$(id -u)/com.nanoclaw`
+    6. Restart the service (see [restart the service](/advanced/troubleshooting#service-management) — uses per-checkout service name `com.nanoclaw-v2-<slug>`).
   </Accordion>
   
   <Accordion title="Wrong token used">
@@ -401,10 +401,9 @@ Since Slack was added via a git merge, you remove it by reverting the merge comm
   <Step title="Rebuild and restart">
     ```bash
     npm install
-    npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
-    # or: systemctl --user restart nanoclaw (Linux)
     ```
+
+    <RestartService />
   </Step>
 </Steps>
 

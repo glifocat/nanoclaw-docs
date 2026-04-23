@@ -382,10 +382,9 @@ Since Discord was added via a git merge, you remove it by reverting the merge co
   <Step title="Rebuild and restart">
     ```bash
     npm install
-    npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
-    # or: systemctl --user restart nanoclaw (Linux)
     ```
+
+    <RestartService />
   </Step>
 </Steps>
 

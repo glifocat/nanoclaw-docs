@@ -1,11 +1,15 @@
 <CodeGroup>
 ```bash macOS
 npm run build
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+launchctl kickstart -k gui/$(id -u)/"$(ls ~/Library/LaunchAgents | grep -E '^com\.nanoclaw(-v2-[a-f0-9]{8})?\.plist$' | head -n1 | sed 's/\.plist$//')"
 ```
 
 ```bash Linux
 npm run build
-systemctl --user restart nanoclaw
+systemctl --user restart "$(systemctl --user list-unit-files 'nanoclaw*.service' --no-legend | awk '{print $1}' | head -n1)"
 ```
 </CodeGroup>
+
+<Note>
+Since v2.0.3, each NanoClaw checkout registers a unique service name so multiple installs on the same host don't clobber each other. The service is `com.nanoclaw-v2-<slug>` on macOS and `nanoclaw-v2-<slug>.service` on Linux, where `<slug>` is `sha1(projectRoot)[:8]`. Older v1 installs still use the plain `com.nanoclaw` / `nanoclaw.service` names.
+</Note>

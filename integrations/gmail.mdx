@@ -3,6 +3,8 @@ title: Gmail integration
 description: Add Gmail as a tool or full channel using the /add-gmail skill for email reading, sending, and monitoring
 ---
 
+import RestartService from "/snippets/restart-service.mdx";
+
 Add Gmail to NanoClaw as a tool (read, send, search, draft) or as a full channel that monitors your inbox and triggers the agent on new emails.
 
 ## Overview
@@ -156,11 +158,7 @@ After authorization:
   </Step>
   
   <Step title="Rebuild and restart">
-    ```bash
-    npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
-    # or: systemctl --user restart nanoclaw (Linux)
-    ```
+    <RestartService />
   </Step>
 </Steps>
 
@@ -444,18 +442,9 @@ To remove the Gmail skill and revert to a Gmail-free setup:
   <Step title="Rebuild and restart">
     ```bash
     npm install
-    npm run build
     ```
 
-    <CodeGroup>
-    ```bash macOS
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-    ```
-
-    ```bash Linux
-    systemctl --user restart nanoclaw
-    ```
-    </CodeGroup>
+    <RestartService />
   </Step>
 </Steps>
 
