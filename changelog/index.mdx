@@ -6,6 +6,13 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.5" description="2026-04-23" tags={["Fix"]}>
+  - Container orphan reaper is now scoped by `nanoclaw-install=<slug>` label — crash-looping peer installs can no longer kill a healthy install's containers
+  - Setup now enumerates `com.nanoclaw*` launchd plists / `nanoclaw*` systemd user units and unloads peers that are crash-looping (state != running AND runs > 10) before installing its own service
+  - Healthy peer installs are left alone and can coexist on one host
+  - Setup (v2.0.2–v2.0.4): yes-default + session-persist on `claude-assist`, per-checkout service name + docker image tag, npm global-prefix PATH fallback, GitHub API rate-limit bypass for OneCLI install, reuse-existing-OneCLI prompt
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention
