@@ -2,6 +2,7 @@
 title: Command-line interface
 description: Run NanoClaw agents from the terminal with the claw CLI — send prompts, pipe input, resume sessions, and script agent interactions
 keywords: ["cli", "claw", "terminal", "command line", "scripting", "automation"]
+tag: "UPDATED"
 ---
 
 ## Overview
@@ -19,7 +20,7 @@ Use cases include:
 ## Prerequisites
 
 - Python 3.8 or later
-- NanoClaw installed with a built container image (`nanoclaw-agent:latest`)
+- NanoClaw installed with a built container image (per-checkout `nanoclaw-agent-v2-<slug>:latest`)
 - Either `container` (Apple Container, macOS 15+) or `docker` available in `PATH`
 
 ## Installation
@@ -90,7 +91,7 @@ Displays all registered groups with their name, folder, and JID.
 claw --runtime docker "Hello"
 
 # Use a custom image tag
-claw --image nanoclaw-agent:dev "Hello"
+claw --image nanoclaw-agent-v2-<slug>:dev "Hello"
 
 # Custom timeout for long-running tasks (default: 300s)
 claw --timeout 600 "Run the full analysis"

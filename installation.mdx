@@ -3,6 +3,7 @@ title: Installation
 description: Detailed installation requirements and setup for macOS, Linux, and Windows (WSL)
 icon: "download"
 keywords: ["requirements", "docker", "node", "apple container", "windows", "wsl", "onecli"]
+tag: "UPDATED"
 ---
 
 # Installation
@@ -304,7 +305,7 @@ onecli version
 Run `onecli --help` to see all available commands for managing secrets and vault configuration.
 
 <Info>
-OneCLI is also installed automatically by the `/setup` skill if not already present. It's listed here so you know about the dependency upfront.
+OneCLI is also installed automatically by `bash nanoclaw.sh` if not already present. If you already have OneCLI running and bound to a specific listener, the installer will detect it and offer to reuse the existing instance instead of re-running `curl | sh` (which would rebind the gateway and break other consumers). It's listed here so you know about the dependency upfront.
 </Info>
 
 <Note>
@@ -409,7 +410,7 @@ The container is built during setup:
 ./container/build.sh
 ```
 
-This creates the `nanoclaw-agent` image.
+This creates a per-checkout image tagged `nanoclaw-agent-v2-<slug>:latest`, where `<slug>` is `sha1(projectRoot)[:8]`. The deterministic slug lets two NanoClaw checkouts on the same host coexist without overwriting each other's image.
 
 ## File structure
 
@@ -445,8 +446,12 @@ After installation, NanoClaw creates:
 **External files**:
 - `~/.config/nanoclaw/mount-allowlist.json` - Mount permissions
 - `~/.config/nanoclaw/sender-allowlist.json` - Sender access control (optional)
-- `~/Library/LaunchAgents/com.nanoclaw.plist` (macOS) - Service config
-- `~/.config/systemd/user/nanoclaw.service` (Linux/WSL with systemd) - Service config
+- `~/Library/LaunchAgents/com.nanoclaw-v2-<slug>.plist` (macOS) - Service config
+- `~/.config/systemd/user/nanoclaw-v2-<slug>.service` (Linux/WSL with systemd) - Service config
+
+<Note>
+Service labels and docker image tags include a per-checkout slug — `sha1(projectRoot)[:8]` — so multiple NanoClaw installs on the same host don't clobber each other. Find yours with `node -e "console.log(require('./dist/install-slug.js').getInstallSlug())"` or `bash setup/lib/install-slug.sh`. Any v1 `com.nanoclaw` service from an older install is left untouched and can coexist.
+</Note>
 
 ## Service management
 
@@ -455,14 +460,17 @@ NanoClaw runs as a background service:
 <Tabs>
   <Tab title="macOS (launchd)">
     ```bash
+    # Resolve your per-checkout label once
+    LABEL="com.nanoclaw-v2-$(bash setup/lib/install-slug.sh)"
+
     # Start service
-    launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
+    launchctl load ~/Library/LaunchAgents/$LABEL.plist
 
     # Stop service
-    launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
+    launchctl unload ~/Library/LaunchAgents/$LABEL.plist
 
     # Restart service
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    launchctl kickstart -k gui/$(id -u)/$LABEL
 
     # Check status
     launchctl list | grep nanoclaw
@@ -474,23 +482,26 @@ NanoClaw runs as a background service:
   
   <Tab title="Linux (systemd)">
     ```bash
+    # Resolve your per-checkout unit once
+    UNIT="nanoclaw-v2-$(bash setup/lib/install-slug.sh)"
+
     # Start service
-    systemctl --user start nanoclaw
+    systemctl --user start $UNIT
 
     # Stop service
-    systemctl --user stop nanoclaw
+    systemctl --user stop $UNIT
 
     # Restart service
-    systemctl --user restart nanoclaw
+    systemctl --user restart $UNIT
 
     # Check status
-    systemctl --user status nanoclaw
+    systemctl --user status $UNIT
 
     # Enable on boot
-    systemctl --user enable nanoclaw
+    systemctl --user enable $UNIT
 
     # View logs
-    journalctl --user -u nanoclaw -f
+    journalctl --user -u $UNIT -f
     ```
 
     <Note>
@@ -589,7 +600,7 @@ container builder start
 
     # Rebuild and restart
     npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-$(bash setup/lib/install-slug.sh)
     ```
   </Tab>
   
@@ -606,7 +617,7 @@ container builder start
 
     # Rebuild and restart
     npm run build
-    systemctl --user restart nanoclaw
+    systemctl --user restart nanoclaw-v2-$(bash setup/lib/install-slug.sh)
     ```
   </Tab>
 </Tabs>

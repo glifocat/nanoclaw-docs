@@ -6,6 +6,27 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.4" description="2026-04-23" tags={["Maintenance"]}>
+  - Formatting-only pass; no behavior changes
+  - Token-count badge refreshed to 128k (64% of context window)
+</Update>
+
+<Update label="v2.0.3" description="2026-04-23" tags={["Feature", "Fix"]}>
+  - **Per-checkout service name and docker image tag.** Two NanoClaw installs on the same host no longer fight over the shared `com.nanoclaw` / `nanoclaw.service` label or the `nanoclaw-agent:latest` tag. A deterministic slug (`sha1(projectRoot)[:8]`) namespaces everything: service becomes `com.nanoclaw-v2-<slug>` / `nanoclaw-v2-<slug>.service`, images become `nanoclaw-agent-v2-<slug>:latest` (base) and `nanoclaw-agent-v2-<slug>:<agentGroupId>` (per-group). Any v1 `com.nanoclaw` service from an older install is left untouched and can coexist.
+  - **Setup offers to reuse an existing OneCLI.** Previously `setup/onecli.ts` ran `curl -fsSL onecli.sh/install | sh` unconditionally, which rebound gateways shared with other apps. Setup now probes for an existing install (`onecli version` + `onecli config get api-host`) and asks whether to reuse it or install a fresh copy; the new `--reuse` flag skips the installer, reads the configured api-host, and writes `ONECLI_URL` to `.env`.
+  - READMEs aligned across English/Japanese/Chinese for v2 and the quickstart now clones into `nanoclaw-v2`.
+</Update>
+
+<Update label="v2.0.2" description="2026-04-23" tags={["Feature", "Fix"]}>
+  - **`/setup` collapsed to a single instruction.** The Claude-orchestrated `/setup` and `/new-setup` flows are gone. The scripted installer (`bash nanoclaw.sh` → `setup:auto`) now handles bootstrap, container, OneCLI, auth, service, first agent, and optional channel wiring end-to-end with inline Claude-assisted recovery on failure. `/setup` remains as a one-line redirect so the trigger still resolves.
+  - Setup resolves the channels remote dynamically instead of assuming `origin`, and falls back to `npm install` when `corepack` is missing.
+  - Container `/home/node` loosened to `0777` to unblock writes under unusual UID/GID mappings.
+</Update>
+
+<Update label="v2.0.1" description="2026-04-22" tags={["Maintenance"]}>
+  - Token-count badge refreshed to 127k (64% of context window)
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention

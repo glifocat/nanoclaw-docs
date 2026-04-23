@@ -166,8 +166,9 @@ export const TRIGGER_PATTERN = new RegExp(
 export const POLL_INTERVAL = 2000;
 export const SCHEDULER_POLL_INTERVAL = 60000;
 
-// Container settings
-export const CONTAINER_IMAGE = 'nanoclaw-agent:latest';
+// Container settings — per-checkout slug derived from sha1(projectRoot)[:8]
+export const CONTAINER_IMAGE_BASE = process.env.CONTAINER_IMAGE_BASE || getContainerImageBase(PROJECT_ROOT);
+export const CONTAINER_IMAGE = process.env.CONTAINER_IMAGE || getDefaultContainerImage(PROJECT_ROOT);
 export const CONTAINER_TIMEOUT = 1800000;
 export const IDLE_TIMEOUT = 1800000;
 export const MAX_CONCURRENT_CONTAINERS = 5;

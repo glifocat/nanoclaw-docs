@@ -5,6 +5,16 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.1–v2.0.4 sync: per-checkout service/image naming" description="2026-04-23" tags={["Updated"]}>
+  ## Updated
+  - **Service labels**: documented the v2.0.3 move from `com.nanoclaw` / `nanoclaw.service` to `com.nanoclaw-v2-<slug>` / `nanoclaw-v2-<slug>.service`, with `<slug>` = `sha1(projectRoot)[:8]`. Updated every `launchctl kickstart` / `systemctl restart` snippet across installation, troubleshooting, quickstart, snippets, channel integrations, and the creating-skills guide to use the per-checkout label.
+  - **Container image**: documented `CONTAINER_IMAGE_BASE`, updated the `CONTAINER_IMAGE` default to the per-checkout `nanoclaw-agent-v2-<slug>:latest`, and refreshed per-agent-group image references in `concepts/containers` and `advanced/container-runtime`.
+  - **Setup**: noted that `bash nanoclaw.sh` now offers to reuse an existing OneCLI instance instead of rebinding the gateway.
+
+  ## Changelog
+  - Added v2.0.1, v2.0.2, v2.0.3, and v2.0.4 product release entries ([qwibitai/nanoclaw@8a19ad0](https://github.com/qwibitai/nanoclaw/commit/8a19ad0))
+</Update>
+
 <Update label="v2.0.0: architectural rewrite docs" description="2026-04-22" tags={["Updated"]}>
   Merged PR #187 — comprehensive rewrite of concepts, advanced, api, and features pages for the v2.0.0 ground-up architectural rewrite ([qwibitai/nanoclaw#1919](https://github.com/qwibitai/nanoclaw/pull/1919)). Closed PRs #184, #185, #186 as superseded.
 

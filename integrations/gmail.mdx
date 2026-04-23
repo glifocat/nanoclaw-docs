@@ -1,6 +1,7 @@
 ---
 title: Gmail integration
 description: Add Gmail as a tool or full channel using the /add-gmail skill for email reading, sending, and monitoring
+tag: "UPDATED"
 ---
 
 Add Gmail to NanoClaw as a tool (read, send, search, draft) or as a full channel that monitors your inbox and triggers the agent on new emails.
@@ -158,8 +159,8 @@ After authorization:
   <Step title="Rebuild and restart">
     ```bash
     npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
-    # or: systemctl --user restart nanoclaw (Linux)
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-$(bash setup/lib/install-slug.sh)  # macOS
+    # or: systemctl --user restart nanoclaw-v2-$(bash setup/lib/install-slug.sh) (Linux)
     ```
   </Step>
 </Steps>
@@ -449,11 +450,11 @@ To remove the Gmail skill and revert to a Gmail-free setup:
 
     <CodeGroup>
     ```bash macOS
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-$(bash setup/lib/install-slug.sh)
     ```
 
     ```bash Linux
-    systemctl --user restart nanoclaw
+    systemctl --user restart nanoclaw-v2-$(bash setup/lib/install-slug.sh)
     ```
     </CodeGroup>
   </Step>

@@ -1,6 +1,7 @@
 ---
 title: Discord integration
 description: Add Discord as a messaging channel for NanoClaw using the /add-discord skill for team collaboration
+tag: "UPDATED"
 ---
 
 import RestartService from "/snippets/restart-service.mdx";
@@ -383,8 +384,8 @@ Since Discord was added via a git merge, you remove it by reverting the merge co
     ```bash
     npm install
     npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
-    # or: systemctl --user restart nanoclaw (Linux)
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-$(bash setup/lib/install-slug.sh)  # macOS
+    # or: systemctl --user restart nanoclaw-v2-$(bash setup/lib/install-slug.sh) (Linux)
     ```
   </Step>
 </Steps>

@@ -75,12 +75,16 @@ The agent container is built from `container/Dockerfile` and includes:
 ./container/build.sh
 ```
 
+### Per-checkout image naming
+
+Image tags are namespaced per checkout to let multiple NanoClaw installs share a host. The base image is `nanoclaw-agent-v2-<slug>:latest`, where `<slug>` is `sha1(projectRoot)[:8]`. Override with the `CONTAINER_IMAGE` or `CONTAINER_IMAGE_BASE` env var if you publish to a registry.
+
 ### Per-agent-group images
 
 Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image:
 
-- Tag: `nanoclaw-agent:{agentGroupId}`
-- Built on top of `nanoclaw-agent:latest`
+- Tag: `<CONTAINER_IMAGE_BASE>:{agentGroupId}` (e.g. `nanoclaw-agent-v2-ab12cd34:ag_123`)
+- Built on top of `<CONTAINER_IMAGE_BASE>:latest`
 - Adds custom apt and npm packages
 
 ## Two-database IO model

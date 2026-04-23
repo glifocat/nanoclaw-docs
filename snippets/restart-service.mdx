@@ -1,11 +1,11 @@
 <CodeGroup>
 ```bash macOS
 npm run build
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-$(bash setup/lib/install-slug.sh)
 ```
 
 ```bash Linux
 npm run build
-systemctl --user restart nanoclaw
+systemctl --user restart nanoclaw-v2-$(bash setup/lib/install-slug.sh)
 ```
 </CodeGroup>
