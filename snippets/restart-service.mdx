@@ -1,11 +1,15 @@
 <CodeGroup>
 ```bash macOS
 npm run build
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>
 ```
 
 ```bash Linux
 npm run build
-systemctl --user restart nanoclaw
+systemctl --user restart nanoclaw-v2-<slug>
 ```
 </CodeGroup>
+
+<Note>
+Service names include a per-checkout `<slug>` (`sha1(projectRoot)[:8]`) so multiple installs can coexist. Resolve yours with `bash setup/lib/install-slug.sh` from the NanoClaw directory.
+</Note>

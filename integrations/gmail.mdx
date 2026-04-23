@@ -158,8 +158,9 @@ After authorization:
   <Step title="Rebuild and restart">
     ```bash
     npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
-    # or: systemctl --user restart nanoclaw (Linux)
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>  # macOS
+    # or: systemctl --user restart nanoclaw-v2-<slug> (Linux)
+    # Resolve <slug> with: bash setup/lib/install-slug.sh
     ```
   </Step>
 </Steps>
@@ -449,13 +450,15 @@ To remove the Gmail skill and revert to a Gmail-free setup:
 
     <CodeGroup>
     ```bash macOS
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>
     ```
 
     ```bash Linux
-    systemctl --user restart nanoclaw
+    systemctl --user restart nanoclaw-v2-<slug>
     ```
     </CodeGroup>
+
+    Resolve `<slug>` with `bash setup/lib/install-slug.sh` from the NanoClaw directory.
   </Step>
 </Steps>
 

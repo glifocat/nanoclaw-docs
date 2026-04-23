@@ -313,8 +313,8 @@ export class DiscordChannel implements Channel {
     3. For non-main channels: message must @mention the bot
     4. Service is running:
        ```bash
-       launchctl list | grep nanoclaw  # macOS
-       systemctl --user status nanoclaw  # Linux
+       launchctl list | grep nanoclaw  # macOS (matches every NanoClaw install)
+       systemctl --user status nanoclaw-v2-<slug>  # Linux — <slug> from setup/lib/install-slug.sh
        ```
     5. Bot has been invited to the server (check OAuth2 URL was used)
   </Accordion>
@@ -383,8 +383,9 @@ Since Discord was added via a git merge, you remove it by reverting the merge co
     ```bash
     npm install
     npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
-    # or: systemctl --user restart nanoclaw (Linux)
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>  # macOS
+    # or: systemctl --user restart nanoclaw-v2-<slug> (Linux)
+    # Resolve <slug> with: bash setup/lib/install-slug.sh
     ```
   </Step>
 </Steps>

@@ -151,9 +151,11 @@ Even if the container crashes, all data in session databases and mounted directo
 
 Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image with additional apt and npm packages:
 
-- Image tag: `nanoclaw-agent:{agentGroupId}`
-- Built on top of the base `nanoclaw-agent:latest` image
+- Image tag: `nanoclaw-agent-v2-{slug}:{agentGroupId}`
+- Built on top of the base `nanoclaw-agent-v2-{slug}:latest` image
 - Cached — only rebuilt when package lists change
+
+The `{slug}` is `sha1(projectRoot)[:8]` — deterministic per checkout path, so two NanoClaw installs on the same host never share image tags. Override with `CONTAINER_IMAGE` / `CONTAINER_IMAGE_BASE` if needed.
 
 ## Timeouts
 
@@ -233,7 +235,7 @@ Containers provide filesystem isolation, not network isolation. Agents can make 
 ### Container won't start
 
 1. Check Docker is running: `docker ps`
-2. Check image exists: `docker images | grep nanoclaw-agent`
+2. Check image exists: `docker images | grep nanoclaw-agent-v2`
 3. Rebuild image: `./container/build.sh`
 
 ### Container timeout

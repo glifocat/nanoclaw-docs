@@ -310,8 +310,8 @@ Check these common issues:
     # macOS
     launchctl list | grep nanoclaw
     
-    # Linux
-    systemctl --user status nanoclaw
+    # Linux — <slug> from setup/lib/install-slug.sh
+    systemctl --user status nanoclaw-v2-<slug>
     ```
   </Accordion>
   
@@ -430,8 +430,9 @@ Since Telegram was added via a git merge, you remove it by reverting the merge c
     ```bash
     npm install
     npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
-    # or: systemctl --user restart nanoclaw (Linux)
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>  # macOS
+    # or: systemctl --user restart nanoclaw-v2-<slug> (Linux)
+    # Resolve <slug> with: bash setup/lib/install-slug.sh
     ```
   </Step>
 </Steps>
