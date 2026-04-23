@@ -66,6 +66,7 @@ The agent container is built from `container/Dockerfile` and includes:
 
 - **Source is NOT baked in** — `/app/src` is a read-only bind mount from the host. Source changes never require an image rebuild.
 - **`only-built-dependencies` allowlist** in `.npmrc` for `agent-browser` and `@anthropic-ai/claude-code`
+- **One `RUN` block per global CLI** — `vercel`, `agent-browser`, and `@anthropic-ai/claude-code` are each installed in their own `pnpm install -g` layer so bumping the most-frequently-changed CLI (Claude Code) only invalidates one layer. Provider skills like `/add-codex` follow the same pattern, appending a new standalone `RUN` block rather than collapsing into a combined list.
 - **Runs as `node` user** (non-root) with `/workspace/group` as working directory
 - **Entrypoint**: `tini -> entrypoint.sh -> exec bun run /app/src/index.ts`
 
