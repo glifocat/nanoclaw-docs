@@ -34,7 +34,7 @@
     "eyebrows": "breadcrumbs"
   },
   "banner": {
-    "content": "**These docs are being updated for NanoClaw v2.** Hit something that looks outdated? [Ping us on Discord](https://discord.gg/VDdww8qS42).",
+    "content": "**Docs are catching up to v2.** [Join the Discord community](https://discord.gg/VDdww8qS42) — get help, share what you're building, or just say hi.",
     "dismissible": true
   },
   "navbar": {
