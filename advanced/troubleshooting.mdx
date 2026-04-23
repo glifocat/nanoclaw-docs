@@ -14,10 +14,11 @@ Run these commands to get a quick overview of system health:
 ```bash
 # 1. Is the service running?
 launchctl list | grep nanoclaw
-# Expected: PID  0  com.nanoclaw (PID = running, "-" = not running, non-zero exit = crashed)
+# Expected: one row per install, e.g. `PID 0 com.nanoclaw-v2-ab12cd34`
+# (v1 installs still show as `com.nanoclaw`)
 
-# 2. Any running containers?
-docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
+# 2. Any running containers (this install only)?
+docker ps --filter label=nanoclaw-install --format '{{.Names}} {{.Status}}'
 
 # 3. Any stopped/orphaned containers?
 docker ps -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
@@ -58,7 +59,7 @@ Messages sent to the agent receive no response.
   
   <Step title="Check for active containers">
     ```bash
-    docker ps --filter name=nanoclaw-
+    docker ps --filter label=nanoclaw-install
     ```
     
     If containers are stuck running, they may have hit an infinite loop.
@@ -104,10 +105,10 @@ Messages sent to the agent receive no response.
   grep 'concurrency limit' logs/nanoclaw.log | tail -5
   ```
   
-  Stop stuck containers:
+  Stop stuck containers from this install only:
   
   ```bash
-  docker stop -t 1 $(docker ps -q --filter name=nanoclaw-)
+  docker stop -t 1 $(docker ps -q --filter label=nanoclaw-install)
   ```
 </Accordion>
 
@@ -209,6 +210,62 @@ loginctl show-user $USER | grep Linger
 <Note>
   If `loginctl enable-linger` fails with a permission error, your system may require polkit authorization. Contact your system administrator or run the command with `sudo`.
 </Note>
+
+## Two installs on the same host fighting each other
+
+### Symptoms
+- Containers disappear seconds after spawn, without hitting the timeout
+- A freshly built `nanoclaw-agent:latest` silently changes out from under you
+- Two launchd labels or systemd units both claim they own NanoClaw
+- Logs show orphan cleanup reaping containers that belong to a different checkout
+
+### Cause
+
+Before v2.0.2, every NanoClaw checkout used the same shared identifiers:
+
+- launchd label `com.nanoclaw` / systemd unit `nanoclaw.service`
+- Docker image tag `nanoclaw-agent:latest`
+- Orphan reaper matched `docker ps --filter name=nanoclaw-` (substring)
+
+Two installs on the same host would clobber each other's service registration, rebuild the shared image tag, and — worst case — a crash-looping peer (e.g., a legacy v1 plist respawning thousands of times) could kill the healthy install's session containers via the substring-match reaper.
+
+### Fix
+
+v2.0.2 introduces a per-checkout `installSlug` (`sha1(projectRoot)[:8]`, computed in `src/install-slug.ts` and `setup/lib/install-slug.sh`). All collidable identifiers are namespaced off it:
+
+| Identifier | Before | After |
+|---|---|---|
+| launchd label | `com.nanoclaw` | `com.nanoclaw-v2-{slug}` |
+| systemd unit | `nanoclaw.service` | `nanoclaw-v2-{slug}.service` |
+| Base image | `nanoclaw-agent:latest` | `nanoclaw-agent-v2-{slug}:latest` |
+| Per-group image | `nanoclaw-agent:{groupId}` | `nanoclaw-agent-v2-{slug}:{groupId}` |
+| Orphan reaper filter | `name=nanoclaw-` (substring) | `label=nanoclaw-install={slug}` |
+
+Every spawned container is stamped with `--label nanoclaw-install={slug}` at `docker run` time. The orphan reaper filters by that label, so peers are left alone.
+
+### Crash-loop preflight
+
+Setup also enumerates existing `com.nanoclaw*` launchd plists and `nanoclaw*` user systemd units, probes their state and run count, and unloads any that are crash-looping (state != running **AND** runs > 10) before installing this install's service. Healthy v1 installs (`com.nanoclaw`) are untouched and can coexist.
+
+If a peer is still wreaking havoc after setup, unload it manually:
+
+<CodeGroup>
+```bash macOS
+# List all NanoClaw plists
+ls ~/Library/LaunchAgents/com.nanoclaw*.plist
+
+# Unload a specific one
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw-v2-{slug}.plist
+```
+
+```bash Linux
+# List all NanoClaw user units
+systemctl --user list-unit-files 'nanoclaw*'
+
+# Stop and disable a specific one
+systemctl --user disable --now nanoclaw-v2-{slug}.service
+```
+</CodeGroup>
 
 ## Known issues
 

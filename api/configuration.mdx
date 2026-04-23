@@ -18,8 +18,12 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
   Whether the assistant has its own phone number or dedicated account. Set to `"true"` to enable.
 </ParamField>
 
-<ParamField path="CONTAINER_IMAGE" type="string" default="nanoclaw-agent:latest">
-  Docker image to use for agent containers. Per-agent-group images are tagged as `nanoclaw-agent:{agentGroupId}`.
+<ParamField path="CONTAINER_IMAGE" type="string" default="nanoclaw-agent-v2-{installSlug}:latest">
+  Full Docker image reference (including tag) used for agent containers. Default is computed per checkout — see `CONTAINER_IMAGE_BASE` below. Override only if you're pulling a pre-built image from a registry.
+</ParamField>
+
+<ParamField path="CONTAINER_IMAGE_BASE" type="string" default="nanoclaw-agent-v2-{installSlug}">
+  Docker image name (without tag) used as the base for every agent group. Per-agent-group images are tagged as `{CONTAINER_IMAGE_BASE}:{agentGroupId}`. The default `installSlug` is `sha1(projectRoot)[:8]` — deterministic per checkout — so two NanoClaw installs on the same host don't share `nanoclaw-agent:latest` and clobber each other on rebuild. See [Container runtime › Per-checkout install slug](/advanced/container-runtime#per-checkout-install-slug).
 </ParamField>
 
 <ParamField path="CONTAINER_TIMEOUT" type="number" default="1800000">
@@ -40,6 +44,14 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
 
 <ParamField path="ONECLI_API_KEY" type="string">
   API key for authenticating with the OneCLI Agent Vault. Optional — only needed if your OneCLI instance requires authentication.
+</ParamField>
+
+<ParamField path="ATOMIC_CHAT_HOST" type="string" default="http://host.docker.internal:1337">
+  Base URL where the Atomic Chat OpenAI-compatible API is reachable from inside the container. Only read when the `/add-atomic-chat-tool` skill is installed; the MCP server falls back to `localhost` if `host.docker.internal` isn't routable. Forwarded to the container at spawn time.
+</ParamField>
+
+<ParamField path="ATOMIC_CHAT_API_KEY" type="string">
+  Optional API key for Atomic Chat. Local Atomic Chat installs don't require auth — leave unset for those. Forwarded to the container only if set.
 </ParamField>
 
 <ParamField path="MAX_MESSAGES_PER_PROMPT" type="number" default="10">

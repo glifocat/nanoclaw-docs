@@ -1,6 +1,7 @@
 ---
 title: Slack integration
 description: Add Slack as a messaging channel for NanoClaw using the /add-slack skill for team workspaces
+tag: "UPDATED"
 ---
 
 import SyncEnv from "/snippets/sync-env.mdx";
@@ -9,6 +10,10 @@ import RestartService from "/snippets/restart-service.mdx";
 <Warning>
 This page is pending a v2 rewrite. The `/add-slack` skill flow still works, but some mechanics described below reflect v1 architecture — in v2, channel adapters live on a single `channels` branch. See [Integrations overview](/integrations/overview) for current context.
 </Warning>
+
+<Note>
+**Experimental automated flow (v2.0.6+)**: `bash nanoclaw.sh` now includes Slack as an option in the channel picker (marked `(experimental)`). The driver walks through app creation, validates the bot token via `auth.test`, installs the adapter, and prints a post-install checklist for the webhook URL and Event Subscriptions. Since Slack requires a public URL before inbound events work, there's no welcome DM — the driver's "finish in Slack" note replaces the usual "check your DMs" outro. The manual `/add-slack` flow below remains the documented path.
+</Note>
 
 Add Slack as a messaging channel for NanoClaw. Perfect for team workspaces and professional communication.
 

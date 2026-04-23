@@ -5,6 +5,18 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.6 sync: install slug, atomic chat, install-scoped reaper" description="2026-04-23" tags={["Updated"]}>
+  Synced docs with v2.0.1 → v2.0.6 upstream changes in `qwibitai/nanoclaw`.
+
+  ## Updated
+  - **`advanced/container-runtime.mdx`** — Documented the per-checkout install slug (`sha1(projectRoot)[:8]`), new launchd/systemd/image naming (`com.nanoclaw-v2-{slug}` etc.), install-scoped orphan reaper (`--label nanoclaw-install={slug}` vs the old `name=nanoclaw-` substring match), and the `/home/node` 0777 change.
+  - **`concepts/containers.mdx`** — Per-agent-group image tag updated to `nanoclaw-agent-v2-{installSlug}:{agentGroupId}`.
+  - **`api/configuration.mdx`** — Added `CONTAINER_IMAGE_BASE` param, documented the new per-install default for `CONTAINER_IMAGE`, added `ATOMIC_CHAT_HOST` / `ATOMIC_CHAT_API_KEY` params for the new skill.
+  - **`integrations/skills-system.mdx`** — Added `/add-atomic-chat-tool` to the upstream skills list.
+  - **`advanced/troubleshooting.mdx`** — New "Two installs on the same host fighting each other" section covering the old substring-match reaper bug, the v2.0.2+ label-scoped fix, and the crash-loop preflight. `docker ps` examples now prefer `--filter label=nanoclaw-install` over substring matching.
+  - **`changelog/index.mdx`** — v2.0.6 release entry covering Atomic Chat skill, experimental Slack/iMessage channel flows, install-scoped reaper, crash-loop preflight, per-checkout service/image namespacing, setup UX tweaks, and the `/home/node` loosening.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 

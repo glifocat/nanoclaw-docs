@@ -67,6 +67,7 @@ The agent container is built from `container/Dockerfile` and includes:
 - **Source is NOT baked in** — `/app/src` is a read-only bind mount from the host. Source changes never require an image rebuild.
 - **`only-built-dependencies` allowlist** in `.npmrc` for `agent-browser` and `@anthropic-ai/claude-code`
 - **Runs as `node` user** (non-root) with `/workspace/group` as working directory
+- **`/home/node` is world-writable (0777)** so secondary Claude Code subprocesses inside the container can create config state without hitting permission errors
 - **Entrypoint**: `tini -> entrypoint.sh -> exec bun run /app/src/index.ts`
 
 ### Building the image
@@ -79,9 +80,21 @@ The agent container is built from `container/Dockerfile` and includes:
 
 Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image:
 
-- Tag: `nanoclaw-agent:{agentGroupId}`
-- Built on top of `nanoclaw-agent:latest`
+- Tag: `nanoclaw-agent-v2-{installSlug}:{agentGroupId}`
+- Built on top of the base `nanoclaw-agent-v2-{installSlug}:latest`
 - Adds custom apt and npm packages
+
+### Per-checkout install slug
+
+Every install computes a deterministic `installSlug` (first 8 hex chars of `sha1(projectRoot)`) via `src/install-slug.ts`. It namespaces everything that could collide between two NanoClaw checkouts on the same host:
+
+- **launchd label** — `com.nanoclaw-v2-{slug}`
+- **systemd unit** — `nanoclaw-v2-{slug}.service`
+- **Base image** — `nanoclaw-agent-v2-{slug}:latest`
+- **Per-group image** — `nanoclaw-agent-v2-{slug}:{agentGroupId}`
+- **Container label** — `nanoclaw-install={slug}` stamped onto every spawned container
+
+v1 services (`com.nanoclaw` / `nanoclaw.service`) stay untouched and can coexist. The bash equivalent (`setup/lib/install-slug.sh`) produces the same slug so `probe.sh`, `build.sh`, `add-*.sh`, `verify.ts`, and the host process all agree.
 
 ## Two-database IO model
 
@@ -137,7 +150,7 @@ Containers are spawned by the `spawnContainer` function. Wake calls are deduplic
   </Step>
 
   <Step title="Spawn container">
-    Docker container is spawned with `tini` as PID 1.
+    Docker container is spawned with `tini` as PID 1. Every container is stamped with `--label nanoclaw-install={installSlug}` so orphan cleanup only reaps this install's containers and never touches a peer install.
   </Step>
 
   <Step title="Track container state">
@@ -172,6 +185,10 @@ Containers have two timeout/detection mechanisms:
 - `killContainer(sessionId, reason)` stops the container via `docker stop`, falls back to SIGKILL
 - On close/error, the session is marked stopped and typing indicators are cleared
 
+### Orphan reaper (install-scoped)
+
+On startup, `cleanupOrphans()` in `src/container-runtime.ts` reaps leftover containers from a previous run of **this install only**. It filters by `--filter label=nanoclaw-install={slug}` so a crash-looping peer install cannot kill the healthy install's containers. Before this became label-scoped, a substring match on `name=nanoclaw-` meant two installs on the same host could trash each other's sessions within seconds of spawn.
+
 ## Credential injection
 
 The OneCLI SDK's `applyContainerConfig()` configures each container's network to route through the vault:
@@ -192,7 +209,11 @@ const onecliApplied = await onecli.applyContainerConfig(args, {
 
 <Accordion title="List running containers">
   ```bash
+  # All nanoclaw containers on this host
   docker ps --filter name=nanoclaw-
+
+  # Only this install's containers (safer on hosts with multiple installs)
+  docker ps --filter label=nanoclaw-install
   ```
 </Accordion>
 

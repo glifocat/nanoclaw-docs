@@ -6,6 +6,16 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.6" description="2026-04-23" tags={["Feature", "Fix"]}>
+  - **Atomic Chat MCP tool skill** — `/add-atomic-chat-tool` exposes local Atomic Chat models (OpenAI-compatible API at `127.0.0.1:1337/v1`) as `atomic_chat_list_models` and `atomic_chat_generate` tools. New `ATOMIC_CHAT_HOST` / `ATOMIC_CHAT_API_KEY` env vars forwarded to the container at spawn. `[ATOMIC]` container stderr lines are surfaced at `info` level in host logs.
+  - **Slack and iMessage setup channels (experimental)** — interactive driver flows for Slack (Socket Mode app + bot token auth via `auth.test`) and iMessage (local macOS vs remote Photon). Both marked `(experimental)` in the channel picker.
+  - **Install-scoped orphan reaper** — every spawned container is stamped with `--label nanoclaw-install={slug}` and `cleanupOrphans()` now filters by that label. A crash-looping peer install can no longer reap a healthy install's session containers.
+  - **Crash-loop preflight** — setup enumerates existing `com.nanoclaw*` launchd plists / `nanoclaw*` systemd units, probes state, and unloads any that are crash-looping (state != running AND runs > 10) before installing this install's service.
+  - **Per-checkout service name + image tag** — deterministic `installSlug = sha1(projectRoot)[:8]` namespaces the launchd label (`com.nanoclaw-v2-{slug}`), systemd unit (`nanoclaw-v2-{slug}.service`), and Docker image (`nanoclaw-agent-v2-{slug}:latest` / `:{agentGroupId}`). Two installs on the same host can finally coexist.
+  - **Setup flow clarifications** — Yes-default + session-persist on `claude-assist`, quieter first-chat, prose becomes regular weight while outcomes stay bold. `PATH` fix: adds `npm` global-prefix `bin` after fallback install. Rate-limited GitHub API is bypassed when installing the OneCLI CLI.
+  - **`/home/node` loosened to 0777** — secondary Claude Code subprocesses inside the container can now write config state without permission errors.
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention
