@@ -6,6 +6,39 @@ rss: true
 tag: "UPDATED"
 ---
 
+{/* Latest version: 2.0.5 (2026-04-23) */}
+
+<Update label="v2.0.5" description="2026-04-23" tags={["Fix", "Feature"]}>
+  - **Scoped orphan container reaper** — every session container is now stamped with `--label nanoclaw-install=<slug>` and the reaper filters by that label. Two installs on the same host no longer kill each other's containers (previously a substring match on `nanoclaw-` picked up every install's containers).
+  - Setup preflight now enumerates `com.nanoclaw*` launchd plists / nanoclaw user systemd units, probes their state, and unloads any that are crash-looping before installing this install's service.
+  - Setup polish: Yes-default on Claude-assisted recovery, session persistence across retries, PATH fix for `npm` global prefix, GitHub API rate-limit fallback when installing the OneCLI CLI.
+</Update>
+
+<Update label="v2.0.4" description="2026-04-23" tags={["Feature", "Maintenance"]}>
+  - Setup flow clarifications from a user-feedback session — quieter first-chat, lifted text weight (prose regular, outcomes bold).
+  - Token count updated to ~128k (~64% of context window).
+</Update>
+
+<Update label="v2.0.3" description="2026-04-23" tags={["Feature", "Breaking"]}>
+  - **Per-checkout service and image names.** Two NanoClaw installs on the same host used to fight over the shared `com.nanoclaw` launchd label / `nanoclaw.service` systemd unit and the `nanoclaw-agent:latest` docker tag — the second install silently rewrote the service pointer and rebuilt the image out from under the first. A deterministic per-checkout slug (`sha1(projectRoot)[:8]`) now namespaces everything:
+    - Service: `com.nanoclaw-v2-<slug>` (launchd) / `nanoclaw-v2-<slug>.service` (systemd)
+    - Image base: `nanoclaw-agent-v2-<slug>:latest`
+    - Per-agent-group image: `nanoclaw-agent-v2-<slug>:<agentGroupId>`
+  - `/setup` now offers to reuse an existing OneCLI instance instead of clobbering it.
+  - Any pre-v2.0.3 `com.nanoclaw` service left on a host stays untouched and can coexist.
+</Update>
+
+<Update label="v2.0.2" description="2026-04-23" tags={["Fix", "Maintenance"]}>
+  - `/setup` skill collapsed to a single instruction — run `bash nanoclaw.sh`. The script now drives the end-to-end flow including Claude-assisted error recovery.
+  - Fallback to plain `npm install` when corepack is missing.
+  - `setup:auto` now resolves the channels git remote dynamically (no longer assumes `origin`).
+  - Loosened `/home/node` permissions to `0777` inside the container image.
+</Update>
+
+<Update label="v2.0.1" description="2026-04-22" tags={["Maintenance"]}>
+  - Token count updated to ~127k tokens (~64% of context window) following the v2 rewrite.
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention

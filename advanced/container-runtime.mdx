@@ -8,10 +8,7 @@ NanoClaw runs agents in isolated Linux containers to provide security through OS
 
 ## Runtime abstraction
 
-All runtime-specific logic lives in `src/container-runtime.ts`:
-
-- **Docker** (default) — cross-platform support (macOS, Linux, Windows via WSL2)
-- **Apple Container** (macOS only) — lightweight native runtime
+All runtime-specific logic lives in `src/container-runtime.ts`. Docker is the only runtime supported by trunk — Apple Container was removed from default setup in v2.0.0 and is only available via the opt-in `/convert-to-apple-container` skill.
 
 The runtime binary is specified by `CONTAINER_RUNTIME_BIN`:
 
@@ -19,35 +16,11 @@ The runtime binary is specified by `CONTAINER_RUNTIME_BIN`:
 export const CONTAINER_RUNTIME_BIN = 'docker';
 ```
 
-## Apple Container vs Docker
+### Apple Container (opt-in)
 
-Apple Container is Apple's native virtualization framework (macOS 15+). It runs Linux containers without a VM layer like Docker Desktop.
+Apple Container is Apple's native virtualization framework (macOS 15+). It runs Linux containers without a VM layer like Docker Desktop. Apply it post-install via the `/convert-to-apple-container` skill; to revert, use `git revert`.
 
-### When to use Apple Container
-
-- You're on **macOS 15 (Sequoia) or later**
-- You want to **avoid installing Docker Desktop**
-- You want **faster container startup**
-
-### When to stick with Docker
-
-- You're on **Linux or Windows (WSL2)**
-- You need **cross-platform parity**
-- You're deploying to a **production server**
-
-### Key differences
-
-| | Docker | Apple Container |
-|---|---|---|
-| Binary | `docker` | `container` |
-| Bind mounts | `-v host:container:ro` | `--mount type=bind,source=...,target=...,readonly` |
-| Stop command | `docker stop -t 1 name` | `container stop name` |
-| Health check | `docker info` | `container system status` |
-| Platform | macOS, Linux, Windows (WSL2) | macOS 15+ only |
-
-### Switching runtimes
-
-Run the `/convert-to-apple-container` skill in Claude Code. To revert, use `git revert`.
+The skill swaps the runtime binary, mount syntax, and stop commands in `src/container-runtime.ts`.
 
 ## Container image
 
@@ -75,13 +48,22 @@ The agent container is built from `container/Dockerfile` and includes:
 ./container/build.sh
 ```
 
+### Image naming (per-checkout slug)
+
+Since v2.0.3, image and service names include a deterministic per-checkout slug — `sha1(projectRoot)[:8]` — so two NanoClaw installs on the same host can coexist without clobbering each other's service registration or docker tag.
+
+| Artifact | Shape |
+|---|---|
+| Base image | `nanoclaw-agent-v2-<slug>:latest` |
+| Per-agent-group image | `nanoclaw-agent-v2-<slug>:<agentGroupId>` |
+| launchd label (macOS) | `com.nanoclaw-v2-<slug>` |
+| systemd unit (Linux) | `nanoclaw-v2-<slug>.service` |
+
+Override `CONTAINER_IMAGE` / `CONTAINER_IMAGE_BASE` only if you deliberately want to share images across installs.
+
 ### Per-agent-group images
 
-Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image:
-
-- Tag: `nanoclaw-agent:{agentGroupId}`
-- Built on top of `nanoclaw-agent:latest`
-- Adds custom apt and npm packages
+Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image on top of the base image with custom apt and npm packages. Per-agent-group images share the install-scoped base name (`nanoclaw-agent-v2-<slug>`) and use the agent group id as the tag.
 
 ## Two-database IO model
 
@@ -172,6 +154,16 @@ Containers have two timeout/detection mechanisms:
 - `killContainer(sessionId, reason)` stops the container via `docker stop`, falls back to SIGKILL
 - On close/error, the session is marked stopped and typing indicators are cleared
 
+### Orphan cleanup
+
+On host startup, `cleanupOrphans()` in `src/container-runtime.ts` stops stale NanoClaw containers left over from a previous run. Since v2.0.5 the reaper is **scoped by install label**: every container is stamped with `--label nanoclaw-install=<slug>` at spawn time, and the reaper filters `docker ps` by that label. A crash-looping peer install cannot reap your containers, and you cannot reap theirs.
+
+If you're debugging startup-time container churn, check that the install label matches this install before assuming a bug:
+
+```bash
+docker ps -a --filter label=nanoclaw-install=<slug> --format '{{.Names}} {{.Status}}'
+```
+
 ## Credential injection
 
 The OneCLI SDK's `applyContainerConfig()` configures each container's network to route through the vault:
@@ -191,6 +183,14 @@ const onecliApplied = await onecli.applyContainerConfig(args, {
 ## Debugging containers
 
 <Accordion title="List running containers">
+  Scoped to the current install by label (recommended — avoids showing peer installs' containers):
+
+  ```bash
+  docker ps --filter label=nanoclaw-install=<slug>
+  ```
+
+  Or by name prefix (returns every install's containers on the host):
+
   ```bash
   docker ps --filter name=nanoclaw-
   ```

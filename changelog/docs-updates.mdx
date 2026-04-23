@@ -5,6 +5,17 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.5 sync: per-checkout slugs and install-scoped orphan reaper" description="2026-04-23" tags={["Updated"]}>
+  Synced docs to upstream changes between v2.0.1 and v2.0.5 — the key technical shift is per-checkout namespacing of service and image names so two NanoClaw installs on the same host can coexist.
+
+  ## Updated
+  - **`changelog/index.mdx`**: Added release entries for v2.0.1 through v2.0.5, highlighting per-checkout service/image slugs (v2.0.3), setup polish (v2.0.2, v2.0.4), and the install-label-scoped orphan reaper (v2.0.5).
+  - **`api/configuration.mdx`**: Renamed the default `CONTAINER_IMAGE` to `nanoclaw-agent-v2-<slug>:latest` and documented the new `CONTAINER_IMAGE_BASE` derivation.
+  - **`advanced/container-runtime.mdx`**: Added an "Image naming (per-checkout slug)" table, documented the install-label-scoped `cleanupOrphans()`, reframed Apple Container as an opt-in migration (no longer a first-class runtime option), and updated the "List running containers" recipe to use `--filter label=nanoclaw-install=<slug>`.
+  - **`concepts/containers.mdx`**: Updated image tag scheme to the per-checkout slug convention.
+  - **`advanced/troubleshooting.mdx`**: Updated quick-check grep prefix (`nanoclaw-v2-`), swapped `launchctl` / `docker ps` examples to use `com.nanoclaw-v2-<slug>` and `--filter label=nanoclaw-install=<slug>`, updated the Kubernetes image-GC section for the new image name, added a "Peer installs killing each other's containers" section explaining the pre-v2.0.5 bug and the fix, and swapped `npm run build` for `pnpm run build` in service recipes.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 

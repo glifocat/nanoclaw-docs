@@ -9,18 +9,18 @@ This guide covers common issues you may encounter when running NanoClaw and how 
 
 ## Quick status check
 
-Run these commands to get a quick overview of system health:
+Run these commands to get a quick overview of system health. Since v2.0.3, service and container names are namespaced by a per-checkout slug (`com.nanoclaw-v2-<slug>`, `nanoclaw-v2-<slug>.service`). To target this install specifically, filter by `nanoclaw-v2-` instead of `nanoclaw-`:
 
 ```bash
-# 1. Is the service running?
-launchctl list | grep nanoclaw
-# Expected: PID  0  com.nanoclaw (PID = running, "-" = not running, non-zero exit = crashed)
+# 1. Is the service running? (macOS)
+launchctl list | grep nanoclaw-v2-
+# Expected: PID  0  com.nanoclaw-v2-<slug> (PID = running, "-" = not running, non-zero exit = crashed)
 
-# 2. Any running containers?
-docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
+# 2. Any running containers in THIS install?
+docker ps --filter label=nanoclaw-install=<slug> --format '{{.Names}} {{.Status}}'
 
 # 3. Any stopped/orphaned containers?
-docker ps -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
+docker ps -a --filter label=nanoclaw-install=<slug> --format '{{.Names}} {{.Status}}'
 
 # 4. Recent errors in service log?
 grep -E 'ERROR|WARN' logs/nanoclaw.log | tail -20
@@ -175,9 +175,30 @@ cat groups/{group}/logs/container-{timestamp}.log
   
   Then rebuild:
   ```bash
-  npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+  pnpm run build && launchctl kickstart -k "gui/$(id -u)/com.nanoclaw-v2-<slug>"
   ```
 </Accordion>
+
+## Peer installs killing each other's containers
+
+### Symptoms
+- Your session containers are killed within seconds of spawn on a host where another NanoClaw install also runs.
+- Logs show `Stopped orphaned containers` with names that belong to your install.
+- Especially common when a legacy v1 `com.nanoclaw` plist is crash-looping in the background.
+
+### Cause
+
+Pre-v2.0.5, `cleanupOrphans()` used a substring `docker ps --filter name=nanoclaw-` match that picked up every install's containers. Any install's startup — or a crash-looping peer restarting constantly — could reap a healthy install's containers.
+
+### Fix
+
+Upgrade to v2.0.5 or later. The reaper is now scoped by `--label nanoclaw-install=<slug>`. Setup preflight also enumerates `com.nanoclaw*` launchd plists and `nanoclaw*` user systemd units and unloads any that are crash-looping before installing this install's service.
+
+Verify your containers carry the label:
+
+```bash
+docker inspect <container-name> --format '{{ index .Config.Labels "nanoclaw-install" }}'
+```
 
 ## Service stops after SSH logout (Linux)
 
@@ -233,7 +254,7 @@ If containers are consistently hitting the hard timeout, consider lowering `IDLE
 
 **Symptoms:** `Container exited with code 125: pull access denied for nanoclaw-agent` — the container image disappears after a few hours, even though you just built it.
 
-**Cause:** If your container runtime has Kubernetes enabled (Rancher Desktop enables it by default), the kubelet runs image garbage collection when disk usage exceeds 85%. NanoClaw containers are ephemeral (run and exit), so `nanoclaw-agent:latest` is never protected by a running container. The kubelet sees it as unused and deletes it — often overnight when no messages are being processed.
+**Cause:** If your container runtime has Kubernetes enabled (Rancher Desktop enables it by default), the kubelet runs image garbage collection when disk usage exceeds 85%. NanoClaw containers are ephemeral (run and exit), so `nanoclaw-agent-v2-<slug>:latest` is never protected by a running container. The kubelet sees it as unused and deletes it — often overnight when no messages are being processed.
 
 **Fix:** Disable Kubernetes if you don't need it:
 
@@ -304,7 +325,7 @@ After updating credentials, restart the service:
 
 <CodeGroup>
 ```bash macOS
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+launchctl kickstart -k "gui/$(id -u)/com.nanoclaw-v2-<slug>"
 ```
 
 ```bash Linux
@@ -346,7 +367,7 @@ Scan the QR code with your phone, then restart the service:
 
 <CodeGroup>
 ```bash macOS
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+launchctl kickstart -k "gui/$(id -u)/com.nanoclaw-v2-<slug>"
 ```
 
 ```bash Linux
@@ -423,12 +444,13 @@ sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;
 </Accordion>
 
 <Accordion title="Test mount manually">
-  Run a test container to verify mounts:
-  
+  Run a test container to verify mounts. Pull the image name from `CONTAINER_IMAGE` in your environment (since v2.0.3 it's per-checkout: `nanoclaw-agent-v2-<slug>:latest`):
+
   ```bash
+  IMG=$(node -e "console.log(require('./dist/config.js').CONTAINER_IMAGE)" 2>/dev/null || echo nanoclaw-agent-v2-$(echo -n "$(pwd)" | shasum | cut -c1-8):latest)
   docker run -i --rm \
     -v /path/to/host:/workspace/test:ro \
-    nanoclaw-agent:latest \
+    "$IMG" \
     ls -la /workspace/test
   ```
 </Accordion>
@@ -571,7 +593,7 @@ This issue was fixed by passing `resumeSessionAt` with the last assistant messag
 ### Restart the service
 
 ```bash
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+launchctl kickstart -k "gui/$(id -u)/com.nanoclaw-v2-<slug>"
 ```
 
 ### View live logs
@@ -587,19 +609,19 @@ Stopping the service does NOT kill running containers. They will continue runnin
 </Warning>
 
 ```bash
-launchctl bootout gui/$(id -u)/com.nanoclaw
+launchctl bootout "gui/$(id -u)/com.nanoclaw-v2-<slug>"
 ```
 
 ### Start the service
 
 ```bash
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw.plist
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/com.nanoclaw-v2-<slug>.plist
 ```
 
 ### Rebuild after code changes
 
 ```bash
-npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+pnpm run build && launchctl kickstart -k "gui/$(id -u)/com.nanoclaw-v2-<slug>"
 ```
 
 ## Getting help

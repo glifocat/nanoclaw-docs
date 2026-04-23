@@ -17,7 +17,7 @@ Containers provide:
 - **Signal forwarding** — `tini` as PID 1 ensures clean shutdown
 
 <Info>
-NanoClaw uses Docker by default for cross-platform compatibility. On macOS, you can use Apple Container instead (via `/convert-to-apple-container` skill).
+NanoClaw uses Docker. On macOS, Apple Container is available as an opt-in migration via the `/convert-to-apple-container` skill — it's no longer offered at install time.
 </Info>
 
 ## Container architecture
@@ -151,8 +151,8 @@ Even if the container crashes, all data in session databases and mounted directo
 
 Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image with additional apt and npm packages:
 
-- Image tag: `nanoclaw-agent:{agentGroupId}`
-- Built on top of the base `nanoclaw-agent:latest` image
+- Base image: `nanoclaw-agent-v2-<slug>:latest` — where `<slug>` is `sha1(projectRoot)[:8]`, so two installs on the same host never share a tag (since v2.0.3).
+- Per-agent-group tag: `nanoclaw-agent-v2-<slug>:{agentGroupId}`
 - Cached — only rebuilt when package lists change
 
 ## Timeouts
