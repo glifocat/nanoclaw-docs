@@ -6,6 +6,10 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="Unreleased" description="2026-04-23" tags={["Fix"]}>
+  - Setup: bundled installer now bypasses GitHub's rate-limited releases API when installing the OneCLI CLI. On API throttling (HTTP 403), it resolves the latest version via the `/releases/latest` HTTP redirect and downloads the archive directly; if that also fails, it installs a pinned fallback version (`ONECLI_CLI_FALLBACK_VERSION`). Unblocks `bash nanoclaw.sh` on shared-egress networks (corporate NAT, public Wi-Fi).
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention
