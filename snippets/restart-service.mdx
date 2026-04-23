@@ -1,11 +1,13 @@
 <CodeGroup>
 ```bash macOS
+# Substitute your install's service label (find via `launchctl list | grep nanoclaw`)
 npm run build
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>
 ```
 
 ```bash Linux
+# Substitute your install's unit name (find via `systemctl --user list-unit-files | grep nanoclaw`)
 npm run build
-systemctl --user restart nanoclaw
+systemctl --user restart nanoclaw-v2-<slug>
 ```
 </CodeGroup>
