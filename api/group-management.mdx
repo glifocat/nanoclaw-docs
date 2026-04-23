@@ -136,7 +136,10 @@ Session resolution depends on the wiring's `session_mode`:
 | `user_dms` | Cached DM channel mapping |
 | `sessions` | Session status and container tracking |
 | `pending_questions` | Interactive question cards |
+| `pending_channel_approvals` | Unwired channel approval flow |
 | `pending_sender_approvals` | Unknown sender approval flow |
+
+Both `pending_channel_approvals` and `pending_sender_approvals` carry `title` and `options_json` columns alongside the approval metadata. The approval modules normalize options and write both fields at creation time; `getAskQuestionRender` reads them back directly rather than hardcoding render strings. This keeps the post-click card title in sync with the per-event title chosen at creation (for example, "📣 Bot mentioned in new chat" vs. "💬 New direct message") instead of reverting to a constant.
 
 ### Session databases
 

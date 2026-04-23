@@ -143,6 +143,10 @@ Container spawning is deduplicated — concurrent wake calls for the same sessio
 - **Stale detection**: host sweep detects containers with old heartbeats or stuck processing_ack
 - **Fallback**: SIGKILL if graceful stop fails
 
+### Orphan reaping (install-scoped)
+
+Every container is stamped with a `nanoclaw-install=<slug>` label at spawn. Orphan cleanup filters by that label so peer installs on the same host don't reap each other's containers — a crash-looping legacy install can no longer kill a healthy install's sessions. See the [container runtime page](/advanced/container-runtime#install-label-scoping) for details.
+
 <Info>
 Even if the container crashes, all data in session databases and mounted directories persists. Only the container process itself is ephemeral.
 </Info>

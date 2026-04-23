@@ -119,6 +119,17 @@ ONECLI_URL=http://127.0.0.1:10254
 With the OneCLI Agent Vault, API keys and OAuth tokens are no longer stored in `.env`. Secrets are managed via `onecli secrets create` and injected by the vault at request time.
 </Note>
 
+## Agent provider selection
+
+Each container spawns under a single agent provider. The provider name is resolved with this precedence:
+
+1. `sessions.agent_provider` — per-session override
+2. `agent_groups.agent_provider` — per-group default
+3. `provider` in the group's `container.json`
+4. `'claude'` — fallback
+
+Empty strings are treated as unset, so writing `''` from a DB-backed form doesn't shadow a group-level default. Case is normalized (`Codex`, `codex`, `CODEX` all resolve to `codex`). This lets you flip a single group to a different provider by updating the DB column without editing `container.json`.
+
 ## Credential management
 
 Credentials are managed externally via OneCLI — no credential environment variables are needed in `.env`.

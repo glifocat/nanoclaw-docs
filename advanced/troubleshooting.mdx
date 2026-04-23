@@ -212,6 +212,12 @@ loginctl show-user $USER | grep Linger
 
 ## Known issues
 
+### Orphan processing_ack claims
+
+When a container exits with an unresolved `processing_ack` claim, the sweep reorder ensures the wake step runs before crashed-container cleanup. A fresh container clears orphan `processing` rows on its own startup, so once it's running the claim resolves itself. `resetStuckProcessingRows` is idempotent — if a message already has a future `process_after`, the retry bump is skipped so the wake path can pick the message up when the backoff elapses, instead of pushing it past `MAX_TRIES`.
+
+If you suspect this issue on an older install, look for messages that reach `MAX_TRIES` without any container ever being spawned. Upgrading resolves it.
+
 ### Cursor rollback on error
 
 The message cursor (`lastAgentTimestamp`) is now rolled back on container errors, provided no output was already sent to the user. If the agent fails after sending partial output, the cursor is not rolled back to prevent duplicate messages.
