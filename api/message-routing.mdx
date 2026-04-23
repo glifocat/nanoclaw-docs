@@ -25,6 +25,8 @@ if (!adapter.supportsThreads) {
 
 Combined query for messaging group and wired agent count. Messaging groups are auto-created only on mentions or DMs — plain chatter is silent.
 
+The `isGroup` flag is threaded from the adapter (via `InboundMessage` → `InboundEvent`) into messaging-group creation, so the Chat SDK bridge's `onDirectMessage` vs `onNewMention` distinction is preserved. Channel mentions are no longer misclassified as DMs when a messaging group is auto-created.
+
 ### 3. Unwired channel handling
 
 If no agents are wired and it's a mention, the channel-request gate escalates to the owner for approval.
@@ -106,6 +108,16 @@ registerDeliveryAction('cancel_task', handleCancelTask);
 - 3 attempts per message
 - Permanently failed after exhausting retries
 - Attempt counter resets on process restart
+- Pending question / approval inserts use `INSERT OR IGNORE`, so retries after transient adapter failures don't trip `UNIQUE` constraints on `question_id` / `approval_id` and can actually reach the send step
+
+### Interactive callback encoding
+
+Ask-question cards encode the option index rather than the full option value in each button's callback payload:
+
+- Button id: `ncq:<questionId>:<index>`
+- Button value: stringified `<index>`
+
+This keeps callback data under Telegram's 64-byte inline-keyboard cap even when options carry long values (ISO datetimes, URLs, long tokens). Both the Chat SDK `onAction` path (Telegram / Slack / etc.) and the Discord Gateway interaction handler resolve the index back to the real option value via `getAskQuestionRender(questionId)` before dispatching to the host. Response handlers for `pending_questions` and `pending_approvals` still receive the canonical value. A backward-compat fallback in `resolveSelectedOption` treats non-numeric tails as literal values, so cards delivered under the old encoding still resolve if clicked after upgrade.
 
 ## Types
 

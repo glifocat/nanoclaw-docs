@@ -46,6 +46,7 @@ Install with a skill invocation in Claude Code. The skill copies the adapter fro
 
 | Skill | Platform | Notes |
 |-------|----------|-------|
+| `/add-signal` | Signal | Native adapter over `signal-cli` TCP JSON-RPC; DMs + groups, voice-message detection, typing indicators (DMs) |
 | `/add-teams` | Microsoft Teams | Bot framework |
 | `/add-imessage` | Apple iMessage | macOS-only; uses AppleScript bridge |
 | `/add-matrix` | Matrix | Federated; supports Element and self-hosted homeservers |
@@ -59,6 +60,14 @@ Install with a skill invocation in Claude Code. The skill copies the adapter fro
 | `/claw` | Local terminal | Talk to your agent from a CLI — no platform account required |
 
 Documentation for these is rolling out post-v2 launch. The skill itself is self-documenting via `SKILL.md` on the `channels` branch — ask Claude Code to walk you through any of them.
+
+### Auto-setup channels
+
+`bash nanoclaw.sh` can wire these channels end-to-end from the auto-setup flow (QR scan, account link, first agent wiring):
+
+- **WhatsApp** and **Telegram** — stable
+- **Signal** — mirrors the WhatsApp/Telegram flow, renders the `signal-cli link` QR in the terminal, and persists `SIGNAL_ACCOUNT` to `.env`. Requires `signal-cli` installed (`brew install signal-cli` on macOS or GitHub releases on Linux).
+- **Slack** and **iMessage** — experimental. Slack walks through app creation and validates the bot token via `auth.test`, but still requires a public URL for inbound events. iMessage picks local (macOS Full Disk Access) vs remote (Photon) mode.
 
 ## Providers
 

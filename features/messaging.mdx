@@ -142,6 +142,8 @@ The delivery system uses a two-poll architecture:
 4. Permission check for cross-channel delivery
 5. Retry up to 3 times on failure
 
+Pending question and approval inserts are idempotent (`INSERT OR IGNORE` on `question_id` / `approval_id`) so a retry after a transient adapter failure — rate limit, network blip, adapter 5xx — can reach the send step instead of tripping a `UNIQUE` constraint. The insert helpers return whether a new row was actually created so the delivery log doesn't double up per retry.
+
 <Note>
 Typing indicators are paused after each real user-facing delivery to avoid visual flicker.
 </Note>

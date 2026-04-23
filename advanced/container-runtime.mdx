@@ -172,6 +172,23 @@ Containers have two timeout/detection mechanisms:
 - `killContainer(sessionId, reason)` stops the container via `docker stop`, falls back to SIGKILL
 - On close/error, the session is marked stopped and typing indicators are cleared
 
+## Provider resolution
+
+Each spawned container runs under exactly one agent provider (Claude, Codex, OpenCode, Ollama, etc.). `resolveProviderName` in the container runner picks the provider using this precedence, taking the first non-empty value:
+
+1. `sessions.agent_provider` — per-session override
+2. `agent_groups.agent_provider` — per-group default
+3. `provider` in the group's `container.json`
+4. `'claude'` — hardcoded fallback
+
+Empty strings are treated as unset so a DB-backed form can write `''` for "no override" without shadowing group-level defaults. The resolved name is lowercased before dispatch, so `Codex`, `codex`, and `CODEX` are equivalent. The `container.json` fallback remains for installs that only set the provider in JSON.
+
+## Install-label scoping
+
+Every spawned container is stamped with `--label nanoclaw-install=<slug>` where the slug is derived from the install path. `cleanupOrphans` filters by this label (`docker ps --filter label=nanoclaw-install=<slug>`) rather than a `name=nanoclaw-` substring match, so two NanoClaw installs on the same host cannot reap each other's containers.
+
+The setup preflight also enumerates `com.nanoclaw*` launchd plists and nanoclaw user systemd units, probes their state, and unloads any that are crash-looping (state != running AND runs > 10) before installing this install's service.
+
 ## Credential injection
 
 The OneCLI SDK's `applyContainerConfig()` configures each container's network to route through the vault:
