@@ -106,12 +106,24 @@ interface Session {
   agent_group_id: string;
   messaging_group_id?: string;
   thread_id?: string;
+  agent_provider?: string; // Optional per-session provider override
   status: 'active' | 'closed';
   container_status: 'running' | 'idle' | 'stopped';
   last_active: string;
   created_at: string;
 }
 ```
+
+### Provider precedence
+
+Both `agent_groups` and `sessions` carry an optional `agent_provider` column. The spawner resolves the provider for each session using this precedence (first non-empty value wins):
+
+1. `sessions.agent_provider` — per-session override
+2. `agent_groups.agent_provider` — group default
+3. `container.json` `provider` — on-disk fallback for existing installs
+4. `'claude'` — built-in default
+
+Empty strings are treated as unset, so a form that writes `''` for "no override" falls through to the next level. Provider names are lowercased before dispatch.
 
 Session resolution depends on the wiring's `session_mode`:
 

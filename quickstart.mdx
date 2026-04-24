@@ -37,7 +37,7 @@ This guide covers the default installer. If you want to customize the install pa
     - Verifying your environment (platform, WSL detection, container runtime)
     - Building the agent container image
     - Registering your Anthropic credential with [OneCLI](https://github.com/onecli/onecli)
-    - Pairing your first channel (Telegram, Discord, WhatsApp, or the local CLI)
+    - Pairing your first channel (Telegram, Discord, WhatsApp, Signal, or the local CLI)
     - Installing a systemd or launchd service so NanoClaw starts with your machine
 
     If any step fails, Claude Code is invoked automatically to diagnose and resume from where it broke. You don't have to debug the installer yourself.
@@ -48,8 +48,8 @@ This guide covers the default installer. If you want to customize the install pa
 
     - **Display name** — what you want your agent to be called (default: `Andy`)
     - **Anthropic credential method** — Claude subscription (OAuth), Anthropic API key, or skip
-    - **First channel** — Telegram, Discord, WhatsApp, or local CLI. You can add more later.
-    - **Channel-specific auth** — bot token for Telegram/Discord, QR code for WhatsApp, nothing for CLI
+    - **First channel** — Telegram, Discord, WhatsApp, Signal, or local CLI. You can add more later.
+    - **Channel-specific auth** — bot token for Telegram/Discord, QR code for WhatsApp, `signal-cli` link QR for Signal (needs `signal-cli` installed on the host), nothing for CLI
 
     The flow is linear. One question at a time. You can Ctrl+C and restart; the installer picks up where you left off.
   </Step>

@@ -46,6 +46,7 @@ Install with a skill invocation in Claude Code. The skill copies the adapter fro
 
 | Skill | Platform | Notes |
 |-------|----------|-------|
+| `/add-signal` | Signal | Requires `signal-cli` on the host; scan the link QR from Signal → Linked Devices. Wired into `bash nanoclaw.sh` as a first-channel choice. |
 | `/add-teams` | Microsoft Teams | Bot framework |
 | `/add-imessage` | Apple iMessage | macOS-only; uses AppleScript bridge |
 | `/add-matrix` | Matrix | Federated; supports Element and self-hosted homeservers |
@@ -71,7 +72,7 @@ By default, NanoClaw uses Claude via the official [Claude Agent SDK](https://doc
 | `/add-ollama-provider` | Ollama | Local open-weight models — no cloud calls |
 | `/add-ollama-tool` | Ollama (tool mode) | Use local Ollama as a tool inside Claude agents |
 
-`agent_provider` is a column on `agent_groups` in the central database — each agent group can run a different provider. Mix and match in the same install.
+`agent_provider` lives on both `agent_groups` (the group default) and `sessions` (per-session override) in the central database. The spawner resolves in precedence order — `sessions.agent_provider` → `agent_groups.agent_provider` → `container.json` `provider` → `'claude'` — so you can mix providers per group and override per session without editing on-disk config. See [Group management → Provider precedence](/api/group-management#provider-precedence) for the full rules.
 
 ## How channel skills work
 
