@@ -5,16 +5,19 @@ tag: "UPDATED"
 keywords: ["integrations", "channels", "providers", "skills", "add-telegram", "add-whatsapp", "add-codex", "add-opencode"]
 ---
 
-NanoClaw trunk ships the registry and infrastructure. Channel adapters and alternative AI providers live on long-lived skill branches — you install them on demand with `/add-<name>` skills. This keeps your fork lean and your code legible: nothing you didn't ask for.
+NanoClaw trunk ships the registry and infrastructure. Channel adapters, tool integrations, and alternative AI providers live on long-lived skill branches — you install them on demand with `/add-<name>` skills. This keeps your fork lean and your code legible: nothing you didn't ask for.
 
-## Two kinds of integration
+## Three kinds of integration
 
-<CardGroup cols={2}>
+<CardGroup cols={3}>
   <Card title="Channels" icon="plug" href="#channels">
-    Where messages come from: WhatsApp, Telegram, Discord, Slack, Teams, email, the terminal — 15+ adapters live on the `channels` branch
+    Where messages come from: WhatsApp, Telegram, Discord, Slack, Teams, email, the terminal.
+  </Card>
+  <Card title="Tools" icon="screwdriver-wrench" href="#tools">
+    Capabilities the agent can call: Google Calendar, Gmail, and other MCP-backed APIs via OneCLI-managed OAuth.
   </Card>
   <Card title="Providers" icon="robot" href="#providers">
-    Which AI runs the agent: Claude (default), OpenAI Codex, OpenCode (OpenRouter/Google/DeepSeek), Ollama (local). Configurable per agent group.
+    Which AI runs the agent: Claude (default), OpenAI Codex, OpenCode, Ollama. Configurable per agent group.
   </Card>
 </CardGroup>
 
@@ -59,6 +62,21 @@ Install with a skill invocation in Claude Code. The skill copies the adapter fro
 | `/claw` | Local terminal | Talk to your agent from a CLI — no platform account required |
 
 Documentation for these is rolling out post-v2 launch. The skill itself is self-documenting via `SKILL.md` on the `channels` branch — ask Claude Code to walk you through any of them.
+
+## Tools
+
+Tool skills add MCP servers that expose third-party APIs to the agent without leaking credentials into the container. The agent calls them when you ask — they don't trigger on external events the way channels do. Credentials are held in the [OneCLI Agent Vault](/concepts/security); the container ships with `onecli-managed` stub tokens that the gateway rewrites at request time.
+
+<CardGroup cols={2}>
+  <Card title="Google Calendar" icon="calendar" href="/integrations/google-calendar">
+    `/add-gcal-tool` — multi-calendar, multi-account via `@cocal/google-calendar-mcp`
+  </Card>
+  <Card title="Gmail (tool mode)" icon="envelope">
+    `/add-gmail-tool` — read, send, search, draft via `@gongrzhe/server-gmail-autoauth-mcp`
+  </Card>
+</CardGroup>
+
+Tool skills are safe to install alongside each other — the Dockerfile install block and per-group `container.json` are merged, not replaced.
 
 ## Providers
 

@@ -1,0 +1,257 @@
+---
+title: "Google Calendar"
+description: "Add Google Calendar as an MCP tool via /add-gcal-tool — OneCLI-managed OAuth, no raw credentials in the container."
+tag: "NEW"
+keywords: ["google calendar", "gcal", "add-gcal-tool", "mcp", "onecli", "calendar"]
+---
+
+`/add-gcal-tool` wires [`@cocal/google-calendar-mcp`](https://github.com/cocal-com/google-calendar-mcp) into selected agent groups. The agent gets calendar tools — listing calendars, reading and searching events, creating/updating/deleting events, and free/busy queries — across multiple calendars and multiple Google accounts.
+
+This is a tool skill, not a channel. The agent uses calendar tools when you ask it to; it doesn't poll for events or trigger on new invites.
+
+## How it works
+
+The MCP server inside the container reads **stub credentials** that contain the literal string `onecli-managed`. At request time, the [OneCLI Agent Vault](/concepts/security) gateway intercepts outbound calls to `calendar.googleapis.com` and `oauth2.googleapis.com` and swaps the stub bearer for the real OAuth token from its vault. The container never sees raw credentials — same invariant as every other v2 integration.
+
+This mirrors the `/add-gmail-tool` stub pattern. Calendar installs independently (sibling skill), not as part of a combined "Google Workspace" skill.
+
+<Note>
+  **Why `@cocal/google-calendar-mcp` and not `@gongrzhe/server-calendar-autoauth-mcp`?** The gongrzhe server only supports the `primary` calendar and exposes 5 event-level tools (no `list_calendars`). The cocal server explicitly supports multi-calendar and multi-account, is actively maintained, and is the default for v2.
+</Note>
+
+## Tools exposed
+
+The exact set depends on the MCP server version — run `tools/list` against the server to enumerate. All tools are surfaced to the agent as `mcp__calendar__<name>`.
+
+| Tool | Description |
+|------|-------------|
+| `mcp__calendar__list-calendars` | List all calendars the connected account can see |
+| `mcp__calendar__list-events` | List events on a calendar within a time window |
+| `mcp__calendar__search-events` | Free-text search across events |
+| `mcp__calendar__get-event` | Fetch a single event by id |
+| `mcp__calendar__create-event` | Create a new event |
+| `mcp__calendar__update-event` | Update an existing event |
+| `mcp__calendar__delete-event` | Delete an event |
+| `mcp__calendar__list-colors` | List event/calendar color options |
+| `mcp__calendar__get-freebusy` | Free/busy query across one or more calendars |
+| `mcp__calendar__get-current-time` | Current time in the server's timezone |
+
+Multi-account management tools are also exposed — use them to switch between connected Google accounts within a single agent group.
+
+## Prerequisites
+
+<Steps>
+  <Step title="Connect Google Calendar in OneCLI">
+    Open the OneCLI web UI at [http://127.0.0.1:10254](http://127.0.0.1:10254), go to **Apps → Google Calendar**, and click **Connect**. Sign in with the Google account the agent should act as.
+
+    The minimum useful scopes are `calendar.readonly` and `calendar.events`.
+
+    Verify from the CLI:
+
+    ```bash
+    onecli apps get --provider google-calendar
+    ```
+
+    Expected output includes `"connection": { "status": "connected" }` with the scopes above.
+  </Step>
+
+  <Step title="Confirm mount allowlist covers ~/.calendar-mcp">
+    The stub credentials live in `~/.calendar-mcp/`. The path must sit under an `allowedRoots` entry in your mount allowlist:
+
+    ```bash
+    cat ~/.config/nanoclaw/mount-allowlist.json
+    ```
+
+    See [security model](/concepts/security) for allowlist format.
+  </Step>
+
+  <Step title="Check each target agent's secret mode">
+    Auto-created agents start in `selective` secret mode — no secrets are injected by default. For the Calendar token to reach the agent:
+
+    ```bash
+    onecli agents list
+    onecli agents set-secret-mode --id <agent-id> --mode all
+    ```
+
+    Or stay in `selective` and explicitly assign the Calendar secret with `onecli agents set-secrets`.
+  </Step>
+</Steps>
+
+## Install
+
+Run the skill from your NanoClaw directory:
+
+```bash
+claude
+/add-gcal-tool
+```
+
+The skill walks you through five phases:
+
+<Steps>
+  <Step title="Pre-flight checks">
+    Verifies OneCLI has Google Calendar connected, stub credentials exist (writes them if not), the mount allowlist covers `~/.calendar-mcp`, and each target agent's secret mode will actually inject the token.
+  </Step>
+
+  <Step title="Apply code changes">
+    - Adds `CALENDAR_MCP_VERSION` ARG to `container/Dockerfile` and installs `@cocal/google-calendar-mcp` into the pinned pnpm global-install block.
+    - Adds `'mcp__calendar__*'` to `TOOL_ALLOWLIST` in the Claude provider so the agent can actually call the tools.
+    - Rebuilds the container image with `./container/build.sh`.
+
+    If `/add-gmail-tool` is already applied, the skill merges into the existing install block instead of duplicating it. Calendar uses `zod@4.x` so the `zod-to-json-schema@3.22.5` pin that gmail needs is harmless here.
+  </Step>
+
+  <Step title="Wire per agent group">
+    For each agent group, merges into `groups/<folder>/container.json`:
+
+    ```jsonc
+    {
+      "mcpServers": {
+        "calendar": {
+          "command": "google-calendar-mcp",
+          "args": [],
+          "env": {
+            "GOOGLE_OAUTH_CREDENTIALS": "/workspace/extra/.calendar-mcp/gcp-oauth.keys.json",
+            "GOOGLE_CALENDAR_MCP_TOKEN_PATH": "/workspace/extra/.calendar-mcp/credentials.json"
+          }
+        }
+      },
+      "additionalMounts": [
+        {
+          "hostPath": "/home/<user>/.calendar-mcp",
+          "containerPath": ".calendar-mcp",
+          "readonly": false
+        }
+      ]
+    }
+    ```
+
+    Additional mounts use **relative** `containerPath` values — they land at `/workspace/extra/<relative>`. Absolute paths are rejected by mount-security.
+
+    If the group already has `/add-gmail-tool` wired, the skill **merges** the new `calendar` entry alongside `gmail` in `mcpServers` and adds the `.calendar-mcp` mount alongside `.gmail-mcp`.
+  </Step>
+
+  <Step title="Build and restart">
+    ```bash
+    pnpm run build
+    systemctl --user restart nanoclaw   # Linux
+    # launchctl kickstart -k gui/$(id -u)/com.nanoclaw   # macOS
+    ```
+
+    Kill existing agent containers so they respawn with the new `mcpServers` config:
+
+    ```bash
+    docker ps -q --filter 'name=nanoclaw-v2-' | xargs -r docker kill
+    ```
+  </Step>
+
+  <Step title="Verify">
+    From a wired agent, send **"list my calendars"** or **"what's on my work calendar next Monday?"**. The first call takes 2–3 seconds while the MCP server starts and OneCLI does the token exchange.
+  </Step>
+</Steps>
+
+## Stub credentials
+
+`@cocal/google-calendar-mcp` defaults to `~/.config/google-calendar-mcp/tokens.json`. The skill overrides this via env vars in `container.json` so the server reads our stubs at `~/.calendar-mcp/` instead — a sibling path to `/add-gmail-tool`'s `~/.gmail-mcp/`.
+
+If the stubs don't exist, the skill writes them:
+
+```json
+// ~/.calendar-mcp/gcp-oauth.keys.json
+{
+  "installed": {
+    "client_id": "onecli-managed.apps.googleusercontent.com",
+    "client_secret": "onecli-managed",
+    "redirect_uris": ["http://localhost:3000/oauth2callback"]
+  }
+}
+```
+
+```json
+// ~/.calendar-mcp/credentials.json
+{
+  "access_token": "onecli-managed",
+  "refresh_token": "onecli-managed",
+  "token_type": "Bearer",
+  "expiry_date": 99999999999999,
+  "scope": "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events"
+}
+```
+
+<Warning>
+  If either file already contains **real** credentials (no `onecli-managed` marker), the skill stops and asks you to back up and remove them. Real credentials in these files defeat the vault model — OneCLI only rewrites tokens on requests whose outbound bearer is the `onecli-managed` placeholder.
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="command not found: google-calendar-mcp">
+    The container image hasn't been rebuilt with the new pnpm install line. Run `./container/build.sh` and kill any existing agent containers so they respawn from the new image.
+  </Accordion>
+
+  <Accordion title="ENOENT ...credentials.json">
+    The stub mount didn't make it into the container. Re-check the `additionalMounts` block in the agent group's `container.json`, and confirm `~/.calendar-mcp` sits under an `allowedRoots` entry in your mount allowlist.
+  </Accordion>
+
+  <Accordion title="401 Unauthorized from googleapis.com">
+    OneCLI isn't injecting the real token. Three things to check:
+
+    - `onecli apps get --provider google-calendar` shows `connected` with the right scopes.
+    - The agent's secret mode is `all`, or the Google Calendar secret is explicitly assigned.
+    - The agent container was spawned **after** the connection and secret-mode change (the gateway looks up secrets per request, so no container restart is needed — but the container does need to be running under the agent id that was flipped).
+  </Accordion>
+
+  <Accordion title="Agent says 'I don't have calendar tools'">
+    `mcp__calendar__*` is missing from `TOOL_ALLOWLIST` in `container/agent-runner/src/providers/claude.ts`, or the image build cache is stale. Add the glob if missing, then rebuild: `./container/build.sh`.
+  </Accordion>
+
+  <Accordion title="Same group already has Gmail — how do I keep both?">
+    Both MCP servers coexist in the same `container.json`. **Merge** the new `calendar` entry into the existing `mcpServers` block and the new mount into the existing `additionalMounts` array — don't replace. The skill does this for you automatically when `/add-gmail-tool` has already been applied.
+  </Accordion>
+</AccordionGroup>
+
+## Removal
+
+The skill is reversible:
+
+<Steps>
+  <Step title="Unwire each agent group">
+    Delete the `"calendar"` entry from `mcpServers` and the `.calendar-mcp` entry from `additionalMounts` in every `groups/<folder>/container.json`.
+  </Step>
+
+  <Step title="Revert code changes">
+    Remove `'mcp__calendar__*'` from `TOOL_ALLOWLIST`, drop the `CALENDAR_MCP_VERSION` ARG, and delete the calendar package from the Dockerfile install block.
+  </Step>
+
+  <Step title="Rebuild and restart">
+    ```bash
+    pnpm run build
+    ./container/build.sh
+    systemctl --user restart nanoclaw
+    ```
+  </Step>
+
+  <Step title="Optional cleanup">
+    ```bash
+    rm -rf ~/.calendar-mcp/
+    onecli apps disconnect --provider google-calendar
+    ```
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Skills system" icon="puzzle-piece" href="/integrations/skills-system">
+    How skill branches work and how to author your own
+  </Card>
+  <Card title="Security model" icon="shield" href="/concepts/security">
+    OneCLI credential injection, mount allowlist, secret modes
+  </Card>
+  <Card title="Container runtime" icon="box" href="/advanced/container-runtime">
+    How MCP servers run inside each agent container
+  </Card>
+  <Card title="Scheduled tasks" icon="clock" href="/features/scheduled-tasks">
+    Combine calendar tools with scheduled daily summaries
+  </Card>
+</CardGroup>
