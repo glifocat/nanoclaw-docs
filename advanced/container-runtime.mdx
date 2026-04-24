@@ -172,6 +172,21 @@ Containers have two timeout/detection mechanisms:
 - `killContainer(sessionId, reason)` stops the container via `docker stop`, falls back to SIGKILL
 - On close/error, the session is marked stopped and typing indicators are cleared
 
+## Provider resolution
+
+Each session's provider contribution (per-provider mounts, env passthrough) is resolved by a pure `resolveProviderName()` helper with this precedence:
+
+1. `sessions.agent_provider`
+2. `agent_groups.agent_provider`
+3. `container.json` `provider`
+4. `'claude'` (fallback)
+
+Empty strings are treated as unset, so a DB-backed form that writes `''` for "no override" falls through cleanly. The resolved name is lowercased.
+
+<Note>
+The in-container runner reads `provider` from `container.json`, not from the DB. The DB columns drive only the host-side contribution. To spawn a non-default runner, set `"provider": "<name>"` in the group's `container.json`. Provider-install skills (`/add-codex`, `/add-opencode`) wire both sides.
+</Note>
+
 ## Credential injection
 
 The OneCLI SDK's `applyContainerConfig()` configures each container's network to route through the vault:

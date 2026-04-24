@@ -46,6 +46,7 @@ Install with a skill invocation in Claude Code. The skill copies the adapter fro
 
 | Skill | Platform | Notes |
 |-------|----------|-------|
+| `/add-signal` | Signal | Native `signal-cli` JSON-RPC daemon; wired into the `bash nanoclaw.sh` auto-setup flow with QR-code linking |
 | `/add-teams` | Microsoft Teams | Bot framework |
 | `/add-imessage` | Apple iMessage | macOS-only; uses AppleScript bridge |
 | `/add-matrix` | Matrix | Federated; supports Element and self-hosted homeservers |
@@ -71,7 +72,9 @@ By default, NanoClaw uses Claude via the official [Claude Agent SDK](https://doc
 | `/add-ollama-provider` | Ollama | Local open-weight models — no cloud calls |
 | `/add-ollama-tool` | Ollama (tool mode) | Use local Ollama as a tool inside Claude agents |
 
-`agent_provider` is a column on `agent_groups` in the central database — each agent group can run a different provider. Mix and match in the same install.
+Each agent group can run a different provider. Mix and match in the same install.
+
+The in-container runner reads `provider` from the group's `container.json` — that's the source of truth for which runner is spawned. The DB columns `agent_groups.agent_provider` and `sessions.agent_provider` drive the host-side provider contribution (per-session mounts, env passthrough) with the precedence: **session → agent group → container.json → `'claude'`**. For a new group, setting `"provider": "codex"` in `container.json` is the simplest route; provider-install skills (`/add-codex`, `/add-opencode`) wire both.
 
 ## How channel skills work
 

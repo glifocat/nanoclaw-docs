@@ -130,6 +130,17 @@ onecli secrets create --name Anthropic --type anthropic --value YOUR_KEY --host-
 
 The `@onecli-sh/sdk` package's `applyContainerConfig()` configures each container's network to route through the vault, injecting credentials at request time.
 
+## Provider selection
+
+The AI provider per container is resolved by `resolveProviderName()` in the container runner with this precedence:
+
+1. `sessions.agent_provider`
+2. `agent_groups.agent_provider`
+3. `container.json` `provider`
+4. `'claude'` (fallback)
+
+The DB columns drive host-side contribution (per-session mounts, env passthrough). The in-container runner reads `provider` from `container.json`, so the group's `container.json` must also be set for the runner itself to switch. Empty strings are treated as unset to avoid footguns when a DB-backed form writes `''` for "no override."
+
 ## Security notes
 
 - **Secrets** are never read by NanoClaw directly — OneCLI manages them externally
