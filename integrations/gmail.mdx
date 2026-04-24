@@ -1,13 +1,15 @@
 ---
 title: Gmail integration (v1 only)
-description: The /add-gmail skill shipped on v1. v2 does not include a Gmail adapter — use /add-resend for outbound email.
+description: The /add-gmail skill shipped on v1. v2 uses /add-gmail-tool for OneCLI-managed Gmail tools, or /add-resend for outbound email.
 hidden: true
+tag: "UPDATED"
 ---
 
 <Warning>
 **Gmail is not a v2 channel.** v2 ships with no `src/channels/gmail.ts` and no `/add-gmail` skill on the `channels` branch. This page describes the v1 integration for users still running v1.
 
 For v2:
+- **Gmail as a tool** — `/add-gmail-tool` installs the Gmail MCP server with OneCLI-managed OAuth. The container sees `"onecli-managed"` stub credentials; OneCLI injects the real bearer token at request time, so no raw OAuth tokens ever reach the container. Exposes `mcp__gmail__*` tools (search, read, send, draft, labels, filters) to the agent.
 - **Outbound email** — `/add-resend` (transactional sends via Resend)
 - **Google Chat** — `/add-gchat`
 
