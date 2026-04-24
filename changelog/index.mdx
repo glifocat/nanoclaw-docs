@@ -6,6 +6,73 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.12" description="2026-04-24" tags={["Fix", "Security"]}>
+  - Session state now keyed per provider — continuation IDs survive switching an agent group between providers instead of being overwritten
+  - Agent-to-agent messages forward file attachments between agents
+  - Attachment filenames are validated to reject path-traversal characters before write
+  - Setup CI workflow correctly labels PRs opened from forks that follow the contributing template
+</Update>
+
+<Update label="v2.0.11" description="2026-04-24" tags={["Fix"]}>
+  - Setup `verify` step accepts the CLI-only success state so a standalone install is no longer reported as failed
+  - Setup detects and surfaces auth-ping failures instead of silently continuing
+</Update>
+
+<Update label="v2.0.10" description="2026-04-24" tags={["Feature", "Fix"]}>
+  - `bash nanoclaw.sh` now offers Signal as a first-class channel — probes for `signal-cli`, renders the link QR in-terminal, and wires the first agent end to end (mirrors the WhatsApp and Telegram flows)
+  - Container runner honors `sessions.agent_provider` and `agent_groups.agent_provider` with the documented precedence (session overrides group, group overrides `container.json`); setting `agent_provider = 'codex'` on a group now actually routes through Codex
+  - Setup `register` step uses current `engage_mode` columns instead of the ones dropped by migration 010
+</Update>
+
+<Update label="v2.0.9" description="2026-04-23" tags={["Feature", "Fix"]}>
+  - Added Signal channel adapter to the `channels` branch (`/add-signal`) — `signal-cli` bridge with QR device linking
+  - Channel and sender approval tables persist `title` and `options` so approval cards survive restarts with correct copy
+  - `pending_questions` and `pending_approvals` inserts are idempotent — delivery no longer errors when the same row is re-emitted during a retry
+  - Telegram `callback_data` now encodes the option index instead of the literal label so replies stay under the 64-byte cap
+</Update>
+
+<Update label="v2.0.8" description="2026-04-23" tags={["Feature", "Fix"]}>
+  - Added `/add-codex` provider install skill — installs OpenAI Codex from the `providers` branch (pinned `CODEX_VERSION`)
+  - Sweep wakes the container before resetting orphan claims, and retries claims idempotently so a transient conflict no longer drops a due message
+  - Container spawn clears stale orphan heartbeats so restart recovery can't mistake the new container for the dead one
+</Update>
+
+<Update label="v2.0.7" description="2026-04-23" tags={["Feature"]}>
+  - Added `/add-atomic-chat-tool` MCP tool skill for Atomic Chat integration (skill ships its own MCP file; no trunk source changes)
+</Update>
+
+<Update label="v2.0.6" description="2026-04-23" tags={["Feature"]}>
+  - Approval cards show human-readable names and correct post-click labels on channel and sender cards
+  - Router forwards `isGroup` from the adapter into messaging group creation so DMs aren't misclassified as groups
+  - Discord resolves user ID from DM interactions for approval clicks
+</Update>
+
+<Update label="v2.0.5" description="2026-04-23" tags={["Feature", "Fix"]}>
+  - Added experimental Slack and iMessage channel flows to `bash nanoclaw.sh`
+  - Orphan container reaper is now scoped by install label — two NanoClaw installs on the same host no longer kill each other's containers
+  - Setup-flow polish: Yes-default on claude-assist prompts, quieter first-chat, npm fallback when corepack is missing, `PATH` fix after fallback install
+</Update>
+
+<Update label="v2.0.4" description="2026-04-23" tags={["Feature"]}>
+  - Broad setup-flow clarifications from a user-feedback session — clearer prose weight, outcome highlighting
+</Update>
+
+<Update label="v2.0.3" description="2026-04-23" tags={["Feature", "Breaking"]}>
+  - **Per-checkout service name and Docker image tag.** Two NanoClaw installs on one host now coexist cleanly: launchd labels become `com.nanoclaw-v2-{slug}`, systemd units become `nanoclaw-v2-{slug}.service`, and the base container image tag becomes `nanoclaw-agent-v2-{slug}:latest` (where `{slug}` is an 8-character `sha1(projectRoot)` prefix). Every spawned container is stamped with a `nanoclaw-install={slug}` label so orphan cleanup stays install-scoped. Override with `CONTAINER_IMAGE_BASE` / `CONTAINER_IMAGE` if you need to pin a shared tag.
+  - Chinese and Japanese README translations aligned with v2 English
+</Update>
+
+<Update label="v2.0.2" description="2026-04-22" tags={["Fix"]}>
+  - Setup offers to reuse an existing OneCLI instance instead of clobbering it
+  - `/home/node` permissions loosened to `0777` in the container image
+  - Setup resolves the `channels` remote dynamically rather than assuming the `origin` name
+</Update>
+
+<Update label="v2.0.1" description="2026-04-22" tags={["Fix"]}>
+  - Setup falls back to `npm install` when corepack is unavailable
+  - Collapsed the `/setup` skill to a single instruction: run `bash nanoclaw.sh`
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention

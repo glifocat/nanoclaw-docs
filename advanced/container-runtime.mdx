@@ -79,9 +79,10 @@ The agent container is built from `container/Dockerfile` and includes:
 
 Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image:
 
-- Tag: `nanoclaw-agent:{agentGroupId}`
-- Built on top of `nanoclaw-agent:latest`
+- Base image: `nanoclaw-agent-v2-{slug}:latest` (where `{slug}` is the 8-character install slug — see [Install slug](/api/configuration#install-slug))
+- Per-group tag: `nanoclaw-agent-v2-{slug}:{agentGroupId}`
 - Adds custom apt and npm packages
+- Every spawned container is stamped with the `nanoclaw-install={slug}` label so orphan cleanup only reaps this install's containers
 
 ## Two-database IO model
 

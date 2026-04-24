@@ -18,8 +18,12 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
   Whether the assistant has its own phone number or dedicated account. Set to `"true"` to enable.
 </ParamField>
 
-<ParamField path="CONTAINER_IMAGE" type="string" default="nanoclaw-agent:latest">
-  Docker image to use for agent containers. Per-agent-group images are tagged as `nanoclaw-agent:{agentGroupId}`.
+<ParamField path="CONTAINER_IMAGE" type="string" default="nanoclaw-agent-v2-{slug}:latest">
+  Docker image reference used when spawning agent containers. The default is derived per-checkout from an 8-character install slug (`sha1(projectRoot)[:8]`) so two NanoClaw installs on the same host do not clobber each other's image tag. Per-agent-group images are tagged as `{CONTAINER_IMAGE_BASE}:{agentGroupId}`.
+</ParamField>
+
+<ParamField path="CONTAINER_IMAGE_BASE" type="string" default="nanoclaw-agent-v2-{slug}">
+  Docker image name without the tag. Used to construct both the base image (`:latest`) and per-agent-group images (`:{agentGroupId}`). Override if you need to pin a shared image name across checkouts.
 </ParamField>
 
 <ParamField path="CONTAINER_TIMEOUT" type="number" default="1800000">
@@ -92,6 +96,20 @@ All paths are absolute and resolved from the project root:
 <ResponseField name="MOUNT_ALLOWLIST_PATH" type="string">
   `~/.config/nanoclaw/mount-allowlist.json` — mount security allowlist (never mounted into containers)
 </ResponseField>
+
+## Install slug
+
+Each checkout gets a deterministic 8-character slug (`sha1(projectRoot)[:8]`) used to namespace per-host resources so multiple installs coexist cleanly:
+
+| Resource | Format |
+|---|---|
+| launchd label (macOS) | `com.nanoclaw-v2-{slug}` |
+| systemd unit (Linux) | `nanoclaw-v2-{slug}.service` |
+| Base container image | `nanoclaw-agent-v2-{slug}:latest` |
+| Per-group image | `nanoclaw-agent-v2-{slug}:{agentGroupId}` |
+| Container label | `nanoclaw-install={slug}` |
+
+The host stamps every spawned container with the `nanoclaw-install` label so the orphan reaper only reaps containers from the current install — never a peer's. Any legacy v1 `com.nanoclaw` service on the host is left untouched.
 
 ## Trigger pattern
 
