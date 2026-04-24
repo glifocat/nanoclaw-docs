@@ -100,6 +100,7 @@ The delivery system enforces per-agent permissions:
 - Cross-channel delivery requires an explicit `agent_destinations` row
 - System messages (scheduling, approvals) are routed through registered delivery action handlers
 - File attachments are read from `outbox/{messageId}/`
+- Agent-to-agent messages with file references have their bytes copied from the source's outbox into the target's inbox; filenames are validated against path traversal (rejecting `..`, separators, and any name where `path.basename(name) !== name`) before copy
 - 3 retry attempts per message, then permanently failed
 
 ### Credential handling

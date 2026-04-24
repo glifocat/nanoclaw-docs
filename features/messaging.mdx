@@ -142,6 +142,8 @@ The delivery system uses a two-poll architecture:
 4. Permission check for cross-channel delivery
 5. Retry up to 3 times on failure
 
+For `agent` routes, if the source message references files (from `send_file`), the bytes are copied from the source session's `outbox/{messageId}/` into the target's `inbox/{a2aMessageId}/` and surfaced to the target as `attachments`. Without this copy, file references would arrive at the target but the target has no way to read the bytes — they live in a session directory it doesn't mount.
+
 <Note>
 Typing indicators are paused after each real user-facing delivery to avoid visual flicker.
 </Note>
