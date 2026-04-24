@@ -5,6 +5,15 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Setup verify: auth-error detection + CLI-only success" description="2026-04-24" tags={["Updated"]}>
+  Synced docs with upstream [qwibitai/nanoclaw#1970](https://github.com/qwibitai/nanoclaw/pull/1970) and related setup-verify changes (v2.0.11).
+
+  ## Updated
+  - **`advanced/troubleshooting.mdx`**: Container 401 errors section now lists `agentPing: auth_error` in `logs/setup.log` as a symptom. The installer's agent ping classifies replies containing `Invalid bearer token`, `authentication_error`, or `Failed to authenticate` as auth failures rather than socket errors.
+  - **`quickstart.mdx`**: Documented the `verify` sub-step in the setup:auto phase and clarified that a CLI-only install passes verification when the agent ping succeeds — messaging channel credentials are optional.
+  - **`features/cli.mdx`**: Added a note that a successful `claw` round-trip is sufficient for `setup/verify` to report success even when no messaging channel is configured.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
