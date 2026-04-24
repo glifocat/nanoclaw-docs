@@ -2,6 +2,7 @@
 title: Command-line interface
 description: Run NanoClaw agents from the terminal with the claw CLI — send prompts, pipe input, resume sessions, and script agent interactions
 keywords: ["cli", "claw", "terminal", "command line", "scripting", "automation"]
+tag: "UPDATED"
 ---
 
 ## Overview
@@ -15,6 +16,10 @@ Use cases include:
 - **Dev workflow** — stay in the terminal without context-switching to a chat app
 - **Bootstrapping** — use an agent immediately before any messaging channel is set up
 - **Testing** — faster feedback loop than sending a message through a chat app
+
+<Note>
+**CLI-only installs are a first-class configuration.** `setup/verify` accepts an install with no messaging channels as long as the local agent round-trip succeeds — the CLI pings the agent (`AGENT_PING=ok`) and verification passes. You can run NanoClaw end-to-end with `claw` alone and add messaging channels later.
+</Note>
 
 ## Prerequisites
 
@@ -168,6 +173,15 @@ claw "What are the open P0 bugs?" | mail -s "P0 Bug Report" team@example.com
     ```bash
     export NANOCLAW_DIR=/path/to/your/nanoclaw
     ```
+  </Accordion>
+
+  <Accordion title="Setup verify shows STATUS=failed on a CLI-only install">
+    Setup verification accepts an install with no messaging channels as long as the CLI agent responds. If you see `STATUS=failed` with no channels configured, check the other fields in the `VERIFY` status block:
+
+    - `SERVICE` must be `running`
+    - `CREDENTIALS` must be `configured` (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, or `ONECLI_URL` in `.env`)
+    - `REGISTERED_GROUPS` must be `> 0` — run `/init-first-agent` if not
+    - `AGENT_PING` must be `ok` — `no_reply` or `socket_error` means the container isn't answering; check `logs/nanoclaw.log`
   </Accordion>
 </AccordionGroup>
 
