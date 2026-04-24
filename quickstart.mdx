@@ -108,6 +108,7 @@ If something looks wrong after install, `logs/setup.log` is the first file to re
     - **onecli** — installs OneCLI Agent Vault and registers your Anthropic secret
     - **channel pairing** — runs the `add-<channel>` skill you picked
     - **service** — launchd (macOS) / systemd (Linux) / `start-nanoclaw.sh` wrapper (WSL without systemd)
+    - **verify** — end-to-end check that the service is running, credentials are configured, at least one agent group is registered, and the CLI agent round-trips a ping. A CLI-only install (no messaging channels configured) passes verification as long as the agent ping succeeds; messaging channel credentials are optional.
     - **diagnostics** — optional opt-in PostHog event with platform + channel choice
   </Accordion>
 
