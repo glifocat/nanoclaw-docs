@@ -11,13 +11,9 @@ NanoClaw runs agents in isolated Linux containers to provide security through OS
 All runtime-specific logic lives in `src/container-runtime.ts`:
 
 - **Docker** (default) — cross-platform support (macOS, Linux, Windows via WSL2)
-- **Apple Container** (macOS only) — lightweight native runtime
+- **Apple Container** (macOS only) — opt-in via `/convert-to-apple-container`
 
-The runtime binary is specified by `CONTAINER_RUNTIME_BIN`:
-
-```typescript
-export const CONTAINER_RUNTIME_BIN = 'docker';
-```
+The runtime binary (`CONTAINER_RUNTIME_BIN`) is selected automatically based on which runtime is installed. Docker is the trunk default; Apple Container is enabled by the conversion skill.
 
 ## Apple Container vs Docker
 
@@ -75,13 +71,17 @@ The agent container is built from `container/Dockerfile` and includes:
 ./container/build.sh
 ```
 
+### Per-install image tags
+
+Each NanoClaw checkout gets its own `INSTALL_SLUG` derived from the project root, used for both the base image tag and a `nanoclaw-install` Docker label stamped onto every spawned container. This prevents two installs on the same host from clobbering each other's `nanoclaw-agent:latest` on rebuild, and scopes orphan-cleanup so it only reaps containers from this install.
+
 ### Per-agent-group images
 
 Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image:
 
-- Tag: `nanoclaw-agent:{agentGroupId}`
-- Built on top of `nanoclaw-agent:latest`
-- Adds custom apt and npm packages
+- Tag: `nanoclaw-agent-{install-slug}:{agentGroupId}`
+- Built on top of the install's base `nanoclaw-agent` image
+- Adds custom apt and npm packages from `container.json`
 
 ## Two-database IO model
 
@@ -191,32 +191,36 @@ const onecliApplied = await onecli.applyContainerConfig(args, {
 ## Debugging containers
 
 <Accordion title="List running containers">
+  Container names follow the format `nanoclaw-v2-{group-folder}-{timestamp}`. List per-install containers via the install label:
+
   ```bash
-  docker ps --filter name=nanoclaw-
+  docker ps --filter label=nanoclaw-install
   ```
 </Accordion>
 
 <Accordion title="View container logs">
   ```bash
-  docker logs nanoclaw-{session-id}
+  docker logs nanoclaw-v2-{group-folder}-{timestamp}
   ```
+
+  Note: `stdout` is unused in v2 — agent IO goes through the session DBs. Useful logs come from `stderr` and the host's `logs/nanoclaw.log`.
 </Accordion>
 
 <Accordion title="Inspect container mounts">
   ```bash
-  docker inspect nanoclaw-{session-id} | jq '.[0].Mounts'
+  docker inspect nanoclaw-v2-{group-folder}-{timestamp} | jq '.[0].Mounts'
   ```
 </Accordion>
 
 <Accordion title="Execute commands in running container">
   ```bash
-  docker exec -it nanoclaw-{session-id} /bin/bash
+  docker exec -it nanoclaw-v2-{group-folder}-{timestamp} /bin/bash
   ```
 </Accordion>
 
 <Accordion title="Stop a running container">
   ```bash
-  docker stop -t 1 nanoclaw-{session-id}
+  docker stop -t 1 nanoclaw-v2-{group-folder}-{timestamp}
   ```
 </Accordion>
 

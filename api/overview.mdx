@@ -3,56 +3,71 @@ title: API architecture overview
 description: Core API reference for NanoClaw architecture and data flow
 sidebarTitle: "Overview"
 keywords: ["api", "architecture", "data flow"]
+tag: "UPDATED"
 ---
 
-NanoClaw is a single Node.js process that connects to messaging channels (WhatsApp, Telegram, Discord, Slack, Gmail) and routes messages to Claude Agent SDK instances running in isolated containers. Each group has its own filesystem and memory.
+NanoClaw is a single Node.js host process that orchestrates per-session agent containers. Channel adapters land platform messages, the router resolves them through an entity model (users → messaging groups → agent groups → sessions), and the agent-runner inside each container processes them by reading and writing two SQLite databases.
 
 ## Architecture
 
 ### Core components
 
-- **Orchestrator** (`src/index.ts`) - State management, message loop, and agent invocation
-- **Message Router** (`src/router.ts`) - Message formatting and outbound routing
-- **Container Runner** (`src/container-runner.ts`) - Spawns agent containers with mounts
-- **Task Scheduler** (`src/task-scheduler.ts`) - Runs scheduled tasks
-- **Database** (`src/db.ts`) - SQLite operations for messages, groups, and tasks
-- **Channels** (`src/channels/`) - Channel connections and message delivery
+- **Orchestrator** (`src/index.ts`) — initializes the central DB, runs migrations, starts channel adapters, delivery polls, and the host sweep
+- **Inbound router** (`src/router.ts`) — thread policy, messaging group lookup, sender resolution, fan-out, and engage evaluation
+- **Session manager** (`src/session-manager.ts`) — resolves sessions, opens `inbound.db` and `outbound.db`, manages the heartbeat path
+- **Container runner** (`src/container-runner.ts`) — spawns per-agent-group containers with session and outbox mounts; calls `onecli.ensureAgent`
+- **Container runtime** (`src/container-runtime.ts`) — Docker vs Apple Container selection and orphan cleanup
+- **Delivery** (`src/delivery.ts`) — polls `outbound.db` and dispatches to channel adapters and registered system-action handlers
+- **Host sweep** (`src/host-sweep.ts`) — 60s loop for `processing_ack` sync, stale detection, due-message wake, and recurrence advancement
+- **Modules** (`src/modules/`) — pluggable hooks: permissions, scheduling, agent-to-agent, approvals, self-mod, typing
+- **Channels** (`src/channels/`) — adapter registry and Chat SDK bridge; specific adapters install from the `channels` branch
 
 ### Key concepts
 
-#### Groups
+#### Entity model
 
-Groups are isolated workspaces for the agent. Each group has:
+```
+users (id "<channel>:<handle>", kind, display_name)
+user_roles (user_id, role, agent_group_id)         — owner | admin (global or scoped)
+agent_group_members (user_id, agent_group_id)
 
-- Unique folder in `groups/{name}/`
-- Isolated filesystem and memory
-- Persistent session ID
-- Optional trigger pattern (default: requires `@{ASSISTANT_NAME}` mention)
+agent_groups (workspace, container config, provider)
+    ↕ many-to-many via messaging_group_agents (engage_mode, sender_scope, session_mode, ...)
+messaging_groups (one chat/channel on one platform; unknown_sender_policy)
+
+sessions (agent_group_id + messaging_group_id + thread_id → per-session container)
+```
+
+Privilege is user-level (owner/admin), not channel-level. Wirings carry the engage policy, sender scope, and session mode for each (messaging group, agent group) pair.
 
 #### Message flow
 
-1. Channel receives message and calls `onMessage` callback
-2. Message is stored in database via `storeMessage()`
-3. Message loop detects new messages for registered groups
-4. Router formats messages as XML and passes to agent container
-5. Agent processes messages and returns output
-6. Output is stripped of `<internal>` tags and sent back through channel
+1. The channel adapter receives a message and calls `onInbound` on the router
+2. Thread policy collapses `threadId` for non-threaded platforms
+3. The router resolves the messaging group (auto-creating on mention/DM), then fans out to wired agents
+4. Each engaging agent gets a write to its session's `inbound.db` and a container wake
+5. The agent-runner polls `inbound.db`, calls the configured provider, and writes responses to `outbound.db`
+6. The host's delivery poll reads `outbound.db` and dispatches via the adapter's `deliver()` callback
 
-#### Sessions
+#### Sessions and the two-DB split
 
-Each group maintains a persistent session ID that preserves conversation context across container restarts. Sessions are stored in the database and loaded when spawning containers.
+Each session has two SQLite files under `data/v2-sessions/<agent_group_id>/<session_id>/`:
 
-## Database schema
+- `inbound.db` — host writes, container reads (`messages_in`, routing, destinations, pending_questions)
+- `outbound.db` — container writes, host reads (`messages_out`, `processing_ack`, `session_state`)
 
-NanoClaw uses SQLite for persistent storage:
+Exactly one writer per file — no cross-mount lock contention. The heartbeat is a file touch at `/workspace/.heartbeat`, not a DB update.
 
-- `chats` - Chat metadata (JID, name, last activity)
-- `messages` - Full message history for registered groups
-- `registered_groups` - Group configuration and settings
-- `sessions` - Session IDs by group folder
-- `scheduled_tasks` - Task definitions and schedules
-- `task_run_logs` - Task execution history
-- `router_state` - Message cursor positions
+## Database
+
+The central database (`data/v2.db`) holds everything that isn't per-session:
+
+- `users`, `user_roles`, `agent_group_members` — entity model
+- `agent_groups`, `messaging_groups`, `messaging_group_agents` — workspaces and wirings
+- `sessions` — per-session status and container state
+- `agent_destinations`, `pending_approvals`, `pending_sender_approvals`, `pending_channel_approvals` — module state
+- `chat_sdk_*` — Chat SDK bridge state
+- `schema_version` — managed by `src/db/migrations/`
 
 ## Configuration files
 

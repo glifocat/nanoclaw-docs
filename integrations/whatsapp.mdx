@@ -61,20 +61,16 @@ WhatsApp (Baileys) → SQLite → Polling loop → Container (Claude Agent SDK) 
     Baileys emits `messages.upsert` events, filtered by registered groups.
   </Step>
   
-  <Step title="Message storage">
-    Messages are stored in SQLite (`store/messages.db`).
+  <Step title="Routing">
+    The host router resolves the wiring(s) for the messaging group, evaluates engage mode and sender scope, and writes the message to the session's `inbound.db`.
   </Step>
-  
-  <Step title="Queue processing">
-    The polling loop checks for messages that require agent responses.
+
+  <Step title="Container wake">
+    The container runner wakes the per-session container; the agent-runner polls `inbound.db` and processes the message.
   </Step>
-  
-  <Step title="Container invocation">
-    Agent runs in an isolated Linux container with the group's filesystem mounted.
-  </Step>
-  
+
   <Step title="Response routing">
-    Response is sent back via `sendMessage()` with assistant name prefix.
+    The agent writes a response to `outbound.db`. The host's delivery poll reads it and dispatches via the WhatsApp adapter's `deliver()` callback.
   </Step>
 </Steps>
 
@@ -332,17 +328,17 @@ Messages are queued during disconnection and flushed on reconnect.
 
 ### Not receiving messages
 
-Check if the chat is registered:
+Check if the chat exists as a v2 messaging group:
 
 ```bash
-sqlite3 store/messages.db "SELECT * FROM registered_groups"
+sqlite3 data/v2.db "SELECT id, channel_type, platform_id FROM messaging_groups WHERE channel_type = 'whatsapp';"
 ```
 
-If the chat isn't listed, register it using the process above.
+If the chat isn't listed, mention the bot once — messaging groups are auto-created on the first mention or DM.
 
 ### Bot responding to itself
 
-Ensure `ASSISTANT_HAS_OWN_NUMBER` is set correctly in `src/config.ts`:
+Ensure `ASSISTANT_HAS_OWN_NUMBER` is set correctly in `.env`:
 
 - If sharing a number, set to `false` (bot messages will have the name prefix)
 - If using a dedicated number, set to `true` (bot messages are identified by `fromMe`)

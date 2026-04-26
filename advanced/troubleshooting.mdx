@@ -66,23 +66,28 @@ Messages sent to the agent receive no response.
   
   <Step title="Check container logs">
     ```bash
-    docker logs nanoclaw-{group}-{timestamp}
+    docker logs nanoclaw-v2-{group-folder}-{timestamp}
     ```
-    
-    Look for errors in the agent execution.
+
+    `stdout` is unused in v2 (all IO goes through session DBs). Useful output appears on `stderr` and in `logs/nanoclaw.log`.
   </Step>
 </Steps>
 
 ### Solutions
 
-<Accordion title="Trigger word not matching">
-  Verify the trigger word in your message matches the configured trigger:
-  
+<Accordion title="Engage mode mismatch">
+  In v2, trigger behavior is controlled per-wiring via `engage_mode` (`pattern`, `mention`, `mention-sticky`) — there is no global trigger word. Inspect the wirings for a messaging group:
+
   ```bash
-  sqlite3 store/messages.db "SELECT name, trigger_pattern FROM registered_groups;"
+  sqlite3 data/v2.db "
+    SELECT mg.platform_id, ag.name AS agent, mga.engage_mode, mga.engage_pattern, mga.sender_scope
+    FROM messaging_group_agents mga
+    JOIN messaging_groups mg ON mg.id = mga.messaging_group_id
+    JOIN agent_groups ag ON ag.id = mga.agent_group_id;
+  "
   ```
-  
-  The trigger is case-insensitive and must appear at the start of the message.
+
+  If you expect `pattern` matching, confirm the regex matches your messages. If `mention`, the platform must surface a mention event (e.g., `@bot` in Discord, reply on WhatsApp).
 </Accordion>
 
 <Accordion title="Container runtime not available">
@@ -121,62 +126,38 @@ Messages sent to the agent receive no response.
 ### Diagnosis
 
 ```bash
-# Check for recent timeouts
-grep -E 'Container timeout|timed out' logs/nanoclaw.log | tail -10
+# Check for recent timeouts and stale-container kills
+grep -E 'Container timeout|stale|Killing container' logs/nanoclaw.log | tail -10
 
-# Check container log files
-ls -lt groups/*/logs/container-*.log | head -10
+# Check the host log for the affected session
+grep '{session-id}' logs/nanoclaw.log | tail -50
 
-# Read the most recent container log
-cat groups/{group}/logs/container-{timestamp}.log
+# Inspect the container's stderr if it's still running
+docker logs nanoclaw-v2-{group-folder}-{timestamp}
 ```
 
 ### Solutions
 
-<Accordion title="Increase timeout for specific group">
-  Modify the group's `containerConfig` in the database:
-  
+<Accordion title="Adjust the global container timeout">
+  In v2, container timeouts are configured via the `CONTAINER_TIMEOUT` environment variable (milliseconds, default 1,800,000 = 30 minutes). Update `.env` and restart the service. There is no per-group timeout override in `container.json`.
+</Accordion>
+
+<Accordion title="Stuck container — let the host sweep handle it">
+  The host sweep runs every 60 seconds and detects stuck containers via `.heartbeat` mtime and unacknowledged `processing_ack` rows. Stale containers are killed automatically. Watch for:
+
   ```bash
-  sqlite3 store/messages.db
+  grep -E 'stale heartbeat|stuck processing_ack|Killing container' logs/nanoclaw.log
   ```
-  
-  ```sql
-  UPDATE registered_groups 
-  SET container_config = json_set(
-    COALESCE(container_config, '{}'),
-    '$.timeout',
-    3600000  -- 1 hour in milliseconds
-  )
-  WHERE name = 'Family Chat';
+
+  If a container is genuinely stuck and you need to kill it immediately:
+
+  ```bash
+  docker stop -t 1 nanoclaw-v2-{group-folder}-{timestamp}
   ```
 </Accordion>
 
-<Accordion title="Check for infinite loops">
-  Review the container log to see if the agent is stuck:
-  
-  ```bash
-  cat groups/{group}/logs/container-{timestamp}.log
-  ```
-  
-  Look for repeated patterns or lack of progress. If the agent is stuck, consider:
-  - Simplifying the prompt
-  - Adding constraints to the task
-  - Reviewing recent changes to `CLAUDE.md`
-</Accordion>
-
-<Accordion title="Adjust idle timeout">
-  The idle timeout (for graceful shutdown between messages) is currently equal to the hard timeout. This is a known issue. To fix:
-  
-  Edit `src/config.ts` and set:
-  ```typescript
-  export const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-  export const CONTAINER_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-  ```
-  
-  Then rebuild:
-  ```bash
-  npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-  ```
+<Accordion title="Check for infinite loops in the agent">
+  Look at the host log entries for the session — the agent-runner emits structured events as `processing_ack` rows. If the same tool is firing repeatedly, simplify the prompt, add constraints to the task, or review recent changes to `CLAUDE.md` and per-group memory in `groups/{folder}/CLAUDE.local.md`.
 </Accordion>
 
 ## Service stops after SSH logout (Linux)
@@ -212,22 +193,20 @@ loginctl show-user $USER | grep Linger
 
 ## Known issues
 
-### Cursor rollback on error
+### Replaying lost messages
 
-The message cursor (`lastAgentTimestamp`) is now rolled back on container errors, provided no output was already sent to the user. If the agent fails after sending partial output, the cursor is not rolled back to prevent duplicate messages.
+In v2 there is no `lastAgentTimestamp` cursor — each inbound message is a row in the session's `inbound.db` with a status (`pending`, `processing`, `completed`, `failed`). Stuck or failed rows can be inspected directly:
 
-If you need to manually reset the cursor, update it in `router_state`:
-
-```sql
--- The cursor is stored as a JSON object mapping JIDs to timestamps
-SELECT value FROM router_state WHERE key = 'last_agent_timestamp';
+```bash
+sqlite3 data/v2-sessions/{agent_group_id}/{session_id}/inbound.db \
+  "SELECT id, status, kind, substr(content, 1, 80) FROM messages_in ORDER BY rowid DESC LIMIT 20;"
 ```
 
-### IDLE_TIMEOUT and CONTAINER_TIMEOUT
+To force a re-process, flip a row back to `pending` and let the next sweep wake the container.
 
-The hard timeout is calculated as `Math.max(configTimeout, IDLE_TIMEOUT + 30_000)`, ensuring a 30-second gap for graceful `_close` sentinel shutdown before the hard kill fires. With default settings (both 30 minutes), the hard timeout is 30 minutes 30 seconds.
+### No host-side idle timer
 
-If containers are consistently hitting the hard timeout, consider lowering `IDLE_TIMEOUT` in `src/config.ts` to a shorter value (e.g., 5 minutes) so idle containers exit more promptly.
+There is no separate `IDLE_TIMEOUT` in v2 — `CONTAINER_TIMEOUT` is the only wall-clock timer. Stuck and stale containers are caught by the host sweep using `.heartbeat` mtime and `processing_ack` claim age, which avoids killing legitimate long-running work on a fixed timer.
 
 ### Kubernetes image garbage collection deletes nanoclaw-agent image
 
@@ -316,33 +295,34 @@ systemctl --user restart nanoclaw
 Never copy tokens from `~/.claude/.credentials.json` into `.env`. These are short-lived keychain tokens that expire within hours. Use `claude setup-token` to generate a long-lived token instead.
 </Warning>
 
-## WhatsApp authentication issues
+## Channel authentication issues
+
+In v2, channel adapters live on the `channels` branch and are skill-installed per fork (`/add-discord`, `/add-slack`, `/add-whatsapp`, etc.). Authentication state lives in the channel's own files (e.g., `store/auth/` for WhatsApp, OAuth tokens managed by OneCLI for HTTP-based platforms).
 
 ### Symptoms
-- Logs show "QR" or "authentication required"
-- No messages are being received
+- Logs show authentication errors, QR requests, or "channel not connected"
+- Inbound messages stop arriving from a specific channel
 - Connection repeatedly drops
 
 ### Diagnosis
 
 ```bash
-# Check for QR code requests
-grep 'QR\|authentication required\|qr' logs/nanoclaw.log | tail -5
+# Check for channel registration on startup
+grep -E 'Channel.*registered|Channel.*disabled|adapter' logs/nanoclaw.log | tail -10
 
-# Check auth files exist
-ls -la store/auth/
+# Look for auth-related errors
+grep -iE 'auth|QR|unauthorized' logs/nanoclaw.log | tail -10
 ```
 
 ### Solution
 
-Re-authenticate with WhatsApp:
+Re-run the channel's setup skill (`/add-<channel>`) to refresh credentials, or update the secret in OneCLI for HTTP-based platforms:
 
 ```bash
-claude
-/add-whatsapp
+onecli secrets update --name <name> --value <new-token>
 ```
 
-Scan the QR code with your phone, then restart the service:
+Then restart the service:
 
 <CodeGroup>
 ```bash macOS
@@ -370,15 +350,15 @@ grep -E 'Mount validated|Mount.*REJECTED|mount' logs/nanoclaw.log | tail -10
 # Verify the mount allowlist is readable
 cat ~/.config/nanoclaw/mount-allowlist.json
 
-# Check group's container_config in DB
-sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;"
+# Inspect a group's container.json (mounts live in the file, not the DB)
+cat groups/{group-folder}/container.json
 ```
 
 ### Solutions
 
 <Accordion title="Add path to mount allowlist">
   Edit `~/.config/nanoclaw/mount-allowlist.json`:
-  
+
   ```json
   {
     "allowedRoots": [
@@ -388,12 +368,11 @@ sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;
         "description": "Project files"
       }
     ],
-    "blockedPatterns": [".ssh", ".gnupg", ".aws", ".env", "credentials"],
-    "nonMainReadOnly": true
+    "blockedPatterns": [".ssh", ".gnupg", ".aws", ".env", "credentials"]
   }
   ```
-  
-  Then restart the service. If the mount allowlist file did not exist at startup, NanoClaw will detect it once created without requiring a restart.
+
+  The "missing file" state is not cached — you can create the allowlist without restarting. Parse errors, however, are cached for the process lifetime; restart the service after fixing a syntax error.
 </Accordion>
 
 <Accordion title="Reset mount allowlist to defaults">
@@ -433,55 +412,59 @@ sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;
   ```
 </Accordion>
 
-## IPC issues
+## Session DB issues
+
+In v2, host ↔ container communication runs entirely through two SQLite files per session — `inbound.db` (host writes, container reads) and `outbound.db` (container writes, host reads). The legacy `data/ipc/` directory and `store/messages.db` from v1 no longer exist.
 
 ### Symptoms
-- Messages sent via IPC don't appear in the chat
-- Tasks don't get scheduled
-- IPC files accumulate in `data/ipc/{group}/`
+- Outbound messages never delivered to the chat
+- Tasks scheduled but never run
+- Container exits immediately after spawn
 
 ### Diagnosis
 
 ```bash
-# Check for failed IPC operations
-ls -la data/ipc/errors/
-cat data/ipc/errors/main-message-*.json
+# Find the session's DB files
+ls -la data/v2-sessions/{agent_group_id}/{session_id}/
 
-# Monitor IPC activity
-grep 'IPC' logs/nanoclaw.log | tail -20
+# Inspect pending inbound messages
+sqlite3 data/v2-sessions/{agent_group_id}/{session_id}/inbound.db \
+  "SELECT id, kind, status, process_after FROM messages_in ORDER BY rowid DESC LIMIT 10;"
 
-# Verify IPC directory permissions
-ls -la data/ipc/main/
-ls -la data/ipc/family-chat/
+# Inspect outbound activity (kind, deliver_after, errors via host log)
+sqlite3 data/v2-sessions/{agent_group_id}/{session_id}/outbound.db \
+  "SELECT id, kind, deliver_after FROM messages_out ORDER BY rowid DESC LIMIT 10;"
+
+# Watch delivery decisions in the host log
+tail -f logs/nanoclaw.log | grep -E 'deliver|outbound|delivery'
 ```
 
 ### Solutions
 
-<Accordion title="Check IPC authorization">
-  Non-main groups can only send messages to their own chat. Verify the `chatJid` in the IPC file matches the group's registered JID:
-  
+<Accordion title="Check delivery authorization">
+  Cross-channel delivery requires an explicit row in `agent_destinations`. The origin chat (where the conversation started) is always permitted. Inspect destinations:
+
   ```bash
-  sqlite3 store/messages.db "SELECT jid, name, folder FROM registered_groups;"
+  sqlite3 data/v2.db \
+    "SELECT agent_group_id, channel_type, platform_id, thread_id FROM agent_destinations;"
   ```
 </Accordion>
 
-<Accordion title="Verify JSON format">
-  IPC files must be valid JSON. Check for syntax errors:
-  
+<Accordion title="Verify journal mode">
+  All session DBs must use `journal_mode=DELETE`. WAL mode does not refresh across Docker bind mounts and breaks cross-mount visibility. Check:
+
   ```bash
-  cat data/ipc/errors/{group}-message-*.json | jq .
+  sqlite3 data/v2-sessions/{agent_group_id}/{session_id}/inbound.db "PRAGMA journal_mode;"
   ```
+
+  Expected output: `delete`. If it says `wal`, something downgraded the file — re-run setup or recreate the session.
 </Accordion>
 
-<Accordion title="Test IPC manually">
-  Write a test message:
-  
+<Accordion title="Verify the heartbeat is fresh">
+  The `.heartbeat` file in the session directory is touched periodically by the running container. A stale mtime or missing file is how the host sweep identifies stuck containers:
+
   ```bash
-  echo '{"type":"message","chatJid":"me","text":"test"}' > \
-    data/ipc/main/messages/test.json
-  
-  # Watch logs for processing
-  tail -f logs/nanoclaw.log | grep IPC
+  ls -la data/v2-sessions/{agent_group_id}/{session_id}/.heartbeat
   ```
 </Accordion>
 
@@ -507,64 +490,16 @@ You can run the cleanup manually with `--dry-run` to preview what would be delet
 bash scripts/cleanup-sessions.sh --dry-run
 ```
 
-## Stale session auto-recovery
+## Session resume
 
-NanoClaw automatically detects and recovers from stale or corrupt sessions. When a container fails because the session transcript file (`.jsonl`) is missing — due to a crash mid-write, manual deletion, or disk-full condition — NanoClaw clears the broken session ID and lets the existing backoff mechanism in the group queue retry with a fresh session.
-
-Stale sessions are detected by matching the error output against known patterns (`no conversation found`, `ENOENT` on `.jsonl` files, or `session not found`). Only these specific signals trigger session clearing — transient errors (network, API) fall through to the normal retry path.
-
-You can identify stale session recovery in logs by looking for:
-
-```
-Stale session detected — clearing for next retry
-```
-
-No manual intervention is required.
-
-### Manual recovery
-
-If auto-recovery doesn't trigger (e.g., the error message doesn't match the expected patterns), you can manually clear a stale session:
+The agent-runner persists the SDK session ID in `outbound.db`'s `session_state` so the next wake resumes the same conversation rather than starting fresh. If responses suddenly look like the agent forgot context, inspect:
 
 ```bash
-sqlite3 store/messages.db "DELETE FROM sessions WHERE group_folder = '{group-folder}';"
+sqlite3 data/v2-sessions/{agent_group_id}/{session_id}/outbound.db \
+  "SELECT key, value FROM session_state;"
 ```
 
-Then restart the service or wait for the next retry.
-
-## Session branching issues
-
-### Symptoms
-- Agent responses don't appear in the conversation
-- Session transcript shows multiple branches
-- Concurrent CLI processes in session debug logs
-
-### Diagnosis
-
-```bash
-# Check for concurrent CLI processes
-ls -la data/sessions/{group}/.claude/debug/
-
-# Count unique SDK processes (each .txt file = one CLI subprocess)
-# Multiple files = concurrent queries
-
-# Check parentUuid branching in transcript
-python3 -c "
-import json, sys
-lines = open('data/sessions/{group}/.claude/projects/-workspace-group/{session}.jsonl').read().strip().split('\n')
-for i, line in enumerate(lines):
-  try:
-    d = json.loads(line)
-    if d.get('type') == 'user' and d.get('message'):
-      parent = d.get('parentUuid', 'ROOT')[:8]
-      content = str(d['message'].get('content', ''))[:60]
-      print(f'L{i+1} parent={parent} {content}')
-  except: pass
-"
-```
-
-### Solution
-
-This issue was fixed by passing `resumeSessionAt` with the last assistant message UUID. If you're still experiencing it, ensure you're running the latest version of the agent runner.
+Clearing the row (or deleting the file) forces a fresh session on the next wake.
 
 ## Service management
 
@@ -599,8 +534,10 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw.plist
 ### Rebuild after code changes
 
 ```bash
-npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+pnpm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
 ```
+
+For agent-runner changes only (the container's TypeScript), no rebuild is needed — `/app/src` is a read-only bind mount and the next container spawn picks up the new code. For Dockerfile changes, run `./container/build.sh`.
 
 ## Getting help
 
@@ -621,5 +558,5 @@ If you're still experiencing issues:
 ## Related pages
 
 - [Security model](/advanced/security-model) - Authorization and isolation
-- [IPC system](/advanced/ipc-system) - Inter-process communication
+- [Two-DB session model](/advanced/ipc-system) - How the host and container communicate
 - [Container runtime](/advanced/container-runtime) - Container execution details

@@ -412,19 +412,19 @@ The `CLAUDE_SKILL_DIR` variable resolves to the skill directory at runtime, so t
 
 ### Pattern: Database integration
 
-The script reads registered groups directly from NanoClaw's SQLite database:
+The script reads agent groups directly from NanoClaw's central database (`data/v2.db`):
 
 ```python
-def get_groups(db: Path) -> list[dict]:
+def get_agent_groups(db: Path) -> list[dict]:
     conn = sqlite3.connect(db)
     rows = conn.execute(
-        "SELECT jid, name, folder, is_main FROM registered_groups ORDER BY name"
+        "SELECT id, name, folder FROM agent_groups ORDER BY name"
     ).fetchall()
     conn.close()
-    return [{"jid": r[0], "name": r[1], "folder": r[2], "is_main": bool(r[3])} for r in rows]
+    return [{"id": r[0], "name": r[1], "folder": r[2]} for r in rows]
 ```
 
-This means `claw` works with any channel — it targets groups by name, folder, or JID without needing to know which messaging platform is connected.
+This means `claw` works with any channel — it targets agent groups by name, folder, or id without needing to know which messaging platform is connected.
 
 ### Pattern: Container output sentinel
 

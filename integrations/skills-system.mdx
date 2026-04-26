@@ -91,10 +91,10 @@ The channel fork architecture keeps the upstream `main` branch minimal. Core Nan
 - Live in `.claude/skills/` on `main`
 
 **Container skills** (synced into every container):
-- `/agent-browser`, `/capabilities`, `/slack-formatting`, `/status`
-- Live in `container/skills/` and are synced to each group's `.claude/skills/` directory
+- `agent-browser`, `frontend-engineer`, `self-customize`, `slack-formatting`, `vercel-cli`, `welcome`
+- Live in `container/skills/` and are synced into each container's `~/.claude/skills/` via symlinks at spawn time (the symlinks target `/app/skills/<name>` inside the container)
+- Selection is per agent group via `container.json` (`"skills": "all"` includes everything in `container/skills/`)
 - Available to the agent running inside the container
-- Some are restricted to the main channel (e.g., `/capabilities` and `/status` check for the `/workspace/project` mount)
 
 ## Applying a skill
 

@@ -309,12 +309,12 @@ export class DiscordChannel implements Channel {
   <Accordion title="Bot not responding">
     Check these items:
     
-    1. `DISCORD_BOT_TOKEN` is set in `.env` AND synced to `data/env/env`
-    2. Channel is registered:
+    1. `DISCORD_BOT_TOKEN` is registered with OneCLI (or in `.env` for legacy installs)
+    2. Channel is registered as a messaging group:
        ```bash
-       sqlite3 store/messages.db "SELECT * FROM registered_groups WHERE jid LIKE 'dc:%'"
+       sqlite3 data/v2.db "SELECT id, channel_type, platform_id FROM messaging_groups WHERE channel_type = 'discord';"
        ```
-    3. For non-main channels: message must @mention the bot
+    3. The agent's wiring uses the engage mode you expect (`mention`, `mention-sticky`, or `pattern`)
     4. Service is running:
        ```bash
        launchctl list | grep nanoclaw  # macOS
@@ -333,11 +333,15 @@ export class DiscordChannel implements Channel {
   </Accordion>
   
   <Accordion title="Bot only responds to @mentions">
-    This is the behavior for non-main channels with `requiresTrigger: true`.
-    
-    To make it respond to all messages:
-    - Update the registered group's `requiresTrigger` to `false`, or
-    - Register the channel as your main channel
+    This is the default `mention` engage mode for new wirings. To respond to all messages, update the wiring to `pattern` mode with `engage_pattern = '.'`:
+
+    ```bash
+    sqlite3 data/v2.db "
+      UPDATE messaging_group_agents
+      SET engage_mode = 'pattern', engage_pattern = '.'
+      WHERE messaging_group_id = '<id>' AND agent_group_id = '<id>';
+    "
+    ```
   </Accordion>
   
   <Accordion title="Can't copy channel ID">
@@ -377,16 +381,20 @@ Since Discord was added via a git merge, you remove it by reverting the merge co
     This creates a new commit that undoes all of Discord's code changes.
   </Step>
 
-  <Step title="Remove registrations">
+  <Step title="Remove wirings and messaging groups">
     ```bash
-    sqlite3 store/messages.db "DELETE FROM registered_groups WHERE jid LIKE 'dc:%'"
+    sqlite3 data/v2.db "
+      DELETE FROM messaging_group_agents WHERE messaging_group_id IN
+        (SELECT id FROM messaging_groups WHERE channel_type = 'discord');
+      DELETE FROM messaging_groups WHERE channel_type = 'discord';
+    "
     ```
   </Step>
 
   <Step title="Rebuild and restart">
     ```bash
-    npm install
-    npm run build
+    pnpm install
+    pnpm run build
     launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
     # or: systemctl --user restart nanoclaw (Linux)
     ```
