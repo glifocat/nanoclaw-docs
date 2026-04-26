@@ -39,7 +39,7 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
 </ParamField>
 
 <ParamField path="ONECLI_API_KEY" type="string">
-  API key for authenticating with the OneCLI Agent Vault. Optional — only needed if your OneCLI instance requires authentication.
+  API key for authenticating with the OneCLI Agent Vault. Optional — only needed if your OneCLI instance requires authentication. Read by the OneCLI SDK at request time. Setup writes this automatically when you pass `--onecli-api-token` (or `NANOCLAW_ONECLI_API_TOKEN`) for a remote vault.
 </ParamField>
 
 <ParamField path="MAX_MESSAGES_PER_PROMPT" type="number" default="10">
@@ -56,6 +56,30 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
 
 <ParamField path="TZ" type="string" default="system timezone">
   Timezone for scheduled tasks (cron expressions). Resolved from `TZ` env, `.env` file, then system default. Validated as a real IANA timezone identifier. Falls back to `UTC` if no valid timezone is found.
+</ParamField>
+
+## Setup-time environment variables
+
+These variables are read by `nanoclaw.sh` and `setup:auto` to pre-fill answers in the installer's advanced-settings screen. They map 1:1 to CLI flags (see [Advanced setup flags](/installation#advanced-setup-flags)) and are folded into `process.env` before any setup step runs.
+
+<ParamField path="NANOCLAW_ONECLI_API_HOST" type="string" default="https://app.onecli.sh">
+  Use a remote OneCLI vault instead of installing one locally. When set, the OneCLI setup step skips the local-vs-fresh prompt, health-checks the URL, and runs the CLI installer in remote-only mode (writes `ONECLI_URL` to `.env`). Equivalent flag: `--onecli-api-host`.
+</ParamField>
+
+<ParamField path="NANOCLAW_ONECLI_API_TOKEN" type="string">
+  Bearer token for the remote OneCLI vault. Required if `NANOCLAW_ONECLI_API_HOST` points at an authenticated gateway. Must start with `oc_`. Setup runs `onecli auth login --api-key` so CLI calls during the rest of setup are authenticated, and writes the value to `.env` as `ONECLI_API_KEY` for the runtime SDK. Equivalent flag: `--onecli-api-token`.
+</ParamField>
+
+<ParamField path="NANOCLAW_ANTHROPIC_BASE_URL" type="string">
+  Use a proxy or alternative endpoint instead of `api.anthropic.com`. Equivalent flag: `--anthropic-base-url`.
+</ParamField>
+
+<ParamField path="NANOCLAW_DISPLAY_NAME" type="string">
+  Skip the "what should your assistant call you?" prompt by setting the display name up front. Equivalent flag: `--display-name`.
+</ParamField>
+
+<ParamField path="NANOCLAW_SKIP" type="string">
+  Comma-separated list of step names to skip during setup (debugging only). Equivalent flag: `--skip`.
 </ParamField>
 
 ## Timezone configuration

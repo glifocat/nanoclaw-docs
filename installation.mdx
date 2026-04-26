@@ -134,6 +134,43 @@ The installer walks through bootstrap, container build, OneCLI credential regist
 
 For the step-by-step breakdown of what each phase does, see [Quick start](/quickstart).
 
+## Advanced setup flags
+
+`nanoclaw.sh` forwards every argument after it to `setup:auto`, so you can pre-fill advanced answers from the command line. The same values can be set as environment variables — pass `--help` to print the full list:
+
+```bash
+bash nanoclaw.sh --help
+```
+
+When the installer starts, the first prompt is **Standard setup** vs **Advanced**. Picking "Advanced" opens an interactive settings screen seeded with current values from flags and environment variables. You can also skip the screen entirely by passing the values as flags up front.
+
+| Flag | Env var | Purpose |
+|------|---------|---------|
+| `--onecli-api-host` | `NANOCLAW_ONECLI_API_HOST` | Use a remote OneCLI vault instead of installing one locally. Defaults to `https://app.onecli.sh`. When set, the OneCLI step skips the local-vs-fresh prompt, health-checks the URL, and installs the CLI in remote-only mode. |
+| `--onecli-api-token` | `NANOCLAW_ONECLI_API_TOKEN` | Bearer token for the remote vault. Required if `--onecli-api-host` points at an authenticated gateway. Must start with `oc_`. The token is passed to `onecli auth login --api-key` and also written to `.env` as `ONECLI_API_KEY` for the runtime SDK. |
+| `--anthropic-base-url` | `NANOCLAW_ANTHROPIC_BASE_URL` | Use a proxy or alternative endpoint instead of `api.anthropic.com`. |
+| `--display-name` | `NANOCLAW_DISPLAY_NAME` | Skip the "what should your assistant call you?" prompt. |
+| `--skip` | `NANOCLAW_SKIP` | Comma-separated step names to skip (debugging only). |
+
+Examples:
+
+```bash
+# Connect to a hosted remote vault and skip the OneCLI prompt entirely
+bash nanoclaw.sh \
+  --onecli-api-host https://app.onecli.sh \
+  --onecli-api-token oc_abc123...
+
+# Route Anthropic traffic through a proxy
+bash nanoclaw.sh --anthropic-base-url https://proxy.example.com
+
+# Pre-fill the display name
+NANOCLAW_DISPLAY_NAME="Pip" bash nanoclaw.sh
+```
+
+<Note>
+The remote-vault token is only used when `--onecli-api-host` is also set. Local installs run unauthenticated against `127.0.0.1` and don't need a token.
+</Note>
+
 ## File structure after install
 
 <Tree>

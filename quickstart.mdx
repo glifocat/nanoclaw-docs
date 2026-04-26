@@ -41,10 +41,19 @@ This guide covers the default installer. If you want to customize the install pa
     - Installing a systemd or launchd service so NanoClaw starts with your machine
 
     If any step fails, Claude Code is invoked automatically to diagnose and resume from where it broke. You don't have to debug the installer yourself.
+
+    <Tip>
+    Run `bash nanoclaw.sh --help` to see every supported flag. Flags are forwarded to `setup:auto`, so you can pre-fill advanced answers (for example `--onecli-api-host https://app.onecli.sh --onecli-api-token oc_...`) and skip the interactive screen entirely. See [Advanced setup flags](/installation#advanced-setup-flags) for the full list.
+    </Tip>
   </Step>
 
   <Step title="Answer the setup prompts">
-    Running through [clack](https://github.com/natemoo-re/clack), you'll be asked:
+    Running through [clack](https://github.com/natemoo-re/clack), the first prompt asks how to begin:
+
+    - **Standard setup** (default — press Enter) — the linear flow described below
+    - **Advanced** — opens a settings screen where you can override defaults like a remote OneCLI vault URL, an OneCLI access token, or an alternative Anthropic base URL before any setup work begins
+
+    After that, you'll be asked:
 
     - **Display name** — what you want your agent to be called (default: `Andy`)
     - **Anthropic credential method** — Claude subscription (OAuth), Anthropic API key, or skip
@@ -105,7 +114,7 @@ If something looks wrong after install, `logs/setup.log` is the first file to re
 
     - **environment** — Docker / Apple Container detection, runtime selection
     - **container** — builds `nanoclaw-agent:latest` via `container/build.sh`
-    - **onecli** — installs OneCLI Agent Vault and registers your Anthropic secret
+    - **onecli** — installs OneCLI Agent Vault and registers your Anthropic secret. If you set a remote vault host (`--onecli-api-host` or `NANOCLAW_ONECLI_API_HOST`), this step skips the local-vs-fresh prompt, health-checks the remote URL, installs the OneCLI CLI in remote-only mode, runs `onecli auth login` with your token, and writes `ONECLI_URL` + `ONECLI_API_KEY` to `.env`.
     - **channel pairing** — runs the `add-<channel>` skill you picked
     - **service** — launchd (macOS) / systemd (Linux) / `start-nanoclaw.sh` wrapper (WSL without systemd)
     - **diagnostics** — optional opt-in PostHog event with platform + channel choice
