@@ -134,6 +134,27 @@ The installer walks through bootstrap, container build, OneCLI credential regist
 
 For the step-by-step breakdown of what each phase does, see [Quick start](/quickstart).
 
+### Advanced settings
+
+The welcome menu offers **Standard setup** (default) and **Advanced**. The advanced screen exposes overrides without burdening the linear flow:
+
+- **OneCLI vault URL** — point at a remote vault (e.g. `https://app.onecli.sh`) instead of installing one locally
+- **OneCLI access token** — bearer token for the remote vault (must start with `oc_`)
+- **Anthropic API base URL** — proxy or alternative Anthropic-compatible endpoint
+- **Anthropic auth token** — bearer token for that endpoint, stored in OneCLI as a header-injection secret
+
+All advanced settings are also available as CLI flags. See [Configuration → Setup CLI flags](/api/configuration#setup-cli-flags). Run `bash nanoclaw.sh --help` to list them.
+
+```bash
+# Connect to a hosted vault non-interactively
+bash nanoclaw.sh --onecli-api-host https://app.onecli.sh --onecli-api-token oc_xxx
+
+# Route Anthropic traffic through a proxy
+bash nanoclaw.sh --anthropic-base-url https://proxy.example.com --anthropic-auth-token sk-xxx
+```
+
+When `--onecli-api-host` is set, setup skips the local-vs-fresh prompt, runs a health pre-flight against the remote, and only installs the OneCLI CLI binary (not the gateway). When both `--anthropic-base-url` and `--anthropic-auth-token` are set, the auth-method prompt is short-circuited — the token is stored as an OneCLI generic secret with header injection so the real bearer never enters the container.
+
 ## File structure after install
 
 <Tree>

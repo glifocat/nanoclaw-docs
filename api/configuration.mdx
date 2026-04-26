@@ -35,11 +35,15 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
 </ParamField>
 
 <ParamField path="ONECLI_URL" type="string" default="http://localhost:10254">
-  URL for the OneCLI Agent Vault that handles credential injection for containers.
+  URL for the OneCLI Agent Vault that handles credential injection for containers. Set automatically when you connect to a remote vault via `--onecli-api-host`.
 </ParamField>
 
 <ParamField path="ONECLI_API_KEY" type="string">
-  API key for authenticating with the OneCLI Agent Vault. Optional — only needed if your OneCLI instance requires authentication.
+  Bearer token for authenticating with the OneCLI Agent Vault. Required for remote vaults, optional for local installs. Tokens must start with `oc_`.
+</ParamField>
+
+<ParamField path="ANTHROPIC_BASE_URL" type="string">
+  Custom Anthropic-compatible endpoint. When set, the `claude` provider registers a container config that injects this URL plus a placeholder `ANTHROPIC_AUTH_TOKEN` so the SDK adds an `Authorization: Bearer` header for OneCLI to rewrite. The real token is stored as a generic OneCLI secret with host-pattern matching the base URL hostname.
 </ParamField>
 
 <ParamField path="MAX_MESSAGES_PER_PROMPT" type="number" default="10">
@@ -118,6 +122,23 @@ ONECLI_URL=http://127.0.0.1:10254
 <Note>
 With the OneCLI Agent Vault, API keys and OAuth tokens are no longer stored in `.env`. Secrets are managed via `onecli secrets create` and injected by the vault at request time.
 </Note>
+
+## Setup CLI flags
+
+`bash nanoclaw.sh` forwards arguments to `setup:auto`. Flags map to `NANOCLAW_*` env vars and can also be set non-interactively via the **Advanced** entry in the welcome menu.
+
+| Flag | Env var | Purpose |
+|------|---------|---------|
+| `--onecli-api-host` | `NANOCLAW_ONECLI_API_HOST` | Connect to a remote OneCLI vault (default: `https://app.onecli.sh`) instead of installing one locally. |
+| `--onecli-api-token` | `NANOCLAW_ONECLI_API_TOKEN` | Bearer token for the remote vault. Validated to start with `oc_`. Written to `ONECLI_API_KEY` in `.env` and to the CLI's persistent auth store via `onecli auth login --api-key`. |
+| `--anthropic-base-url` | `NANOCLAW_ANTHROPIC_BASE_URL` | Use a proxy or alternative Anthropic-compatible endpoint. |
+| `--anthropic-auth-token` | `NANOCLAW_ANTHROPIC_AUTH_TOKEN` | Bearer token for the custom Anthropic endpoint. Stored as a generic OneCLI secret with header injection (host-pattern = base URL hostname). |
+| `--no-<key>` | — | Set a boolean flag to false. |
+| `--help` | — | Print available flags and exit. |
+| `--skip` | `NANOCLAW_SKIP` | Comma-separated step names to skip (debugging). |
+| `--display-name` | `NANOCLAW_DISPLAY_NAME` | Skip the assistant name prompt. |
+
+When both `--anthropic-base-url` and `--anthropic-auth-token` are set, setup short-circuits the auth-method prompt: it creates the OneCLI generic secret, writes `ANTHROPIC_BASE_URL` to `.env`, and appends `import './claude.js';` to `src/providers/index.ts` so the provider only registers when a custom endpoint is configured.
 
 ## Credential management
 
