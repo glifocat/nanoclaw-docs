@@ -75,7 +75,7 @@ The channel fork architecture keeps the upstream `main` branch minimal. Core Nan
 ### Four categories of skills
 
 **Feature skills** (branch-based, installed on demand):
-- `/add-discord`, `/add-telegram`, `/add-slack`, `/add-gmail`, etc.
+- `/add-discord`, `/add-telegram`, `/add-slack`, `/add-signal`, etc.
 - Each has a `SKILL.md` with setup instructions and a corresponding `skill/*` branch with code
 - Discovered through Claude Code's plugin marketplace
 
@@ -190,26 +190,51 @@ Dependencies are implicit in git history — no separate dependency file is need
 
 ## Available integration skills
 
-### Channels (from fork repos)
+### Channels (from the `channels` branch)
 
-| Channel | Command | Fork repo | Library |
-|---------|---------|-----------|---------|
-| WhatsApp | `/add-whatsapp` | `nanoclaw-whatsapp` | @whiskeysockets/baileys |
-| Telegram | `/add-telegram` | `nanoclaw-telegram` | grammy |
-| Discord | `/add-discord` | `nanoclaw-discord` | discord.js |
-| Slack | `/add-slack` | `nanoclaw-slack` | @slack/bolt (Socket Mode) |
-| Gmail | `/add-gmail` | `nanoclaw-gmail` | googleapis |
+In v2, channel adapters live on the `channels` branch in upstream and are installed via `/add-<channel>` skills that copy the relevant files into your fork. Telegram and WhatsApp also have dedicated fork repos that track upstream and bundle channel-specific extras (voice transcription, image vision, etc.).
 
-### Upstream skills (from skill branches)
+| Channel | Command | Library |
+|---------|---------|---------|
+| WhatsApp | `/add-whatsapp` | @whiskeysockets/baileys |
+| WhatsApp Cloud | `/add-whatsapp-cloud` | Meta Cloud API |
+| Telegram | `/add-telegram` | grammy |
+| Discord | `/add-discord` | discord.js |
+| Slack | `/add-slack` | @slack/bolt (Socket Mode) |
+| Signal | `/add-signal` | signal-cli |
+| iMessage | `/add-imessage` | osascript bridge |
+| Teams | `/add-teams` | botbuilder |
+| Matrix | `/add-matrix` | matrix-bot-sdk |
+| Google Chat | `/add-gchat` | googleapis |
+| Webex | `/add-webex` | webex |
+| WeChat | `/add-wechat` | wechaty |
+| Linear | `/add-linear` | @linear/sdk |
+| GitHub | `/add-github` | octokit |
+| Resend | `/add-resend` | resend (outbound email) |
+| Emacs | `/add-emacs` | local HTTP bridge (no bot token) |
 
-- **`/add-compact`** — Manual context compaction skill
+### Tool skills (MCP servers)
+
+- **`/add-gmail-tool`** — OneCLI-native Gmail MCP server (read, send, search, draft) — no raw OAuth tokens reach the container
+- **`/add-gcal-tool`** — OneCLI-native Google Calendar MCP server
 - **`/add-ollama-tool`** — Ollama MCP server for local models
 - **`/add-parallel`** — Parallel AI MCP servers for web research
+- **`/add-vercel`** — Vercel MCP server
+- **`/add-atomic-chat-tool`** — Atomic Chat MCP server
+
+### Provider skills (alternative model providers)
+
+- **`/add-codex`** — OpenAI Codex provider
+- **`/add-opencode`** — OpenCode provider
+- **`/add-ollama-provider`** — Run agents on a local Ollama model
+
+### Other upstream skills (from skill branches)
+
 - **`/channel-formatting`** — Channel-aware Markdown-to-native text conversion for outbound messages (WhatsApp, Telegram, Slack, Signal)
 - **`/convert-to-apple-container`** — Switch from Docker to Apple Container on macOS
-- **`/add-emacs`** — Emacs channel with interactive chat buffer and org-mode integration (local HTTP bridge, no bot token needed)
 - **`/add-macos-statusbar`** — macOS menu bar status indicator with start/stop/restart controls
 - **`/add-karpathy-llm-wiki`** — Persistent wiki knowledge base per group, based on Karpathy's LLM Wiki pattern
+- **`/add-dashboard`** — Web dashboard skill
 - **`/use-native-credential-proxy`** — Replace OneCLI Agent Vault with built-in `.env`-based credential proxy
 
 ### Channel-specific skills (from channel fork branches)
@@ -358,7 +383,7 @@ Skills extend this philosophy: instead of a config file with `integrations: [tel
     Add Slack support to your installation
   </Card>
 
-  <Card title="Add Gmail" icon="envelope" href="/integrations/gmail">
-    Add Gmail integration to your installation
+  <Card title="Add WhatsApp" icon="whatsapp" href="/integrations/whatsapp">
+    Add WhatsApp support to your installation
   </Card>
 </CardGroup>

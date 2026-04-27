@@ -5,6 +5,26 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Weekly health check: skill catalog and v2.0.x changelog" description="2026-04-27" tags={["Updated"]}>
+  Automated health-check sweep against upstream `qwibitai/nanoclaw` `main`.
+
+  ## Skill catalog
+  - **`integrations/skills-system.mdx`**: Replaced the stale v1 channel/fork table with the current v2 channel list (16 channels installed via `/add-<channel>` skills from the `channels` branch). Removed the `nanoclaw-gmail` row (Gmail is no longer a v2 channel). Removed `/add-compact` (not in upstream). Added new sections for **tool skills** (`/add-gmail-tool`, `/add-gcal-tool`, `/add-ollama-tool`, `/add-parallel`, `/add-vercel`, `/add-atomic-chat-tool`), **provider skills** (`/add-codex`, `/add-opencode`, `/add-ollama-provider`), and a `/add-dashboard` entry. Replaced the dead "Add Gmail" card with WhatsApp.
+  - **Feature-skill examples**: replaced `/add-gmail` with `/add-signal` in the bullet list (Signal is now the single canonical Signal skill — `/add-signal-v2` was merged in upstream and dropped).
+
+  ## Configuration reference
+  - **`api/configuration.mdx`**: documented `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN`. Both are now passed into agent containers when set, with the auth token stored as a OneCLI generic Bearer secret rather than living in container env. Configurable at install time via `--anthropic-base-url` and `--anthropic-auth-token`.
+  - **`integrations/ollama.mdx`**: rewrote the "Third-party model endpoints" section to show the new setup-flag flow and the OneCLI header-injection model. The container now sees a placeholder bearer; the vault swaps in the real Authorization header on the wire.
+
+  ## Changelog
+  - **`changelog/index.mdx`**: added v2.0.11–v2.0.14 release entries — covering custom Anthropic endpoints via OneCLI, the advanced-settings registry / remote OneCLI setup flow, channel-registration wiring fix, per-provider session state, attachment path-traversal fix, the `/add-gmail-tool` and `/add-gcal-tool` skills, and the `/add-signal-v2` → `/add-signal` consolidation.
+
+  ## Verified clean
+  - All internal links resolve (`mint broken-links`).
+  - All `tag: "UPDATED"` pages were last modified within the 2-week window — no stale tags to remove.
+  - All page frontmatter has `title` and a description ≥ 50 characters.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
