@@ -7,7 +7,7 @@ tag: "UPDATED"
 keywords: ["nanoclaw", "ai team", "multi-agent", "claude", "agent sdk", "container isolation", "v2", "chat sdk"]
 ---
 
-NanoClaw started as a way to run a single Claude agent on WhatsApp. v2 turns it into a team. Spawn multiple agents, wire them to any mix of 15+ messaging channels, have them route work to each other, and keep every one of them isolated in its own Linux container.
+NanoClaw started as a way to run a single Claude agent on WhatsApp. v2 turns it into a team. Spawn multiple agents, wire them to messaging channels, have them route work to each other, and keep every one of them isolated in its own Linux container.
 
 One host process on your machine. One container per active session. A codebase small enough to hold in your head — and small enough for Claude Code to hold in its context window.
 
@@ -52,7 +52,7 @@ Scheduling is a timestamp column on a message row. Agent-to-agent delegation is 
 
 ### Multi-channel by design
 
-Install any subset of: WhatsApp, WhatsApp Cloud, Telegram, Discord, Slack, Microsoft Teams, Google Chat, Webex, iMessage, Matrix, WeChat, Linear, GitHub, Resend (email), Emacs, or the local CLI channel. Channels are thin adapters over [Vercel's Chat SDK](https://chat-sdk.dev/docs/adapters) — a new adapter is typically a short TypeScript file.
+Install any subset of: Telegram, Discord, WhatsApp, Signal, Microsoft Teams, Slack, iMessage, Google Chat, Webex, Matrix, WeChat, Linear, GitHub, Resend (email), Emacs, or the local CLI channel. Channels are adapters over the NanoClaw channel interface; Chat SDK-backed channels use [Vercel's Chat SDK](https://chat-sdk.dev/docs/adapters), while native channels keep their platform-specific runtime.
 
 ### Flexible isolation per channel
 
@@ -123,11 +123,11 @@ The install and onboarding flow is a scripted, deterministic path. When a step n
 - **Inbox/outbox session model** — `inbound.db` (host writes, container reads) and `outbound.db` (container writes, host reads). One writer per file eliminates SQLite cross-mount contention. No stdin piping, no IPC files.
 - **Entity model** — agent groups (workspaces) and messaging groups (platform channels) are independent. `messaging_group_agents` rows wire them together with per-wiring engage mode, sender scope, and session mode.
 - **Delivery loop** — two polls: an active poll (1s) for running sessions, a sweep (60s) for liveness and recovery. Heartbeat-based stale detection, not wall-clock timeouts.
-- **Channel adapters** — thin wrappers over [Vercel's Chat SDK](https://chat-sdk.dev/docs/adapters) on a `channels` branch. Add only what you use.
+- **Channel adapters** — modules on the `channels` branch that implement NanoClaw's channel interface. Some use [Vercel's Chat SDK](https://chat-sdk.dev/docs/adapters); native channels keep platform-specific runtime code.
 - **Credentials** — [OneCLI Agent Vault](https://github.com/onecli/onecli) is the sole credential path. Containers receive placeholder tokens; the vault injects real auth at request time and enforces per-agent policies.
 
 <Info>
-**Codebase size**: ~127k tokens (~64% of Claude's context window). Big for v1; still small enough that Claude Code can reason over the whole repo.
+**Codebase size**: ~133k tokens (~67% of Claude's context window). Big for v1; still small enough that Claude Code can reason over the whole repo.
 </Info>
 
 ## Key source files (host)

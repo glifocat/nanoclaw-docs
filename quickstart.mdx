@@ -9,7 +9,7 @@ keywords: ["setup", "install", "getting started", "nanoclaw.sh", "bash", "claude
 From a fresh machine to an agent you can message — one command, a handful of prompts, a few minutes.
 
 <Note>
-This guide covers the default installer. If you want to customize the install path (skip steps, change the Anthropic secret name), see [Installation](/installation).
+This guide covers the default installer. If you want to skip steps, reuse an existing OneCLI instance, or point Anthropic traffic at a custom endpoint, see [Installation](/installation).
 </Note>
 
 ## The one-command flow
@@ -37,7 +37,7 @@ This guide covers the default installer. If you want to customize the install pa
     - Verifying your environment (platform, WSL detection, container runtime)
     - Building the agent container image
     - Registering your Anthropic credential with [OneCLI](https://github.com/onecli/onecli)
-    - Pairing your first channel (Telegram, Discord, WhatsApp, or the local CLI)
+    - Pairing your first channel (Telegram, Discord, WhatsApp, Signal, Teams, Slack, iMessage, or the local CLI)
     - Installing a systemd or launchd service so NanoClaw starts with your machine
 
     If any step fails, Claude Code is invoked automatically to diagnose and resume from where it broke. You don't have to debug the installer yourself.
@@ -48,8 +48,8 @@ This guide covers the default installer. If you want to customize the install pa
 
     - **Display name** — what you want your agent to be called (default: `Andy`)
     - **Anthropic credential method** — Claude subscription (OAuth), Anthropic API key, or skip
-    - **First channel** — Telegram, Discord, WhatsApp, or local CLI. You can add more later.
-    - **Channel-specific auth** — bot token for Telegram/Discord, QR code for WhatsApp, nothing for CLI
+    - **First channel** — Telegram, Discord, WhatsApp, Signal, Teams, Slack, iMessage, or local CLI. You can add more later.
+    - **Channel-specific auth** — pairing code, QR code, bot token, app credentials, or no extra auth for CLI, depending on the platform
 
     The flow is linear. One question at a time. You can Ctrl+C and restart; the installer picks up where you left off.
   </Step>
@@ -70,7 +70,7 @@ This guide covers the default installer. If you want to customize the install pa
     For the local CLI:
 
     ```bash
-    pnpm claw
+    pnpm run chat hi
     ```
 
     Your agent responds. You're set.
@@ -104,10 +104,14 @@ If something looks wrong after install, `logs/setup.log` is the first file to re
     Driven by `setup/auto.ts`. Each sub-step emits a structured status block and writes its raw output to `logs/setup-steps/NN-<name>.log`:
 
     - **environment** — Docker / Apple Container detection, runtime selection
-    - **container** — builds `nanoclaw-agent:latest` via `container/build.sh`
-    - **onecli** — installs OneCLI Agent Vault and registers your Anthropic secret
-    - **channel pairing** — runs the `add-<channel>` skill you picked
+    - **container** — builds the checkout-scoped agent image via `container/build.sh`
+    - **onecli** — installs OneCLI Agent Vault or reuses an existing configured instance
+    - **auth** — registers Anthropic credentials in OneCLI
+    - **cli-agent** — wires the terminal agent and confirms it responds before optional channel setup
+    - **timezone** — detects or resolves your IANA timezone
+    - **channel pairing** — runs the selected setup flow for Telegram, Discord, WhatsApp, Signal, Teams, Slack, or iMessage
     - **service** — launchd (macOS) / systemd (Linux) / `start-nanoclaw.sh` wrapper (WSL without systemd)
+    - **verify** — checks credentials, service status, registered groups, and first-agent connectivity
     - **diagnostics** — optional opt-in PostHog event with platform + channel choice
   </Accordion>
 
@@ -116,8 +120,8 @@ If something looks wrong after install, `logs/setup.log` is the first file to re
   </Accordion>
 
   <Accordion title="Service installation">
-    - **macOS** — creates launchd service at `~/Library/LaunchAgents/com.nanoclaw.plist`
-    - **Linux (systemd)** — user service at `~/.config/systemd/user/nanoclaw.service`; enables `loginctl linger` so the service survives SSH logout
+    - **macOS** — creates a launchd service named like `com.nanoclaw-v2-<slug>` in `~/Library/LaunchAgents/`
+    - **Linux (systemd)** — user service named like `nanoclaw-v2-<slug>.service`; enables `loginctl linger` so the service survives SSH logout
     - **WSL without systemd** — creates a `start-nanoclaw.sh` wrapper; you run it manually on login or wire it to `.bashrc`
   </Accordion>
 </AccordionGroup>
@@ -153,7 +157,7 @@ tail -f logs/nanoclaw.log
 
 # Service status
 launchctl list | grep nanoclaw     # macOS
-systemctl --user status nanoclaw   # Linux
+systemctl --user list-units 'nanoclaw*'  # Linux
 ```
 
 Or just ask:
@@ -168,7 +172,7 @@ Or just ask:
 
 <CardGroup cols={2}>
   <Card title="Add more channels" icon="plus" href="/integrations/overview">
-    `/add-slack`, `/add-whatsapp`, `/add-matrix` — install from the `channels` branch
+    `/add-slack`, `/add-whatsapp`, `/add-signal` — install or wire channels from the current channel setup flows
   </Card>
   <Card title="Customize" icon="wrench" href="/features/customization">
     Change the trigger word, tune timeouts, adjust engage modes

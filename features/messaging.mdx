@@ -119,9 +119,9 @@ Container concurrency is managed globally:
 
 ## Channel routing
 
-Every channel is a thin adapter over [Vercel's Chat SDK](https://chat-sdk.dev/docs/adapters). Adapters implement the same four callbacks (`onInbound`, `onInboundEvent`, `onMetadata`, `onAction`), so routing, fan-out, and delivery don't know or care which platform a message came from.
+Every channel implements the same adapter interface. Chat SDK-backed channels use [Vercel's Chat SDK](https://chat-sdk.dev/docs/adapters); native channels keep platform-specific clients behind the same callbacks (`onInbound`, `onInboundEvent`, `onMetadata`, `onAction`). Routing, fan-out, and delivery do not need platform-specific branches.
 
-15+ adapters live on the `channels` branch (Discord, Slack, Telegram, Teams, Google Chat, WhatsApp, Matrix, iMessage, GitHub, Linear, and more). Install one per fork with `/add-<name>`. See the [integrations overview](/integrations/overview) for the full list.
+Optional adapters live on the `channels` branch or in the current setup flows (Discord, Slack, Telegram, Signal, Teams, Google Chat, WhatsApp, Matrix, iMessage, GitHub, Linear, and more). Install one with `/add-<name>` or select it during `bash nanoclaw.sh`. See the [integrations overview](/integrations/overview) for the full list.
 
 <Warning>
 Channels are installed as skills, not configured through env vars or files. Use `/add-telegram`, `/add-discord`, etc. to copy an adapter module into your fork.
