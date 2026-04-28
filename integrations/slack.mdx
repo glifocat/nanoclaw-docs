@@ -1,6 +1,7 @@
 ---
 title: Slack integration
 description: Add Slack as a messaging channel for NanoClaw using the /add-slack skill for team workspaces
+tag: "UPDATED"
 ---
 
 import SyncEnv from "/snippets/sync-env.mdx";
@@ -14,11 +15,12 @@ Add Slack as a messaging channel for NanoClaw. Perfect for team workspaces and p
 
 ## Overview
 
-The Slack integration uses [@slack/bolt](https://slack.dev/bolt-js/) with Socket Mode, which means no public URL is required. The bot connects directly to Slack from your machine.
+The Slack integration uses the Chat SDK bridge with HTTP webhooks. Slack delivers events to a public URL that NanoClaw exposes on port 3000 by default, so the host needs to be reachable from the internet (e.g. via ngrok, Cloudflare Tunnel, or a reverse proxy on a VPS).
 
 ### Features
 
-- **Socket Mode** - No webhooks or public URLs needed
+- **Webhook delivery** - Events arrive via Slack's Event Subscriptions
+- **Interactive components** - Approval cards and buttons via Interactivity & Shortcuts
 - **Public and private channels** - Respond in any channel the bot is added to
 - **Direct messages** - Users can DM the bot directly
 - **Multi-channel support** - Monitor multiple channels simultaneously
@@ -27,7 +29,7 @@ The Slack integration uses [@slack/bolt](https://slack.dev/bolt-js/) with Socket
 
 ## Adding Slack
 
-Use the `/add-slack` skill to add Slack support:
+Use the `/add-slack` skill to add Slack support. When run from inside `/setup`, the skill also wires the first agent to your Slack DMs and sends a welcome message.
 
 <Steps>
   <Step title="Run the skill">
@@ -36,37 +38,30 @@ Use the `/add-slack` skill to add Slack support:
     /add-slack
     ```
   </Step>
-  
-  <Step title="Choose deployment mode">
-    - **Replace existing channels** - Slack becomes the only channel
-    - **Alongside** - Add Slack alongside existing channels
-  </Step>
-  
+
   <Step title="Apply code changes">
-    The skill merges the `skill/slack` branch which adds:
-    - `src/channels/slack.ts` (SlackChannel implementation)
-    - `src/channels/slack.test.ts` (46 unit tests)
-    - Multi-channel support in `src/index.ts`
-    - Slack config in `src/config.ts`
-    - The `@slack/bolt` NPM package
+    The skill copies the Slack adapter in from the `channels` branch:
+    - `src/channels/slack.ts` (Chat SDK bridge registration)
+    - Appends `import './slack.js';` to `src/channels/index.ts`
+    - Installs `@chat-adapter/slack` (pinned version)
   </Step>
-  
+
   <Step title="Create Slack app">
-    Set up a Slack app with Socket Mode and proper scopes
+    Set up a Slack app with the required scopes, Event Subscriptions, and Interactivity & Shortcuts enabled
   </Step>
-  
+
   <Step title="Configure environment">
-    Add both tokens to `.env` and sync to container
+    Add `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET` to `.env` and sync to the container
   </Step>
-  
-  <Step title="Register channels">
-    Get channel IDs and register them with NanoClaw
+
+  <Step title="Wire your first agent">
+    During `/setup`, the flow asks for your Slack member ID, opens a DM via `conversations.open`, and runs `init-first-agent` to wire the messaging agent. Outside `/setup`, run `/manage-channels` to wire an agent group.
   </Step>
 </Steps>
 
 ## Creating a Slack app
 
-The setup process requires two tokens: a Bot Token (`xoxb-`) and an App-Level Token (`xapp-`).
+The setup process requires a Bot Token (`xoxb-`) and a Signing Secret. The host must be publicly reachable so Slack can deliver events and interactive component payloads.
 
 ### Quick setup
 
@@ -76,43 +71,51 @@ The setup process requires two tokens: a Bot Token (`xoxb-`) and an App-Level To
     2. Click **Create New App** → **From scratch**
     3. Enter app name and select workspace
   </Step>
-  
-  <Step title="Enable Socket Mode">
-    1. Go to **Socket Mode** in sidebar
-    2. Toggle **Enable Socket Mode** to On
-    3. Generate token with name `nanoclaw`
-    4. **Copy the App-Level Token** (starts with `xapp-`)
-  </Step>
-  
-  <Step title="Subscribe to events">
-    1. Go to **Event Subscriptions**
-    2. Toggle **Enable Events** to On
-    3. Add bot events:
-       - `message.channels` (public channels)
-       - `message.groups` (private channels)
-       - `message.im` (direct messages)
-    4. Click **Save Changes**
-  </Step>
-  
+
   <Step title="Add OAuth scopes">
     1. Go to **OAuth & Permissions**
     2. Add these **Bot Token Scopes**:
        - `chat:write` (send messages)
+       - `im:write` (open DMs with users — required for the welcome DM)
        - `channels:history` (read public channels)
        - `groups:history` (read private channels)
        - `im:history` (read DMs)
        - `channels:read` (list channels)
        - `groups:read` (list private channels)
        - `users:read` (look up display names)
+       - `reactions:write` (send reactions)
   </Step>
-  
+
   <Step title="Install to workspace">
-    1. Go to **Install App**
-    2. Click **Install to Workspace**
-    3. Review permissions and click **Allow**
-    4. **Copy the Bot User OAuth Token** (starts with `xoxb-`)
+    1. Click **Install to Workspace** and review permissions
+    2. **Copy the Bot User OAuth Token** (starts with `xoxb-`)
+    3. Go to **Basic Information** and copy the **Signing Secret**
+  </Step>
+
+  <Step title="Enable DMs">
+    1. Go to **App Home** and enable the **Messages Tab**
+    2. Check **"Allow users to send Slash commands and messages from the messages tab"**
+  </Step>
+
+  <Step title="Subscribe to events">
+    1. Go to **Event Subscriptions** and toggle **Enable Events** on
+    2. Set the **Request URL** to `https://your-domain/webhook/slack` — Slack sends a verification challenge that must pass before you can save
+    3. Under **Subscribe to bot events**, add:
+       - `message.channels`, `message.groups`, `message.im`, `app_mention`
+    4. Click **Save Changes**
+  </Step>
+
+  <Step title="Enable interactivity">
+    1. Go to **Interactivity & Shortcuts** and toggle **Interactivity** on
+    2. Set the **Request URL** to the same `https://your-domain/webhook/slack`
+    3. Click **Save Changes**
+    4. When Slack prompts you to **reinstall the app**, do it to apply the new settings
   </Step>
 </Steps>
+
+<Note>
+Without **Interactivity & Shortcuts** enabled, button clicks on channel-approval cards silently fail — Slack accepts them in the UI but never posts the payload to the webhook.
+</Note>
 
 <Tip>
   For detailed setup with screenshots, see the [SLACK_SETUP.md guide](https://github.com/qwibitai/NanoClaw/blob/main/.claude/skills/add-slack/SLACK_SETUP.md).
@@ -126,21 +129,17 @@ Add to `.env`:
 
 ```bash
 SLACK_BOT_TOKEN=xoxb-your-bot-token-here
-SLACK_APP_TOKEN=xapp-your-app-token-here
+SLACK_SIGNING_SECRET=your-signing-secret
 ```
 
-If you chose to replace existing channels:
+The Chat SDK bridge starts a shared webhook server on port 3000 (override with `WEBHOOK_PORT`) and serves `/webhook/slack`. That port must be publicly reachable for Slack to deliver events.
 
-```bash
-SLACK_ONLY=true
-```
+### Credential reference
 
-### Token reference
-
-| Token | Prefix | Where to find it |
+| Credential | Prefix | Where to find it |
 |-------|--------|------------------|
 | Bot User OAuth Token | `xoxb-` | **OAuth & Permissions** → **Bot User OAuth Token** |
-| App-Level Token | `xapp-` | **Basic Information** → **App-Level Tokens** |
+| Signing Secret | _none_ | **Basic Information** → **App Credentials** → **Signing Secret** |
 
 ### Sync to container
 
@@ -265,38 +264,7 @@ The Slack integration supports:
 
 ## Implementation details
 
-The Slack channel implements the `Channel` interface using Socket Mode:
-
-```typescript
-export class SlackChannel implements Channel {
-  name = 'slack';
-  
-  async connect(): Promise<void> {
-    this.app = new App({
-      token: process.env.SLACK_BOT_TOKEN,
-      appToken: process.env.SLACK_APP_TOKEN,
-      socketMode: true,
-    });
-    
-    this.app.message(async ({ message, client }) => {
-      const channelJid = `slack:${message.channel}`;
-      
-      this.opts.onMessage(channelJid, {
-        id: message.ts,
-        chat_jid: channelJid,
-        sender: message.user,
-        sender_name: await this.getUserName(message.user),
-        content: message.text,
-        timestamp: new Date(parseFloat(message.ts) * 1000).toISOString(),
-        is_from_me: false,
-        is_bot_message: message.bot_id !== undefined,
-      });
-    });
-    
-    await this.app.start();
-  }
-}
-```
+The Slack adapter is provided by `@chat-adapter/slack` via the Chat SDK bridge. Inbound events arrive on the shared webhook server at `/webhook/slack`, are verified using `SLACK_SIGNING_SECRET`, and are translated into the host's standard message envelope. Outbound messages — including welcome DMs sent during setup — go out through `chat.postMessage`.
 
 ## Troubleshooting
 
@@ -318,14 +286,17 @@ export class SlackChannel implements Channel {
   
   <Accordion title="Bot not receiving messages">
     Verify these settings:
-    
-    1. Socket Mode is enabled (Slack app settings)
-    2. Bot is subscribed to correct events:
-       - `message.channels`
-       - `message.groups`
-       - `message.im`
-    3. Bot has been added to the channel
-    4. Bot has required OAuth scopes
+
+    1. Event Subscriptions is enabled and the Request URL passed Slack's verification challenge
+    2. The webhook server (port 3000 by default) is reachable from the public internet
+    3. Bot is subscribed to the correct events:
+       - `message.channels`, `message.groups`, `message.im`, `app_mention`
+    4. Bot has been added to the channel
+    5. Bot has all the required OAuth scopes
+  </Accordion>
+
+  <Accordion title="Approval buttons do nothing">
+    If channel-approval cards render but clicks have no effect, Interactivity & Shortcuts is not enabled. Toggle **Interactivity** on, set the Request URL to `https://your-domain/webhook/slack`, save, and reinstall the app when Slack prompts.
   </Accordion>
   
   <Accordion title="Missing scope errors">
@@ -340,12 +311,12 @@ export class SlackChannel implements Channel {
   </Accordion>
   
   <Accordion title="Wrong token used">
-    Verify token format:
-    
-    - Bot tokens start with `xoxb-`
-    - App tokens start with `xapp-`
-    
-    If your token doesn't match, you may have copied the wrong one.
+    Verify the credential format:
+
+    - Bot User OAuth Token starts with `xoxb-` (from **OAuth & Permissions**)
+    - Signing Secret is a hex string with no prefix (from **Basic Information** → **App Credentials**)
+
+    If `SLACK_BOT_TOKEN` doesn't start with `xoxb-`, you likely copied the App-Level Token (`xapp-`) by mistake.
   </Accordion>
 </AccordionGroup>
 
