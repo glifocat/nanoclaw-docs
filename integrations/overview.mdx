@@ -1,17 +1,17 @@
 ---
 title: Integrations overview
-description: Channels and providers as skills — add only what you need.
+description: Channels and providers as skills and setup flows — add only what you need.
 tag: "UPDATED"
 keywords: ["integrations", "channels", "providers", "skills", "add-telegram", "add-whatsapp", "add-codex", "add-opencode"]
 ---
 
-NanoClaw trunk ships the registry and infrastructure. Channel adapters and alternative AI providers live on long-lived skill branches — you install them on demand with `/add-<name>` skills. This keeps your fork lean and your code legible: nothing you didn't ask for.
+NanoClaw trunk ships the registry and infrastructure. Channel adapters and alternative AI providers are installed on demand through setup flows and `/add-<name>` skills. This keeps your fork lean and your code legible: nothing you didn't ask for.
 
 ## Two kinds of integration
 
 <CardGroup cols={2}>
   <Card title="Channels" icon="plug" href="#channels">
-    Where messages come from: WhatsApp, Telegram, Discord, Slack, Teams, email, the terminal — 15+ adapters live on the `channels` branch
+    Where messages come from: Telegram, Discord, WhatsApp, Signal, Slack, Teams, iMessage, email, the terminal, and more
   </Card>
   <Card title="Providers" icon="robot" href="#providers">
     Which AI runs the agent: Claude (default), OpenAI Codex, OpenCode (OpenRouter/Google/DeepSeek), Ollama (local). Configurable per agent group.
@@ -20,7 +20,7 @@ NanoClaw trunk ships the registry and infrastructure. Channel adapters and alter
 
 ## Channels
 
-Install with a skill invocation in Claude Code. The skill copies the adapter from the `channels` branch into your fork and walks you through platform-specific auth.
+Install through `bash nanoclaw.sh` during first setup, or with a skill invocation in Claude Code later. Channel flows install the adapter, collect platform-specific auth, register the first messaging group, and restart the service when needed.
 
 ### Documented channels
 
@@ -38,7 +38,11 @@ Install with a skill invocation in Claude Code. The skill copies the adapter fro
   </Card>
 
   <Card title="Slack" icon="hashtag" href="/integrations/slack">
-    `/add-slack` — Socket Mode (no public URL required)
+    `/add-slack` — Slack app credentials plus a public events URL
+  </Card>
+
+  <Card title="Signal" icon="message-circle">
+    `/add-signal` — signal-cli linked-device flow
   </Card>
 </CardGroup>
 
@@ -46,7 +50,7 @@ Install with a skill invocation in Claude Code. The skill copies the adapter fro
 
 | Skill | Platform | Notes |
 |-------|----------|-------|
-| `/add-teams` | Microsoft Teams | Bot framework |
+| `/add-teams` | Microsoft Teams | Bot Framework |
 | `/add-imessage` | Apple iMessage | macOS-only; uses AppleScript bridge |
 | `/add-matrix` | Matrix | Federated; supports Element and self-hosted homeservers |
 | `/add-gchat` | Google Chat | Workspace accounts |
@@ -58,7 +62,7 @@ Install with a skill invocation in Claude Code. The skill copies the adapter fro
 | `/add-resend` | Email (outbound) | Transactional sends via Resend |
 | `/claw` | Local terminal | Talk to your agent from a CLI — no platform account required |
 
-Documentation for these is rolling out post-v2 launch. The skill itself is self-documenting via `SKILL.md` on the `channels` branch — ask Claude Code to walk you through any of them.
+Documentation for these is rolling out post-v2 launch. The skill itself is self-documenting via `SKILL.md` — ask Claude Code to walk you through any of them.
 
 ## Providers
 
@@ -75,19 +79,15 @@ By default, NanoClaw uses Claude via the official [Claude Agent SDK](https://doc
 
 ## How channel skills work
 
-1. **Skill invocation** — you run `/add-<channel>` in Claude Code from your NanoClaw directory
-2. **Copy, don't merge** — the skill reads the adapter source from the `channels` branch (not your trunk) and copies only the files for that channel into your fork
-3. **Platform auth** — the skill prompts for the tokens, OAuth flows, or QR pairing each platform requires
-4. **First messaging group** — the skill registers your first chat/channel/group from that platform so you can test immediately
-5. **Verify** — a round-trip test confirms inbound + outbound work before the skill exits
+1. **Skill or setup invocation** — you pick a channel in `bash nanoclaw.sh` or run `/add-<channel>` later from Claude Code
+2. **Adapter install** — the flow adds the channel adapter and any platform package dependencies
+3. **Platform auth** — the flow prompts for tokens, OAuth flows, QR pairing, or linked-device setup
+4. **First messaging group** — the flow registers your first chat/channel/group from that platform so you can test immediately
+5. **Verify** — a round-trip test confirms inbound + outbound work before the flow exits
 
-To update installed channel skills when the `channels` branch gets improvements:
+To pick up channel installer improvements, rerun the relevant `/add-<channel>` workflow. The installer fetches the current `channels` branch and updates the files it owns.
 
-```
-/update-skills
-```
-
-To remove a channel, revert the skill's commit:
+To remove a channel, revert the commit that installed it:
 
 ```
 git revert <skill-commit-sha>
@@ -107,7 +107,7 @@ The choice is per channel, configurable via `/manage-channels`. See [Channel iso
 
 <CardGroup cols={2}>
   <Card title="Skills system" icon="puzzle-piece" href="/integrations/skills-system">
-    How skill branches work, how to update, and how to author your own
+    How skills work, how to update, and how to author your own
   </Card>
   <Card title="Customization" icon="wrench" href="/features/customization">
     Trigger words, timeouts, engage modes, sender scope

@@ -1,11 +1,13 @@
 <CodeGroup>
 ```bash macOS
-npm run build
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+pnpm run build
+launchctl list | grep nanoclaw
+launchctl kickstart -k gui/$(id -u)/<label>
 ```
 
 ```bash Linux
-npm run build
-systemctl --user restart nanoclaw
+pnpm run build
+systemctl --user list-units 'nanoclaw*'
+systemctl --user restart <unit>
 ```
 </CodeGroup>

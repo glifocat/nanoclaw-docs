@@ -41,7 +41,7 @@ graph TB
 
 ### Channel adapters
 
-NanoClaw uses a self-registering adapter pattern for messaging channels. Each channel (WhatsApp, Telegram, Discord, Slack, Gmail) registers at startup. Channels with missing credentials are skipped with a warning.
+NanoClaw uses a self-registering adapter pattern for messaging channels. Installed adapters such as Telegram, Discord, WhatsApp, Signal, Slack, Teams, iMessage, and the local CLI register at startup. Channels with missing credentials are skipped with a warning.
 
 All adapters implement a common interface with `onInbound`, `onInboundEvent`, `onMetadata`, and `onAction` callbacks, allowing the rest of the system to be channel-agnostic.
 
