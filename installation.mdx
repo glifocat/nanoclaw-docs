@@ -47,9 +47,9 @@ Everything you need to know before running `bash nanoclaw.sh`. For the one-comma
 |---|---|---|
 | Node 22 | Host (orchestrator) | Yes — via nvm if missing |
 | pnpm 10 | Host (package manager) | Yes — via `corepack enable` |
-| Docker (or Apple Container) | Host (container runtime) | Partial — prompts you to install if absent |
+| Docker (or Apple Container) | Host (container runtime) | Partial — prompts you to install or start it if absent |
 | Build tools (gcc, python3) | Host (for `better-sqlite3` native compile) | No — install beforehand |
-| OneCLI Agent Vault | Host (credential injection) | Yes — via `/init-onecli` step |
+| OneCLI Agent Vault | Host (credential injection) | Yes — installs locally or reuses an existing configured instance |
 | Bun 1.3.12 | Container (agent-runner runtime) | Yes — baked into the agent container image |
 
 ### Build tools
@@ -115,10 +115,24 @@ Docker is the default and works on all three platforms. Apple Container is an op
     ```
 
     <Note>
-    The default installer picks Docker. To switch, run `/convert-to-apple-container` after NanoClaw is running. The skill modifies `src/container-runtime.ts`, adjusts mount syntax and stop commands, and handles credential proxy networking if you're using the legacy proxy skill.
+    The default installer picks Docker. To switch, run `/convert-to-apple-container` after NanoClaw is running. The skill modifies the runtime integration and uses `git revert` as the rollback path.
     </Note>
   </Tab>
 </Tabs>
+
+### Advanced installer environment
+
+`nanoclaw.sh` and `setup:auto` read environment variables when you need to debug or script part of setup.
+
+| Env var | Use |
+|---|---|
+| `NANOCLAW_SKIP` | Comma-separated setup steps to skip while debugging (`environment`, `container`, `onecli`, `auth`, `mounts`, `service`, `cli-agent`, `timezone`, `channel`, `verify`, `first-chat`) |
+| `NANOCLAW_DISPLAY_NAME` | Skip the operator display-name prompt |
+| `NANOCLAW_AGENT_NAME` | Set the messaging-channel agent name; the CLI scratch agent remains `Terminal Agent` |
+| `SECRET_NAME` | OneCLI secret name for `setup/register-claude-token.sh` (default: `Anthropic`) |
+| `HOST_PATTERN` | OneCLI host pattern for `setup/register-claude-token.sh` (default: `api.anthropic.com`) |
+
+If OneCLI is already installed and configured, setup asks whether to reuse it. For custom Anthropic-compatible model endpoints, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in `.env`.
 
 ## Run the installer
 
@@ -156,10 +170,9 @@ For the step-by-step breakdown of what each phase does, see [Quick start](/quick
         <Tree.File name="container.json" />
       </Tree.Folder>
     </Tree.Folder>
-    <Tree.Folder name="store">
-      <Tree.File name="v2.db" />
-    </Tree.Folder>
     <Tree.Folder name="data" defaultOpen>
+      <Tree.File name="v2.db" />
+      <Tree.Folder name="env" />
       <Tree.Folder name="v2-sessions" defaultOpen>
         <Tree.Folder name="{agent_group_id}" defaultOpen>
           <Tree.Folder name="{session_id}" defaultOpen>
@@ -187,12 +200,12 @@ For the step-by-step breakdown of what each phase does, see [Quick start](/quick
 |------|---------|
 | `~/.config/nanoclaw/mount-allowlist.json` | Which host directories agents can mount |
 | `~/.config/nanoclaw/sender-allowlist.json` | Optional per-channel sender access control |
-| `~/Library/LaunchAgents/com.nanoclaw.plist` (macOS) | launchd service definition |
-| `~/.config/systemd/user/nanoclaw.service` (Linux) | systemd user-service definition |
+| `~/Library/LaunchAgents/com.nanoclaw-v2-<slug>.plist` (macOS) | launchd service definition |
+| `~/.config/systemd/user/nanoclaw-v2-<slug>.service` (Linux) | systemd user-service definition |
 
 ## Container image contents
 
-The agent container (`nanoclaw-agent:latest`) is built from `container/Dockerfile`:
+The agent container image is scoped per checkout, with a name like `nanoclaw-agent-v2-<slug>:latest`. It is built from `container/Dockerfile`:
 
 - **Base**: `node:22-slim`
 - **tini** as PID 1 — reaps Chromium zombies, forwards signals so `outbound.db` writes finalize on SIGTERM
@@ -212,11 +225,12 @@ NanoClaw runs as a background service so the host stays responsive to channel ev
   <Tab title="macOS (launchd)">
     ```bash
     # Start / stop
-    launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
-    launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
+    # Replace <label> with com.nanoclaw-v2-<slug>
+    launchctl load ~/Library/LaunchAgents/<label>.plist
+    launchctl unload ~/Library/LaunchAgents/<label>.plist
 
     # Restart
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+    launchctl kickstart -k gui/$(id -u)/<label>
 
     # Status
     launchctl list | grep nanoclaw
@@ -228,16 +242,17 @@ NanoClaw runs as a background service so the host stays responsive to channel ev
 
   <Tab title="Linux (systemd)">
     ```bash
-    systemctl --user start nanoclaw
-    systemctl --user stop nanoclaw
-    systemctl --user restart nanoclaw
-    systemctl --user status nanoclaw
+    # Replace <unit> with nanoclaw-v2-<slug>
+    systemctl --user start <unit>
+    systemctl --user stop <unit>
+    systemctl --user restart <unit>
+    systemctl --user status <unit>
 
     # Enable on boot
-    systemctl --user enable nanoclaw
+    systemctl --user enable <unit>
 
     # Logs
-    journalctl --user -u nanoclaw -f
+    journalctl --user -u <unit> -f
     ```
 
     <Note>

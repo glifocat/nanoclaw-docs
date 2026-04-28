@@ -18,8 +18,8 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
   Whether the assistant has its own phone number or dedicated account. Set to `"true"` to enable.
 </ParamField>
 
-<ParamField path="CONTAINER_IMAGE" type="string" default="nanoclaw-agent:latest">
-  Docker image to use for agent containers. Per-agent-group images are tagged as `nanoclaw-agent:{agentGroupId}`.
+<ParamField path="CONTAINER_IMAGE" type="string" default="nanoclaw-agent-v2-&lt;slug&gt;:latest">
+  Docker image to use for agent containers. The default is scoped to the checkout path via `src/install-slug.ts` so multiple NanoClaw installs can coexist on one host.
 </ParamField>
 
 <ParamField path="CONTAINER_TIMEOUT" type="number" default="1800000">
