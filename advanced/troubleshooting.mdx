@@ -316,6 +316,34 @@ systemctl --user restart nanoclaw
 Never copy tokens from `~/.claude/.credentials.json` into `.env`. These are short-lived keychain tokens that expire within hours. Use `claude setup-token` to generate a long-lived token instead.
 </Warning>
 
+### `claude setup-token` returns "No sk-ant-oat…AA token found"
+
+**Cause:** `setup/register-claude-token.sh` runs `claude setup-token` under `script(1)` so the OAuth dance still works over SSH and headless shells, then regex-matches the token from the captured output. The capture can fail if:
+
+- `claude` isn't on PATH because the installer in `~/.local/bin` wasn't picked up by the current shell
+- `script(1)` isn't installed (required on both macOS and Linux)
+- The browser flow was cancelled or timed out before the token printed
+
+**Fix:**
+
+```bash
+# 1. Confirm script(1) is available
+command -v script
+
+# 2. Re-run with the raw capture preserved on failure — the path is printed to stderr
+bash setup/register-claude-token.sh
+
+# 3. If `claude` is missing, install it explicitly and retry
+bash setup/install-claude.sh
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+If the issue persists, paste an existing long-lived token directly:
+
+```bash
+onecli secrets create --name Anthropic --type anthropic --value sk-ant-oat01-... --host-pattern api.anthropic.com
+```
+
 ## WhatsApp authentication issues
 
 ### Symptoms
