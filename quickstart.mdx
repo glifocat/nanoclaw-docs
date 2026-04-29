@@ -52,6 +52,10 @@ This guide covers the default installer. If you want to skip steps, reuse an exi
     - **Channel-specific auth** — pairing code, QR code, bot token, app credentials, or no extra auth for CLI, depending on the platform
 
     The flow is linear. One question at a time. You can Ctrl+C and restart; the installer picks up where you left off.
+
+    <Note>
+    Re-running on a checkout with an existing `.env`? The installer detects channel tokens, OneCLI config, and your saved display name, and offers to reuse them so you don't have to paste credentials again. See [Re-running setup](/installation#re-running-setup).
+    </Note>
   </Step>
 
   <Step title="Authorize Anthropic">
