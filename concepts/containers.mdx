@@ -235,6 +235,7 @@ Containers provide filesystem isolation, not network isolation. Agents can make 
 1. Check Docker is running: `docker ps`
 2. Check image exists: `docker images | grep nanoclaw-agent`
 3. Rebuild image: `./container/build.sh`
+4. Confirm the OneCLI Agent Vault is reachable (`onecli status`). If the gateway can't be applied, NanoClaw refuses to spawn the container and leaves the inbound message pending for the next sweep retry.
 
 ### Container timeout
 

@@ -181,12 +181,21 @@ const onecliApplied = await onecli.applyContainerConfig(args, {
   addHostMapping: false,
   agent: agentIdentifier,
 });
+if (!onecliApplied) {
+  throw new Error('OneCLI gateway not applied — refusing to spawn container without credentials');
+}
 ```
 
 - Injects `HTTPS_PROXY` and CA certs into Docker args
 - All container API calls route through the vault
 - No raw API keys are passed via environment variables
 - Each agent group gets its own `agentIdentifier` for credential scoping
+
+### Required for spawn
+
+The OneCLI gateway is a **hard prerequisite** for container spawn. If `applyContainerConfig()` returns `false` (gateway unreachable, agent provisioning failed, etc.), the spawn aborts before the container starts — NanoClaw never launches a container that lacks credential routing.
+
+The throw is treated as a **transient failure**: the caller (router or host sweep) catches it, leaves the inbound message pending, and the next 60-second sweep tick retries the spawn. Once the gateway is reachable again, the queued message wakes a fresh container without operator intervention.
 
 ## Debugging containers
 
