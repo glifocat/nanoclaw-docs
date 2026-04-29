@@ -132,7 +132,7 @@ Docker is the default and works on all three platforms. Apple Container is an op
 | `SECRET_NAME` | OneCLI secret name for `setup/register-claude-token.sh` (default: `Anthropic`) |
 | `HOST_PATTERN` | OneCLI host pattern for `setup/register-claude-token.sh` (default: `api.anthropic.com`) |
 
-If OneCLI is already installed and configured, setup asks whether to reuse it. For custom Anthropic-compatible model endpoints, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in `.env`.
+If OneCLI is already installed and configured, setup asks whether to reuse it. On a re-run, the installer also detects existing `.env` values (channel tokens, OneCLI config, display name) and the registered group state, then offers to reuse what's already there — skipping the cli-agent and first-chat steps when groups are already wired. For custom Anthropic-compatible model endpoints, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in `.env`.
 
 ## Run the installer
 
