@@ -129,6 +129,8 @@ Container spawning is deduplicated — concurrent wake calls for the same sessio
 3. Skill symlinks are synced before every spawn
 4. Docker container is spawned with `tini` as PID 1
 
+`wakeContainer` never throws. It returns `true` on a successful spawn (or when a container is already running) and `false` on a transient spawn failure — most commonly an unreachable [OneCLI Agent Vault](/advanced/security-model#credential-vault). The host refuses to spawn a container without working credential injection: the inbound row stays pending and the host sweep retries on its next tick. The router stops the typing indicator when wake returns `false` so the user isn't left looking at a hanging "agent typing" state.
+
 ### Execution
 
 1. **Agent-runner starts**: `bun run /app/src/index.ts`

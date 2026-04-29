@@ -188,6 +188,18 @@ const onecliApplied = await onecli.applyContainerConfig(args, {
 - No raw API keys are passed via environment variables
 - Each agent group gets its own `agentIdentifier` for credential scoping
 
+### OneCLI is required for spawn
+
+If the OneCLI gateway can't be wired into the container args, the host refuses to spawn the container. This is treated as a transient hard failure rather than a silent fallback:
+
+- `applyContainerConfig` returning `false` (or any thrown error) propagates out of `spawnContainer`
+- `wakeContainer` catches the error, logs a warning, and returns `false` — it never throws
+- The inbound message row stays pending in the session DB
+- The host sweep retries on its next tick (60 s by default)
+- The router stops the typing indicator when wake returns `false`, so the user doesn't see a stuck "agent typing" state
+
+The previous behavior — spawning a credential-less container that would then fail every API call — has been removed. If you see repeated `wakeContainer failed — host-sweep will retry` log lines, check the OneCLI service first.
+
 ## Debugging containers
 
 <Accordion title="List running containers">

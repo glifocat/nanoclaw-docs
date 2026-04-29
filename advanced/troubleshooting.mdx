@@ -316,6 +316,42 @@ systemctl --user restart nanoclaw
 Never copy tokens from `~/.claude/.credentials.json` into `.env`. These are short-lived keychain tokens that expire within hours. Use `claude setup-token` to generate a long-lived token instead.
 </Warning>
 
+## Container won't spawn — OneCLI gateway unreachable
+
+### Symptoms
+
+- Host log shows `wakeContainer failed — host-sweep will retry` for the affected session
+- The typing indicator appears and then disappears immediately on inbound messages
+- Inbound rows stay pending; no container is started; no reply is delivered
+- Repeated attempts every ~60 seconds (host sweep tick)
+
+### Cause
+
+The host refuses to spawn a container without working credential injection. If `applyContainerConfig()` from `@onecli-sh/sdk` returns `false` or throws, `spawnContainer()` aborts and `wakeContainer()` returns `false`. The inbound row is left pending so the next sweep tick retries — there is no silent fallback to a credential-less container.
+
+Common triggers:
+
+- The OneCLI service isn't running on the configured `ONECLI_URL`
+- `ONECLI_API_KEY` is wrong or missing for an instance that requires auth
+- A network/firewall change blocks the host from reaching the gateway
+
+### Solution
+
+<Steps>
+  <Step title="Check the OneCLI gateway is up">
+    ```bash
+    curl -fsS "${ONECLI_URL:-http://127.0.0.1:10254}/health"
+    ```
+    If this fails, restart OneCLI before continuing.
+  </Step>
+  <Step title="Verify the host env">
+    Confirm `ONECLI_URL` (and `ONECLI_API_KEY`, if your instance requires auth) are set correctly in `.env`. See [Configuration](/api/configuration#environment-variables).
+  </Step>
+  <Step title="Wait one sweep tick">
+    No manual intervention is needed once the gateway is reachable — the host sweep retries every 60 seconds and the pending message will be delivered on the next pass.
+  </Step>
+</Steps>
+
 ## WhatsApp authentication issues
 
 ### Symptoms

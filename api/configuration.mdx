@@ -54,6 +54,10 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
   Logging verbosity. Valid values: `debug`, `info`, `warn`, `error`, `fatal`.
 </ParamField>
 
+<ParamField path="CLAUDE_CODE_AUTO_COMPACT_WINDOW" type="number" default="165000">
+  Token threshold at which Claude Code auto-compacts the agent's conversation context. Read from the host env and forwarded into each spawned agent container. Useful when running a 1M-context model variant or emergency-tuning a live deployment without editing source. Leave unset to keep the default `165000`.
+</ParamField>
+
 <ParamField path="TZ" type="string" default="system timezone">
   Timezone for scheduled tasks (cron expressions). Resolved from `TZ` env, `.env` file, then system default. Validated as a real IANA timezone identifier. Falls back to `UTC` if no valid timezone is found.
 </ParamField>
