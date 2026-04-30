@@ -139,20 +139,17 @@ usermod -aG sudo nanoclaw
 # 3. Enable passwordless sudo (avoids prompts during setup)
 echo "nanoclaw ALL=(ALL) NOPASSWD:ALL" | tee /etc/sudoers.d/nanoclaw
 
-# 4. Copy SSH keys so you can log in as the new user
-cp -r ~/.ssh /home/nanoclaw/.ssh && chown -R nanoclaw:nanoclaw /home/nanoclaw/.ssh
-
-# 5. Log out, then SSH back in as nanoclaw
+# 4. Log out, then SSH back in as nanoclaw
 exit
 ssh nanoclaw@your-server
 
-# 6. Clone and run setup as the new user
+# 5. Clone and run setup as the new user
 git clone https://github.com/qwibitai/nanoclaw.git && cd nanoclaw
 bash nanoclaw.sh
 ```
 
 <Note>
-Not using SSH? Refer to your hosting provider's docs (or ask your coding agent) to set up SSH access first. The setup script no longer prints web-terminal-specific instructions.
+Not using SSH? Refer to your hosting provider's docs (or ask your coding agent) to set up SSH access first. The setup script prints an SSH hint above the user-creation steps and no longer includes web-terminal-specific instructions.
 </Note>
 
 ### Docker group re-exec
