@@ -134,6 +134,12 @@ Docker is the default and works on all three platforms. Apple Container is an op
 
 If OneCLI is already installed and configured, setup asks whether to reuse it. For custom Anthropic-compatible model endpoints, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in `.env`.
 
+### Re-running setup with existing credentials
+
+When you re-run `bash nanoclaw.sh` against a project that already has a `.env` file, each step checks for its own credentials individually and prompts you per service (for example, "Found an existing Telegram bot token (123456:ABC…). Use it?"). There is no upfront "reuse everything" question — you confirm each service as the wizard reaches it, so you can keep some tokens and rotate others in the same run.
+
+If `data/v2.db` already shows registered agent groups, the `cli-agent` and `first-chat` steps are skipped automatically.
+
 ## Run the installer
 
 Once the system dependencies above are in place:
