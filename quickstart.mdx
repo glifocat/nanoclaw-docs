@@ -31,6 +31,10 @@ This guide covers the default installer. If you want to skip steps, reuse an exi
     bash nanoclaw.sh
     ```
 
+    <Warning>
+    On Linux, don't run this as root. If the installer detects you're root, it stops and offers to print steps for creating a dedicated `nanoclaw` user. Pick option 1 to see them, or option 2 to continue as root anyway (not recommended). See [Creating a dedicated Linux user](/installation#creating-a-dedicated-linux-user-recommended).
+    </Warning>
+
     This is the whole install command. `nanoclaw.sh` walks you through:
 
     - Installing Node 22, pnpm, and Docker if they're missing

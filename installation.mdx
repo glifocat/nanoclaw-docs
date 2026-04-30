@@ -24,6 +24,11 @@ Everything you need to know before running `bash nanoclaw.sh`. For the one-comma
     - 2 GB RAM minimum, 4 GB recommended
     - 4 GB free disk space
     - systemd (for the user service)
+    - A non-root user with sudo and `docker` group membership
+
+    <Warning>
+    **Don't run `nanoclaw.sh` as root.** On Linux, the installer pre-flight detects root and presents a numbered menu: `1)` show instructions for creating a dedicated user, or `2)` continue as root anyway (not recommended). Running as root causes permission issues with containers, services, and file ownership. See [Creating a dedicated Linux user](#creating-a-dedicated-linux-user-recommended) below.
+    </Warning>
   </Tab>
 
   <Tab title="Windows (WSL2)">
@@ -120,6 +125,40 @@ Docker is the default and works on all three platforms. Apple Container is an op
   </Tab>
 </Tabs>
 
+### Creating a dedicated Linux user (recommended)
+
+If `bash nanoclaw.sh` detects you're root on Linux, it shows a warning and offers to print these instructions before exiting. Run them from your root SSH session, then re-run setup as the new user.
+
+```bash
+# 1. Create a new user
+adduser nanoclaw
+
+# 2. Add to sudo group
+usermod -aG sudo nanoclaw
+
+# 3. Enable passwordless sudo (avoids prompts during setup)
+echo "nanoclaw ALL=(ALL) NOPASSWD:ALL" | tee /etc/sudoers.d/nanoclaw
+
+# 4. Copy SSH keys so you can log in as the new user
+cp -r ~/.ssh /home/nanoclaw/.ssh && chown -R nanoclaw:nanoclaw /home/nanoclaw/.ssh
+
+# 5. Log out, then SSH back in as nanoclaw
+exit
+ssh nanoclaw@your-server
+
+# 6. Clone and run setup as the new user
+git clone https://github.com/qwibitai/nanoclaw.git && cd nanoclaw
+bash nanoclaw.sh
+```
+
+<Note>
+Not using SSH? Refer to your hosting provider's docs (or ask your coding agent) to set up SSH access first. The setup script no longer prints web-terminal-specific instructions.
+</Note>
+
+### Docker group re-exec
+
+On a fresh Linux install, `nanoclaw.sh` adds the current user to the `docker` group, but supplementary group membership is fixed at login — so the running shell can't talk to `/var/run/docker.sock` until next login. The container build step detects this, ensures the user is in the `docker` group, then re-executes itself under `sg docker` so the child picks up `docker` as its primary group without requiring a logout. The re-exec preserves setup state via `NANOCLAW_REEXEC_SG=1` and a propagated `NANOCLAW_SKIP` list, so the welcome menu and existing-config prompts don't reappear from scratch.
+
 ### Advanced installer environment
 
 `nanoclaw.sh` and `setup:auto` read environment variables when you need to debug or script part of setup.
@@ -131,6 +170,7 @@ Docker is the default and works on all three platforms. Apple Container is an op
 | `NANOCLAW_AGENT_NAME` | Set the messaging-channel agent name; the CLI scratch agent remains `Terminal Agent` |
 | `SECRET_NAME` | OneCLI secret name for `setup/register-claude-token.sh` (default: `Anthropic`) |
 | `HOST_PATTERN` | OneCLI host pattern for `setup/register-claude-token.sh` (default: `api.anthropic.com`) |
+| `NANOCLAW_REEXEC_SG` | Set automatically when the container step re-execs under `sg docker`. Skips the welcome menu and existing-config prompt on the second pass. Don't set this manually. |
 
 If OneCLI is already installed and configured, setup asks whether to reuse it. For custom Anthropic-compatible model endpoints, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in `.env`.
 
