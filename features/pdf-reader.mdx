@@ -4,6 +4,11 @@ description: Extract and process text from PDF attachments and URLs
 keywords: ["pdf", "document", "text extraction", "whatsapp", "poppler"]
 ---
 
+
+<Warning>
+**v1-only feature; not needed in v2.** The `/add-pdf-reader` skill no longer ships in v2. PDF handling is now native to the Claude provider — PDFs are passed directly to Claude as document content blocks (see `docs/architecture.md` §"Native content blocks" in the framework repo). No skill installation required. This page is pending deletion.
+</Warning>
+
 NanoClaw can extract text from PDF files sent as attachments, shared via URL, or stored locally. The agent can then read, summarize, or answer questions about the document content.
 
 <Note>
