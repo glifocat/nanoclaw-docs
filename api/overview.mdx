@@ -5,6 +5,11 @@ sidebarTitle: "Overview"
 keywords: ["api", "architecture", "data flow"]
 ---
 
+
+<Warning>
+This page describes the v1 file structure. In v2, `src/db.ts` became the `src/db/` directory (split into `agent-groups.ts`, `messaging-groups.ts`, `sessions.ts`, `session-db.ts`, plus a `migrations/` subdirectory). `src/task-scheduler.ts` no longer exists — scheduled tasks are now `messages_in` rows in each session's `inbound.db` (see [Task scheduling](/api/task-scheduling)). The host process is documented across `src/router.ts`, `src/delivery.ts`, `src/host-sweep.ts`, `src/session-manager.ts`, and `src/container-runner.ts`. A v2 rewrite is pending. See [System architecture](/concepts/architecture) and [Message routing](/api/message-routing) for current context.
+</Warning>
+
 NanoClaw is a single Node.js process that connects to messaging channels (WhatsApp, Telegram, Discord, Slack, Gmail) and routes messages to Claude Agent SDK instances running in isolated containers. Each group has its own filesystem and memory.
 
 ## Architecture

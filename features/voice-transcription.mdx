@@ -4,6 +4,11 @@ description: Transcribe voice messages using OpenAI Whisper API or local whisper
 keywords: ["voice", "transcription", "whisper", "speech-to-text", "whatsapp"]
 ---
 
+
+<Warning>
+**v1-only feature.** The `/add-voice-transcription` skill no longer ships in v2 — it is not present on trunk, the `channels` branch, or the `providers` branch. Voice transcription was a v1 fork-only capability tied to WhatsApp via the deprecated `nanoclaw-whatsapp` fork. This page is pending deletion; the instructions below do not apply to v2 installs.
+</Warning>
+
 NanoClaw can transcribe voice messages so the agent understands audio content. Two options are available: cloud-based (OpenAI Whisper API) and fully local (whisper.cpp).
 
 <Note>

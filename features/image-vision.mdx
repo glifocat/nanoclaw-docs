@@ -4,6 +4,11 @@ description: Process image attachments with multimodal AI understanding
 keywords: ["image", "vision", "multimodal", "whatsapp", "attachments"]
 ---
 
+
+<Warning>
+**v1-only feature; not needed in v2.** The `/add-image-vision` skill no longer ships in v2. Image handling is now native to the Claude provider — JPEG, PNG, GIF, and WebP attachments are passed directly to Claude as image content blocks (see `docs/architecture.md` §"Native content blocks" in the framework repo). No skill installation required. This page is pending deletion.
+</Warning>
+
 NanoClaw can understand images sent as message attachments using Claude's multimodal capabilities. The agent sees the image content and can describe, analyze, or act on it.
 
 <Note>
