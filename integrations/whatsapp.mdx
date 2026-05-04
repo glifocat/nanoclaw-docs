@@ -223,7 +223,7 @@ WhatsApp uses JIDs (Jabber IDs) to identify chats:
 - **Group:** `120363012345678901@g.us`
 - **LID (newer format):** `123456:78@lid`
 
-The channel translates LID JIDs to phone JIDs automatically.
+The adapter resolves every LID to a phone JID before emitting messages to the router, so a single contact always maps to one `messaging_groups` row regardless of which JID form WhatsApp delivers. Earlier versions pre-created paired LID/phone rows during migration; that step has been removed because the adapter now handles resolution at runtime.
 
 ## Registering chats
 
