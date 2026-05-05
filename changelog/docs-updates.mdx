@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Configurable Claude auto-compact window" description="2026-04-29" tags={["Updated"]}>
+  Documented `CLAUDE_CODE_AUTO_COMPACT_WINDOW` in `api/configuration.mdx` after upstream [qwibitai/nanoclaw#2116](https://github.com/qwibitai/nanoclaw/pull/2116) made the Claude provider respect operator-set values rather than always pinning the host env to the built-in 165k default. The override is forwarded into every Claude container at spawn so deployments can tune the threshold without source edits — e.g., when running a 1M-context model variant.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
