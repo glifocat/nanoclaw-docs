@@ -125,19 +125,24 @@ Claude will call `ollama_list_models` to see available models, then `ollama_gene
 
 ## Third-party model endpoints
 
-Independently of Ollama, NanoClaw supports any Anthropic API-compatible endpoint. Set these in `.env`:
+Independently of Ollama, NanoClaw supports any Anthropic API-compatible endpoint. The recommended way to configure this is at setup time:
 
 ```bash
-ANTHROPIC_BASE_URL=https://your-api-endpoint.com
-ANTHROPIC_AUTH_TOKEN=your-token-here
+bash nanoclaw.sh --anthropic-base-url https://your-api-endpoint.com --anthropic-auth-token your-token-here
 ```
+
+The setup flow registers the token as a OneCLI generic secret with header injection (`Authorization: Bearer …`) and writes `ANTHROPIC_BASE_URL` to `.env`. The container only ever sees `ANTHROPIC_BASE_URL` and a placeholder bearer — OneCLI rewrites the real Authorization header on the wire.
 
 This allows you to use:
 - Open-source models on [Together AI](https://together.ai), [Fireworks](https://fireworks.ai), etc.
 - Custom model deployments with Anthropic-compatible APIs
 
+<Note>
+Both flags must be set together. If you only set `ANTHROPIC_BASE_URL` without `ANTHROPIC_AUTH_TOKEN`, setup falls back to the standard OAuth/API-key auth flow.
+</Note>
+
 <Warning>
-When using custom endpoints, the secret injection layer (OneCLI Agent Vault in v1.2.35+, or the credential proxy in earlier versions) still intercepts container API requests. Ensure the endpoint is reachable from the host.
+The custom-endpoint flow requires the OneCLI Agent Vault. The container holds no raw secret — the vault injects the Authorization header at request time and enforces the same audit/rotation as other credentials.
 </Warning>
 
 ## Related pages

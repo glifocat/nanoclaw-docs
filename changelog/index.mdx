@@ -6,6 +6,32 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.14" description="2026-04-27" tags={["Feature", "Fix"]}>
+  - Custom Anthropic-compatible endpoints now route through the OneCLI Agent Vault. Configure with `--anthropic-base-url` and `--anthropic-auth-token`; the token is stored as a OneCLI generic secret with header injection so the container only ever sees `ANTHROPIC_BASE_URL` and a placeholder bearer.
+  - Setup flow gained an advanced-settings registry (`--help` lists every flag). New flags include `--onecli-api-host`, `--onecli-api-token`, `--anthropic-base-url`, and `--anthropic-auth-token`. Power users can run "Advanced setup" from the welcome menu to override defaults without going through the linear flow.
+  - Setup can connect to a remote OneCLI gateway instead of installing one locally — pick "Connect to a remote OneCLI" in the setup wizard or pass `--onecli-api-host`. The CLI authenticates against the remote vault and writes `ONECLI_URL` to `.env`.
+  - OneCLI access tokens are validated to start with `oc_` and the default remote URL is `https://app.onecli.sh`.
+  - Fixed duplicate `pollHealth` import in `setup/auto.ts`.
+</Update>
+
+<Update label="v2.0.13" description="2026-04-25" tags={["Skill", "Maintenance"]}>
+  - Merged `/add-signal-v2` lessons into `/add-signal` and dropped the v2 skill. The unified skill covers registration paths (new number + linked device), CAPTCHA flow, VoIP SMS-first timing, Java prereq, config-lock warning, group wiring SQL, the `not_member` silent-drop fix, GroupV2 groupId extraction, and UUID-based platform IDs (`signal:{ACI}`).
+  - Added `/add-gcal-tool` — OneCLI-native Google Calendar MCP server. Sibling of `/add-gmail-tool`; the skill applies the Dockerfile and TOOL_ALLOWLIST changes at install time so trunk stays clean.
+</Update>
+
+<Update label="v2.0.12" description="2026-04-24" tags={["Fix"]}>
+  - Fixed channel-registration wiring: channels now wire with the correct engage fields, and prefix handling is skipped for native IDs.
+  - Per-provider session state — Claude Code session continuations are keyed per provider so they survive provider switches.
+  - `agent-route` rejects unsafe attachment filenames to prevent path traversal and forwards file attachments between agents correctly.
+</Update>
+
+<Update label="v2.0.11" description="2026-04-23" tags={["Skill", "Fix"]}>
+  - Added `/add-gmail-tool` — OneCLI-native Gmail MCP server (read, send, search, draft). No raw OAuth tokens reach the container; the gateway swaps a stub bearer for the real token at request time.
+  - Setup now detects auth ping failures and accepts a CLI-only verify success path.
+  - PR labelling workflow extended to PRs from forks that follow the contributing template.
+  - Documentation note that `container.json`'s provider field is what the agent runner reads.
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention

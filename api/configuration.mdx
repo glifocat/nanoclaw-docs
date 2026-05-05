@@ -42,6 +42,14 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
   API key for authenticating with the OneCLI Agent Vault. Optional — only needed if your OneCLI instance requires authentication.
 </ParamField>
 
+<ParamField path="ANTHROPIC_BASE_URL" type="string">
+  Custom Anthropic-compatible endpoint to route Claude traffic through (e.g. an internal proxy or alternative provider). When set, NanoClaw registers the `claude` provider host config and passes the base URL into agent containers. Configure during setup with `--anthropic-base-url`.
+</ParamField>
+
+<ParamField path="ANTHROPIC_AUTH_TOKEN" type="string">
+  Bearer token for the custom Anthropic endpoint. Stored as a OneCLI generic secret with header injection — the container never sees the real token. Configure during setup with `--anthropic-auth-token` (only used when `ANTHROPIC_BASE_URL` is also set).
+</ParamField>
+
 <ParamField path="MAX_MESSAGES_PER_PROMPT" type="number" default="10">
   Maximum number of messages sent to container agents per prompt.
 </ParamField>
