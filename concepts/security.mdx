@@ -222,6 +222,16 @@ Diagnostics are entirely skill-driven — they exist as markdown instructions re
 - `request_approval` requires admin action before processing
 - Per-wiring `sender_scope=known` restricts to group members even on public channels
 
+### Malicious attachment filename
+
+**Attack**: a chat sender (or compromised peer agent) supplies an attachment whose filename contains path-traversal characters such as `../../etc/passwd`, hoping the host writes it outside the per-session inbox directory.
+
+**Mitigation**:
+- Every inbound attachment filename is validated before being joined to the inbox path
+- Names containing `/`, `\`, NUL, `.`, or `..` are rejected and replaced with `attachment-<timestamp>`
+- The check runs unconditionally on the channel-inbound path, including end-to-end-encrypted channels where filenames cannot be sanitized server-side
+- See [attachment filename sanitization](/advanced/security-model#attachment-filename-sanitization) for details
+
 ## Best practices
 
 1. **Use `request_approval` for public groups** — prevents unauthorized access while allowing legitimate users

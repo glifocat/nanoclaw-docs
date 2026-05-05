@@ -102,6 +102,16 @@ The delivery system enforces per-agent permissions:
 - File attachments are read from `outbox/{messageId}/`
 - 3 retry attempts per message, then permanently failed
 
+### Attachment filename sanitization
+
+Inbound attachments are staged to disk under `data/v2-sessions/{agent_group_id}/{session_id}/inbox/{message_id}/` before the container reads them. Filenames originate from untrusted sources (chat-message metadata, agent-to-agent forwards) and are validated by `isSafeAttachmentName` before being joined to the inbox path:
+
+- Rejects empty strings, `.`, and `..`
+- Rejects any value containing `/`, `\`, or NUL
+- Rejects any value where `path.basename(name) !== name` (catches OS-specific separators and Windows drive prefixes)
+
+Names that fail validation are replaced with `attachment-<timestamp>` and a warning is logged. This prevents a malicious filename like `../../etc/passwd` from escaping the inbox and writing anywhere the host process has filesystem permission. End-to-end-encrypted channels (WhatsApp, Matrix) cannot sanitize filenames server-side, so this guard runs unconditionally on every inbound attachment.
+
 ### Credential handling
 
 NanoClaw delegates all credential management to the OneCLI Agent Vault:

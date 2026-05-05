@@ -6,6 +6,10 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.14" description="2026-04-28" tags={["Security"]}>
+  - Fixed path traversal vulnerability in channel-inbound attachment handling — filenames containing `..`, path separators, or NUL bytes are now rejected before being joined to the per-session inbox path. See [security model](/advanced/security-model#attachment-filename-sanitization).
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention
