@@ -289,6 +289,17 @@ rm -rf node_modules pnpm-lock.yaml && pnpm install
 
 If the error mentions Python: `sudo apt-get install python3` (Linux/WSL) or `xcode-select --install` (macOS).
 
+### `pnpm: command not found` during setup
+
+When `corepack enable` fails with an `EACCES` error (common when Node is installed to a system-writable prefix like `/usr/local` that your user doesn't own), `nanoclaw.sh` falls back to `npm install -g pnpm`. The install succeeds, but the resulting binary may not be on your shell's `PATH` — for example, if you've run `npm config set prefix ~/.npm-global` to avoid `sudo`.
+
+`nanoclaw.sh` and `setup.sh` both prepend `$(npm config get prefix)/bin` to `PATH` after the fallback, so the hand-off to `pnpm run setup:auto` works automatically. If you still see `pnpm: command not found` after the install completes, add npm's global bin to your shell config:
+
+```bash
+echo 'export PATH="$(npm config get prefix)/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
 ### Container build fails
 
 ```bash
