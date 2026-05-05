@@ -5,6 +5,13 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.14 sync: setup flags and remote OneCLI" description="2026-04-26" tags={["Updated"]}>
+  ## Updated
+  - **`api/configuration.mdx`**: documented `ANTHROPIC_BASE_URL` env var, expanded `ONECLI_API_KEY` description, added a Setup CLI flags table covering `--onecli-api-host`, `--onecli-api-token`, `--anthropic-base-url`, `--anthropic-auth-token`, `--skip`, and `--display-name`.
+  - **`installation.mdx`**: added an Advanced settings section describing the welcome-menu Advanced screen, equivalent CLI flags, and the on-the-wire flow (remote OneCLI health pre-flight, custom Anthropic endpoint via header-injection secret).
+  - **Changelog**: added v2.0.14 product release entry.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
