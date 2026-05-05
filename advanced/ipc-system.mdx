@@ -113,7 +113,7 @@ graph LR
 |-------|---------|
 | `messages_out` | Outbound messages with `deliver_after` and recurrence |
 | `processing_ack` | Tracks which inbound messages the container has processed |
-| `session_state` | Persistent key/value store (e.g., SDK session ID for resume across restarts) |
+| `session_state` | Persistent key/value store. Primary use: per-provider continuation IDs keyed `continuation:<provider>` so each provider (Claude, Codex, etc.) resumes its own thread on restart |
 | `container_state` | Tool-in-flight state (tool name, declared timeout, start time) for stuck-detection |
 
 ## MCP tools (container-side)

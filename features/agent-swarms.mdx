@@ -2,6 +2,7 @@
 title: Agent Swarms
 description: Spin up teams of specialized Claude agents that collaborate on complex tasks in your chat
 keywords: ["agent swarms", "multi-agent", "collaboration"]
+tag: "UPDATED"
 ---
 
 
@@ -139,6 +140,12 @@ a comparison table
 The agent might spawn:
 - Multiple document reading agents (one per PDF)
 - A synthesis agent to create the comparison table
+
+## Forwarding files between agents
+
+When a sub-agent calls `send_file(to='parent', path=…)` (or any cross-agent file send), the agent-to-agent router copies the referenced file from the source session's `outbox/<msg-id>/` into the target session's `inbox/<a2a-msg-id>/` and surfaces it as a `localPath` attachment relative to `/workspace/`. The receiving agent sees a formatter line like `[file: report.pdf — saved to /workspace/inbox/<a2a-id>/report.pdf]` and can read the path directly or forward it onward.
+
+Filenames in routed messages are validated before any filesystem I/O — path-traversal values (`../`, absolute paths, separators, NUL) are rejected with a warning and the text payload is still delivered.
 
 ## Memory and context sharing
 

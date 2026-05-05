@@ -102,7 +102,7 @@ In v2, all communication between host and container uses two SQLite databases pe
 |-------|---------|
 | `messages_out` | Outbound messages with `deliver_after` and recurrence |
 | `processing_ack` | Tracks which inbound messages the container has processed |
-| `session_state` | Persistent key/value store (e.g., SDK session ID for resume) |
+| `session_state` | Persistent key/value store. Continuations are keyed per provider (`continuation:<provider>`) so switching providers is lossless — each provider's last thread stays on file |
 | `container_state` | Tool-in-flight state for stuck-detection |
 
 ### Cross-mount invariants

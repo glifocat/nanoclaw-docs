@@ -126,7 +126,7 @@ The host sweep (`src/host-sweep.ts`) runs every 60 seconds:
 
 - **messages_out** — outbound messages with `deliver_after` and recurrence
 - **processing_ack** — tracks which inbound messages the container has processed
-- **session_state** — persistent key/value store (e.g., SDK session ID for resume)
+- **session_state** — persistent key/value store. Primary use: per-provider continuation IDs (`continuation:<provider>`) so each provider resumes its own conversation independently across container restarts and provider switches
 - **container_state** — tool-in-flight state for stuck-detection
 
 ### Module system

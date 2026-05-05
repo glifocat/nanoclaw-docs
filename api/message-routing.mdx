@@ -91,6 +91,18 @@ For each session with due outbound messages:
 4. Mark delivered in `inbound.db`
 5. Clean up `outbox/` files (best-effort)
 
+### Agent-to-agent file forwarding
+
+When an outbound message from agent A addresses agent B (`channel_type='agent'`) and its content references file attachments (`files: [...]`), the router copies each referenced file from the source's `outbox/<src-msg-id>/` into the target's `inbox/<a2a-msg-id>/` and rewrites the content to expose them as `attachments` (the standard formatter shape) with `localPath` relative to `/workspace/`. The target agent's formatter renders these as `[file: <name> — saved to /workspace/inbox/<a2a-id>/<name>]`, so a parent agent can use `send_file(path=…, to=…)` to forward onward.
+
+Filenames that arrive in a routed message are untrusted input. They are validated against an allowlist before any I/O:
+
+- Empty, `.`, and `..` are rejected
+- Any value containing `/`, `\`, or NUL is rejected
+- Any value where `path.basename(name) !== name` is rejected
+
+Unsafe names are dropped with a warning; the accompanying text still delivers. Missing source files are skipped with the same best-effort pattern.
+
 ### Delivery actions
 
 Modules register handlers via `registerDeliveryAction(action, handler)`:
