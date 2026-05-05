@@ -1,6 +1,7 @@
 ---
 title: Slack integration
 description: Add Slack as a messaging channel for NanoClaw using the /add-slack skill for team workspaces
+tag: "UPDATED"
 ---
 
 import SyncEnv from "/snippets/sync-env.mdx";
@@ -106,13 +107,26 @@ The setup process requires two tokens: a Bot Token (`xoxb-`) and an App-Level To
        - `users:read` (look up display names)
   </Step>
   
+  <Step title="Enable Interactivity & Shortcuts">
+    Slack interactive buttons (channel approval cards, sender approval prompts) require Interactivity to be enabled. Without it, button clicks silently fail to reach the host.
+
+    1. Go to **Interactivity & Shortcuts**
+    2. Toggle **Interactivity** on
+    3. Set the **Request URL** to `https://<your-public-host>/webhook/slack`
+    4. Click **Save Changes**
+  </Step>
+
   <Step title="Install to workspace">
     1. Go to **Install App**
-    2. Click **Install to Workspace**
+    2. Click **Install to Workspace** (or **Reinstall** if Slack prompts you to apply new settings)
     3. Review permissions and click **Allow**
     4. **Copy the Bot User OAuth Token** (starts with `xoxb-`)
   </Step>
 </Steps>
+
+<Warning>
+If you change OAuth scopes, event subscriptions, or Interactivity settings after installing, Slack will prompt you to **reinstall the app**. Reinstall and copy the new bot token — it changes on reinstall.
+</Warning>
 
 <Tip>
   For detailed setup with screenshots, see the [SLACK_SETUP.md guide](https://github.com/qwibitai/NanoClaw/blob/main/.claude/skills/add-slack/SLACK_SETUP.md).
@@ -346,6 +360,15 @@ export class SlackChannel implements Channel {
     - App tokens start with `xapp-`
     
     If your token doesn't match, you may have copied the wrong one.
+  </Accordion>
+
+  <Accordion title="Buttons on approval cards do nothing">
+    Channel-approval and sender-approval cards rely on Slack's interactive components. If clicking a button has no effect and nothing reaches the host:
+
+    1. Open your Slack app's **Interactivity & Shortcuts** page
+    2. Confirm **Interactivity** is toggled on
+    3. Confirm the **Request URL** points at your public host (`https://<your-public-host>/webhook/slack`)
+    4. Save and reinstall the app when Slack prompts
   </Accordion>
 </AccordionGroup>
 

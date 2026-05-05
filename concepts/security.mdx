@@ -150,6 +150,12 @@ Each session has isolated databases at `data/v2-sessions/{agent_group_id}/{sessi
 - Sessions cannot see other sessions' data
 - Cross-session information disclosure is prevented by mount isolation
 
+#### Attachment filename safety
+
+Filenames carried with messages — both inbound from a channel adapter and forwarded between agents over the agent-to-agent route — are validated before any filesystem write. The host rejects names that are empty, equal to `.` or `..`, contain `/`, `\`, or NUL, or whose `path.basename` differs from the input. An adversarial or hallucinating sender (or sub-agent) cannot use a value like `../evil.sh` to escape the destination session's `inbox/` or outbox directory and overwrite a sibling session's files.
+
+Unsafe names are dropped with a warning log and the rest of the delivery proceeds — a single bad attachment does not kill the message's text content.
+
 ### 5. Credential handling
 
 NanoClaw uses the [OneCLI](https://github.com/onecli/onecli) Agent Vault for centralized secret management. API keys are never stored in `.env` or exposed to containers — the vault intercepts outbound API traffic from containers and injects credentials at request time.

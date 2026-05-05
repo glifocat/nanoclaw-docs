@@ -58,6 +58,14 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
   Timezone for scheduled tasks (cron expressions). Resolved from `TZ` env, `.env` file, then system default. Validated as a real IANA timezone identifier. Falls back to `UTC` if no valid timezone is found.
 </ParamField>
 
+<ParamField path="ANTHROPIC_BASE_URL" type="string">
+  Optional. Custom Anthropic-compatible API endpoint. When set during setup (via `--anthropic-base-url`), the Claude provider config is registered and this value is passed into agent containers so the SDK calls your endpoint instead of `api.anthropic.com`. The matching auth token is **not** stored in `.env` — it goes into the OneCLI vault as a generic secret with header injection (`Authorization: Bearer {value}`) scoped to the base URL hostname, so the proxy rewrites the Authorization header on the wire.
+</ParamField>
+
+<ParamField path="NANOCLAW_ANTHROPIC_AUTH_TOKEN" type="string">
+  Setup-only. Provided via `--anthropic-auth-token` alongside `--anthropic-base-url`. Setup uses it to create the OneCLI generic secret and then discards it — the value is never written to `.env` or passed into containers. The container only sees a placeholder `ANTHROPIC_AUTH_TOKEN` so the SDK includes an `Authorization` header for the vault to overwrite.
+</ParamField>
+
 ## Timezone configuration
 
 The timezone is resolved through a priority chain:
@@ -129,6 +137,23 @@ onecli secrets create --name Anthropic --type anthropic --value YOUR_KEY --host-
 ```
 
 The `@onecli-sh/sdk` package's `applyContainerConfig()` configures each container's network to route through the vault, injecting credentials at request time.
+
+### Custom Anthropic-compatible endpoints
+
+If you point the agent at a custom Anthropic-compatible endpoint (gateway, proxy, or self-hosted relay), pass both the base URL and the auth token to setup:
+
+```bash
+... --anthropic-base-url https://your-gateway.example.com \
+    --anthropic-auth-token YOUR_TOKEN
+```
+
+Setup then:
+
+1. Creates an OneCLI **generic** secret with the token, host-pattern matching the base URL hostname, and header injection (`--header-name Authorization --value-format 'Bearer {value}'`).
+2. Writes `ANTHROPIC_BASE_URL` to `.env` so the runtime can read it.
+3. Appends `import './claude.js';` to `src/providers/index.ts` so the Claude provider container config registers — standard installs hitting `api.anthropic.com` don't load this file at all.
+
+Containers receive `ANTHROPIC_BASE_URL` plus a placeholder `ANTHROPIC_AUTH_TOKEN`. The SDK adds an `Authorization: Bearer placeholder` header; OneCLI matches on the host pattern and rewrites it with the real token before the request leaves the gateway. The real token never enters the container.
 
 ## Security notes
 

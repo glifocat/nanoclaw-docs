@@ -179,6 +179,64 @@ cat groups/{group}/logs/container-{timestamp}.log
   ```
 </Accordion>
 
+## Startup crash-loop backoff
+
+NanoClaw includes a startup circuit breaker that backs off on repeated crashes to avoid exhausting Discord gateway identify limits or triggering Cloudflare IP bans. State is stored at `data/circuit-breaker.json` and counts consecutive crashes within a 1-hour window. A clean shutdown resets the counter; the next start with no recent crash is unaffected.
+
+### Backoff schedule
+
+| Consecutive crash | Delay before next start |
+|---|---|
+| 1 | 0s |
+| 2 | 0s |
+| 3 | 10s |
+| 4 | 30s |
+| 5 | 2min |
+| 6 | 5min |
+| 7+ | 15min (capped) |
+
+### Symptoms
+
+- Logs show `Circuit breaker: delaying startup due to repeated crashes`
+- Service appears to "hang" on startup before the host process actually boots
+- Channels reconnect on a noticeable delay after a crash loop
+
+### Diagnosis
+
+```bash
+# Inspect the breaker state
+cat data/circuit-breaker.json
+
+# Look for breaker activity in logs
+grep -E 'Circuit breaker|repeated crashes' logs/nanoclaw.error.log | tail -10
+```
+
+### Recovery
+
+If you've fixed the underlying crash and want to clear the backoff immediately, delete the state file before starting:
+
+```bash
+rm -f data/circuit-breaker.json
+```
+
+The breaker also auto-resets when the previous startup is older than 1 hour, so leaving the host stopped for an hour clears the counter.
+
+## Where to look first
+
+When something goes wrong, check these locations in order:
+
+| Source | What it shows |
+|---|---|
+| `logs/nanoclaw.error.log` | Delivery failures, crash-loop backoff, warnings — start here |
+| `logs/nanoclaw.log` | Full routing chain, channel events, group loading |
+| `logs/setup.log` and `logs/setup-steps/*.log` | Setup wizard output, per-step logs (bootstrap, environment, container, onecli, mounts, service) |
+| `data/v2-sessions/<agent-group>/<session>/inbound.db` | `messages_in` — did the message reach the container? |
+| `data/v2-sessions/<agent-group>/<session>/outbound.db` | `messages_out` — did the agent produce a response? |
+
+<Note>
+Container logs are lost after the container exits (`docker run --rm`). If the agent silently failed inside the container, there is no persistent log to inspect — the session DBs are the next-best signal.
+</Note>
+
 ## Service stops after SSH logout (Linux)
 
 ### Symptoms
