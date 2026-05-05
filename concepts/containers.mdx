@@ -129,6 +129,8 @@ Container spawning is deduplicated — concurrent wake calls for the same sessio
 3. Skill symlinks are synced before every spawn
 4. Docker container is spawned with `tini` as PID 1
 
+`wakeContainer` returns `Promise<boolean>` and never throws. A `false` result means the OneCLI gateway couldn't be wired (transient failure) — the container is not spawned, the inbound row stays pending, and the host sweep retries on its next 60-second tick. Containers are never spawned without working credentials.
+
 ### Execution
 
 1. **Agent-runner starts**: `bun run /app/src/index.ts`

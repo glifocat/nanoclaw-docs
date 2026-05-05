@@ -264,6 +264,42 @@ If you need Kubernetes enabled, set `CONTAINER_IMAGE` to an image stored in a re
 
 **Fix:** Already fixed. The agent runner now passes `resumeSessionAt` with the last assistant message UUID to explicitly anchor each resume.
 
+## OneCLI gateway unreachable
+
+### Symptoms
+- Host log shows `OneCLI gateway not applied — refusing to spawn container without credentials`
+- Host log shows `wakeContainer failed — host-sweep will retry`
+- Inbound messages sit pending; no container spawns
+- Typing indicator briefly appears then stops without a reply
+
+### Cause
+
+In v2.0.17+, OneCLI gateway success is required to spawn a container. If `applyContainerConfig()` returns `false` (vault returned a non-applied response) or throws (gateway unreachable), the host refuses to start a credential-less container. The inbound row stays pending and the host sweep retries on its next 60-second tick.
+
+### Solution
+
+<Steps>
+  <Step title="Verify the OneCLI service is running">
+    ```bash
+    curl -s http://localhost:10254/health
+    ```
+
+    If this fails, restart the OneCLI service.
+  </Step>
+
+  <Step title="Check the configured URL matches">
+    Confirm `ONECLI_URL` in `.env` points at a reachable instance.
+  </Step>
+
+  <Step title="Verify the agent identifier is registered">
+    The host calls `onecli.ensureAgent` for non-main groups before applying config. Check vault logs for sync failures.
+  </Step>
+
+  <Step title="Wait one sweep tick">
+    Once OneCLI is back, the host sweep (60s) will re-wake the container automatically — pending inbound messages are retried without resending.
+  </Step>
+</Steps>
+
 ## Container 401 errors
 
 ### Symptoms

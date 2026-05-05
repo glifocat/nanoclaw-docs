@@ -5,6 +5,15 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.16–2.0.17 sync: OneCLI required, auto-compact override" description="2026-04-29" tags={["Updated"]}>
+  ## Updated
+  - **`advanced/container-runtime.mdx`**: New "OneCLI gateway is required for spawn" section — `wakeContainer` returns `Promise<boolean>`, never throws; gateway failures leave the inbound row pending and the host sweep retries.
+  - **`concepts/containers.mdx`**: Wake-and-spawn description now reflects the boolean return contract and host-sweep retry behavior.
+  - **`api/configuration.mdx`**: Added `CLAUDE_CODE_AUTO_COMPACT_WINDOW` env var (operator override for Claude Code auto-compact threshold, defaults to `165000`, available in v2.0.16+).
+  - **`advanced/troubleshooting.mdx`**: Added "OneCLI gateway unreachable" section covering the new pending-row + sweep-retry behavior.
+  - **Changelog**: Added v2.0.16 and v2.0.17 product release entries.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 

@@ -188,6 +188,15 @@ const onecliApplied = await onecli.applyContainerConfig(args, {
 - No raw API keys are passed via environment variables
 - Each agent group gets its own `agentIdentifier` for credential scoping
 
+### OneCLI gateway is required for spawn
+
+As of v2.0.17, OneCLI gateway success is a precondition for container spawn. If `applyContainerConfig()` returns `false` or throws, `spawnContainer` aborts and never starts a credential-less container.
+
+- `wakeContainer(session)` never throws — it returns `Promise<boolean>`. `true` on success, `false` on transient failure (gateway unreachable, vault misconfigured).
+- The inbound row stays pending. The host sweep (60s tick) retries the wake on its next pass.
+- The router stops the typing indicator when wake returns `false` so it doesn't leak across the retry window.
+- Look for `OneCLI gateway not applied — refusing to spawn container without credentials` in the host log when this fires.
+
 ## Debugging containers
 
 <Accordion title="List running containers">

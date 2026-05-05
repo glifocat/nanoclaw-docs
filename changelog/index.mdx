@@ -6,6 +6,15 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.17" description="2026-04-29" tags={["Fix"]}>
+  - OneCLI gateway success is now required for container spawn — `wakeContainer` returns `Promise<boolean>` and never throws. Transient gateway failures leave the inbound row pending; the host sweep retries on its next 60-second tick. Containers are no longer started without working credentials.
+  - Router stops the typing indicator when wake returns `false` so it doesn't leak across the retry window.
+</Update>
+
+<Update label="v2.0.16" description="2026-04-29" tags={["Feature", "Fix"]}>
+  - Operators can now override the Claude Code auto-compact threshold via `CLAUDE_CODE_AUTO_COMPACT_WINDOW` — useful for 1M-context model variants or emergency tuning a live deployment without editing source. Defaults to `165000` when unset.
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention
