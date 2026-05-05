@@ -134,6 +134,14 @@ Docker is the default and works on all three platforms. Apple Container is an op
 
 If OneCLI is already installed and configured, setup asks whether to reuse it. For custom Anthropic-compatible model endpoints, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in `.env`.
 
+### Headless and remote installs
+
+The Claude subscription auth path needs a TTY for `claude setup-token` to capture its OAuth token. NanoClaw wraps it with `script(1)` and a regex extractor (`setup/register-claude-token.sh`) so the flow works over SSH, in tmux, and in other terminals where the CLI's normal token-print path would otherwise be lost.
+
+- The `claude` binary is installed on demand via `setup/install-claude.sh` (the official `https://claude.ai/install.sh` native installer) into `~/.local/bin`, only if you pick the subscription path.
+- The two paste-based paths (existing OAuth token, API key) skip the PTY entirely — `setup/auth.ts` invokes `onecli secrets create` directly with the value collected through clack.
+- `script(1)` is required on the host. Both BSD (macOS) and util-linux flag layouts are detected automatically.
+
 ## Run the installer
 
 Once the system dependencies above are in place:

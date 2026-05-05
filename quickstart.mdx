@@ -55,9 +55,11 @@ This guide covers the default installer. If you want to skip steps, reuse an exi
   </Step>
 
   <Step title="Authorize Anthropic">
-    The one step that hands off from the scripted flow: `claude setup-token` opens a browser for OAuth and prints a long-lived token back into your terminal. The installer captures the status and returns to the clack flow once the token is stored in OneCLI.
+    The one step that hands off from the scripted flow: `claude setup-token` opens a browser for OAuth and prints a long-lived token back into your terminal. The installer captures the token via a PTY (so it works over SSH and other headless setups), regex-matches the `sk-ant-oat…AA` value, and stores it in OneCLI as a secret named `Anthropic`.
 
-    If you chose to skip Anthropic auth or use an API key instead, this step is skipped or replaced with a password prompt.
+    If the Claude Code CLI isn't installed yet, the subscription path runs `setup/install-claude.sh` first — the official native installer drops a prebuilt `claude` binary into `~/.local/bin` without touching your global Node setup.
+
+    If you chose to skip Anthropic auth or paste an existing OAuth token / API key instead, this step is skipped or replaced with an in-process password prompt that calls `onecli secrets create` directly.
   </Step>
 
   <Step title="Send your first message">
@@ -106,7 +108,7 @@ If something looks wrong after install, `logs/setup.log` is the first file to re
     - **environment** — Docker / Apple Container detection, runtime selection
     - **container** — builds the checkout-scoped agent image via `container/build.sh`
     - **onecli** — installs OneCLI Agent Vault or reuses an existing configured instance
-    - **auth** — registers Anthropic credentials in OneCLI
+    - **auth** — checks for an existing Anthropic secret in OneCLI (`onecli secrets list`) and registers one if missing. Pasted tokens go through `setup/auth.ts` (`onecli secrets create`); the subscription path delegates to `setup/register-claude-token.sh`, which captures `claude setup-token` output under a PTY so headless and remote shells work
     - **cli-agent** — wires the terminal agent and confirms it responds before optional channel setup
     - **timezone** — detects or resolves your IANA timezone
     - **channel pairing** — runs the selected setup flow for Telegram, Discord, WhatsApp, Signal, Teams, Slack, or iMessage
@@ -116,7 +118,9 @@ If something looks wrong after install, `logs/setup.log` is the first file to re
   </Accordion>
 
   <Accordion title="The Anthropic exception">
-    `claude setup-token` owns the TTY during OAuth. It opens your browser, prints the token, and inherits stdio fully — we don't mirror the token to any log file (that would add attack surface). Control returns to the clack flow on exit.
+    `claude setup-token` owns the TTY during OAuth. The installer wraps it with `script(1)` so the OAuth dance still completes on headless or SSH'd machines, then strips ANSI codes and extracts the `sk-ant-oat…AA` token from the captured output. The token is registered with OneCLI via `onecli secrets create` and the temp capture file is deleted on exit — it is never mirrored to `logs/setup.log` or `logs/setup-steps/`.
+
+    Override the OneCLI secret name or host pattern with the `SECRET_NAME` / `HOST_PATTERN` environment variables (see [Installation](/installation#advanced-installer-environment)).
   </Accordion>
 
   <Accordion title="Service installation">
