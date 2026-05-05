@@ -66,6 +66,19 @@ The agent only responds when explicitly mentioned at the platform level (e.g., `
 
 The agent responds to a platform mention OR if there's an existing active session for this agent, messaging group, and thread combination. Once activated by a mention, the agent continues responding in that thread.
 
+### Defaults when a channel is wired
+
+The register step picks an engage mode based on whether the messaging group is a group chat or a DM, and whether an explicit trigger was passed:
+
+| Messaging group | Explicit `--trigger`? | `engage_mode` | `engage_pattern` |
+|---|---|---|---|
+| Group (`is_group=1`) | no | `mention` | `null` |
+| Group (`is_group=1`) | yes | `pattern` | the trigger regex |
+| DM (`is_group=0`) | no | `pattern` | `.` (match every message) |
+| DM (`is_group=0`) | yes | `pattern` | the trigger regex |
+
+Groups default to mention-only so the bot doesn't interject on every message; DMs default to "respond to everything" because the user is clearly addressing the agent. Both defaults can be overridden later with `/manage-channels`.
+
 <Note>
 Messages that don't trigger an agent can still be stored if the wiring has `ignored_message_policy='accumulate'`. These messages provide context when the agent is eventually triggered.
 </Note>

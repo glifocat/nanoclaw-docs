@@ -50,7 +50,7 @@ All adapters implement a common interface with `onInbound`, `onInboundEvent`, `o
 The router (`src/router.ts`) is the central message routing pipeline:
 
 1. **Thread policy** — non-threaded adapters (Telegram, WhatsApp, iMessage) collapse `threadId` to null
-2. **Messaging group lookup** — finds or auto-creates messaging groups on mentions/DMs
+2. **Messaging group lookup** — finds or auto-creates messaging groups on mentions/DMs, keyed by `(channel_type, platform_id)`. Rows store the platform ID in the exact shape the adapter emits — Chat SDK adapters are prefixed (`discord:…`, `telegram:…`), native adapters (WhatsApp, iMessage, Signal) are not
 3. **Unwired channel handling** — if no agents are wired, the channel-request gate escalates to the owner for approval
 4. **Sender resolution** — the permissions module extracts namespaced user IDs and upserts users
 5. **Fan-out** — each wired agent is evaluated independently against engage mode, sender scope, and access gates

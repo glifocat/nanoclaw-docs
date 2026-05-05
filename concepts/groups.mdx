@@ -26,6 +26,15 @@ A messaging group is:
 - Can be denied (sets `denied_at` to silently drop future mentions)
 - Auto-created on first mention or DM
 
+#### Platform ID namespacing
+
+The `platform_id` column is stored in the exact shape the adapter emits at runtime, so the router's `(channel_type, platform_id)` lookup always matches. Registration code normalizes the raw ID before writing the row:
+
+- **Chat SDK adapters** (Discord, Slack, Telegram, Teams, Google Chat, Matrix) are prefixed with the channel type — e.g. `discord:1234567890`, `telegram:123456789`.
+- **Native adapters** (WhatsApp, iMessage, Signal) send their own ID formats and are stored as-is. JIDs containing `@` (`1234567890@s.whatsapp.net`, `user@example.com`), phone numbers starting with `+`, and Signal `group:<id>` IDs never receive a channel prefix.
+
+Prefixing a native ID — or failing to prefix a Chat SDK ID — causes the router lookup to miss and messages to drop silently.
+
 ### Wirings (messaging_group_agents)
 
 Wirings connect messaging groups to agent groups with four orthogonal axes:
