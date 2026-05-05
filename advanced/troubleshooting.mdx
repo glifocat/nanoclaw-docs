@@ -79,7 +79,9 @@ Messages sent to the agent receive no response.
   Verify the trigger word in your message matches the configured trigger:
   
   ```bash
-  sqlite3 store/messages.db "SELECT name, trigger_pattern FROM registered_groups;"
+  sqlite3 data/v2.db "SELECT ag.name, mga.engage_mode, mga.engage_pattern
+    FROM messaging_group_agents mga
+    JOIN agent_groups ag ON ag.id = mga.agent_group_id;"
   ```
   
   The trigger is case-insensitive and must appear at the start of the message.
@@ -134,21 +136,19 @@ cat groups/{group}/logs/container-{timestamp}.log
 ### Solutions
 
 <Accordion title="Increase timeout for specific group">
-  Modify the group's `containerConfig` in the database:
-  
+  Container config (timeouts, mounts, MCP servers, packages) lives in `groups/<folder>/container.json`, not the database. Edit the file directly:
+
   ```bash
-  sqlite3 store/messages.db
+  $EDITOR groups/family-chat/container.json
   ```
-  
-  ```sql
-  UPDATE registered_groups 
-  SET container_config = json_set(
-    COALESCE(container_config, '{}'),
-    '$.timeout',
-    3600000  -- 1 hour in milliseconds
-  )
-  WHERE name = 'Family Chat';
+
+  ```json
+  {
+    "timeout": 3600000
+  }
   ```
+
+  The next container spawn for that agent group picks up the new value.
 </Accordion>
 
 <Accordion title="Check for infinite loops">
@@ -370,8 +370,8 @@ grep -E 'Mount validated|Mount.*REJECTED|mount' logs/nanoclaw.log | tail -10
 # Verify the mount allowlist is readable
 cat ~/.config/nanoclaw/mount-allowlist.json
 
-# Check group's container_config in DB
-sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;"
+# Inspect each agent group's container config (lives on disk, not in the DB)
+for f in groups/*/container.json; do echo "== $f =="; cat "$f"; done
 ```
 
 ### Solutions
@@ -461,7 +461,10 @@ ls -la data/ipc/family-chat/
   Non-main groups can only send messages to their own chat. Verify the `chatJid` in the IPC file matches the group's registered JID:
   
   ```bash
-  sqlite3 store/messages.db "SELECT jid, name, folder FROM registered_groups;"
+  sqlite3 data/v2.db "SELECT mg.channel_type, mg.platform_id, ag.name, ag.folder
+    FROM messaging_group_agents mga
+    JOIN messaging_groups mg ON mg.id = mga.messaging_group_id
+    JOIN agent_groups ag ON ag.id = mga.agent_group_id;"
   ```
 </Accordion>
 
@@ -526,7 +529,8 @@ No manual intervention is required.
 If auto-recovery doesn't trigger (e.g., the error message doesn't match the expected patterns), you can manually clear a stale session:
 
 ```bash
-sqlite3 store/messages.db "DELETE FROM sessions WHERE group_folder = '{group-folder}';"
+sqlite3 data/v2.db "DELETE FROM sessions
+  WHERE agent_group_id = (SELECT id FROM agent_groups WHERE folder = '{group-folder}');"
 ```
 
 Then restart the service or wait for the next retry.
