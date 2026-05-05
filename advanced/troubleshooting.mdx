@@ -610,9 +610,11 @@ If you're still experiencing issues:
 
 2. **Run the debug skill:** `claude` → `/debug` for guided troubleshooting.
 
-3. **Check the Discord:** [Join the community](https://discord.gg/VDdww8qS42) for help from other users.
+3. **Let the installer recover for you:** When `bash nanoclaw.sh` fails on a step, claude-assist offers to install the Claude CLI (via `setup/install-claude.sh`) and run `claude setup-token` if it isn't signed in yet, then walks Claude through the failing step. On headless or remote machines, the OAuth flow falls back to capturing the token from the PTY output via `script(1)`. Set `NANOCLAW_SKIP_CLAUDE_ASSIST=1` to disable for CI runs.
 
-4. **Review recent changes:** If the issue started after a customization, review what changed:
+4. **Check the Discord:** [Join the community](https://discord.gg/VDdww8qS42) for help from other users.
+
+5. **Review recent changes:** If the issue started after a customization, review what changed:
    ```bash
    git diff
    git log --oneline -10

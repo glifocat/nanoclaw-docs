@@ -40,7 +40,7 @@ This guide covers the default installer. If you want to skip steps, reuse an exi
     - Pairing your first channel (Telegram, Discord, WhatsApp, Signal, Teams, Slack, iMessage, or the local CLI)
     - Installing a systemd or launchd service so NanoClaw starts with your machine
 
-    If any step fails, Claude Code is invoked automatically to diagnose and resume from where it broke. You don't have to debug the installer yourself.
+    If any step fails, Claude Code is invoked automatically to diagnose and resume from where it broke. If the Claude CLI isn't installed or signed in yet, the installer offers to install it and run `claude setup-token` (with a code-paste fallback for headless or remote machines) before kicking off the diagnosis. You don't have to debug the installer yourself.
   </Step>
 
   <Step title="Answer the setup prompts">
@@ -51,7 +51,7 @@ This guide covers the default installer. If you want to skip steps, reuse an exi
     - **First channel** — Telegram, Discord, WhatsApp, Signal, Teams, Slack, iMessage, or local CLI. You can add more later.
     - **Channel-specific auth** — pairing code, QR code, bot token, app credentials, or no extra auth for CLI, depending on the platform
 
-    The flow is linear. One question at a time. You can Ctrl+C and restart; the installer picks up where you left off.
+    The flow is linear. One question at a time. You can Ctrl+C and restart; the installer picks up where you left off. On a re-run, it detects an existing `.env`, OneCLI config, and channel tokens and offers to reuse them — so you don't have to paste credentials twice. If a display name and group are already wired, cli-agent and first-chat steps are skipped automatically.
   </Step>
 
   <Step title="Authorize Anthropic">
