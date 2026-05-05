@@ -39,7 +39,11 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
 </ParamField>
 
 <ParamField path="ONECLI_API_KEY" type="string">
-  API key for authenticating with the OneCLI Agent Vault. Optional — only needed if your OneCLI instance requires authentication.
+  API key for authenticating with the OneCLI Agent Vault. Required when connecting to a remote OneCLI gateway; optional for local installs. Tokens follow the `oc_…` format and are validated at setup time.
+</ParamField>
+
+<ParamField path="ANTHROPIC_BASE_URL" type="string" default="https://api.anthropic.com">
+  Override the Anthropic API endpoint. When set, NanoClaw registers the `claude` provider container config so the agent SDK calls this URL instead of the default. Setup wires this through OneCLI: the matching auth token is stored as a vault secret keyed to the URL hostname, and the container only ever sees `ANTHROPIC_BASE_URL` plus a placeholder `ANTHROPIC_AUTH_TOKEN` — the proxy rewrites the `Authorization: Bearer …` header on the wire.
 </ParamField>
 
 <ParamField path="MAX_MESSAGES_PER_PROMPT" type="number" default="10">
@@ -126,6 +130,17 @@ Credentials are managed externally via OneCLI — no credential environment vari
 Register secrets with OneCLI:
 ```bash
 onecli secrets create --name Anthropic --type anthropic --value YOUR_KEY --host-pattern api.anthropic.com
+```
+
+For custom Anthropic-compatible endpoints, the secret is stored as a generic Bearer credential keyed to the URL hostname:
+```bash
+onecli secrets create \
+  --name Anthropic \
+  --type generic \
+  --value YOUR_TOKEN \
+  --host-pattern your-endpoint.example.com \
+  --header-name Authorization \
+  --value-format 'Bearer {value}'
 ```
 
 The `@onecli-sh/sdk` package's `applyContainerConfig()` configures each container's network to route through the vault, injecting credentials at request time.

@@ -148,6 +148,25 @@ The installer walks through bootstrap, container build, OneCLI credential regist
 
 For the step-by-step breakdown of what each phase does, see [Quick start](/quickstart).
 
+### Advanced setup options
+
+Setup ships an "Advanced" welcome menu and a config registry that drives both CLI flags and an opt-in advanced-settings screen. Power users can override defaults without extra prompts in the standard linear flow:
+
+| Flag | Env var | Purpose |
+|---|---|---|
+| `--onecli-api-host <url>` | `NANOCLAW_ONECLI_API_HOST` | Connect to a remote OneCLI gateway instead of installing one locally. Defaults to `https://app.onecli.sh`. Skips the local-vs-fresh prompt and runs a health pre-flight before linking. |
+| `--onecli-api-token <token>` | `NANOCLAW_ONECLI_API_TOKEN` | API token for a remote OneCLI gateway. Must start with `oc_`; written to `.env` as `ONECLI_API_KEY` and used to authenticate the OneCLI CLI for setup-time secret operations. |
+| `--anthropic-base-url <url>` | `NANOCLAW_ANTHROPIC_BASE_URL` | Custom Anthropic-compatible endpoint. When combined with `--anthropic-auth-token`, setup short-circuits the auth-method prompt and routes the credential through OneCLI. |
+| `--anthropic-auth-token <token>` | `NANOCLAW_ANTHROPIC_AUTH_TOKEN` | Bearer token for the custom endpoint. Stored as a OneCLI generic secret with header injection — never written to `.env` and never enters the container. |
+
+Pass flags to the installer:
+
+```bash
+bash nanoclaw.sh --onecli-api-host https://onecli.example.com --onecli-api-token oc_xxx
+```
+
+Run `bash nanoclaw.sh --help` for the full list. Flags resolve to `process.env` so existing step code keeps reading env vars unchanged.
+
 ## File structure after install
 
 <Tree>

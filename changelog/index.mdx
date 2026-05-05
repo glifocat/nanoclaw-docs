@@ -6,6 +6,13 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.14" description="2026-04-26" tags={["Feature"]}>
+  - Setup advanced-settings registry drives both CLI flags and an opt-in advanced screen — adds `--onecli-api-host`, `--onecli-api-token`, `--anthropic-base-url`, `--anthropic-auth-token`
+  - Remote OneCLI gateway option in setup — connect to a hosted vault (default `https://app.onecli.sh`) instead of installing locally; setup authenticates the OneCLI CLI so secret reads/writes during setup hit the remote vault
+  - Custom Anthropic-compatible endpoints route through the OneCLI vault — auth token stored as a generic Bearer secret with header injection, container only sees `ANTHROPIC_BASE_URL` + a placeholder
+  - OneCLI API tokens validated against the `oc_` prefix at setup time
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention

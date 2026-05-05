@@ -125,19 +125,26 @@ Claude will call `ollama_list_models` to see available models, then `ollama_gene
 
 ## Third-party model endpoints
 
-Independently of Ollama, NanoClaw supports any Anthropic API-compatible endpoint. Set these in `.env`:
+Independently of Ollama, NanoClaw supports any Anthropic API-compatible endpoint. The cleanest way to wire one up is via setup flags:
 
 ```bash
-ANTHROPIC_BASE_URL=https://your-api-endpoint.com
-ANTHROPIC_AUTH_TOKEN=your-token-here
+bash nanoclaw.sh \
+  --anthropic-base-url https://your-api-endpoint.com \
+  --anthropic-auth-token your-token-here
 ```
+
+When both are set, setup short-circuits the auth-method prompt, stores the token in the OneCLI vault as a generic Bearer secret keyed to the URL hostname, writes `ANTHROPIC_BASE_URL` to `.env`, and registers the `claude` provider container config. The container only ever sees `ANTHROPIC_BASE_URL` plus a placeholder `ANTHROPIC_AUTH_TOKEN` — OneCLI rewrites the `Authorization` header on the wire so the real token never enters the container.
 
 This allows you to use:
 - Open-source models on [Together AI](https://together.ai), [Fireworks](https://fireworks.ai), etc.
 - Custom model deployments with Anthropic-compatible APIs
 
+<Note>
+Standard installs hitting `api.anthropic.com` don't load the `claude` provider config at all — setup only appends `import './claude.js'` to `src/providers/index.ts` when a custom endpoint is configured.
+</Note>
+
 <Warning>
-When using custom endpoints, the secret injection layer (OneCLI Agent Vault in v1.2.35+, or the credential proxy in earlier versions) still intercepts container API requests. Ensure the endpoint is reachable from the host.
+When using custom endpoints, the OneCLI Agent Vault still intercepts container API requests. Ensure the endpoint is reachable from the host.
 </Warning>
 
 ## Related pages

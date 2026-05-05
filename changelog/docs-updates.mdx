@@ -5,6 +5,14 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.14 sync: custom Anthropic endpoints, remote OneCLI" description="2026-04-26" tags={["Updated"]}>
+  ## Updated
+  - **`api/configuration`**: Documented `ANTHROPIC_BASE_URL` env var and the OneCLI generic-Bearer secret form for custom endpoints. Clarified that `ONECLI_API_KEY` is required for remote vaults and follows the `oc_…` token format.
+  - **`integrations/ollama`**: Replaced the `.env`-based `ANTHROPIC_AUTH_TOKEN` instructions with the `--anthropic-base-url` / `--anthropic-auth-token` setup-flag flow that routes the token through the OneCLI vault. Containers now only see `ANTHROPIC_BASE_URL` plus a placeholder bearer.
+  - **`installation`**: Added an "Advanced setup options" section covering `--onecli-api-host`, `--onecli-api-token`, `--anthropic-base-url`, `--anthropic-auth-token` and the remote OneCLI gateway flow.
+  - **Changelog**: v2.0.14 product release entry.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
