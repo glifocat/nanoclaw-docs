@@ -136,7 +136,13 @@ Session resolution depends on the wiring's `session_mode`:
 | `user_dms` | Cached DM channel mapping |
 | `sessions` | Session status and container tracking |
 | `pending_questions` | Interactive question cards |
+| `pending_channel_approvals` | Unwired-channel registration flow |
 | `pending_sender_approvals` | Unknown sender approval flow |
+
+Pending approval rows persist the rendered card's `title` and normalized
+`options_json` alongside the row so that the initial card and any
+post-click re-render (for example, after a Discord interaction updates
+the message) read the exact same wording from a single source.
 
 ### Session databases
 
@@ -165,7 +171,11 @@ Each session has two databases in `data/v2-sessions/{agent_group_id}/{session_id
 When a message arrives on an unwired channel:
 
 1. Router detects no wirings exist for this messaging group
-2. Channel-request gate sends approval card to the owner
+2. Channel-request gate sends approval card to the owner. The card title
+   (`📣 Bot mentioned in new chat` for groups, `💬 New direct message`
+   for DMs) and Approve / Ignore option labels are persisted on the
+   `pending_channel_approvals` row so a post-click re-render on the same
+   channel shows the same wording instead of a generic fallback.
 3. **Approve** — creates wiring with defaults:
    - Groups: `mention-sticky` engage mode
    - DMs: `pattern='.'` (always respond)
