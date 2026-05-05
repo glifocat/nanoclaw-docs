@@ -2,7 +2,7 @@
 title: Integrations overview
 description: Channels and providers as skills and setup flows — add only what you need.
 tag: "UPDATED"
-keywords: ["integrations", "channels", "providers", "skills", "add-telegram", "add-whatsapp", "add-codex", "add-opencode"]
+keywords: ["integrations", "channels", "providers", "skills", "add-telegram", "add-whatsapp", "add-signal", "add-codex", "add-opencode"]
 ---
 
 NanoClaw trunk ships the registry and infrastructure. Channel adapters and alternative AI providers are installed on demand through setup flows and `/add-<name>` skills. This keeps your fork lean and your code legible: nothing you didn't ask for.
@@ -43,6 +43,10 @@ Install through `bash nanoclaw.sh` during first setup, or with a skill invocatio
 
   <Card title="Signal" icon="message-circle">
     `/add-signal` — signal-cli linked-device flow
+  </Card>
+
+  <Card title="Signal" icon="shield-halved" href="/integrations/signal">
+    `/add-signal` — native adapter over a local `signal-cli` TCP daemon
   </Card>
 </CardGroup>
 

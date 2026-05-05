@@ -5,6 +5,17 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Signal channel integration" description="2026-04-23" tags={["New"]}>
+  Documented the new [Signal integration](/integrations/signal) shipped with the `/add-signal` skill ([qwibitai/nanoclaw#1953](https://github.com/qwibitai/nanoclaw/pull/1953)). Signal is a native adapter over a local `signal-cli` TCP daemon — no Chat SDK bridge, no npm dependencies, Node.js builtins only.
+
+  ## Added
+  - **`integrations/signal.mdx`**: prerequisites (`signal-cli` install + account link), `/add-signal` skill flow, env vars (`SIGNAL_ACCOUNT`, `SIGNAL_TCP_HOST/PORT`, `SIGNAL_CLI_PATH`, `SIGNAL_MANAGE_DAEMON`, `SIGNAL_DATA_DIR`), 127.0.0.1 binding warning, feature summary (markdown styling, quoted replies, DM typing indicators, echo suppression, Note to Self, voice attachment placeholders), troubleshooting, and a removal path (files + import, not `git revert`).
+
+  ## Updated
+  - **`integrations/overview.mdx`**: added Signal to the documented-channels card grid.
+  - **`docs.json`**: added `integrations/signal` to the Integrations nav group.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 

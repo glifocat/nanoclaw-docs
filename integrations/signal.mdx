@@ -1,0 +1,195 @@
+---
+title: "Signal integration"
+description: "Add Signal as a messaging channel for NanoClaw via the /add-signal skill."
+tag: "NEW"
+keywords: ["signal", "signal-cli", "channel", "messaging", "add-signal"]
+---
+
+import SyncEnv from "/snippets/sync-env.mdx";
+import RestartService from "/snippets/restart-service.mdx";
+
+Add Signal as a messaging channel via the native `signal` adapter. It speaks JSON-RPC to a local [signal-cli](https://github.com/AsamK/signal-cli) TCP daemon — no Chat SDK bridge and no npm dependencies (only Node.js builtins: `node:net`, `node:child_process`, `node:fs`).
+
+## Overview
+
+### Features
+
+- **Native adapter** — bypasses the Chat SDK bridge; fewer moving parts
+- **Markdown formatting** — `**bold**`, `*italic*` / `_italic_`, `` `code` ``, ` ```code fences``` `, `~~strike~~`, `||spoiler||` are converted to Signal's offset-based text styles
+- **Quoted replies** — inbound Signal quotes populate `replyTo*` fields
+- **Typing indicators** — DMs only (Signal does not support group typing)
+- **Echo suppression** — outbound messages are matched on `(platformId, text)` within a 10 s TTL to avoid syncMessage loops
+- **Note to Self** — messages you send to your own account from another device route to the agent with `isFromMe: true`
+- **Voice attachments** — detected but not transcribed by default; the agent receives a `[Voice Message]` placeholder. Run `/add-voice-transcription` for local transcription via parakeet-mlx
+
+Not supported yet: outbound file attachments (logged and dropped), edit/delete messages, reactions.
+
+## Prerequisites
+
+`signal-cli` installed and a Signal account linked on the host:
+
+<Steps>
+  <Step title="Install signal-cli">
+    ```bash
+    # macOS
+    brew install signal-cli
+
+    # Linux — download from https://github.com/AsamK/signal-cli/releases
+    ```
+  </Step>
+
+  <Step title="Link your Signal account">
+    ```bash
+    signal-cli -a +1YOURNUMBER link
+    ```
+
+    Follow the QR-code instructions in your mobile Signal app.
+  </Step>
+</Steps>
+
+## Adding Signal
+
+Run the `/add-signal` skill from your NanoClaw install:
+
+```bash
+claude
+/add-signal
+```
+
+The skill is idempotent. It:
+
+1. Fetches `origin/channels`
+2. Copies `src/channels/signal.ts` and `src/channels/signal.test.ts` in from that branch
+3. Appends `import './signal.js';` to `src/channels/index.ts` (if not already present)
+4. Runs `pnpm run build`
+
+No npm packages are installed — the adapter uses only Node.js builtins.
+
+## Configuration
+
+### Required
+
+Add to `.env`:
+
+```bash
+SIGNAL_ACCOUNT=+1YOURNUMBER
+```
+
+### Optional
+
+```bash
+# TCP daemon host and port (default: 127.0.0.1:7583)
+SIGNAL_TCP_HOST=127.0.0.1
+SIGNAL_TCP_PORT=7583
+
+# Path to the signal-cli binary (default: resolved on PATH)
+SIGNAL_CLI_PATH=/usr/local/bin/signal-cli
+
+# Whether NanoClaw manages the daemon lifecycle (default: true).
+# Set to false if you run signal-cli daemon externally.
+SIGNAL_MANAGE_DAEMON=true
+
+# signal-cli data directory (default: ~/.local/share/signal-cli)
+SIGNAL_DATA_DIR=~/.local/share/signal-cli
+```
+
+<Warning>
+  Keep `SIGNAL_TCP_HOST=127.0.0.1`. The `signal-cli` daemon has no authentication — binding it to a public interface would expose your full Signal account to the network.
+</Warning>
+
+### Sync to container
+
+<SyncEnv />
+
+### Restart
+
+<RestartService />
+
+## Channel info
+
+| Field | Value |
+|-------|-------|
+| Channel type | `signal` |
+| Platform ID format | Phone number for DMs (e.g. `+15555550123`); `group:<groupId>` for groups |
+| Find group IDs | `signal-cli -a +1YOURNUMBER listGroups` |
+| Threads | Not supported |
+| Default isolation | One agent per Signal account; mixed groups typically get their own agent |
+
+Signal chats are direct-addressable — the sender's phone number is the platform ID.
+
+## Wiring to an agent
+
+After the first run, wire the channel to an agent group. If you're mid-`/setup`, return to that flow. Otherwise:
+
+- `/init-first-agent` — create a new agent and wire it to your Signal DM (or first group)
+- `/manage-channels` — wire Signal to an existing agent group, with an isolation choice (separate agent, `session_mode: 'shared'`, or `session_mode: 'agent-shared'`)
+
+See [Channel isolation model](/concepts/groups) for the isolation tradeoffs.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Daemon not reachable">
+    Check the host logs:
+
+    ```bash
+    grep "Signal" logs/nanoclaw.log | tail
+    ```
+
+    - `Signal daemon failed to start. Is signal-cli installed and your account linked?` — confirm `signal-cli` is on `PATH` (or set `SIGNAL_CLI_PATH`) and that `signal-cli -a +1YOURNUMBER listIdentities` succeeds without prompting.
+    - `Signal daemon not reachable at 127.0.0.1:7583` with `SIGNAL_MANAGE_DAEMON=false` — start the daemon yourself: `signal-cli -a +1YOURNUMBER daemon --tcp 127.0.0.1:7583`.
+  </Accordion>
+
+  <Accordion title="Bot not responding">
+    1. Check the channel connected: `grep "Signal channel connected" logs/nanoclaw.log | tail -1`
+    2. Check the channel is wired:
+       ```bash
+       sqlite3 data/v2.db "SELECT mg.platform_id, mg.name FROM messaging_groups mg JOIN messaging_group_agents mga ON mg.id = mga.messaging_group_id WHERE mg.channel_type='signal'"
+       ```
+    3. Check the host service is running:
+       ```bash
+       # macOS
+       launchctl print gui/$(id -u)/com.nanoclaw
+
+       # Linux
+       systemctl --user status nanoclaw
+       ```
+  </Accordion>
+
+  <Accordion title="Lost connection mid-session">
+    If you see `Signal channel lost TCP connection to signal-cli daemon` in the logs, the daemon dropped the connection. There is no auto-reconnect yet — restart NanoClaw to re-establish.
+  </Accordion>
+</AccordionGroup>
+
+## Removing Signal
+
+Signal was added via a copy from the `channels` branch — not a merge — so `git revert` won't cleanly undo it. Remove the adapter files and its import instead:
+
+```bash
+rm src/channels/signal.ts src/channels/signal.test.ts
+# Remove the "import './signal.js';" line from src/channels/index.ts
+pnpm run build
+```
+
+Then drop any wired messaging groups:
+
+```bash
+sqlite3 data/v2.db "DELETE FROM messaging_groups WHERE channel_type='signal'"
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Skills system" icon="puzzle-piece" href="/integrations/skills-system">
+    How channel skills on the `channels` branch are installed and kept up to date
+  </Card>
+  <Card title="Channel isolation" icon="layer-group" href="/concepts/groups">
+    Decide how Signal relates to other agent groups
+  </Card>
+  <Card title="Integrations overview" icon="plug" href="/integrations/overview">
+    The full list of channels and providers
+  </Card>
+  <Card title="Security" icon="shield" href="/concepts/security">
+    Sender policies, user roles, OneCLI credentials
+  </Card>
+</CardGroup>
