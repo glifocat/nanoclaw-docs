@@ -316,6 +316,41 @@ systemctl --user restart nanoclaw
 Never copy tokens from `~/.claude/.credentials.json` into `.env`. These are short-lived keychain tokens that expire within hours. Use `claude setup-token` to generate a long-lived token instead.
 </Warning>
 
+## Container refuses to spawn — OneCLI gateway not applied
+
+### Symptoms
+- Host log shows `OneCLI gateway not applied — refusing to spawn container without credentials`
+- Inbound messages stay pending; no container starts
+- Issue clears on its own when the gateway becomes reachable, retries every ~60 seconds
+
+### Cause
+
+The OneCLI Agent Vault is the sole credential path for containers, so applying the gateway is a prerequisite for spawn. If `applyContainerConfig()` returns false (vault unreachable, agent provisioning failed, network blip), the host throws and aborts the spawn rather than launching a container that would have no working credentials.
+
+This is intentional fail-closed behavior — without it, the container would start, immediately 401 on every API call, and silently chew through retries.
+
+### Diagnosis
+
+```bash
+# Is the vault reachable?
+onecli status
+
+# Is the URL the host expects matching the running instance?
+grep ONECLI_URL .env
+curl -s "${ONECLI_URL:-http://localhost:10254}/api/health"
+
+# Recent gateway failures in the host log
+grep -i 'OneCLI gateway' logs/nanoclaw.log | tail -20
+```
+
+### Solution
+
+1. Restart the OneCLI service if it's down. On most installs it runs as a user service or via the `onecli` daemon.
+2. If the URL has changed, update `ONECLI_URL` in `.env` and restart NanoClaw.
+3. Once the gateway is reachable again, the next host sweep tick (≤ 60 seconds) retries the queued inbound messages — no manual replay needed.
+
+If the failure persists, run `/init-onecli` to reinstall the vault and re-register your secrets.
+
 ## WhatsApp authentication issues
 
 ### Symptoms
