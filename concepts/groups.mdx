@@ -13,7 +13,7 @@ In v2, NanoClaw uses a new entity model that separates **agent groups** (workspa
 An agent group is:
 
 - A workspace with its own folder under `groups/{name}/`
-- An optional provider configuration
+- An optional `agent_provider` override on the `agent_groups` row (with per-session override via `sessions.agent_provider`, falling back to `container.json` and then Claude)
 - A container configuration (`container.json`) with custom packages and mounts
 - The unit of credential scoping (each gets its own OneCLI agent)
 

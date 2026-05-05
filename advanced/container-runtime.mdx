@@ -121,7 +121,7 @@ Containers are spawned by the `spawnContainer` function. Wake calls are deduplic
 
 <Steps>
   <Step title="Read agent group config">
-    The host reads `container.json` and resolves provider contributions.
+    The host reads `container.json` and resolves the provider. Precedence: `sessions.agent_provider` → `agent_groups.agent_provider` → `container.json` `provider` → `'claude'`. Empty strings fall through. The resolved name is lowercased, then passed to the matching provider's container contribution function.
   </Step>
 
   <Step title="Build volume mounts">
