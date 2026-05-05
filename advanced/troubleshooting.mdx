@@ -297,6 +297,16 @@ Short-lived OAuth tokens copied from the system keychain or `~/.claude/.credenti
 
     - **Long-lived OAuth token**: Run `claude setup-token` and add the resulting `CLAUDE_CODE_OAUTH_TOKEN` to `.env`
     - **API key**: Get a key from [console.anthropic.com](https://console.anthropic.com) and add `ANTHROPIC_API_KEY` to `.env`
+
+    **Headless or remote machines:** if no browser can open, run `claude setup-token` under `script(1)` to capture the token from the PTY transcript:
+
+    ```bash
+    script -q /tmp/claude-token.log -c "claude setup-token"
+    grep -oE 'sk-ant-oat[A-Za-z0-9_-]+AA' /tmp/claude-token.log | tail -1
+    rm /tmp/claude-token.log
+    ```
+
+    The installer's `claude setup-token` step does this automatically — this snippet only matters if you're rotating tokens manually outside of `bash nanoclaw.sh`.
   </Tab>
 </Tabs>
 
@@ -606,7 +616,7 @@ npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
 
 If you're still experiencing issues:
 
-1. **Ask Claude Code directly:** Run `claude` and describe the problem. Claude can read logs, check database state, and diagnose issues.
+1. **Ask Claude Code directly:** Run `claude` and describe the problem. Claude can read logs, check database state, and diagnose issues. The installer also offers Claude-assisted diagnosis automatically when a setup step fails — if the Claude CLI isn't installed or signed in, it offers to install (`setup/install-claude.sh`) and authenticate (`claude setup-token`) before running the diagnosis. Set `NANOCLAW_SKIP_CLAUDE_ASSIST=1` to disable this offer on CI or scripted runs.
 
 2. **Run the debug skill:** `claude` → `/debug` for guided troubleshooting.
 

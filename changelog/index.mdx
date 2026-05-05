@@ -6,6 +6,15 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.15" description="2026-04-29" tags={["Feature", "Fix"]}>
+  - Re-run detection: `setup:auto` parses an existing `.env` and offers to reuse OneCLI, Telegram, Discord, Slack, Teams, Signal, WhatsApp, and iMessage credentials instead of re-prompting for them
+  - Defer the operator display-name prompt until it's actually needed (`cli-agent` or channel pairing) and detect existing names from `data/v2.db` so re-runs don't ask twice
+  - Skip the `cli-agent` and `first-chat` steps when `data/registered_groups.json` already exists
+  - Headless `claude setup-token`: wraps the OAuth flow in `script(1)` to capture the long-lived token from PTY output, with a code-paste fallback for machines without a browser
+  - Claude-assisted error recovery now offers to install the Claude CLI (`setup/install-claude.sh`) and sign in (`claude setup-token`) instead of silently skipping when the CLI is missing or unauthenticated
+  - Setup-flow polish: cyan card and log bodies, cyan highlight on active and submitted choices, green "you" pronoun in the display-name prompt, password fields clear on validation error, undimmed setup card bodies
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention

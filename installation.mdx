@@ -134,6 +134,8 @@ Docker is the default and works on all three platforms. Apple Container is an op
 
 If OneCLI is already installed and configured, setup asks whether to reuse it. For custom Anthropic-compatible model endpoints, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in `.env`.
 
+On a re-run, `setup:auto` parses `.env` for known channel and OneCLI keys and offers to reuse them in a single confirmation prompt. When the prompt is accepted it skips the `onecli` step (when `ONECLI_URL` is set) and the `cli-agent` and `first-chat` steps (when `data/registered_groups.json` exists). The operator display name is read from `data/v2.db` (`users.display_name` for `cli:local`) so it isn't re-prompted unnecessarily.
+
 ## Run the installer
 
 Once the system dependencies above are in place:

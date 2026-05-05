@@ -5,6 +5,16 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.15: setup-flow re-run and headless OAuth" description="2026-04-29" tags={["Updated"]}>
+  Documented the v2.0.15 setup-flow improvements: existing-env detection on re-run, headless `claude setup-token` capture via `script(1)`, and the claude-assist auto-install offer.
+
+  ## Updated
+  - **`quickstart.mdx`** — added accordions for re-running on a configured machine, headless OAuth capture, and Claude-assisted error recovery; mentioned the install-and-sign-in offer in the run-the-installer step
+  - **`installation.mdx`** — documented `.env`/`registered_groups.json`/`data/v2.db` re-run detection
+  - **`advanced/troubleshooting.mdx`** — added a headless `claude setup-token` snippet to the auth 401 section and noted the auto-install flow in "Getting help"
+  - **`changelog/index.mdx`** — added v2.0.15 entry covering re-run detection, headless OAuth, claude-assist install offer, and the cyan/green setup-flow theme polish
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 

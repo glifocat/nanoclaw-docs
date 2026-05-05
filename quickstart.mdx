@@ -40,7 +40,9 @@ This guide covers the default installer. If you want to skip steps, reuse an exi
     - Pairing your first channel (Telegram, Discord, WhatsApp, Signal, Teams, Slack, iMessage, or the local CLI)
     - Installing a systemd or launchd service so NanoClaw starts with your machine
 
-    If any step fails, Claude Code is invoked automatically to diagnose and resume from where it broke. You don't have to debug the installer yourself.
+    If any step fails, Claude Code is invoked automatically to diagnose and resume from where it broke. You don't have to debug the installer yourself. If the Claude CLI is missing or unauthenticated on the host, the installer offers to install it (`setup/install-claude.sh`) and sign you in (`claude setup-token`) before running diagnosis.
+
+    Re-running on a machine that already has a `.env` and registered groups? The installer detects existing credentials, offers to reuse them, and skips steps that have already completed. Pick **No, start fresh** to ignore the detected state.
   </Step>
 
   <Step title="Answer the setup prompts">
@@ -56,6 +58,8 @@ This guide covers the default installer. If you want to skip steps, reuse an exi
 
   <Step title="Authorize Anthropic">
     The one step that hands off from the scripted flow: `claude setup-token` opens a browser for OAuth and prints a long-lived token back into your terminal. The installer captures the status and returns to the clack flow once the token is stored in OneCLI.
+
+    On headless or remote machines where a browser can't open, the installer wraps `claude setup-token` in `script(1)` to capture the OAuth token from the PTY output and falls back to a code-paste flow if needed. You can paste the auth code from another browser and the installer extracts the token without you having to copy it manually.
 
     If you chose to skip Anthropic auth or use an API key instead, this step is skipped or replaced with a password prompt.
   </Step>
@@ -117,6 +121,27 @@ If something looks wrong after install, `logs/setup.log` is the first file to re
 
   <Accordion title="The Anthropic exception">
     `claude setup-token` owns the TTY during OAuth. It opens your browser, prints the token, and inherits stdio fully — we don't mirror the token to any log file (that would add attack surface). Control returns to the clack flow on exit.
+
+    On headless and remote systems the installer runs the same command under `script(1)` so it can capture the long-lived token from the PTY transcript when no browser is available. The transcript file is read once, the token is moved into `CLAUDE_CODE_OAUTH_TOKEN`, and the temp file is deleted before the next step.
+  </Accordion>
+
+  <Accordion title="Re-running on a configured machine">
+    On a re-run, the installer parses your existing `.env` and offers to reuse what's already there instead of asking you to paste credentials again. It groups detected keys by integration (OneCLI, Telegram, Discord, Slack, Teams, Signal, WhatsApp, iMessage) and shows a confirmation card. Choose **Yes, use what I already have** to:
+
+    - Skip the OneCLI install step when `ONECLI_URL` is set
+    - Skip the `cli-agent` and `first-chat` steps when `data/registered_groups.json` exists
+    - Reuse channel tokens (Telegram, Discord, Slack, Teams, iMessage) without prompting
+
+    Your operator display name is also detected from `data/v2.db` (the `users.display_name` for `cli:local`) so the prompt only appears when there's no existing record. Choose **No, start fresh** to discard the detected values and prompt for everything.
+  </Accordion>
+
+  <Accordion title="Claude-assisted error recovery">
+    If a step fails, the installer offers to hand off to Claude Code for diagnosis. When the Claude CLI isn't installed or signed in on the host, it now interactively offers to:
+
+    1. Install the Claude CLI via `setup/install-claude.sh`
+    2. Sign in via `claude setup-token` (browser OAuth, with the same headless-friendly capture as the Anthropic step)
+
+    Decline either prompt and the installer skips Claude-assisted diagnosis silently. Set `NANOCLAW_SKIP_CLAUDE_ASSIST=1` to bypass the offer entirely on CI or scripted runs.
   </Accordion>
 
   <Accordion title="Service installation">
