@@ -241,7 +241,7 @@ Source code is NOT baked into the image. `/app/src` is a read-only bind mount fr
 ## Startup sequence
 
 1. **Central DB initialization** — opens `data/v2.db`, runs migrations, performs one-time filesystem cutover
-2. **Container runtime check** — ensures Docker is running, cleans up orphan containers
+2. **Container runtime check** — ensures Docker is running, cleans up orphan containers carrying this install's `nanoclaw-install=<slug>` label (peer installs on the same host are left untouched)
 3. **Channel adapter initialization** — registers all channel adapters with `onInbound`, `onInboundEvent`, `onMetadata`, and `onAction` callbacks
 4. **Delivery adapter bridge** — bridges the delivery system to channel adapters for `deliver()` and `setTyping()` calls
 5. **Delivery polls** — starts active poll (1s for running containers) and sweep poll (60s for all active sessions)

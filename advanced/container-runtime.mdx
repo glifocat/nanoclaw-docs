@@ -172,6 +172,16 @@ Containers have two timeout/detection mechanisms:
 - `killContainer(sessionId, reason)` stops the container via `docker stop`, falls back to SIGKILL
 - On close/error, the session is marked stopped and typing indicators are cleared
 
+### Install-scoped orphan cleanup
+
+Every spawned container is stamped with a `nanoclaw-install=<slug>` label derived from the checkout's install slug. On startup, the runtime reaps only containers carrying this install's label:
+
+```bash
+docker ps --filter label=nanoclaw-install=<slug> --format '{{.Names}}'
+```
+
+This prevents two installs on the same host from reaping each other's containers — a crash-looping peer (e.g., a stale launchd plist) can no longer kill a healthy install's sessions. The label is stamped by `src/container-runner.ts` at spawn time and filtered by `cleanupOrphans` in `src/container-runtime.ts`.
+
 ## Credential injection
 
 The OneCLI SDK's `applyContainerConfig()` configures each container's network to route through the vault:
@@ -192,7 +202,11 @@ const onecliApplied = await onecli.applyContainerConfig(args, {
 
 <Accordion title="List running containers">
   ```bash
+  # All NanoClaw containers on the host
   docker ps --filter name=nanoclaw-
+
+  # Only containers from this install (scoped by install slug)
+  docker ps --filter label=nanoclaw-install=<slug>
   ```
 </Accordion>
 

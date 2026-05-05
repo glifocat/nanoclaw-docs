@@ -19,6 +19,9 @@ launchctl list | grep nanoclaw
 # 2. Any running containers?
 docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
 
+# 2b. Only this install's containers (useful when multiple installs share a host)
+docker ps --filter label=nanoclaw-install=<slug> --format '{{.Names}} {{.Status}}'
+
 # 3. Any stopped/orphaned containers?
 docker ps -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
 
@@ -583,7 +586,7 @@ tail -f logs/nanoclaw.log
 ### Stop the service
 
 <Warning>
-Stopping the service does NOT kill running containers. They will continue running as orphaned processes.
+Stopping the service does NOT kill running containers. They will continue running as orphaned processes until the service restarts, at which point the install-scoped orphan reaper cleans up containers carrying this install's `nanoclaw-install=<slug>` label. Peer installs on the same host are left alone.
 </Warning>
 
 ```bash
