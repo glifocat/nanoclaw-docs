@@ -148,6 +148,17 @@ The installer walks through bootstrap, container build, OneCLI credential regist
 
 For the step-by-step breakdown of what each phase does, see [Quick start](/quickstart).
 
+### Re-running setup
+
+If you re-run `bash nanoclaw.sh` on a checkout that already has a `.env` file, the installer parses it and offers to reuse what it finds:
+
+- **Channel tokens** — Telegram, Discord, Slack, Teams, iMessage, Signal, and WhatsApp keys are detected and grouped by channel
+- **OneCLI configuration** — `ONECLI_URL` is reused, skipping the `onecli` step
+- **Display name** — pulled from `data/v2.db` (the `cli:local` user) so you aren't asked again
+- **Wired groups** — if `data/registered_groups.json` exists, the `cli-agent` and `first-chat` steps are skipped
+
+Pick **Yes, use what I already have** to keep the existing setup; pick **No, start fresh** to ignore the file and re-prompt for everything. Password prompts also clear on validation error, so a bad paste no longer concatenates with the previous attempt.
+
 ## File structure after install
 
 <Tree>
