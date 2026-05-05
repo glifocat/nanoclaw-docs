@@ -67,6 +67,7 @@ The agent container is built from `container/Dockerfile` and includes:
 - **Source is NOT baked in** — `/app/src` is a read-only bind mount from the host. Source changes never require an image rebuild.
 - **`only-built-dependencies` allowlist** in `.npmrc` for `agent-browser` and `@anthropic-ai/claude-code`
 - **Runs as `node` user** (non-root) with `/workspace/group` as working directory
+- **`/home/node` is mode `0777`** so the Claude SDK state mount is writable regardless of host uid/gid mapping
 - **Entrypoint**: `tini -> entrypoint.sh -> exec bun run /app/src/index.ts`
 
 ### Building the image
