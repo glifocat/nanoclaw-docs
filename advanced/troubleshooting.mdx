@@ -566,6 +566,46 @@ for i, line in enumerate(lines):
 
 This issue was fixed by passing `resumeSessionAt` with the last assistant message UUID. If you're still experiencing it, ensure you're running the latest version of the agent runner.
 
+## Startup circuit breaker
+
+NanoClaw has a built-in circuit breaker that delays startup when the host process is repeatedly crashing. This prevents tight crash loops from hammering the system, exhausting log volume, or burning API credits before you have a chance to intervene.
+
+State lives in `data/circuit-breaker.json`. The host writes the file at the start of every boot and deletes it on a clean shutdown (`SIGTERM` or `SIGINT`). If the file still exists when the next boot begins — meaning the previous process exited via crash, kill, or power loss — the breaker increments the consecutive-attempt counter and waits before continuing.
+
+**Backoff schedule:**
+
+| Consecutive crashes | Delay before startup |
+|---------------------|----------------------|
+| 1 | 0s |
+| 2 | 0s |
+| 3 | 10s |
+| 4 | 30s |
+| 5 | 2m |
+| 6 | 5m |
+| 7+ | 15m (capped) |
+
+The counter automatically resets if the previous boot was more than one hour ago, so a single old crash file won't slow down a normal restart.
+
+**Identifying breaker activity in logs:**
+
+```
+Previous startup was not a clean shutdown
+Circuit breaker: delaying startup due to repeated crashes
+Circuit breaker: backoff complete, resuming startup
+Circuit breaker reset on clean shutdown
+```
+
+**Manual override:**
+
+If you've fixed the underlying crash and don't want to wait out the backoff, delete the state file before restarting:
+
+```bash
+rm data/circuit-breaker.json
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+```
+
+The breaker runs before database initialization, so it remains effective even when crashes are caused by migrations, corrupt central DB files, or container-runtime probes.
+
 ## Service management
 
 ### Restart the service
