@@ -140,12 +140,16 @@ Container spawning is deduplicated — concurrent wake calls for the same sessio
 ### Shutdown
 
 - **Host-initiated**: `docker stop` sends SIGTERM; `tini` forwards to Bun process
-- **Stale detection**: host sweep detects containers with old heartbeats or stuck processing_ack
+- **Stale detection**: host sweep kills containers past an absolute heartbeat ceiling or with a per-message claim stuck past tolerance (see below)
 - **Fallback**: SIGKILL if graceful stop fails
 
 <Info>
-Even if the container crashes, all data in session databases and mounted directories persists. Only the container process itself is ephemeral.
+Even if the container crashes, all data in session databases and mounted directories persists. Only the container process itself is ephemeral. On startup, a fresh agent-runner clears its own leftover `processing_ack` rows so orphaned claims don't block re-processing.
 </Info>
+
+### Crash recovery
+
+If a container crashes mid-turn, the host sweep resets any `processing` rows left behind in `messages_in` to `pending` with exponential backoff (base 5s, up to 5 tries before `failed`). The next wake lets a fresh container pick them up — the container clears its own orphan `processing_ack` entries on startup, so rows that were already scheduled for a future retry aren't bumped again.
 
 ## Per-agent-group images
 
@@ -165,11 +169,16 @@ Agent groups can specify custom packages in `container.json`. The host builds a 
 
 ### Stale detection
 
-The host sweep detects stuck containers by checking:
+A 60-second host sweep applies two independent rules to running containers:
 
-- `.heartbeat` file modification time
-- Age of unacknowledged `processing_ack` entries
-- Container state tracking in the session table
+1. **Absolute ceiling** — if `.heartbeat` mtime is older than `max(30 min, current Bash timeout)`, the container is killed. The ceiling extends automatically while the SDK has declared a longer-running `Bash` tool, honoring the user's own timeout directive.
+2. **Per-claim stuck** — for every `processing_ack` row still in `processing`, tolerance is `max(60s, current Bash timeout)`. If the claim has aged past tolerance and the heartbeat hasn't been touched since the claim was taken, the container is killed and that message is reset.
+
+<Note>
+A freshly spawned container hasn't written a heartbeat yet. The ceiling rule skips sessions with no heartbeat file to avoid killing containers seconds after spawn — the per-claim rule still covers "claimed then silent" startup hangs.
+</Note>
+
+After either kill, `processing` rows are reset with exponential backoff (capped at 5 tries) so the next sweep can wake a fresh container.
 
 ## Skills and MCP servers
 

@@ -162,15 +162,18 @@ Containers are spawned by the `spawnContainer` function. Wake calls are deduplic
 
 ### Timeouts and stale detection
 
-Containers have two timeout/detection mechanisms:
+Running containers are policed every 60s by the host sweep using two independent rules:
 
-1. **Container timeout** — maximum runtime before force kill (default: 30 minutes)
-2. **Stale detection** — host sweep checks `.heartbeat` mtime and `processing_ack` age to detect stuck containers
+1. **Absolute ceiling** — kill if heartbeat mtime age > `max(30 min, current Bash timeout)`. Containers that haven't written a heartbeat yet (fresh spawn) skip this rule so they aren't killed within seconds of starting.
+2. **Per-claim stuck** — for each `processing_ack` row in `processing`, tolerance is `max(60s, current Bash timeout)`. If the claim has aged past tolerance and the heartbeat has not advanced since the claim was taken, the container is killed and that message is reset.
+
+When a container isn't running but `processing` rows remain (crash mid-turn), the sweep resets them to `pending` with exponential backoff (`5s * 2^tries`, capped at 5 tries before `failed`). Rows already scheduled for a future retry are skipped so `tries` isn't double-bumped. On startup, the agent-runner clears its own leftover `processing_ack` entries (`clearStaleProcessingAcks`) so orphaned claims from a previous crash don't stall the new poll loop.
 
 ### Container shutdown
 
 - `killContainer(sessionId, reason)` stops the container via `docker stop`, falls back to SIGKILL
 - On close/error, the session is marked stopped and typing indicators are cleared
+- On host startup, orphaned containers from a previous run are reaped via `cleanupOrphans`, scoped by the per-install `nanoclaw-install=<slug>` label so peer installs don't kill each other's containers
 
 ## Credential injection
 

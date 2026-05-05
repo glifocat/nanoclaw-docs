@@ -164,19 +164,8 @@ cat groups/{group}/logs/container-{timestamp}.log
   - Reviewing recent changes to `CLAUDE.md`
 </Accordion>
 
-<Accordion title="Adjust idle timeout">
-  The idle timeout (for graceful shutdown between messages) is currently equal to the hard timeout. This is a known issue. To fix:
-  
-  Edit `src/config.ts` and set:
-  ```typescript
-  export const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-  export const CONTAINER_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-  ```
-  
-  Then rebuild:
-  ```bash
-  npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-  ```
+<Accordion title="Review host sweep kills">
+  If `grep 'Killing container' logs/nanoclaw.log` shows `kill-ceiling` or `claim-stuck` entries, the container was killed because the heartbeat went silent or a `processing_ack` row aged past tolerance. A running `Bash` command extends both thresholds to match its declared timeout — if that timeout is too short for your use case, have the agent declare a longer `Bash` timeout.
 </Accordion>
 
 ## Service stops after SSH logout (Linux)
@@ -223,11 +212,37 @@ If you need to manually reset the cursor, update it in `router_state`:
 SELECT value FROM router_state WHERE key = 'last_agent_timestamp';
 ```
 
-### IDLE_TIMEOUT and CONTAINER_TIMEOUT
+### Stuck container detection
 
-The hard timeout is calculated as `Math.max(configTimeout, IDLE_TIMEOUT + 30_000)`, ensuring a 30-second gap for graceful `_close` sentinel shutdown before the hard kill fires. With default settings (both 30 minutes), the hard timeout is 30 minutes 30 seconds.
+The previous `IDLE_TIMEOUT` + hard-timeout `setTimeout` has been replaced by two host-sweep rules that run every 60 seconds:
 
-If containers are consistently hitting the hard timeout, consider lowering `IDLE_TIMEOUT` in `src/config.ts` to a shorter value (e.g., 5 minutes) so idle containers exit more promptly.
+- **Absolute ceiling** — heartbeat age > `max(30 min, current Bash timeout)` → kill. Skipped for freshly spawned containers that haven't written a heartbeat yet.
+- **Per-claim stuck** — any `processing_ack` row older than `max(60s, current Bash timeout)` with no heartbeat activity since the claim → kill + reset that message.
+
+If containers are being killed too aggressively during long `Bash` commands, check the agent-declared `tool_declared_timeout_ms` — the sweep honors it as the stuck threshold for both rules. Messages killed this way are reset to `pending` with exponential backoff (`5s * 2^tries`, capped at 5 tries before `failed`).
+
+### Stuck after crash
+
+If a container crashes while a message is in `processing`, the host sweep resets the row to `pending` on the next tick (60s). The next wake spawns a fresh container that clears its own `processing_ack` rows on startup. No manual cleanup is needed.
+
+<Accordion title="Check for stuck processing rows">
+  ```bash
+  sqlite3 data/v2-sessions/{agent_group_id}/{session_id}/outbound.db \
+    "SELECT message_id, status, status_changed FROM processing_ack WHERE status = 'processing';"
+  ```
+</Accordion>
+
+<Accordion title="Inspect host sweep decisions">
+  ```bash
+  grep -E 'Killing container|Reset stale message|Waking container' logs/nanoclaw.log | tail -20
+  ```
+</Accordion>
+
+### Adjust idle timeout
+
+<Note>
+The old `IDLE_TIMEOUT` + `CONTAINER_TIMEOUT` knobs have been removed. Idle containers exit naturally when the poll loop has nothing to do — there's no idle-shutdown timer to tune.
+</Note>
 
 ### Kubernetes image garbage collection deletes nanoclaw-agent image
 
