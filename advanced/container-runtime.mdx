@@ -172,6 +172,28 @@ Containers have two timeout/detection mechanisms:
 - `killContainer(sessionId, reason)` stops the container via `docker stop`, falls back to SIGKILL
 - On close/error, the session is marked stopped and typing indicators are cleared
 
+### Install-scoped orphan reaper
+
+Every spawned container is stamped with a `--label nanoclaw-install=<slug>` at creation time. The orphan reaper filters by this label so it only reaps containers owned by **this** install, never peer installs on the same host.
+
+- **Before:** the reaper used `docker ps --filter name=nanoclaw-`, a substring match that picked up every install's containers. A crash-looping peer (e.g. a legacy v1 service respawning thousands of times) would trash the healthy install's session containers on every boot.
+- **Now:** `cleanupOrphans()` filters by `--filter label=nanoclaw-install=<slug>`. Multiple installs can coexist on one host without fighting over containers.
+
+The slug is derived from the project root and exposed as `CONTAINER_INSTALL_LABEL` in `src/config.ts`. Manual debugging commands can scope by label too:
+
+```bash
+docker ps --filter label=nanoclaw-install=<slug>
+```
+
+### Unhealthy peer cleanup (setup preflight)
+
+Before installing the service, setup scans for peer NanoClaw services (other `com.nanoclaw*` launchd plists on macOS, `nanoclaw*.service` units on Linux systemd) and unloads any that are crash-looping. A peer is treated as unhealthy when:
+
+- **launchd:** `state != running` AND `runs > 10`
+- **systemd:** unit is `failed`, or `activating`/non-`active` with more than 10 restarts
+
+Healthy peers are left alone. This complements the install-label reaper — the label stops peers from reaping our containers, and the preflight stops a crash-looping legacy peer from respawning forever in the background.
+
 ## Credential injection
 
 The OneCLI SDK's `applyContainerConfig()` configures each container's network to route through the vault:
@@ -192,7 +214,11 @@ const onecliApplied = await onecli.applyContainerConfig(args, {
 
 <Accordion title="List running containers">
   ```bash
+  # All NanoClaw containers on the host (all installs)
   docker ps --filter name=nanoclaw-
+
+  # Only containers owned by this install
+  docker ps --filter label=nanoclaw-install=<slug>
   ```
 </Accordion>
 

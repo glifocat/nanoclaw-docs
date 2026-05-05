@@ -566,6 +566,53 @@ for i, line in enumerate(lines):
 
 This issue was fixed by passing `resumeSessionAt` with the last assistant message UUID. If you're still experiencing it, ensure you're running the latest version of the agent runner.
 
+## Peer install conflicts
+
+### Symptoms
+
+- Session containers are killed within seconds of spawning, with no error in their own logs
+- `docker ps` shows NanoClaw containers appearing and disappearing rapidly
+- System logs show a second NanoClaw service (often a legacy `com.nanoclaw` plist) respawning on a tight loop
+- Works fine on hosts without a prior NanoClaw install; breaks on hosts that previously ran v1
+
+### Cause
+
+A crash-looping peer NanoClaw service (typically a legacy v1 launchd plist left behind from a previous install) calls its own `cleanupOrphans()` on every respawn. Older installs matched by name substring (`nanoclaw-`), so they indiscriminately killed the healthy install's containers.
+
+### Solution
+
+**Upgrade to the current release.** Starting in v2.0.5, every container is stamped with a `nanoclaw-install=<slug>` label and the reaper filters by label — peers can no longer reap each other's containers. Setup also runs a preflight that unloads crash-looping peer services before installing its own.
+
+If you're still seeing the issue, manually unload the legacy service:
+
+<CodeGroup>
+```bash macOS
+# List every NanoClaw plist and its state
+for plist in ~/Library/LaunchAgents/com.nanoclaw*.plist; do
+  label=$(basename "$plist" .plist)
+  echo "=== $label ==="
+  launchctl print "gui/$(id -u)/$label" 2>/dev/null | grep -E 'state|runs' || echo "not loaded"
+done
+
+# Unload the unhealthy peer
+launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
+```
+
+```bash Linux
+# List every NanoClaw user unit
+systemctl --user list-units 'nanoclaw*'
+
+# Disable the unhealthy peer
+systemctl --user disable --now nanoclaw.service
+```
+</CodeGroup>
+
+Verify containers now survive by listing them scoped to your install:
+
+```bash
+docker ps --filter label=nanoclaw-install=<slug>
+```
+
 ## Service management
 
 ### Restart the service
