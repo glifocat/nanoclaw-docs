@@ -17,7 +17,7 @@ interface AgentGroup {
   id: string;             // Unique identifier
   name: string;           // Display name
   folder: string;         // Filesystem folder name
-  agent_provider?: string; // Optional provider override
+  agent_provider?: string; // Host-side provider contribution only
   created_at: string;     // ISO timestamp
 }
 ```
@@ -25,6 +25,10 @@ interface AgentGroup {
 - Each agent group has a folder under `groups/{folder}/`
 - Container configuration lives on disk (`container.json`), not in the database
 - Each gets its own OneCLI agent identifier for credential scoping
+
+<Note>
+`agent_groups.agent_provider` (and `sessions.agent_provider`, where session overrides group) only drive host-side provider contribution — per-session mounts and env passthrough. The in-container runner reads the `provider` field from `container.json`, not from the DB. Precedence at spawn time: session → group → `container.json` → `'claude'` fallback. If the DB says one provider and `container.json` says another, the runner uses `container.json`.
+</Note>
 
 ### Messaging groups
 

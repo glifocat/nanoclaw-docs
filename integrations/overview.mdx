@@ -75,7 +75,7 @@ By default, NanoClaw uses Claude via the official [Claude Agent SDK](https://doc
 | `/add-ollama-provider` | Ollama | Local open-weight models — no cloud calls |
 | `/add-ollama-tool` | Ollama (tool mode) | Use local Ollama as a tool inside Claude agents |
 
-`agent_provider` is a column on `agent_groups` in the central database — each agent group can run a different provider. Mix and match in the same install.
+Each agent group can run a different provider — mix and match in the same install. Set `"provider": "<name>"` in the group's `container.json`; the in-container runner reads from there. The `agent_groups.agent_provider` and `sessions.agent_provider` DB columns drive host-side contribution only (per-session mounts, env passthrough) and do not propagate into `container.json` at spawn time.
 
 ## How channel skills work
 
