@@ -1,6 +1,7 @@
 ---
 title: Slack integration
 description: Add Slack as a messaging channel for NanoClaw using the /add-slack skill for team workspaces
+tag: "UPDATED"
 ---
 
 import SyncEnv from "/snippets/sync-env.mdx";
@@ -9,6 +10,14 @@ import RestartService from "/snippets/restart-service.mdx";
 <Warning>
 This page is pending a v2 rewrite. The `/add-slack` skill flow still works, but some mechanics described below reflect v1 architecture — in v2, channel adapters live on a single `channels` branch. See [Integrations overview](/integrations/overview) for current context.
 </Warning>
+
+<Note>
+Slack interactive buttons (channel approval cards, sender approvals) require **Interactivity** to be enabled on the Slack app. Without it, button clicks silently fail to reach the host. Enable **Interactivity & Shortcuts** in the app settings and point its Request URL at `https://your-domain/webhook/slack` — the same URL used for Event Subscriptions. After saving, reinstall the app when Slack prompts you. The `/add-slack` skill includes this step.
+</Note>
+
+<Note>
+The `/setup` flow now wires Slack the same way as Discord and Telegram: it collects your Slack member ID, opens a DM via `conversations.open` (requires the `im:write` scope), and runs `init-first-agent` to establish ownership and deliver a welcome DM. The welcome DM goes out via `chat.postMessage` (outbound), so it works before Event Subscriptions are configured. Inbound replies still require the webhook to be reachable.
+</Note>
 
 Add Slack as a messaging channel for NanoClaw. Perfect for team workspaces and professional communication.
 

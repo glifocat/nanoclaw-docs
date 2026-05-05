@@ -6,6 +6,75 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.15" description="2026-04-28" tags={["Fix"]}>
+  - Fixed circuit-breaker off-by-one (delay schedule now matches documented values), `ENOENT` on fresh checkout (creates `DATA_DIR` before writing state), and reset-on-throw in shutdown teardown
+  - Added unit tests covering state transitions, full backoff schedule, reset-window expiry, malformed file handling, and the fresh-install path
+</Update>
+
+<Update label="v2.0.14" description="2026-04-28" tags={["Feature", "Security", "Fix"]}>
+  - Added a startup circuit breaker that backs off on rapid restarts (0s → 0s → 10s → 30s → 2min → 5min → 15min cap) — protects against Discord identify-rate exhaustion and Cloudflare IP bans, resets on clean shutdown
+  - Fixed a path-traversal vulnerability in attachment handling on the channel-inbound path
+  - Slack setup now adds the **Interactivity & Shortcuts** step to the post-install checklist so channel approval buttons work
+  - Slack setup wires the bot during `/setup` like Discord and Telegram (DM via `conversations.open`, `init-first-agent` for ownership and welcome DM)
+</Update>
+
+<Update label="v2.0.13" description="2026-04-27" tags={["Feature", "Refactor"]}>
+  - Custom Anthropic-compatible endpoints now route through the OneCLI vault — setup creates a generic secret with `Authorization: Bearer {value}` header injection so the real token never enters the container
+  - Containers only see `ANTHROPIC_BASE_URL` and a placeholder `ANTHROPIC_AUTH_TOKEN`; the proxy rewrites the `Authorization` header on the wire
+  - The `claude` provider container config is registered on demand by setup (no branch for standard `api.anthropic.com` installs)
+  - Initial implementation passed the auth token directly into containers; this release reroutes it through the vault for audit and rotation
+</Update>
+
+<Update label="v2.0.12" description="2026-04-25" tags={["Fix"]}>
+  - Setup `/register` now wires channels with the correct engage fields and skips the channel prefix for native IDs
+</Update>
+
+<Update label="v2.0.11" description="2026-04-24" tags={["Fix"]}>
+  - Rejected unsafe attachment filenames on the agent-to-agent route to prevent path traversal
+  - Forwarded file attachments correctly between agents
+  - Keyed continuations per provider so session state survives provider switches
+  - Honored `agent_provider` DB columns in the container runner with session override
+</Update>
+
+<Update label="v2.0.10" description="2026-04-24" tags={["Refactor"]}>
+  - Approvals persist `title` + `options` on channel and sender approval tables for richer post-click rendering
+</Update>
+
+<Update label="v2.0.9" description="2026-04-23" tags={["Fix"]}>
+  - Made `pending_questions` and `pending_approvals` inserts idempotent
+  - Telegram callback data now encodes the option index to fit the 64-byte cap
+</Update>
+
+<Update label="v2.0.8" description="2026-04-23" tags={["Fix"]}>
+  - Container restart recovery: wake before reset and idempotent retry for orphan claims
+  - Cleared orphan heartbeat before spawn so a fresh container does not inherit a stale liveness signal
+</Update>
+
+<Update label="v2.0.7" description="2026-04-23" tags={["Skill"]}>
+  - Added `/add-atomic-chat-tool` skill (ships its MCP file inside the skill folder)
+  - Approval cards now show correct post-click labels and human-readable names on channel and sender cards
+  - Discord DM interactions resolve the user ID for approval clicks
+  - Router passes `isGroup` from adapter through to messaging group creation
+</Update>
+
+<Update label="v2.0.5" description="2026-04-22" tags={["Fix"]}>
+  - Orphan reaper scoped by install label so peer installs do not kill each other's containers
+  - Setup flow clarified based on user-feedback session
+</Update>
+
+<Update label="v2.0.4" description="2026-04-22" tags={["Feature"]}>
+  - Per-checkout service name and Docker image tag — multiple installs on one machine no longer collide
+</Update>
+
+<Update label="v2.0.2" description="2026-04-22" tags={["Fix"]}>
+  - Loosened `/home/node` permissions in the container to `0777`
+  - Collapsed the `setup` skill to one instruction — `bash nanoclaw.sh`
+</Update>
+
+<Update label="v2.0.1" description="2026-04-22" tags={["Fix"]}>
+  - Initial post-2.0 fixes around setup ergonomics and container permissions
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention

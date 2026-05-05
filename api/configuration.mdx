@@ -130,6 +130,25 @@ onecli secrets create --name Anthropic --type anthropic --value YOUR_KEY --host-
 
 The `@onecli-sh/sdk` package's `applyContainerConfig()` configures each container's network to route through the vault, injecting credentials at request time.
 
+## Custom Anthropic-compatible endpoints
+
+To point NanoClaw at a custom Anthropic-compatible endpoint (proxy, Together AI, Fireworks, an internal gateway, etc.), provide both flags during setup:
+
+```bash
+bash nanoclaw.sh \
+  --anthropic-base-url https://your-endpoint.example.com \
+  --anthropic-auth-token YOUR_TOKEN
+```
+
+Setup routes the credential through the OneCLI vault rather than passing it directly into the container. It creates a generic OneCLI secret with header injection (`Authorization: Bearer {value}`) and a host pattern matching the base URL hostname, then writes `ANTHROPIC_BASE_URL` to `.env` and registers the `claude` provider container config.
+
+At runtime the container only sees:
+
+- `ANTHROPIC_BASE_URL` — so the SDK calls the right host
+- `ANTHROPIC_AUTH_TOKEN=placeholder` — so the SDK adds an `Authorization` header for the OneCLI proxy to overwrite on the wire
+
+The real auth token never enters the container, preserving audit and rotation guarantees of the vault.
+
 ## Security notes
 
 - **Secrets** are never read by NanoClaw directly — OneCLI manages them externally

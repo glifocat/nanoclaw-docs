@@ -179,6 +179,36 @@ cat groups/{group}/logs/container-{timestamp}.log
   ```
 </Accordion>
 
+## Startup circuit breaker
+
+NanoClaw backs off on rapid restarts to avoid exhausting Discord gateway identify limits and triggering Cloudflare IP bans on other channels. The breaker counts consecutive crashes and delays the next startup according to a fixed schedule.
+
+**Backoff schedule** (by consecutive crash count):
+
+| Crash | Delay |
+|-------|-------|
+| 1st | 0s |
+| 2nd | 0s |
+| 3rd | 10s |
+| 4th | 30s |
+| 5th | 2min |
+| 6th | 5min |
+| 7th+ | 15min (cap) |
+
+The counter is read from `data/circuit-breaker.json`. It resets on a clean shutdown (the file is deleted) or after 1 hour of no startup activity. Only crashes accumulate the counter — graceful exits do not.
+
+You can identify circuit breaker activity in logs:
+
+```bash
+grep -E 'Circuit breaker|circuit-breaker' logs/nanoclaw.log | tail -5
+```
+
+Look for `Circuit breaker: delaying startup due to repeated crashes` with the `attempt` count and `delaySec`. To clear the breaker manually after fixing a crash loop:
+
+```bash
+rm -f data/circuit-breaker.json
+```
+
 ## Service stops after SSH logout (Linux)
 
 ### Symptoms

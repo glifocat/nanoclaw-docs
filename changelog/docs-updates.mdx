@@ -5,6 +5,13 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.15: circuit breaker, custom Anthropic endpoints, Slack interactivity" description="2026-04-28" tags={["Updated"]}>
+  - **Troubleshooting**: documented the new startup circuit breaker — back-off schedule (0s → 0s → 10s → 30s → 2min → 5min → 15min cap), reset-on-clean-shutdown, and `data/circuit-breaker.json` state file. Sourced from `src/circuit-breaker.ts`.
+  - **Configuration**: added a "Custom Anthropic-compatible endpoints" section explaining the OneCLI vault path — setup creates a generic secret with `Authorization: Bearer {value}` header injection so the real auth token never enters the container. Container only sees `ANTHROPIC_BASE_URL` and a placeholder `ANTHROPIC_AUTH_TOKEN`.
+  - **Ollama**: rewrote the third-party endpoint section to use `bash nanoclaw.sh --anthropic-base-url ... --anthropic-auth-token ...` (vault-mediated) instead of raw `.env` variables, with a cross-link to the configuration page.
+  - **Slack**: added Notes covering the **Interactivity & Shortcuts** requirement for approval buttons, and the new auto-wiring during `/setup` (DM via `conversations.open` + `init-first-agent`).
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
