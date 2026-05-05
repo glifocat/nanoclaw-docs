@@ -58,6 +58,14 @@ Configuration is read from `.env` file or `process.env`, with hardcoded fallback
   Timezone for scheduled tasks (cron expressions). Resolved from `TZ` env, `.env` file, then system default. Validated as a real IANA timezone identifier. Falls back to `UTC` if no valid timezone is found.
 </ParamField>
 
+<ParamField path="ATOMIC_CHAT_HOST" type="string" default="http://host.docker.internal:1337">
+  Host for the [Atomic Chat](/integrations/atomic-chat) local model API. Only read by the host container runner when the `/add-atomic-chat-tool` skill is installed; forwarded into the container only when explicitly set.
+</ParamField>
+
+<ParamField path="ATOMIC_CHAT_API_KEY" type="string">
+  Optional API key for Atomic Chat. Leave unset for a local install — Atomic Chat does not require authentication. Only set this if Atomic Chat is behind an authenticated reverse proxy.
+</ParamField>
+
 ## Timezone configuration
 
 The timezone is resolved through a priority chain:
