@@ -132,6 +132,7 @@
               "integrations/telegram",
               "integrations/discord",
               "integrations/slack",
+              "integrations/codex",
               "integrations/ollama",
               "integrations/x-twitter",
               "integrations/parallel-ai"
