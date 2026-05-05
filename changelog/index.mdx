@@ -6,6 +6,13 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.17" description="2026-04-29" tags={["Fix"]}>
+  - **Container spawn now requires a working OneCLI gateway.** If `applyContainerConfig()` fails, `spawnContainer` aborts and `wakeContainer` returns `false` instead of starting a credential-less container that would 401 on every API call. The inbound row stays pending and the host sweep retries on its next 60s tick. The router stops the typing indicator on transient failure so the UI doesn't hang.
+  - **`wakeContainer` contract change**: now returns `Promise<boolean>` and never throws. Callers in router, host-sweep, and modules don't need to wrap it.
+  - **`CLAUDE_CODE_AUTO_COMPACT_WINDOW`**: operators can now override the default `165000` Claude Code auto-compact threshold from the host env (closes upstream #1820). Useful for 1M-context model variants and emergency tuning without editing source.
+  - **Setup UI polish**: cyan brand colors on card and log bodies, cyan highlight on active and submitted choices, green highlight on the `you` and `assistant` words in the display-name and agent-name prompts.
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention

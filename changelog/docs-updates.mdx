@@ -5,6 +5,15 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.17: credential-failure UX and operator-set compact window" description="2026-04-29" tags={["Updated"]}>
+  Documented the v2.0.17 host changes around container spawn and Claude auto-compact configuration. Verified against [qwibitai/nanoclaw#2110](https://github.com/qwibitai/nanoclaw/pull/2110) and [qwibitai/nanoclaw#2116](https://github.com/qwibitai/nanoclaw/pull/2116).
+
+  - **`concepts/containers.mdx`** — `wakeContainer` contract: never throws, returns `boolean`, host refuses to spawn without working OneCLI credential injection, host-sweep retries on transient failure
+  - **`advanced/container-runtime.mdx`** — added "OneCLI is required for spawn" subsection covering propagation, sweep retry, and typing-indicator stop on failure
+  - **`advanced/troubleshooting.mdx`** — new "Container won't spawn — OneCLI gateway unreachable" section with symptoms, cause, and stepwise fix
+  - **`api/configuration.mdx`** — added `CLAUDE_CODE_AUTO_COMPACT_WINDOW` env var (operator override for the 165000-token default; closes upstream #1820)
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
