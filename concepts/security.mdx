@@ -142,7 +142,19 @@ When an unknown sender messages on a `request_approval` channel:
 2. **Approve** — adds sender to `agent_group_members`, replays the original message
 3. **Deny** — deletes the pending row (future messages from this sender re-trigger)
 
-### 4. Session isolation
+### 4. Attachment filename safety
+
+Inbound attachments arrive with attacker-controlled `name` fields. End-to-end encrypted chat platforms (WhatsApp, Matrix, Signal) cannot sanitize filenames server-side, so the host enforces this at the boundary. The `isSafeAttachmentName()` guard in `attachment-safety.ts` rejects:
+
+- empty values, `.`, and `..`
+- any string containing `/`, `\`, or `\0`
+- anything where `path.basename(name)` differs from the original
+
+Unsafe names are replaced with a synthesized `attachment-<timestamp>` so the bytes still land in the inbox without escaping it. The guard runs both on the channel-inbound path (`session-manager.extractAttachmentFiles()`) and on the agent-to-agent forwarding path (`agent-route.ts`).
+
+The router also tightens `ignored_message_policy='accumulate'`: messages are stored as silent context only when engagement simply did not fire. When the access or scope gate explicitly refused an untrusted sender, the message — and its staged attachments — is dropped instead of accumulated.
+
+### 5. Session isolation
 
 Each session has isolated databases at `data/v2-sessions/{agent_group_id}/{session_id}/`:
 
@@ -150,7 +162,7 @@ Each session has isolated databases at `data/v2-sessions/{agent_group_id}/{sessi
 - Sessions cannot see other sessions' data
 - Cross-session information disclosure is prevented by mount isolation
 
-### 5. Credential handling
+### 6. Credential handling
 
 NanoClaw uses the [OneCLI](https://github.com/onecli/onecli) Agent Vault for centralized secret management. API keys are never stored in `.env` or exposed to containers — the vault intercepts outbound API traffic from containers and injects credentials at request time.
 
@@ -163,7 +175,7 @@ NanoClaw uses the [OneCLI](https://github.com/onecli/onecli) Agent Vault for cen
 The OneCLI Agent Vault prevents credential exposure to containers. However, containers can still make authenticated API requests through the vault — they cannot extract the real credentials, but they can use them indirectly.
 </Warning>
 
-### 6. Delivery authorization
+### 7. Delivery authorization
 
 The delivery system enforces per-agent permissions:
 
@@ -172,7 +184,7 @@ The delivery system enforces per-agent permissions:
 - Cross-channel delivery requires an explicit `agent_destinations` row
 - The `ask_question` message type creates interactive `pending_questions` cards
 
-### 7. Diagnostics and telemetry
+### 8. Diagnostics and telemetry
 
 NanoClaw includes opt-in diagnostics that run during `/setup` and `/update-nanoclaw` skill workflows only. There is no runtime telemetry in the application itself.
 

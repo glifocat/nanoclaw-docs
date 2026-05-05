@@ -240,12 +240,13 @@ Source code is NOT baked into the image. `/app/src` is a read-only bind mount fr
 
 ## Startup sequence
 
-1. **Central DB initialization** — opens `data/v2.db`, runs migrations, performs one-time filesystem cutover
-2. **Container runtime check** — ensures Docker is running, cleans up orphan containers
-3. **Channel adapter initialization** — registers all channel adapters with `onInbound`, `onInboundEvent`, `onMetadata`, and `onAction` callbacks
-4. **Delivery adapter bridge** — bridges the delivery system to channel adapters for `deliver()` and `setTyping()` calls
-5. **Delivery polls** — starts active poll (1s for running containers) and sweep poll (60s for all active sessions)
-6. **Host sweep** — 60s sweep for processing_ack sync, stale detection, due-message wake, and recurrence advancement
+1. **Startup circuit breaker** — `enforceStartupBackoff()` consults `data/circuit-breaker.json` and delays startup if the previous run did not shut down cleanly. The schedule is 0s, 0s, 10s, 30s, 2min, 5min, then 15min cap. Counters reset after one hour of quiet or on graceful shutdown.
+2. **Central DB initialization** — opens `data/v2.db`, runs migrations, performs one-time filesystem cutover
+3. **Container runtime check** — ensures Docker is running, cleans up orphan containers
+4. **Channel adapter initialization** — registers all channel adapters with `onInbound`, `onInboundEvent`, `onMetadata`, and `onAction` callbacks
+5. **Delivery adapter bridge** — bridges the delivery system to channel adapters for `deliver()` and `setTyping()` calls
+6. **Delivery polls** — starts active poll (1s for running containers) and sweep poll (60s for all active sessions)
+7. **Host sweep** — 60s sweep for processing_ack sync, stale detection, due-message wake, and recurrence advancement
 
 ## Graceful shutdown
 
@@ -253,8 +254,9 @@ On `SIGTERM` or `SIGINT`:
 
 1. Registered shutdown callbacks execute in order
 2. Delivery polls stop
-3. Channel adapters tear down gracefully
-4. Process exits
+3. Channel adapters tear down gracefully (errors here do not count as a crash)
+4. The circuit-breaker state file is removed so the next start resumes immediately
+5. Process exits
 
 <Warning>
 Modules and channel adapters register their own shutdown callbacks. The shutdown sequence is determined by registration order.

@@ -83,6 +83,12 @@ The permissions module (`src/modules/permissions/`) registers hooks into the cor
 - Approve: creates wiring with defaults, admits sender, replays message
 - Deny: sets `denied_at`, future mentions silently dropped
 
+### Attachment filename safety
+
+Filenames on inbound attachments are attacker-controlled — E2EE platforms cannot sanitize them server-side, and a compromised peer agent can produce them on the agent-to-agent path. `isSafeAttachmentName()` (in `attachment-safety.ts`) rejects empty strings, `.`, `..`, anything containing `/`, `\`, or NUL, and any value where `path.basename(name)` differs from the input. Rejected names are replaced with `attachment-<timestamp>` so data still lands inside the inbox directory.
+
+The router also drops, rather than accumulates, ignored messages when the access or scope gate explicitly refused the sender, so untrusted attachments are not staged to disk on a refusal.
+
 ### Session isolation
 
 Each session has isolated databases:

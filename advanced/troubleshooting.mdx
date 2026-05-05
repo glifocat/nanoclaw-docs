@@ -507,6 +507,43 @@ You can run the cleanup manually with `--dry-run` to preview what would be delet
 bash scripts/cleanup-sessions.sh --dry-run
 ```
 
+## Startup circuit breaker
+
+NanoClaw delays startup after rapid restarts so that crash loops do not exhaust Discord gateway identify limits or trigger Cloudflare IP bans. The breaker runs as the first step of `main()`, before the database opens.
+
+### How it works
+
+State lives in `data/circuit-breaker.json`. Each non-clean start increments the attempt counter and stamps a timestamp. The counter resets when:
+
+- The host shuts down via `SIGTERM` or `SIGINT` (graceful exit removes the file even if channel teardown threw)
+- The previous start was over an hour ago
+
+### Backoff schedule
+
+| Consecutive crashes | Delay |
+|---------------------|-------|
+| 1 (first start)     | 0s    |
+| 2                   | 0s    |
+| 3                   | 10s   |
+| 4                   | 30s   |
+| 5                   | 2min  |
+| 6                   | 5min  |
+| 7+                  | 15min cap |
+
+### Diagnosing
+
+When the breaker fires, the host log shows:
+
+```
+Circuit breaker: delaying startup due to repeated crashes
+```
+
+with `attempt`, `delaySec`, and `resumeAt`. To clear it manually after fixing the underlying crash, delete the state file:
+
+```bash
+rm data/circuit-breaker.json
+```
+
 ## Stale session auto-recovery
 
 NanoClaw automatically detects and recovers from stale or corrupt sessions. When a container fails because the session transcript file (`.jsonl`) is missing — due to a crash mid-write, manual deletion, or disk-full condition — NanoClaw clears the broken session ID and lets the existing backoff mechanism in the group queue retry with a fresh session.

@@ -6,6 +6,14 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.15" description="2026-04-29" tags={["Fix", "Security"]}>
+  - Startup circuit breaker — backs off on rapid restarts (0s, 0s, 10s, 30s, 2min, 5min, 15min cap) to avoid Discord gateway identify limits and Cloudflare bans. State at `data/circuit-breaker.json`; resets on graceful shutdown or after one quiet hour.
+  - Hardened attachment filename handling on the channel-inbound path — `isSafeAttachmentName()` rejects path-traversal sentinels (`..`, separators, NUL); unsafe names are replaced with a synthesized name that stays inside the inbox.
+  - Router no longer accumulates messages when the access or scope gate refused — refused senders' attachments are no longer staged to disk.
+  - Custom Anthropic-compatible endpoints route through the OneCLI vault: setup stores the auth token as a generic secret and only `ANTHROPIC_BASE_URL` plus a placeholder token enter the container.
+  - Slack setup now wires the operator like Discord/Telegram (collects member ID, opens DM via `conversations.open`, runs init-first-agent) and surfaces the **Interactivity & Shortcuts** step required for channel approval cards.
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention

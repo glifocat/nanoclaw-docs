@@ -5,6 +5,17 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.15 source sync: circuit breaker, attachment safety, custom Anthropic endpoint" description="2026-04-29" tags={["Updated"]}>
+  Synced docs to upstream changes through [qwibitai/nanoclaw@e0f8136](https://github.com/qwibitai/nanoclaw/commit/e0f8136).
+
+  ## Updated
+  - **`concepts/architecture.mdx`**: added the startup circuit-breaker step to the startup sequence and noted that graceful shutdown clears the state file.
+  - **`advanced/troubleshooting.mdx`**: new "Startup circuit breaker" section documenting the backoff schedule, state file (`data/circuit-breaker.json`), reset rules, and manual clearing.
+  - **`concepts/security.mdx`** and **`advanced/security-model.mdx`**: documented `isSafeAttachmentName()` filename guard on the channel-inbound and agent-to-agent paths, and the router's tightening of `ignored_message_policy='accumulate'` so refused senders' attachments are not staged to disk.
+  - **`installation.mdx`** and **`integrations/ollama.mdx`**: rewrote custom Anthropic endpoint guidance — setup stores the auth token as an OneCLI generic secret (host-pattern + `Authorization: Bearer {value}`) and only `ANTHROPIC_BASE_URL` plus a placeholder token enter the container.
+  - **`changelog/index.mdx`**: added v2.0.15 release entry.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
