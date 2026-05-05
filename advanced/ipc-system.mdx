@@ -87,7 +87,7 @@ graph LR
   <Step title="Routing">
     Messages are routed by kind:
     - `system` — dispatched to registered delivery action handlers (scheduling, approvals, etc.)
-    - `channel_type='agent'` — routed to the agent-to-agent module
+    - `channel_type='agent'` — routed to the agent-to-agent module. If the source message references files (from `send_file`), the bytes are copied from the source session's `outbox/{messageId}/` into the target session's `inbox/{a2aMessageId}/` so the target agent can actually read them. Filenames are validated against path traversal before copy.
     - Normal messages — permission check, then channel adapter delivery
   </Step>
 
@@ -113,7 +113,7 @@ graph LR
 |-------|---------|
 | `messages_out` | Outbound messages with `deliver_after` and recurrence |
 | `processing_ack` | Tracks which inbound messages the container has processed |
-| `session_state` | Persistent key/value store (e.g., SDK session ID for resume across restarts) |
+| `session_state` | Persistent key/value store. Provider continuation IDs are stored per provider under `continuation:<provider>` keys, so switching providers (Claude ↔ OpenCode, etc.) is lossless — each provider's own thread resumes when re-selected |
 | `container_state` | Tool-in-flight state (tool name, declared timeout, start time) for stuck-detection |
 
 ## MCP tools (container-side)
