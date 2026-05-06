@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="IPC debugging: in-tree SQL wrapper replaces sqlite3 CLI" description="2026-05-06" tags={["Updated"]}>
+  `advanced/ipc-system.mdx`: replaced ad-hoc `sqlite3` invocations with the in-tree wrapper (`pnpm exec tsx scripts/q.ts <db> "<sql>"`) and added a callout explaining the rationale. The host setup deliberately ships no `sqlite3` CLI — it relies on the `better-sqlite3` Node binding that setup already installs — so skill text and debugging snippets that shelled out to `sqlite3` failed on fresh hosts. The wrapper preserves the same path-then-SQL shape and the `sqlite3 -list` output format ([qwibitai/nanoclaw#2309](https://github.com/qwibitai/nanoclaw/pull/2309)).
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
