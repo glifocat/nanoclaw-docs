@@ -196,34 +196,42 @@ Failed deliveries are retried up to 3 times, then permanently marked as failed. 
 
 ## Debugging
 
+<Note>
+  NanoClaw's setup intentionally does not install the `sqlite3` CLI — it relies on the `better-sqlite3` Node binding instead. Use the in-tree wrapper at `scripts/q.ts` for ad-hoc queries against any session database. Output matches `sqlite3 -list` (pipe-separated, no header).
+
+  ```bash
+  pnpm exec tsx scripts/q.ts <db-path> "<sql>"
+  ```
+</Note>
+
 <Accordion title="Inspect session databases">
   ```bash
-  sqlite3 data/v2-sessions/{agent_group_id}/{session_id}/inbound.db \
-    "SELECT * FROM messages_in ORDER BY seq DESC LIMIT 10;"
+  pnpm exec tsx scripts/q.ts data/v2-sessions/{agent_group_id}/{session_id}/inbound.db \
+    "SELECT * FROM messages_in ORDER BY seq DESC LIMIT 10"
 
-  sqlite3 data/v2-sessions/{agent_group_id}/{session_id}/outbound.db \
-    "SELECT * FROM messages_out ORDER BY seq DESC LIMIT 10;"
+  pnpm exec tsx scripts/q.ts data/v2-sessions/{agent_group_id}/{session_id}/outbound.db \
+    "SELECT * FROM messages_out ORDER BY seq DESC LIMIT 10"
   ```
 </Accordion>
 
 <Accordion title="Check processing acknowledgments">
   ```bash
-  sqlite3 data/v2-sessions/{agent_group_id}/{session_id}/outbound.db \
-    "SELECT * FROM processing_ack ORDER BY seq DESC LIMIT 10;"
+  pnpm exec tsx scripts/q.ts data/v2-sessions/{agent_group_id}/{session_id}/outbound.db \
+    "SELECT * FROM processing_ack ORDER BY seq DESC LIMIT 10"
   ```
 </Accordion>
 
 <Accordion title="View container state">
   ```bash
-  sqlite3 data/v2-sessions/{agent_group_id}/{session_id}/outbound.db \
-    "SELECT * FROM container_state;"
+  pnpm exec tsx scripts/q.ts data/v2-sessions/{agent_group_id}/{session_id}/outbound.db \
+    "SELECT * FROM container_state"
   ```
 </Accordion>
 
 <Accordion title="Check delivery status">
   ```bash
-  sqlite3 data/v2-sessions/{agent_group_id}/{session_id}/inbound.db \
-    "SELECT * FROM delivered ORDER BY rowid DESC LIMIT 10;"
+  pnpm exec tsx scripts/q.ts data/v2-sessions/{agent_group_id}/{session_id}/inbound.db \
+    "SELECT * FROM delivered ORDER BY rowid DESC LIMIT 10"
   ```
 </Accordion>
 
