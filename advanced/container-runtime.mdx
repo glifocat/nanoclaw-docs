@@ -58,7 +58,7 @@ The agent container is built from `container/Dockerfile` and includes:
 - **Chromium** — browser automation via agent-browser
 - **Claude Code SDK** — `@anthropic-ai/claude-code` installed globally via pnpm
 - **tini** — PID 1 signal forwarding (ensures outbound.db writes finalize on SIGTERM)
-- **pnpm** (via corepack) — for global Node CLI installs
+- **pnpm** (pinned to 10.33.0 via corepack) — for global Node CLI installs. The version is pinned to match the host's `packageManager` field because pnpm 11 stopped honoring the `only-built-dependencies[]=` allowlist for global installs, which silently skipped `claude-code`'s native-binary postinstall and caused runtime crashes.
 - **System tools** — `curl`, `git`, `ca-certificates`, `unzip`
 - **Optional CJK fonts** — `fonts-noto-cjk` (~200 MB, opt-in via `INSTALL_CJK_FONTS=true`)
 
