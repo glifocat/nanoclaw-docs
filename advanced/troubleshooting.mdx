@@ -111,6 +111,74 @@ Messages sent to the agent receive no response.
   ```
 </Accordion>
 
+## Messages silently lost ("No adapter for channel type")
+
+### Symptoms
+- The bot stops replying even though messages appear to be received and processed.
+- `logs/nanoclaw.error.log` contains repeated entries like:
+  ```
+  WARN No adapter for channel type channelType="telegram"
+  WARN No adapter for channel type channelType="signal"
+  ```
+- The main log shows "Message delivered" entries with `platformMsgId=undefined`. The delivery poll ran, found no adapter, and permanently marked the message as delivered without sending it.
+
+### Root cause
+
+Two NanoClaw service instances are running simultaneously. A second instance (often `nanoclaw-v2-<id>.service` running alongside `nanoclaw.service`) starts with a stale binary that has no channel adapters registered. Its delivery poll races against the working instance and wins — permanently marking outbound messages as delivered without ever sending them.
+
+Affected messages cannot be retried because they have a null `platform_message_id`. The user must resend their message after the duplicate is removed.
+
+### Diagnosis
+
+```bash
+# Check for duplicate running instances
+ps aux | grep 'nanoclaw/dist/index.js' | grep -v grep
+
+# Check which user services are active
+systemctl --user list-units 'nanoclaw*' --all
+
+# Confirm channel adapters registered by the current process
+grep "Channel adapter started" logs/nanoclaw.log | tail -10
+```
+
+### Solutions
+
+<Steps>
+  <Step title="Identify the correct service">
+    The correct service is the one whose log shows all expected channel adapters started (e.g., `signal`, `telegram`, `cli`). The stale instance will be missing these.
+  </Step>
+
+  <Step title="Stop and disable the stale duplicate">
+    ```bash
+    systemctl --user stop nanoclaw.service       # or whichever is the old one
+    systemctl --user disable nanoclaw.service
+    ```
+  </Step>
+
+  <Step title="Ensure the surviving service has its environment file">
+    If the remaining unit is missing `EnvironmentFile`, add it under `[Service]`:
+
+    ```ini
+    EnvironmentFile=/home/<user>/nanoclaw/.env
+    ```
+
+    Then reload and restart:
+
+    ```bash
+    systemctl --user daemon-reload
+    systemctl --user restart nanoclaw-v2-<id>.service
+    ```
+  </Step>
+
+  <Step title="Verify only one instance runs">
+    ```bash
+    ps aux | grep nanoclaw/dist/index.js | grep -v grep
+    ```
+
+    You should see exactly one process.
+  </Step>
+</Steps>
+
 ## Container timeout
 
 ### Symptoms
