@@ -157,6 +157,7 @@ NanoClaw uses the [OneCLI](https://github.com/onecli/onecli) Agent Vault for cen
 - Secrets are registered once via `onecli secrets create`
 - Each non-main agent group gets its own OneCLI agent identifier for per-group credential scoping
 - The `@onecli-sh/sdk` package's `applyContainerConfig()` configures container networking
+- The `onecli-gateway` container skill teaches the agent how to call APIs through the proxy, handle `401`/`403`/`app_not_connected` errors with a connect link, and never ask for raw credentials
 - If the vault is unreachable, the container starts with no credentials and logs a warning
 
 <Warning>
