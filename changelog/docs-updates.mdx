@@ -5,6 +5,11 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Skill: /add-mnemon" description="2026-05-07" tags={["Updated"]}>
+  ## Updated
+  - **Skills system**: Added `/add-mnemon` to upstream skills listing — installs [mnemon](https://github.com/mnemon-dev/mnemon) in the agent container for persistent graph-based memory across sessions, with separate Claude Code (hook-based) and OpenCode (prompt-injection) install paths ([qwibitai/nanoclaw#2318](https://github.com/qwibitai/nanoclaw/pull/2318))
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
