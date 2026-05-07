@@ -57,7 +57,7 @@ This guide covers the default installer. If you want to skip steps, reuse an exi
   <Step title="Authorize Anthropic">
     The one step that hands off from the scripted flow: `claude setup-token` opens a browser for OAuth and prints a long-lived token back into your terminal. The installer captures the status and returns to the clack flow once the token is stored in OneCLI.
 
-    If you chose to skip Anthropic auth or use an API key instead, this step is skipped or replaced with a password prompt.
+    If you chose to skip Anthropic auth or use an API key instead, this step is skipped or replaced with a password prompt. Skipping requires an explicit confirmation — the agent can't run until you connect, and the installer warns that setup errors are harder to debug without Claude available. Re-run setup or `bash nanoclaw.sh` to finish later.
   </Step>
 
   <Step title="Send your first message">
