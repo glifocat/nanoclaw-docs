@@ -91,9 +91,10 @@ The channel fork architecture keeps the upstream `main` branch minimal. Core Nan
 - Live in `.claude/skills/` on `main`
 
 **Container skills** (synced into every container):
-- `/agent-browser`, `/capabilities`, `/slack-formatting`, `/status`
+- `/onecli-gateway`, `/agent-browser`, `/capabilities`, `/slack-formatting`, `/status`
 - Live in `container/skills/` and are synced to each group's `.claude/skills/` directory
 - Available to the agent running inside the container
+- `/onecli-gateway` is shipped by `@onecli-sh/sdk` and teaches the agent how the credential proxy works (how to call any API directly, how to handle 401/403 and `app_not_connected` errors, never to ask the user for raw credentials)
 - Some are restricted to the main channel (e.g., `/capabilities` and `/status` check for the `/workspace/project` mount)
 
 ## Applying a skill

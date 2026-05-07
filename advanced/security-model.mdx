@@ -110,6 +110,7 @@ NanoClaw delegates all credential management to the OneCLI Agent Vault:
 - The vault intercepts HTTPS traffic and injects registered secrets
 - Each agent group receives a unique `agentIdentifier` for per-group credential scoping
 - `ONECLI_URL` (default `http://localhost:10254`) configures the vault address
+- The `onecli-gateway` container skill (shipped with `@onecli-sh/sdk`) is mounted into every container alongside the other container skills, instructing the agent to call APIs through the proxy and to surface a `connect_url` to the user on `app_not_connected` errors instead of asking for raw credentials
 
 **Not mounted:**
 
