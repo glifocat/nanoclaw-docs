@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Setup: skip-Claude-auth confirmation" description="2026-05-07" tags={["Updated"]}>
+  - **`quickstart.mdx`** — clarified that the "Skip — I'll connect later" option in the Anthropic credential picker now requires an explicit confirmation, warns that the agent can't run until Claude is connected, and points users to re-run `bash nanoclaw.sh` to finish later. Reflects the new fourth option in the auth picker upstream ([qwibitai/nanoclaw#2324](https://github.com/qwibitai/nanoclaw/pull/2324)).
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
