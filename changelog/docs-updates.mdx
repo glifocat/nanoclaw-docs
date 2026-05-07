@@ -5,6 +5,13 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Multi-destination routing: post-compaction reminder" description="2026-05-07" tags={["Updated"]}>
+  Documented the post-compaction destination reminder added in nanoclaw v2.0.37 ([qwibitai/nanoclaw#2327](https://github.com/qwibitai/nanoclaw/pull/2327)).
+
+  - **`features/messaging`**: added a "Multi-destination routing" section covering the `<message to="name">…</message>` pattern and the `compacted`-event-triggered system reminder that re-anchors the agent on its destinations after the SDK auto-compacts. Noted that single-destination groups skip the reminder (bare-text fallback handles them).
+  - **`changelog/index`**: v2.0.37 entry for the fix.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 

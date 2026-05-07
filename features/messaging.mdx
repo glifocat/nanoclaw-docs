@@ -87,6 +87,22 @@ Per-wiring `sender_scope` controls who can trigger the agent:
 
 Messages are formatted for the agent with sender information, timestamps, and metadata. The agent-runner inside the container handles formatting for the configured provider.
 
+## Multi-destination routing
+
+When an agent group has more than one destination (multiple channels, or other agents), the agent addresses each one with a `<message to="name">…</message>` block. The destination names come from the live `destinations` table in `inbound.db` and are listed in the system prompt every wake.
+
+### Post-compaction reminder
+
+When the agent SDK auto-compacts the conversation, the destinations stay in the system prompt but the behavioral pattern of using `<message to="…">` wrappers is often summarized away. To keep routing intact across a compaction boundary, the poll loop listens for the provider's `compacted` event and — only when there is more than one destination — pushes a system reminder back into the live query before the next turn:
+
+```text
+[system] Context was just compacted. Reminder: you have N destinations
+(name1, name2, …). Use <message to="name"> blocks to address them.
+Bare text goes to the scratchpad fallback only.
+```
+
+Single-destination groups skip the reminder because the bare-text fallback already routes correctly.
+
 ## Channel-aware formatting
 
 <Note>

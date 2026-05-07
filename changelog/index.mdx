@@ -6,6 +6,12 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.37" description="2026-05-07" tags={["Fix"]}>
+  - Agent-runner now injects a destination reminder back into the live query after the SDK auto-compacts the conversation, so multi-destination groups don't drop `<message to="…">` wrapping after a compaction boundary
+  - Reminder only fires when the agent has more than one destination — single-destination groups rely on the existing bare-text fallback
+  - New `compacted` provider event distinguishes auto-compaction from a normal `result`, so it doesn't mark the turn completed or get dispatched as a chat message ([qwibitai/nanoclaw#2327](https://github.com/qwibitai/nanoclaw/pull/2327))
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention
