@@ -106,6 +106,10 @@ Outbound text from the agent **must** be wrapped in `<message to="name">...</mes
 
 This removes the legacy bare-text fallback that auto-routed to a session's originating channel, which could drop replies on follow-up turns in `agent-shared` sessions where the initial batch had null routing (e.g., a cron task arriving before a chat message).
 
+<Warning>
+**Breaking change.** Agents that emit unwrapped text will silently fail from the user's perspective — the text appears in container logs as `[scratchpad]` but is never delivered. Existing live sessions may continue using the cached "no special wrapping needed" instructions until they're cleared with `/clear`, after which they'll pick up the new mandatory-wrapping system prompt.
+</Warning>
+
 ## Per-destination thread resolution
 
 In `agent-shared` sessions, multiple channels share one session, so a single global `thread_id` would stamp one channel's thread onto another. When dispatching an outbound `<message to="name">`, the agent-runner queries `messages_in` for the most recent inbound row matching that destination's `channel_type` + `platform_id` and inherits *that* row's `thread_id`. If no prior inbound exists for the destination, the reply lands at the channel's top level.

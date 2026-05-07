@@ -5,11 +5,14 @@ icon: "file-pen"
 rss: true
 ---
 
-<Update label="Explicit destination addressing + per-destination threading" description="2026-05-07" tags={["Updated"]}>
-  Documented the agent-runner change ([qwibitai/nanoclaw#2329](https://github.com/qwibitai/nanoclaw/pull/2329)) that requires every agent response to be wrapped in `<message to="name">...</message>` blocks and resolves `thread_id` per-destination.
+<Update label="v2.0.34: Explicit destination addressing + per-destination threading" description="2026-05-07" tags={["Updated"]}>
+  Documented the merged agent-runner change ([qwibitai/nanoclaw#2329](https://github.com/qwibitai/nanoclaw/pull/2329)) that requires every agent response to be wrapped in `<message to="name">...</message>` blocks and resolves `thread_id` per-destination. Shipped in v2.0.34.
+
+  ## Breaking change
+  Agents emitting bare text will no longer have it auto-routed — output goes to scratchpad and is never delivered. Existing live sessions may need `/clear` to pick up the new mandatory-wrapping system prompt; until cleared, they continue using the cached "no wrapping needed" instructions. Documented as a `<Warning>` callout on `features/messaging.mdx`.
 
   ## Updated
-  - **`features/messaging.mdx`** — new sections on the XML format for chats/tasks/webhooks/system responses, the `from=` origin attribute, the explicit-addressing requirement (no more bare-text fallback), per-destination thread resolution in `agent-shared` sessions, and the `PreCompact` hook that preserves routing through compaction.
+  - **`features/messaging.mdx`** — new sections on the XML format for chats/tasks/webhooks/system responses, the `from=` origin attribute, the explicit-addressing requirement, per-destination thread resolution in `agent-shared` sessions, and the `PreCompact` hook that preserves routing through compaction. Added breaking-change warning.
   - **`api/message-routing.mdx`** — added "Outbound dispatch (container side)" with details on the removed bare-text shortcut and `resolveDestinationThread()`.
   - **`concepts/tasks.mdx`** — task message format is now `<task from="..." time="...">` (replaces the old `[SCHEDULED TASK]` plaintext header). Tasks must wrap output in `<message to="name">` blocks; bare text is scratchpad.
   - **`advanced/ipc-system.mdx`** — added "Outbound dispatch and explicit addressing" and "PreCompact hook" sections; clarified that `session_routing` is a fallback while dispatch resolves `thread_id` per-destination.
