@@ -50,7 +50,7 @@ Install through `bash nanoclaw.sh` during first setup, or with a skill invocatio
 
 | Skill | Platform | Notes |
 |-------|----------|-------|
-| `/add-teams` | Microsoft Teams | Bot Framework |
+| `/add-teams` | Microsoft Teams | Bot Framework — Azure portal flow with per-step gates that let you bail out to channel selection without losing the rest of setup |
 | `/add-imessage` | Apple iMessage | macOS-only; uses AppleScript bridge |
 | `/add-matrix` | Matrix | Federated; supports Element and self-hosted homeservers |
 | `/add-gchat` | Google Chat | Workspace accounts |
@@ -84,6 +84,8 @@ By default, NanoClaw uses Claude via the official [Claude Agent SDK](https://doc
 3. **Platform auth** — the flow prompts for tokens, OAuth flows, QR pairing, or linked-device setup
 4. **First messaging group** — the flow registers your first chat/channel/group from that platform so you can test immediately
 5. **Verify** — a round-trip test confirms inbound + outbound work before the flow exits
+
+Heavier setup flows (currently Teams) prompt at each step with **Done**, **Stuck — hand me off to Claude**, **Show the steps again**, or **← Back to channel selection**. Picking the back option drops you at the channel picker so you can choose a different platform instead of killing setup with Ctrl-C; partial state (e.g., a collected App ID) stays in memory but isn't persisted, so returning later starts fresh.
 
 To pick up channel installer improvements, rerun the relevant `/add-<channel>` workflow. The installer fetches the current `channels` branch and updates the files it owns.
 
