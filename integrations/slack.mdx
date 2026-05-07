@@ -1,6 +1,7 @@
 ---
 title: Slack integration
 description: Add Slack as a messaging channel for NanoClaw using the /add-slack skill for team workspaces
+tag: "UPDATED"
 ---
 
 import SyncEnv from "/snippets/sync-env.mdx";
@@ -96,14 +97,13 @@ The setup process requires two tokens: a Bot Token (`xoxb-`) and an App-Level To
   
   <Step title="Add OAuth scopes">
     1. Go to **OAuth & Permissions**
-    2. Add these **Bot Token Scopes**:
+    2. Add these **Bot Token Scopes**, grouped by family:
+       - `im:write`, `im:history` (send and read DMs)
+       - `channels:read`, `channels:history` (list and read public channels)
+       - `groups:read`, `groups:history` (list and read private channels)
        - `chat:write` (send messages)
-       - `channels:history` (read public channels)
-       - `groups:history` (read private channels)
-       - `im:history` (read DMs)
-       - `channels:read` (list channels)
-       - `groups:read` (list private channels)
        - `users:read` (look up display names)
+       - `reactions:write` (add reactions to messages)
   </Step>
   
   <Step title="Install to workspace">
