@@ -1,6 +1,7 @@
 ---
 title: Discord integration
 description: Add Discord as a messaging channel for NanoClaw using the /add-discord skill for team collaboration
+tag: "UPDATED"
 ---
 
 import RestartService from "/snippets/restart-service.mdx";
@@ -346,6 +347,17 @@ export class DiscordChannel implements Channel {
     **User Settings** → **Advanced** → **Developer Mode** → On
     
     Then right-click the channel name → **Copy Channel ID**
+  </Accordion>
+
+  <Accordion title="Gateway listener keeps failing or appears IP-blocked">
+    The Chat SDK Discord bridge restarts the Gateway listener when it expires or errors. Restarts use **exponential backoff capped at 1 hour** (1s, 2s, 4s, 8s, …). The retry counter resets after a listener stays healthy for more than 5 minutes.
+
+    This avoids hammering Discord's Gateway when an unrecoverable failure occurs (for example, an invalid bot token), which previously caused Discord's Cloudflare layer to issue multi-hour IP blocks.
+
+    If you see repeated `Gateway listener error, retrying` log lines:
+    1. Check that `DISCORD_BOT_TOKEN` is valid and not revoked.
+    2. Confirm **Privileged Gateway Intents** are enabled in the Developer Portal.
+    3. If you've been IP-blocked by Cloudflare, fix the token first — backoff prevents new blocks but does not lift an existing one. Wait for the block to expire before restarting NanoClaw.
   </Accordion>
 </AccordionGroup>
 
