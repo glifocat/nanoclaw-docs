@@ -87,6 +87,14 @@ Per-wiring `sender_scope` controls who can trigger the agent:
 
 Messages are formatted for the agent with sender information, timestamps, and metadata. The agent-runner inside the container handles formatting for the configured provider.
 
+## Default reply destination
+
+Every response the agent emits must be wrapped in a `<message to="name">...</message>` block, where `name` is one of the destinations in its live destination map. Inbound messages carry a `from="name"` attribute that names the destination they arrived through.
+
+By default, the agent replies to the same destination the inbound message came `from`. It only addresses a different destination when the request explicitly asks it to (e.g., "tell Laura that…"). This keeps replies in-channel without requiring per-message routing logic.
+
+To send a message mid-response — for example, an acknowledgment before a long-running task — the agent calls the `send_message` MCP tool with `to` set to a destination name.
+
 ## Channel-aware formatting
 
 <Note>
