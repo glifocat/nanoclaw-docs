@@ -117,7 +117,7 @@ The host sweep (`src/host-sweep.ts`) runs every 60 seconds:
 
 **Session inbound.db** (host writes, container reads):
 
-- **messages_in** — inbound messages with status, `process_after`, recurrence, `series_id`, and trigger flag
+- **messages_in** — inbound messages with status, `process_after`, recurrence, `series_id`, trigger flag, and (for A2A inbound) `source_session_id` for return-path routing
 - **delivered** — tracks delivery outcomes
 - **destinations** — live destination map (channels and other agents)
 - **session_routing** — default reply routing
@@ -135,7 +135,7 @@ Modules self-register via barrel imports and provide optional hooks into the rou
 
 - **Permissions** — sender resolution, access gating, channel approval, sender approval
 - **Scheduling** — task creation, pause/resume/cancel/update via delivery actions
-- **Agent-to-agent** — cross-agent message routing
+- **Agent-to-agent** — cross-agent message routing with origin-aware return paths so replies land in the session that asked the question, not just the target's newest active session
 - **Approvals** — interactive question cards
 - **Self-mod** — agent self-modification requests
 - **Typing** — typing indicator management

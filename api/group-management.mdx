@@ -146,7 +146,7 @@ Each session has two databases in `data/v2-sessions/{agent_group_id}/{session_id
 
 | Table | Purpose |
 |-------|---------|
-| `messages_in` | Inbound messages, tasks, system notifications |
+| `messages_in` | Inbound messages, tasks, system notifications. A2A inbound rows carry `source_session_id` for reply return-path routing |
 | `delivered` | Delivery tracking |
 | `destinations` | Live destination map |
 | `session_routing` | Default reply routing |
@@ -155,7 +155,7 @@ Each session has two databases in `data/v2-sessions/{agent_group_id}/{session_id
 
 | Table | Purpose |
 |-------|---------|
-| `messages_out` | Outbound messages |
+| `messages_out` | Outbound messages, including `in_reply_to` stamped by the agent's MCP tools for A2A reply correlation |
 | `processing_ack` | Processing acknowledgments |
 | `session_state` | Persistent key/value store |
 | `container_state` | Tool-in-flight tracking |
