@@ -120,7 +120,7 @@ The host sweep (`src/host-sweep.ts`) runs every 60 seconds:
 - **messages_in** — inbound messages with status, `process_after`, recurrence, `series_id`, and trigger flag
 - **delivered** — tracks delivery outcomes
 - **destinations** — live destination map (channels and other agents)
-- **session_routing** — default reply routing
+- **session_routing** — default reply routing (used as a fallback; outbound dispatch resolves `thread_id` per-destination from the latest matching `messages_in` row)
 
 **Session outbound.db** (container writes, host reads):
 

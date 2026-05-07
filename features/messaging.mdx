@@ -85,7 +85,40 @@ Per-wiring `sender_scope` controls who can trigger the agent:
 
 ## Message formatting
 
-Messages are formatted for the agent with sender information, timestamps, and metadata. The agent-runner inside the container handles formatting for the configured provider.
+The agent-runner formats every inbound row as XML so the agent can see who sent what and where it came from. Each message kind has its own tag, and every tag carries a `from="<destination>"` attribute identifying the originating channel.
+
+| Message kind | Format |
+|--------------|--------|
+| Chat | `<message from="..." sender="..." time="..."> ... </message>` |
+| Scheduled task | `<task from="..." time="..."> ... </task>` |
+| Webhook | `<webhook from="..." source="..." event="..."> ... </webhook>` |
+| System response | `<system_response from="..." action="..." status="..."> ... </system_response>` |
+
+When the routing fields don't match a known destination (e.g., the destination was removed mid-flight), `from` falls back to `unknown:<channel_type>:<platform_id>` so nothing is silently dropped.
+
+## Explicit destination addressing
+
+Outbound text from the agent **must** be wrapped in `<message to="name">...</message>` blocks — including in single-destination groups. Bare text is treated as scratchpad and logged but not sent.
+
+- `<internal>...</internal>` makes scratchpad intent explicit.
+- A single response can contain multiple `<message>` blocks targeting different destinations.
+- The `from=` attribute on each inbound message tells the agent exactly which destination to reply to.
+
+This removes the legacy bare-text fallback that auto-routed to a session's originating channel, which could drop replies on follow-up turns in `agent-shared` sessions where the initial batch had null routing (e.g., a cron task arriving before a chat message).
+
+## Per-destination thread resolution
+
+In `agent-shared` sessions, multiple channels share one session, so a single global `thread_id` would stamp one channel's thread onto another. When dispatching an outbound `<message to="name">`, the agent-runner queries `messages_in` for the most recent inbound row matching that destination's `channel_type` + `platform_id` and inherits *that* row's `thread_id`. If no prior inbound exists for the destination, the reply lands at the channel's top level.
+
+## Compaction continuity
+
+A `PreCompact` hook (registered in each group's `.claude-shared/settings.json`) runs `bun /app/src/compact-instructions.ts` and feeds the compactor custom instructions to preserve message routing through context compaction:
+
+- Recent messages keep their full XML structure (`<message>`, `<task>`, `<webhook>` tags with all attributes).
+- The chronological message/reply sequence is preserved.
+- The list of available destinations is included so the agent continues addressing replies correctly after compaction.
+
+Existing groups pick up the hook automatically — `initGroupFilesystem` patches their `settings.json` on the next group init.
 
 ## Channel-aware formatting
 

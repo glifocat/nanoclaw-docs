@@ -56,6 +56,18 @@ Per-agent decision based on the wiring's `engage_mode`:
 
 Engaging agents get a session write and container wake. Non-engaging agents with `ignored_message_policy='accumulate'` get the message stored with `trigger=0`.
 
+## Outbound dispatch (container side)
+
+The agent-runner parses the agent's final text for `<message to="name">...</message>` blocks and dispatches each one to its resolved destination. There is no bare-text fallback — text outside of `<message>` blocks is scratchpad only, logged but not sent.
+
+This applies even to single-destination groups: every response must explicitly name its destination. The previous "single-destination shortcut" (auto-routing bare text to the session's originating channel or sole destination) was removed because it silently dropped replies in `agent-shared` sessions where the initial batch had null routing.
+
+### Per-destination thread resolution
+
+When dispatching to a destination, `resolveDestinationThread()` queries `messages_in` for the most recent inbound row matching the destination's `channel_type` + `platform_id` and uses that row's `thread_id` and `id` (as `in_reply_to`). Each destination resolves its own thread context instead of inheriting a single global `routing.threadId` — which previously caused cross-channel thread bleed in `agent-shared` sessions.
+
+If no prior inbound exists for the destination, `thread_id` falls back to `null` (top-level channel message).
+
 ## Module hooks
 
 The router accepts optional pluggable hooks:

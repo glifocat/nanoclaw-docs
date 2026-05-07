@@ -172,13 +172,29 @@ flowchart TD
 
 If a task requires agent judgment every time (daily briefings, reminders, reports), skip the script — just use a regular prompt.
 
+## Task message format
+
+Tasks are presented to the agent as XML, not as a `[SCHEDULED TASK]` plaintext header. Each `kind='task'` row renders as:
+
+```xml
+<task from="dest-name" time="2026-05-07T09:00:00-07:00">
+Script output:
+{ "wakeAgent": true, "data": { ... } }
+
+Instructions:
+Review open PRs
+</task>
+```
+
+The `from` attribute identifies the originating destination so the agent can address its reply correctly. When the task's routing fields don't match a known destination, `from` falls back to `unknown:<channel_type>:<platform_id>`.
+
 ## Sending messages from tasks
 
-Tasks can send messages using the `send_message` MCP tool. The delivery system routes these through the standard delivery pipeline with the same authorization checks as interactive messages.
+Tasks can send messages by wrapping output in `<message to="dest-name">...</message>` blocks (the same explicit-addressing rule that applies to all agent output). Tasks can also use the `send_message` MCP tool for mid-execution acknowledgments. The delivery system routes both paths through the standard delivery pipeline with the same authorization checks as interactive messages.
 
 **Silent tasks:**
 
-If a task doesn't call `send_message`, it completes silently — the result is tracked via `processing_ack` but no message is sent to any channel.
+If a task produces no `<message>` blocks and never calls `send_message`, it completes silently — the result is tracked via `processing_ack` but no message is sent to any channel. Bare text outside `<message>` blocks is scratchpad and is not delivered.
 
 ## Sequence numbers
 
