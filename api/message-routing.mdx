@@ -69,6 +69,26 @@ The router accepts optional pluggable hooks:
 
 All hooks are optional. Without the permissions module, the system is allow-all.
 
+## Outbound dispatch (in-container)
+
+Before delivery, the agent runner parses the agent's final text and dispatches each `<message to="name">...</message>` block to the named destination.
+
+- Bare text outside `<message>` blocks is **scratchpad** — logged but never sent.
+- `<internal>...</internal>` makes scratchpad intent explicit and is stripped before logging.
+- Wrapping is **required**, even with a single configured destination. There is no fallback that sends bare text to the originating channel.
+
+### Per-destination thread resolution
+
+For each dispatched block, `thread_id` and `in_reply_to` are resolved per destination by querying the most recent inbound message that matches the destination's `channel_type` and `platform_id`:
+
+```sql
+SELECT thread_id, id FROM messages_in
+WHERE channel_type = ? AND platform_id = ?
+ORDER BY seq DESC LIMIT 1
+```
+
+This matters in `agent-shared` sessions, where one session serves multiple messaging groups with distinct thread contexts. If the lookup misses, the runner falls back to the session's inbound routing context.
+
 ## Outbound delivery
 
 ### Delivery polls

@@ -85,7 +85,41 @@ Per-wiring `sender_scope` controls who can trigger the agent:
 
 ## Message formatting
 
-Messages are formatted for the agent with sender information, timestamps, and metadata. The agent-runner inside the container handles formatting for the configured provider.
+Each inbound message is wrapped in an XML element so the agent can see who sent it, when, and from which destination. The `from` attribute carries the destination name resolved from the message's channel and platform ID — the agent uses it to address responses correctly.
+
+| Kind | Format |
+|------|--------|
+| `chat` | `<message id="..." from="..." sender="..." time="..." reply_to="...">...</message>` |
+| `task` | `<task from="..." time="...">Instructions: ...</task>` |
+| `webhook` | `<webhook from="..." source="..." event="...">{...payload...}</webhook>` |
+| `system` | `<system_response from="..." action="..." status="...">{...result...}</system_response>` |
+
+If routing fields can't be matched to a known destination, `from` falls back to `unknown:<channel_type>:<platform_id>` so nothing is silently dropped.
+
+## Response wrapping
+
+The agent **must wrap every response** in a `<message to="name">...</message>` block — this is required even when only one destination is configured. The destinations and required syntax are injected into the system prompt at wake time:
+
+```
+## Sending messages
+
+You can send messages to the following destinations:
+
+- `discord-test`
+- `slack-test`
+
+**Every response must be wrapped** in a `<message to="name">...</message>` block.
+```
+
+Multiple `<message>` blocks can be included in a single response to fan out to several destinations. Text outside of `<message>` blocks is treated as **scratchpad** — logged but not sent. Use `<internal>...</internal>` to make scratchpad intent explicit.
+
+### Per-destination thread resolution
+
+In `agent-shared` sessions where one agent serves multiple messaging groups, each destination may have a different thread context. When dispatching a `<message to="name">` block, the agent runner resolves `thread_id` and `in_reply_to` from the most recent inbound message matching that destination's channel and platform — never from a single global routing context. This prevents one channel's thread from being stamped onto another.
+
+### Compaction safety
+
+Claude Code's PreCompact hook (`bun /app/src/compact-instructions.ts`) emits custom instructions during context compaction so the summary preserves the routing XML structure (`<message from="...">`, `<task from="...">`, `<webhook from="...">`) and the chronological exchange order. The agent must keep seeing which destination sent each message — otherwise it can't address replies correctly after a compaction. The hook is added automatically to every agent group's `settings.json` on init, and back-filled on existing groups.
 
 ## Channel-aware formatting
 
