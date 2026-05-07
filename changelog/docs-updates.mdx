@@ -5,6 +5,17 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Explicit destination addressing + per-destination threading" description="2026-05-07" tags={["Updated"]}>
+  Documented the agent-runner change ([qwibitai/nanoclaw#2329](https://github.com/qwibitai/nanoclaw/pull/2329)) that requires every agent response to be wrapped in `<message to="name">...</message>` blocks and resolves `thread_id` per-destination.
+
+  ## Updated
+  - **`features/messaging.mdx`** — new sections on the XML format for chats/tasks/webhooks/system responses, the `from=` origin attribute, the explicit-addressing requirement (no more bare-text fallback), per-destination thread resolution in `agent-shared` sessions, and the `PreCompact` hook that preserves routing through compaction.
+  - **`api/message-routing.mdx`** — added "Outbound dispatch (container side)" with details on the removed bare-text shortcut and `resolveDestinationThread()`.
+  - **`concepts/tasks.mdx`** — task message format is now `<task from="..." time="...">` (replaces the old `[SCHEDULED TASK]` plaintext header). Tasks must wrap output in `<message to="name">` blocks; bare text is scratchpad.
+  - **`advanced/ipc-system.mdx`** — added "Outbound dispatch and explicit addressing" and "PreCompact hook" sections; clarified that `session_routing` is a fallback while dispatch resolves `thread_id` per-destination.
+  - **`concepts/architecture.mdx`**, **`advanced/container-runtime.mdx`** — clarified `session_routing` role vs. per-destination thread resolution.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 

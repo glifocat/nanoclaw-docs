@@ -105,7 +105,7 @@ graph LR
 | `messages_in` | Inbound messages with status, `process_after`, recurrence, `series_id`, trigger flag |
 | `delivered` | Tracks delivery outcomes for outbound message IDs |
 | `destinations` | Live destination map for the agent (channels and other agents). Overwritten on every wake |
-| `session_routing` | Single-row default reply routing (channel_type, platform_id, thread_id) |
+| `session_routing` | Single-row default reply routing (channel_type, platform_id, thread_id). Used as a fallback only — outbound dispatch resolves `thread_id` per-destination from the most recent matching `messages_in` row |
 
 ### outbound.db (container writes, host reads)
 
@@ -115,6 +115,22 @@ graph LR
 | `processing_ack` | Tracks which inbound messages the container has processed |
 | `session_state` | Persistent key/value store (e.g., SDK session ID for resume across restarts) |
 | `container_state` | Tool-in-flight state (tool name, declared timeout, start time) for stuck-detection |
+
+## Outbound dispatch and explicit addressing
+
+The agent-runner parses the agent's final text for `<message to="name">...</message>` blocks and dispatches each one to the named destination. There is no bare-text fallback — every response must be wrapped in a `<message>` block, even in single-destination groups. Text outside of blocks is scratchpad (logged via `<internal>...</internal>` for explicit intent).
+
+When dispatching to a destination, the runner resolves `thread_id` per-destination by reading the most recent `messages_in` row matching the destination's `channel_type` + `platform_id`. This prevents cross-channel thread bleed in `agent-shared` sessions where multiple channels share one session.
+
+## PreCompact hook
+
+Each group's `.claude-shared/settings.json` registers a `PreCompact` shell hook that runs `bun /app/src/compact-instructions.ts`. Claude Code captures the hook's stdout and passes it to the compactor as custom instructions, ensuring routing context survives compaction:
+
+- Recent messages retain their full XML structure (`<message>`, `<task>`, `<webhook>`) with all attributes.
+- The chronological message/reply sequence is preserved.
+- The available destinations list is included so the agent continues addressing replies correctly post-compaction.
+
+Existing groups pick up the hook on the next group init via `ensurePreCompactHook()`, which patches an existing `settings.json` if the hook is missing.
 
 ## MCP tools (container-side)
 

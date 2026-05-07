@@ -94,7 +94,7 @@ In v2, all communication between host and container uses two SQLite databases pe
 | `messages_in` | Inbound messages, tasks, system notifications |
 | `delivered` | Tracks delivery outcomes for outbound message IDs |
 | `destinations` | Live destination map (channels and other agents) |
-| `session_routing` | Default reply routing (channel_type, platform_id, thread_id) |
+| `session_routing` | Default reply routing (channel_type, platform_id, thread_id) — outbound dispatch resolves `thread_id` per-destination from the latest matching `messages_in` row |
 
 ### outbound.db (container writes, host reads)
 
