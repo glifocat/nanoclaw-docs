@@ -5,6 +5,15 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="A2A reply return-path routing" description="2026-05-08" tags={["Updated"]}>
+  Documented the agent-to-agent reply routing fix from [qwibitai/nanoclaw#2267](https://github.com/qwibitai/nanoclaw/pull/2267). When a target agent group has multiple active sessions, A2A replies now route back to the session that asked the question via the new `source_session_id` column on `messages_in` and `in_reply_to` threading on `messages_out`.
+
+  ## Updated
+  - **`api/message-routing.mdx`**: new "Agent-to-agent return-path routing" section covering the three-layer resolution (direct return-path, peer-affinity fallback, legacy newest-active-session fallback)
+  - **`concepts/architecture.mdx`**: `messages_in` schema note for `source_session_id`; module summary updated to describe origin-aware A2A routing
+  - **`api/group-management.mdx`**: session-database table notes for the new `source_session_id` and `in_reply_to` fields
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 

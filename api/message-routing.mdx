@@ -86,10 +86,20 @@ For each session with due outbound messages:
 2. Filter already-delivered via `inbound.db`'s `delivered` table
 3. Route by `kind`:
    - `system` — dispatch to registered delivery action handlers
-   - `channel_type='agent'` — agent-to-agent module
+   - `channel_type='agent'` — agent-to-agent module (see [return-path routing](#agent-to-agent-return-path-routing))
    - Normal — permission check, then channel adapter delivery
 4. Mark delivered in `inbound.db`
 5. Clean up `outbox/` files (best-effort)
+
+## Agent-to-agent return-path routing
+
+When an agent emits a reply to another agent group, the target may have multiple active sessions. The router resolves the destination session in three layers, highest fidelity first:
+
+1. **Direct return-path** — if the outbound carries `in_reply_to`, the router opens the source session's `inbound.db`, reads the triggering row's `source_session_id`, and routes to that session.
+2. **Peer-affinity fallback** — when `in_reply_to` is absent or doesn't resolve, the router uses the most recent A2A inbound from the same peer agent group whose `source_session_id` is non-null.
+3. **Legacy fallback** — newest active session for the target agent group (pre-migration compatibility).
+
+The `source_session_id` column on `messages_in` is stamped when an outbound A2A message is converted to the target's inbound row. The container's MCP `send_message` and `send_file` tools thread the current batch's `in_reply_to` onto every outbound row so the host can correlate replies back to the originating session.
 
 ### Delivery actions
 
