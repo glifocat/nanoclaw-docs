@@ -6,6 +6,10 @@ tag: "UPDATED"
 
 In v2, NanoClaw uses a new entity model that separates agent groups (workspaces) from messaging groups (platform chats). These are connected through wirings — many-to-many relationships stored in `messaging_group_agents`.
 
+<Note>
+For day-to-day inspection and modification of these entities, use the [`ncl` admin CLI](/features/admin-cli). It exposes `groups`, `messaging-groups`, `wirings`, `users`, `roles`, `members`, and `destinations` as resources with `list`/`get`/`create`/`update`/`delete` (or composite-key equivalents).
+</Note>
+
 ## Entity model
 
 ### Agent groups
