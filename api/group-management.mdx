@@ -160,6 +160,16 @@ Each session has two databases in `data/v2-sessions/{agent_group_id}/{session_id
 | `session_state` | Persistent key/value store |
 | `container_state` | Tool-in-flight tracking |
 
+## Managing entities from the terminal
+
+Every entity table in this page is exposed through the [`ncl` admin CLI](/features/admin-cli) — list, get, create, update, delete (or grant/revoke for composite-key resources). On the host, `ncl` connects through `data/ncl.sock` (chmod `0600`); inside agent containers, it routes through the same per-session DBs as every other host ↔ container message and gates write commands behind admin approval.
+
+```bash
+ncl groups list
+ncl wirings create --messaging-group-id mg_xyz --agent-group-id abc123 --session-mode shared
+ncl roles grant --user telegram:jane --role admin --group abc123
+```
+
 ## Channel approval flow
 
 When a message arrives on an unwired channel:

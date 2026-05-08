@@ -8,6 +8,10 @@ keywords: ["cli", "claw", "terminal", "command line", "scripting", "automation"]
 
 `claw` is a Python CLI that sends prompts directly to a NanoClaw agent container from the terminal. It reads registered groups from the NanoClaw database, picks up secrets from `.env`, and pipes a JSON payload into a container run — no chat app required.
 
+<Note>
+For managing agent groups, wirings, users, roles, and other configuration, use the [`ncl` admin CLI](/features/admin-cli). `claw` sends prompts; `ncl` manages the configuration that backs every agent.
+</Note>
+
 Use cases include:
 
 - **Scripting and automation** — pipe output from one tool into an agent, or pipe the agent's result into another tool

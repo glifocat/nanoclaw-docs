@@ -116,6 +116,7 @@
               "features/agent-swarms",
               "features/customization",
               "features/cli",
+              "features/admin-cli",
               "features/web-access",
               "features/voice-transcription",
               "features/image-vision",
