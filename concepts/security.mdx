@@ -142,6 +142,15 @@ When an unknown sender messages on a `request_approval` channel:
 2. **Approve** — adds sender to `agent_group_members`, replays the original message
 3. **Deny** — deletes the pending row (future messages from this sender re-trigger)
 
+#### CLI command approval flow
+
+When a container agent runs an approval-gated [`ncl`](/features/admin-cli) write command (e.g. `ncl groups create`, `ncl roles grant`):
+
+1. The dispatcher returns `approval-pending` and does not execute the command
+2. `pickApprover` selects an approver (scoped admin → global admin → owner) and DMs them an approval card with the exact command and arguments
+3. **Approve** — the registered `cli_command` handler re-dispatches the original frame as a host caller; the result is delivered to the agent as a system message
+4. **Deny** — the agent is notified that the request was rejected
+
 ### 4. Session isolation
 
 Each session has isolated databases at `data/v2-sessions/{agent_group_id}/{session_id}/`:
