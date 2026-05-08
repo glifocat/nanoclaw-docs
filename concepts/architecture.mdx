@@ -246,6 +246,7 @@ Source code is NOT baked into the image. `/app/src` is a read-only bind mount fr
 4. **Delivery adapter bridge** — bridges the delivery system to channel adapters for `deliver()` and `setTyping()` calls
 5. **Delivery polls** — starts active poll (1s for running containers) and sweep poll (60s for all active sessions)
 6. **Host sweep** — 60s sweep for processing_ack sync, stale detection, due-message wake, and recurrence advancement
+7. **Admin CLI server** — binds the [`ncl`](/features/admin-cli) Unix socket at `data/ncl.sock` (chmod `0600`) so the host- and container-side CLIs can dispatch through the same registry
 
 ## Graceful shutdown
 
@@ -253,8 +254,9 @@ On `SIGTERM` or `SIGINT`:
 
 1. Registered shutdown callbacks execute in order
 2. Delivery polls stop
-3. Channel adapters tear down gracefully
-4. Process exits
+3. The admin CLI socket server stops accepting connections
+4. Channel adapters tear down gracefully
+5. Process exits
 
 <Warning>
 Modules and channel adapters register their own shutdown callbacks. The shutdown sequence is determined by registration order.

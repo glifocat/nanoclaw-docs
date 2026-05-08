@@ -180,9 +180,22 @@ Container concurrency is managed globally:
 4. **Use global memory for shared context**: avoid duplicating common knowledge
 5. **Set `sender_scope=known` for sensitive groups**: restricts to authorized users
 
+## Managing groups and wirings
+
+Use the [`ncl` admin CLI](/features/admin-cli) to query and modify agent groups, messaging groups, wirings, members, and roles from the terminal:
+
+```bash
+ncl groups list
+ncl wirings create --messaging-group-id mg_xyz --agent-group-id abc123 --session-mode shared
+ncl members add --user-id telegram:jane --agent-group-id abc123
+```
+
+Agents can also run `ncl` from inside their container — write commands are gated behind admin approval.
+
 ## Related topics
 
 - [Security model and trust boundaries](/concepts/security)
 - [Container isolation details](/concepts/containers)
 - [Scheduled tasks per group](/concepts/tasks)
 - [System architecture](/concepts/architecture)
+- [Admin CLI (ncl)](/features/admin-cli)
