@@ -77,11 +77,64 @@ The agent container is built from `container/Dockerfile` and includes:
 
 ### Per-agent-group images
 
-Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image:
+Agent groups can specify custom packages in their container config (stored in the `container_configs` DB table). The host builds a derived Docker image:
 
 - Tag: derived from the checkout-scoped base image and agent group
 - Built on top of `nanoclaw-agent-v2-<slug>:latest`
 - Adds custom apt and npm packages
+- Resulting image tag is written back to the `container_configs.image_tag` column
+
+## Container configuration storage
+
+Per-agent-group runtime config lives in the `container_configs` table in the central DB. The legacy `groups/<folder>/container.json` file is now a **materialized view** — written by the host at spawn time, read by the container at startup. The container has no idea the DB exists; nothing inside the container changed.
+
+### Schema
+
+The `container_configs` table has one row per agent group, with both scalar and JSON columns:
+
+| Column | Type | Purpose |
+|---|---|---|
+| `agent_group_id` | TEXT (PK, FK) | References `agent_groups.id` (cascades on delete) |
+| `provider` | TEXT | Agent provider override (`claude`, `opencode`, etc.) |
+| `model` | TEXT | Model name (e.g., `claude-sonnet-4-6`) |
+| `effort` | TEXT | Reasoning effort hint |
+| `image_tag` | TEXT | Persisted Docker image tag for per-group builds |
+| `assistant_name` | TEXT | Display name in system prompt |
+| `max_messages_per_prompt` | INTEGER | Override for `MAX_MESSAGES_PER_PROMPT` |
+| `skills` | TEXT (JSON) | `"all"` or `["skill1", ...]` |
+| `mcp_servers` | TEXT (JSON) | `Record<string, McpServerConfig>` |
+| `packages_apt` | TEXT (JSON) | `string[]` of apt packages |
+| `packages_npm` | TEXT (JSON) | `string[]` of npm packages |
+| `additional_mounts` | TEXT (JSON) | `AdditionalMountConfig[]` |
+| `updated_at` | TEXT | ISO timestamp |
+
+### Backfill
+
+On startup, the host runs a one-time backfill that seeds `container_configs` rows from any existing `groups/<folder>/container.json` files (and the legacy `agent_groups.agent_provider` column). The backfill is idempotent — it skips groups that already have a row.
+
+### Provider cascade
+
+Provider resolution simplified from a 3-step cascade to 2 steps:
+
+```
+sessions.agent_provider
+  → container_configs.provider
+  → 'claude'
+```
+
+The legacy `agent_groups.agent_provider` column is retained for backwards compat but no longer participates in resolution. Configure provider via `ncl groups config-update --id <group-id> --provider <name>`.
+
+### Updating config
+
+All writes go through the DB layer:
+
+- **`ncl groups config-update`** — change scalar fields (`--provider`, `--model`, `--effort`, `--image-tag`, `--assistant-name`, `--max-messages-per-prompt`)
+- **`ncl groups config-add-mcp-server`** / **`config-remove-mcp-server`** — manage MCP servers
+- **`ncl groups config-add-package`** / **`config-remove-package`** — manage apt/npm packages
+- **Self-mod approvals** (`install_packages`, `add_mcp_server`) — write to DB instead of file
+- **`ncl groups config-get`** — view current config (open access; others require approval)
+
+After most config changes, `restartAgentGroupContainers()` kills running sessions and schedules a wake message so the host sweep respawns them with fresh config.
 
 ## Two-database IO model
 
@@ -120,8 +173,8 @@ Three invariants are critical for correctness:
 Containers are spawned by the `spawnContainer` function. Wake calls are deduplicated via an in-flight promise map.
 
 <Steps>
-  <Step title="Read agent group config">
-    The host reads `container.json` and resolves provider contributions.
+  <Step title="Materialize container config">
+    The host reads the agent group's row from the `container_configs` DB table and writes it as `groups/<folder>/container.json`. This file is a materialized view — the DB is the source of truth, and the file is regenerated on every spawn so the runner always sees fresh config. Provider contributions are resolved from this config.
   </Step>
 
   <Step title="Build volume mounts">
@@ -151,7 +204,7 @@ Containers are spawned by the `spawnContainer` function. Wake calls are deduplic
 |------|---------------|------|---------|
 | Session folder | `/workspace` | RW | inbound.db, outbound.db, outbox/, inbox/ |
 | Agent group folder | `/workspace/agent` | RW | Working files |
-| container.json | `/workspace/agent/container.json` | RO | Nested read-only config |
+| container.json | `/workspace/agent/container.json` | RO | Materialized from DB at spawn time |
 | Composed CLAUDE.md | `/workspace/agent/CLAUDE.md` | RO | Regenerated each spawn |
 | Global memory | `/workspace/global` | RO | Shared instructions |
 | Agent-runner source | `/app/src` | RO | Bind mount from host |

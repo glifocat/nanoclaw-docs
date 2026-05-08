@@ -17,14 +17,16 @@ interface AgentGroup {
   id: string;             // Unique identifier
   name: string;           // Display name
   folder: string;         // Filesystem folder name
-  agent_provider?: string; // Optional provider override
+  /** @deprecated Use container_configs.provider instead. */
+  agent_provider: string | null;
   created_at: string;     // ISO timestamp
 }
 ```
 
 - Each agent group has a folder under `groups/{folder}/`
-- Container configuration lives on disk (`container.json`), not in the database
+- Container configuration lives in the `container_configs` DB table (one row per agent group); the file `groups/<folder>/container.json` is materialized at spawn time
 - Each gets its own OneCLI agent identifier for credential scoping
+- `agent_provider` is deprecated — use `ncl groups config-update --provider` to set the provider on the `container_configs` row instead
 
 ### Messaging groups
 
@@ -44,6 +46,30 @@ interface MessagingGroup {
 - Unique on `(channel_type, platform_id)`
 - Auto-created on first mention or DM
 - `denied_at` silently drops future mentions
+
+### Container configs
+
+Per-agent-group runtime config:
+
+```typescript
+interface ContainerConfigRow {
+  agent_group_id: string;            // PK and FK to agent_groups.id
+  provider: string | null;           // 'claude', 'opencode', etc.
+  model: string | null;              // Model name (e.g., 'claude-sonnet-4-6')
+  effort: string | null;             // Reasoning effort hint
+  image_tag: string | null;          // Persisted Docker image tag
+  assistant_name: string | null;     // Display name in system prompt
+  max_messages_per_prompt: number | null;
+  skills: string;                    // JSON: '"all"' | '["skill1","skill2"]'
+  mcp_servers: string;               // JSON: Record<string, McpServerConfig>
+  packages_apt: string;              // JSON: string[]
+  packages_npm: string;              // JSON: string[]
+  additional_mounts: string;         // JSON: AdditionalMountConfig[]
+  updated_at: string;
+}
+```
+
+Source of truth in the DB. Materialized to `groups/<folder>/container.json` at spawn time so the in-container runner can read it from the read-only mount. All writes go through `ncl groups config-*` operations or self-mod approvals — see [Container runtime](/advanced/container-runtime#container-configuration-storage) for the full list.
 
 ### Wirings (messaging_group_agents)
 
@@ -128,6 +154,7 @@ Session resolution depends on the wiring's `session_mode`:
 | Table | Purpose |
 |-------|---------|
 | `agent_groups` | Agent workspaces |
+| `container_configs` | Per-agent-group runtime config (provider, model, packages, MCP servers, mounts) |
 | `messaging_groups` | Platform chats/channels |
 | `messaging_group_agents` | Wirings with engage/scope/session config |
 | `users` | Namespaced platform identifiers |

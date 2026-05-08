@@ -13,8 +13,7 @@ In v2, NanoClaw uses a new entity model that separates **agent groups** (workspa
 An agent group is:
 
 - A workspace with its own folder under `groups/{name}/`
-- An optional provider configuration
-- A container configuration (`container.json`) with custom packages and mounts
+- A row in the `container_configs` DB table with provider, model, effort, packages, MCP servers, and additional mounts
 - The unit of credential scoping (each gets its own OneCLI agent)
 
 ### Messaging groups
@@ -137,7 +136,7 @@ The global memory directory (`groups/global/`) provides shared context:
 
 ## Additional mounts
 
-Agent groups can have extra directories mounted via `container.json`:
+Agent groups can have extra directories mounted via the `additional_mounts` JSON column on their `container_configs` row. The materialized `container.json` mounted into the container looks like this:
 
 ```json
 {
