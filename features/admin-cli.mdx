@@ -26,6 +26,13 @@ ncl help
 
 Flags use `--hyphen-case` (e.g. `--agent-group-id`) and are mapped to `underscore_case` DB columns automatically.
 
+`list` supports filtering by any non-auto column and pagination via `--limit` (default `200`):
+
+```bash
+ncl wirings list --messaging-group-id mg_xyz
+ncl sessions list --limit 50
+```
+
 ## Resources
 
 | Resource | Verbs | Description |
