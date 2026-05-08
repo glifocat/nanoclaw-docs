@@ -131,6 +131,8 @@ Docker is the default and works on all three platforms. Apple Container is an op
 | `NANOCLAW_AGENT_NAME` | Set the messaging-channel agent name; the CLI scratch agent remains `Terminal Agent` |
 | `SECRET_NAME` | OneCLI secret name for `setup/register-claude-token.sh` (default: `Anthropic`) |
 | `HOST_PATTERN` | OneCLI host pattern for `setup/register-claude-token.sh` (default: `api.anthropic.com`) |
+| `NANOCLAW_SETUP_ASSIST_MODE` | Set to `1` (or pass `--assist-mode`) to use the legacy non-interactive Claude assist on failure instead of the default interactive handoff |
+| `NANOCLAW_SKIP_CLAUDE_ASSIST` | Set to `1` to skip the Claude handoff/assist offer entirely when a step fails |
 
 If OneCLI is already installed and configured, setup asks whether to reuse it. For custom Anthropic-compatible model endpoints, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in `.env`.
 
