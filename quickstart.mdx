@@ -40,7 +40,9 @@ This guide covers the default installer. If you want to skip steps, reuse an exi
     - Pairing your first channel (Telegram, Discord, WhatsApp, Signal, Teams, Slack, iMessage, or the local CLI)
     - Installing a systemd or launchd service so NanoClaw starts with your machine
 
-    If any step fails, Claude Code is invoked automatically to diagnose and resume from where it broke. You don't have to debug the installer yourself.
+    If any step fails, the installer offers to hand off to an interactive Claude session preloaded with the failure context, the relevant source files, and the raw step log. You debug with full terminal access and type `/exit` (or press Ctrl-D) when you're ready to resume setup.
+
+    Set `NANOCLAW_SETUP_ASSIST_MODE=1` (or pass `--assist-mode`) to use the legacy non-interactive assist that proposes a single fix command instead. Set `NANOCLAW_SKIP_CLAUDE_ASSIST=1` to disable the handoff entirely.
   </Step>
 
   <Step title="Answer the setup prompts">
