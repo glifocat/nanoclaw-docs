@@ -6,6 +6,15 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.0.45" description="2026-05-08" tags={["Feature"]}>
+  - **Admin CLI (`ncl`).** New command for querying and modifying NanoClaw's central DB — agent groups, messaging groups, wirings, users, roles, members, destinations, sessions, approvals, and dropped messages. Host transport runs over a Unix socket; container transport runs over the session DB.
+  - **Approval flow for container-side writes.** When an agent inside a container runs an `ncl` write command (`create`/`update`/`delete`/`grant`/`revoke`/`add`/`remove`), the dispatcher sends an approval card to an admin instead of executing inline. On approve, the original frame is re-dispatched on the host and the result is delivered back to the agent as a system message.
+  - **List filtering and pagination.** `ncl <resource> list` accepts column filters as flags (e.g. `--messaging-group-id mg_xyz`) and a `--limit` (default 200). Run `ncl help` for usage. See [Admin CLI](/features/admin-cli).
+  - **`nc` → `ncl` rename.** The CLI binary, socket path, container wrapper, and error prefixes were renamed from `nc` to `ncl`. Setup adds a `~/.local/bin/ncl` symlink and a pnpm script alias.
+  - **v1 → v2 migration.** Run `bash migrate-v2.sh` from a v2 checkout. The script merges `.env`, seeds the v2 DB from `registered_groups`, copies group folders (`CLAUDE.md` → `CLAUDE.local.md`), copies session data with conversation continuity, ports scheduled tasks, interactively installs channels, copies container skills, builds the agent container, and offers a service switchover. Hands off to Claude (`/migrate-from-v1`) for owner seeding, access policy, CLAUDE.md cleanup, and fork customization porting.
+  - **Migration fixes.** `1b-db` resolves Discord DMs as `discord:@me:<id>` (previously skipped any v1 chat that wasn't a guild channel). `1c-groups` skips symlinks instead of following them. When `1b-db` reuses an auto-created `messaging_group` with no wired agents, its `unknown_sender_policy` is reconciled to the migration's `public` default.
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention

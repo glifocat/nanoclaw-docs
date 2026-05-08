@@ -1,0 +1,114 @@
+---
+title: Admin CLI (ncl)
+description: Query and modify NanoClaw's central configuration — agent groups, messaging groups, wirings, users, roles, members, and more — from the host or from inside an agent container
+keywords: ["ncl", "admin cli", "central db", "configuration", "approvals", "wirings", "roles"]
+tag: "NEW"
+---
+
+## Overview
+
+`ncl` is the admin CLI for NanoClaw. It reads and writes the central database — the single source of truth for agent groups, messaging groups, wirings, users, roles, members, destinations, sessions, approvals, and dropped messages.
+
+It runs in two places with the same surface:
+
+- **On the host**, talking to the running NanoClaw process over a Unix socket.
+- **Inside an agent container**, talking to the host through the session DB transport — so an agent can introspect or request changes without leaving its sandbox.
+
+The binary is `ncl` (renamed from `nc` in v2.0.45). On the host, setup symlinks it into `~/.local/bin`; inside containers it lives at `/usr/local/bin/ncl`.
+
+## Usage
+
+```
+ncl <resource> <verb> [<id>] [--flags]
+ncl <resource> help
+ncl help
+```
+
+- Flags use `--hyphen-case` (e.g. `--agent-group-id`); they are mapped to `underscore_case` columns automatically.
+- `list` accepts column filters (any non-auto column) and a `--limit` (default 200).
+- `<resource> help` prints all available fields, types, enums, and which fields are required or updatable.
+
+## Resources
+
+| Resource | Verbs | What it is |
+|----------|-------|------------|
+| `groups` | `list`, `get`, `create`, `update`, `delete` | Agent groups (workspace, personality, container config) |
+| `messaging-groups` | `list`, `get`, `create`, `update`, `delete` | A single chat or channel on one platform |
+| `wirings` | `list`, `get`, `create`, `update`, `delete` | Links a messaging group to an agent group (session mode, triggers) |
+| `users` | `list`, `get`, `create`, `update` | Platform identities (`<channel>:<handle>`) |
+| `roles` | `list`, `grant`, `revoke` | Owner / admin privileges (global or scoped to an agent group) |
+| `members` | `list`, `add`, `remove` | Unprivileged access gate for an agent group |
+| `destinations` | `list`, `add`, `remove` | Where an agent group can send messages |
+| `sessions` | `list`, `get` | Active sessions (read-only) |
+| `user-dms` | `list` | Cold-DM cache (read-only) |
+| `dropped-messages` | `list` | Messages from unregistered senders (read-only) |
+| `approvals` | `list`, `get` | Pending approval requests (read-only) |
+
+For composite-key resources (`roles`, `members`, `destinations`), use the custom verbs (`grant`/`revoke`, `add`/`remove`) instead of `create`/`delete`.
+
+## Access model
+
+- **Read commands** (`list`, `get`) are open from any caller.
+- **Write commands** (`create`, `update`, `delete`, `grant`, `revoke`, `add`, `remove`) run inline when invoked from the host. When invoked from inside a container, they go through the [approval flow](#approval-flow).
+
+## Approval flow
+
+When an agent inside a container runs a write command, the dispatcher does **not** execute it inline. Instead, it requests approval from an admin and notifies the agent when the result is ready.
+
+<Steps>
+  <Step title="Agent runs a write command">
+    For example: `ncl groups create --name "Research" --folder research`.
+  </Step>
+  <Step title="Dispatcher returns approval-pending">
+    The command returns immediately with `approval-pending`. It has **not** been executed yet.
+  </Step>
+  <Step title="Admin gets an approval card">
+    An admin or owner receives a notification (on the same channel when possible) showing exactly what the agent requested, with approve/reject options. Approvers are resolved from the `user_roles` table — preference order: scoped admins for the agent group, then global admins, then owners.
+  </Step>
+  <Step title="Result delivered as a system message">
+    On approve, the original frame is re-dispatched on the host (`caller: 'host'`) and the result is delivered back to the agent as a system message. On reject, the agent is told the request was rejected.
+  </Step>
+</Steps>
+
+The agent doesn't need to poll or retry — the result arrives automatically.
+
+<Note>
+`approval-pending` is not an error. Agents should treat it as the normal acknowledgement for any write command and wait for the system message with the final result.
+</Note>
+
+## Examples
+
+```bash
+# Read commands (no approval needed, work from host or container)
+ncl groups list
+ncl groups get abc123
+ncl wirings list --messaging-group-id mg_xyz
+ncl wirings list --limit 50
+ncl roles list
+ncl wirings help
+```
+
+```bash
+# Write commands (inline on host, approval-gated from container)
+ncl groups create --name "Research" --folder research
+ncl groups update abc123 --name "Research v2"
+ncl roles grant --user telegram:jane --role admin
+ncl roles grant --user discord:bob --role admin --group abc123
+ncl members add --user-id telegram:jane --agent-group-id abc123
+ncl destinations add --agent-group-id abc123 --messaging-group-id mg_xyz
+```
+
+## Transports
+
+| Caller | Transport | Source |
+|--------|-----------|--------|
+| Host shell | Unix socket | `src/cli/socket-server.ts`, `src/cli/socket-client.ts` |
+| Container agent | Session DB (request frame on outbound, response on inbound) | `container/agent-runner/src/cli/ncl.ts` |
+
+Both transports call the same dispatcher (`src/cli/dispatch.ts`); only the `CallerContext` differs. Generic CRUD is registered through `src/cli/crud.ts`, with per-resource definitions in `src/cli/resources/`.
+
+## Related
+
+- [Group management API](/api/group-management) — entity model behind the resources `ncl` exposes
+- [Message routing](/api/message-routing) — how wirings tie messaging groups to agent groups
+- [Security model](/advanced/security-model) — approval routing and role resolution

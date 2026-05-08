@@ -5,6 +5,16 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.45 sync: ncl admin CLI" description="2026-05-08" tags={["New"]}>
+  Documented the `ncl` admin CLI introduced in upstream v2.0.45.
+
+  ## New
+  - **`features/admin-cli.mdx`**: full reference for `ncl` — resource/verb table, host vs container transports (Unix socket on the host, session DB inside containers), `list` filtering and `--limit`, the approval flow for container-side writes (`approval-pending` → admin card → re-dispatch on approve → system message back to the agent), and example read/write commands.
+  - **`api/group-management.mdx`**: added a callout pointing readers to `ncl` for runtime inspection and modification of agent groups, messaging groups, wirings, users, roles, members, and destinations.
+  - **`changelog/index.mdx`**: v2.0.45 entry covering `ncl`, the approval flow for container-side writes, list filtering and pagination, the `nc` → `ncl` rename, and the v1 → v2 migration script.
+  - **Navigation**: `features/admin-cli` added to the Features group in `docs.json`.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
