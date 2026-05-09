@@ -74,7 +74,7 @@ Containers only see what's explicitly mounted. The v2 mount structure is differe
 |-------|---------------|------|---------|
 | Session folder | `/workspace` | Read-write | `inbound.db`, `outbound.db`, `outbox/`, `.claude/` |
 | Agent group folder | `/workspace/agent` | Read-write | Working files, `CLAUDE.local.md` |
-| Container config | `/workspace/agent/container.json` | Read-only | Nested RO mount (agent can't modify config) |
+| Container config | `/workspace/agent/container.json` | Read-only | Materialized from DB at spawn time (agent can't modify) |
 | Composed CLAUDE.md | `/workspace/agent/CLAUDE.md` | Read-only | Regenerated each spawn |
 | CLAUDE.md fragments | `/workspace/agent/.claude-fragments` | Read-only | Fragment files for composition |
 | Global memory | `/workspace/global` | Read-only | `groups/global/` directory |
@@ -82,10 +82,10 @@ Containers only see what's explicitly mounted. The v2 mount structure is differe
 | Agent-runner source | `/app/src` | Read-only | Shared source (bind mount from host) |
 | Container skills | `/app/skills` | Read-only | Shared skill definitions |
 | Claude SDK state | `/home/node/.claude` | Read-write | SDK state + skill symlinks |
-| Additional mounts | `/workspace/extra/{name}` | Per-config | From `container.json` (validated against allowlist) |
+| Additional mounts | `/workspace/extra/{name}` | Per-config | From container config (validated against allowlist) |
 
 <Warning>
-The `container.json` file is mounted read-only as a nested mount inside the read-write agent group folder. This prevents the agent from modifying its own container configuration.
+The `container.json` file is a **materialized view** of the DB-backed `container_configs` row. The host writes it at spawn time and mounts it read-only as a nested mount inside the read-write agent group folder. The agent cannot modify its own container configuration — config changes go through self-mod approvals or `ncl groups config <verb>` commands.
 </Warning>
 
 ### Mount security
@@ -142,18 +142,31 @@ Container spawning is deduplicated — concurrent wake calls for the same sessio
 - **Host-initiated**: `docker stop` sends SIGTERM; `tini` forwards to Bun process
 - **Stale detection**: host sweep detects containers with old heartbeats or stuck processing_ack
 - **Fallback**: SIGKILL if graceful stop fails
+- **`onExit` callback**: `killContainer` accepts an optional callback that fires after the process actually exits, used by the restart flow to guarantee the old container is gone before the new one spawns
 
 <Info>
 Even if the container crashes, all data in session databases and mounted directories persists. Only the container process itself is ephemeral.
 </Info>
 
+### Explicit restart
+
+`ncl groups restart --id <group-id> [--rebuild] [--message <text>]` kills running containers for the agent group and lets them respawn:
+
+- Without `--message`, containers come back on the next inbound message
+- With `--message`, an `on_wake` message is queued in `inbound.db` and the container respawns immediately via the `onExit` callback
+- `--rebuild` forces an image rebuild before respawn (useful after package changes)
+- Called from inside a container, `--id` is auto-filled and only the calling session is restarted
+
+The `on_wake` flag on `messages_in` ensures wake messages are delivered only on the fresh container's first poll iteration. This prevents the dying container — still in its SIGTERM grace window — from stealing the message before it exits.
+
 ## Per-agent-group images
 
-Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image with additional apt and npm packages:
+Agent groups can specify custom packages in their container config (the `container_configs` DB table — materialized to `container.json` at spawn time). The host builds a derived Docker image with additional apt and npm packages:
 
 - Image tag: derived from the checkout-scoped base image and agent group
 - Built on top of the base `nanoclaw-agent-v2-<slug>:latest` image
 - Cached — only rebuilt when package lists change
+- Image tag is persisted to the DB after build
 
 ## Timeouts
 
@@ -187,7 +200,7 @@ The `nanoclaw` MCP server provides tools for container-to-host communication via
 - `schedule_task`, `cancel_task`, `pause_task`, `resume_task`, `update_task` — task management
 - `list_tasks` — view scheduled tasks
 
-Additional MCP servers can be configured in `container.json`.
+Additional MCP servers can be configured per-agent-group via `ncl groups config add-mcp-server` (writes to the `container_configs` DB table).
 
 ### Global memory injection
 

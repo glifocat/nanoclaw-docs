@@ -133,21 +133,24 @@ cat groups/{group}/logs/container-{timestamp}.log
 
 ### Solutions
 
-<Accordion title="Increase timeout for specific group">
-  Modify the group's `containerConfig` in the database:
-  
+<Accordion title="Inspect or change a group's container config">
+  Container config lives in the `container_configs` table in `data/v2.db`. Inspect with the CLI:
+
   ```bash
-  sqlite3 store/messages.db
+  ncl groups config get --id <agent-group-id>
   ```
-  
-  ```sql
-  UPDATE registered_groups 
-  SET container_config = json_set(
-    COALESCE(container_config, '{}'),
-    '$.timeout',
-    3600000  -- 1 hour in milliseconds
-  )
-  WHERE name = 'Family Chat';
+
+  Update scalar fields (e.g., model, effort, image tag, max messages per prompt). Config writes only touch the DB — to apply the change to a running container, follow up with `ncl groups restart`:
+
+  ```bash
+  ncl groups config update --id <agent-group-id> --model claude-sonnet-4-6 --max-messages-per-prompt 20
+  ncl groups restart --id <agent-group-id>
+  ```
+
+  Or query directly with SQLite:
+
+  ```bash
+  sqlite3 data/v2.db "SELECT * FROM container_configs WHERE agent_group_id = '<id>';"
   ```
 </Accordion>
 
@@ -370,8 +373,8 @@ grep -E 'Mount validated|Mount.*REJECTED|mount' logs/nanoclaw.log | tail -10
 # Verify the mount allowlist is readable
 cat ~/.config/nanoclaw/mount-allowlist.json
 
-# Check group's container_config in DB
-sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;"
+# Check a group's container config (mounts and packages live here)
+sqlite3 data/v2.db "SELECT agent_group_id, additional_mounts, packages_apt, packages_npm FROM container_configs;"
 ```
 
 ### Solutions
