@@ -4,7 +4,7 @@ description: Environment variables and configuration options for NanoClaw contai
 tag: "UPDATED"
 ---
 
-NanoClaw configuration is managed through environment variables, the `.env` file, and the `src/config.ts` module. In v2, some configuration has moved to `container.json` per agent group.
+NanoClaw configuration is managed through environment variables, the `.env` file, and the `src/config.ts` module. In v2, per-agent-group container runtime config (provider, model, packages, MCP servers, mounts, skills, `cli_scope`) lives in the `container_configs` table in the central DB. The host materializes it to `groups/<folder>/container.json` at spawn time. Manage with `ncl groups config get/update`.
 
 ## Environment variables
 
@@ -92,6 +92,35 @@ All paths are absolute and resolved from the project root:
 <ResponseField name="MOUNT_ALLOWLIST_PATH" type="string">
   `~/.config/nanoclaw/mount-allowlist.json` — mount security allowlist (never mounted into containers)
 </ResponseField>
+
+## Per-agent-group container config
+
+Stored in the `container_configs` table in the central DB; one row per agent group. Materialized to `groups/<folder>/container.json` at spawn time. Edit only via `ncl` — do not modify `container.json` directly.
+
+Common fields:
+
+| Field | Description |
+|-------|-------------|
+| `provider`, `model` | Agent provider and model selection |
+| `packages.apt`, `packages.npm` | Extra apt and npm packages to bake into the per-group image |
+| `mcp_servers` | Additional MCP servers wired to the container |
+| `additional_mounts` | Extra host directories (validated against the mount allowlist) |
+| `skills` | Container skill list |
+| `cli_scope` | `disabled` / `group` (default) / `global` — controls in-container `ncl` access |
+
+Manage container config:
+
+```bash
+ncl groups config get --id <group-id>
+ncl groups config update --id <group-id> --model <model>
+ncl groups config add-mcp-server --id <group-id> ...
+ncl groups config remove-mcp-server --id <group-id> ...
+ncl groups config add-package --id <group-id> --type apt --name <pkg>
+ncl groups config remove-package --id <group-id> --type npm --name <pkg>
+ncl groups restart --id <group-id> [--rebuild] [--message <text>]
+```
+
+Existing filesystem `container.json` files are backfilled into the DB automatically on first startup after upgrading.
 
 ## Trigger pattern
 

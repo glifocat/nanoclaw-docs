@@ -5,6 +5,18 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.0.48 sync: container config in DB, on-wake messages, CLI scope" description="2026-05-09" tags={["Updated"]}>
+  Documented the v2.0.45 → v2.0.48 changes: per-agent-group container runtime config moved from `groups/<folder>/container.json` files to the `container_configs` central-DB table (filesystem configs backfilled on startup, materialized to `container.json` at spawn time), explicit container restart via `ncl groups restart` with race-free `on_wake` messages, and per-group `cli_scope` (`disabled` / `group` / `global`).
+
+  ## Updated
+  - **`concepts/containers.mdx`**: container config table sourced from the DB; new "Explicit restart" subsection covering `ncl groups restart`, the `on_wake` flag, and the `onExit` callback contract; new "CLI scope" subsection.
+  - **`concepts/groups.mdx`**: agent group definition now references `container_configs`; additional-mounts wording aligned with DB-stored config.
+  - **`advanced/container-runtime.mdx`**: spawn flow reads from `container_configs` and materializes `container.json`; mounts table updated; added "Explicit restart with on-wake messages" and "CLI scope enforcement" subsections.
+  - **`api/configuration.mdx`**: new "Per-agent-group container config" section listing common fields and `ncl groups config` verbs, including `cli_scope`.
+  - **`api/group-management.mdx`**: corrected the claim that container config lives on disk only — now in the DB, materialized at spawn time.
+  - **`changelog/index.mdx`**: added `v2.0.48` and `v2.0.45` release entries.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 

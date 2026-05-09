@@ -14,7 +14,7 @@ An agent group is:
 
 - A workspace with its own folder under `groups/{name}/`
 - An optional provider configuration
-- A container configuration (`container.json`) with custom packages and mounts
+- A container configuration in the `container_configs` table — provider, model, packages, MCP servers, mounts, skills, and `cli_scope`. The host materializes it to `groups/<folder>/container.json` at spawn time. Manage via `ncl groups config get/update`.
 - The unit of credential scoping (each gets its own OneCLI agent)
 
 ### Messaging groups
@@ -137,7 +137,7 @@ The global memory directory (`groups/global/`) provides shared context:
 
 ## Additional mounts
 
-Agent groups can have extra directories mounted via `container.json`:
+Agent groups can have extra directories mounted via the container config (stored in the `container_configs` table, materialized to `container.json` at spawn time):
 
 ```json
 {

@@ -77,7 +77,7 @@ The agent container is built from `container/Dockerfile` and includes:
 
 ### Per-agent-group images
 
-Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image:
+Agent groups can specify custom packages via their container config (managed with `ncl groups config add-package/remove-package`). The host builds a derived Docker image:
 
 - Tag: derived from the checkout-scoped base image and agent group
 - Built on top of `nanoclaw-agent-v2-<slug>:latest`
@@ -121,7 +121,7 @@ Containers are spawned by the `spawnContainer` function. Wake calls are deduplic
 
 <Steps>
   <Step title="Read agent group config">
-    The host reads `container.json` and resolves provider contributions.
+    The host reads the `container_configs` row for the agent group, materializes it to `groups/<folder>/container.json`, and resolves provider contributions.
   </Step>
 
   <Step title="Build volume mounts">
@@ -151,7 +151,7 @@ Containers are spawned by the `spawnContainer` function. Wake calls are deduplic
 |------|---------------|------|---------|
 | Session folder | `/workspace` | RW | inbound.db, outbound.db, outbox/, inbox/ |
 | Agent group folder | `/workspace/agent` | RW | Working files |
-| container.json | `/workspace/agent/container.json` | RO | Nested read-only config |
+| container.json | `/workspace/agent/container.json` | RO | Materialized from the `container_configs` table at spawn time |
 | Composed CLAUDE.md | `/workspace/agent/CLAUDE.md` | RO | Regenerated each spawn |
 | Global memory | `/workspace/global` | RO | Shared instructions |
 | Agent-runner source | `/app/src` | RO | Bind mount from host |
@@ -170,7 +170,28 @@ Containers have two timeout/detection mechanisms:
 ### Container shutdown
 
 - `killContainer(sessionId, reason)` stops the container via `docker stop`, falls back to SIGKILL
+- An optional `onExit` callback fires after the process exits, guaranteeing the old container is gone before any respawn happens
 - On close/error, the session is marked stopped and typing indicators are cleared
+
+### Explicit restart with on-wake messages
+
+Config CLI operations no longer auto-kill containers. To restart an agent group's container, use:
+
+```bash
+ncl groups restart --id <group-id> [--rebuild] [--message <text>]
+```
+
+When `--message` is provided, the host writes the wake message to `messages_in` with the `on_wake` flag set, kills the running container, and respawns via the `onExit` callback. The `on_wake` flag ensures the message is picked up only by the fresh container's first poll iteration — a dying container in its SIGTERM grace period can never steal it.
+
+Self-mod approval handlers (`install_packages`, `add_mcp_server`) use the same race-free mechanism: rebuild the image when needed, write an `on_wake` message, kill the container, and respawn via `onExit`.
+
+### CLI scope enforcement
+
+The agent group's `cli_scope` setting (`disabled`, `group`, `global`) controls what the in-container agent can do via `ncl`. Enforcement is host-side, applied in the dispatcher:
+
+- `disabled` rejects every `cli_request` and excludes the `ncl` instructions from the composed CLAUDE.md
+- `group` (default) restricts requests to `groups`, `sessions`, `destinations`, and `members` for the agent group itself, auto-fills `--id` and group args, rejects cross-group access, blocks `cli_scope` mutations, and runs post-handler result filtering to prevent cross-group data leaks in list responses
+- `global` (set automatically for owner agent groups) is unrestricted
 
 ## Credential injection
 
