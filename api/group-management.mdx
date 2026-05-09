@@ -23,7 +23,7 @@ interface AgentGroup {
 ```
 
 - Each agent group has a folder under `groups/{folder}/`
-- Container configuration lives on disk (`container.json`), not in the database
+- Container configuration lives in the `container_configs` table in the central DB (provider, model, packages, MCP servers, mounts, `cli_scope`); a snapshot is materialized to `container.json` at spawn time
 - Each gets its own OneCLI agent identifier for credential scoping
 
 ### Messaging groups
@@ -128,6 +128,7 @@ Session resolution depends on the wiring's `session_mode`:
 | Table | Purpose |
 |-------|---------|
 | `agent_groups` | Agent workspaces |
+| `container_configs` | Per-agent-group runtime config (provider, model, packages, MCP servers, mounts, `cli_scope`) |
 | `messaging_groups` | Platform chats/channels |
 | `messaging_group_agents` | Wirings with engage/scope/session config |
 | `users` | Namespaced platform identifiers |
@@ -159,6 +160,21 @@ Each session has two databases in `data/v2-sessions/{agent_group_id}/{session_id
 | `processing_ack` | Processing acknowledgments |
 | `session_state` | Persistent key/value store |
 | `container_state` | Tool-in-flight tracking |
+
+## Admin CLI (`ncl groups`)
+
+The `ncl` admin CLI exposes group and container-config management. Write operations require approval from inside containers; on the host they run directly.
+
+| Verb | Purpose |
+|------|---------|
+| `list`, `get`, `create`, `update`, `delete` | Standard CRUD over `agent_groups` |
+| `restart` | Kill containers for a group; pass `--rebuild` to rebuild the image and `--message <text>` to deliver an on-wake message to the fresh container |
+| `config get` | Show the container config row |
+| `config update` | Update scalar fields (`--provider`, `--model`, `--effort`, `--image-tag`, `--assistant-name`, `--max-messages-per-prompt`, `--cli-scope`) |
+| `config add-mcp-server` / `config remove-mcp-server` | Manage the MCP servers attached to a group |
+| `config add-package` / `config remove-package` | Manage apt and npm package lists |
+
+Config CLI operations no longer auto-kill containers — call `ncl groups restart` explicitly to apply changes. Group-scoped agents (where `cli_scope = 'group'`) cannot change `cli_scope` on themselves or any other group.
 
 ## Channel approval flow
 

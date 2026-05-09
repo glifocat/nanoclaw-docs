@@ -5,6 +5,19 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Container config in DB, on-wake restarts, CLI scope" description="2026-05-09" tags={["Updated"]}>
+  Documented three v2.0.46–v2.0.48 features that change how per-agent-group config is stored and how containers are restarted.
+
+  ## Updated
+  - **`concepts/containers`**: container config now lives in `container_configs` (DB), not `container.json`; the file is a spawn-time snapshot. Added explicit-restart and on-wake message section. MCP server and package management commands now reference `ncl groups config`.
+  - **`concepts/groups`**: agent group definition references the `container_configs` row. New "CLI scope" section covering `disabled` / `group` / `global` and escalation blocks.
+  - **`api/configuration`**: per-agent-group runtime config moved to the central DB; `container.json` is materialized on spawn.
+  - **`api/group-management`**: added `container_configs` table to schema. New "Admin CLI (`ncl groups`)" section listing all verbs and behavior.
+  - **`advanced/container-runtime`**: spawn flow reads `container_configs`; `killContainer` exposes an `onExit` callback. New "Explicit restart and on-wake messages" section.
+  - **`features/customization`**: mount config moved to the `additional_mounts` column of `container_configs`.
+  - **`changelog/index`**: added v2.0.45 (admin CLI, v1→v2 migration) and v2.0.48 (DB-backed config, on-wake, CLI scope) release entries.
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
