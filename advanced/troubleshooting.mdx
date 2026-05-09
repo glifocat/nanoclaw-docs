@@ -137,13 +137,14 @@ cat groups/{group}/logs/container-{timestamp}.log
   Container config lives in the `container_configs` table in `data/v2.db`. Inspect with the CLI:
 
   ```bash
-  ncl groups config-get --id <agent-group-id>
+  ncl groups config get --id <agent-group-id>
   ```
 
-  Update scalar fields (e.g., model, effort, image tag, max messages per prompt) — running containers will be restarted to pick up the change:
+  Update scalar fields (e.g., model, effort, image tag, max messages per prompt). Config writes only touch the DB — to apply the change to a running container, follow up with `ncl groups restart`:
 
   ```bash
-  ncl groups config-update --id <agent-group-id> --model claude-sonnet-4-6 --max-messages-per-prompt 20
+  ncl groups config update --id <agent-group-id> --model claude-sonnet-4-6 --max-messages-per-prompt 20
+  ncl groups restart --id <agent-group-id>
   ```
 
   Or query directly with SQLite:

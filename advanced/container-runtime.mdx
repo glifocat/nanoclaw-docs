@@ -106,6 +106,7 @@ The `container_configs` table has one row per agent group, with both scalar and 
 | `packages_apt` | TEXT (JSON) | `string[]` of apt packages |
 | `packages_npm` | TEXT (JSON) | `string[]` of npm packages |
 | `additional_mounts` | TEXT (JSON) | `AdditionalMountConfig[]` |
+| `cli_scope` | TEXT | `disabled` \| `group` (default) \| `global` — controls in-container `ncl` access |
 | `updated_at` | TEXT | ISO timestamp |
 
 ### Backfill
@@ -122,19 +123,44 @@ sessions.agent_provider
   → 'claude'
 ```
 
-The legacy `agent_groups.agent_provider` column is retained for backwards compat but no longer participates in resolution. Configure provider via `ncl groups config-update --id <group-id> --provider <name>`.
+The legacy `agent_groups.agent_provider` column is retained for backwards compat but no longer participates in resolution and is no longer exposed via `ncl groups`. Configure provider via `ncl groups config update --id <group-id> --provider <name>`.
 
 ### Updating config
 
-All writes go through the DB layer:
+All writes go through the DB layer. Multi-word verbs accept either spaces (preferred) or dashes — `ncl groups config get` and `ncl groups config-get` both work.
 
-- **`ncl groups config-update`** — change scalar fields (`--provider`, `--model`, `--effort`, `--image-tag`, `--assistant-name`, `--max-messages-per-prompt`)
-- **`ncl groups config-add-mcp-server`** / **`config-remove-mcp-server`** — manage MCP servers
-- **`ncl groups config-add-package`** / **`config-remove-package`** — manage apt/npm packages
+- **`ncl groups config update`** — change scalar fields (`--provider`, `--model`, `--effort`, `--image-tag`, `--assistant-name`, `--max-messages-per-prompt`, `--cli-scope`)
+- **`ncl groups config add-mcp-server`** / **`config remove-mcp-server`** — manage MCP servers
+- **`ncl groups config add-package`** / **`config remove-package`** — manage apt/npm packages
 - **Self-mod approvals** (`install_packages`, `add_mcp_server`) — write to DB instead of file
-- **`ncl groups config-get`** — view current config (open access; others require approval)
+- **`ncl groups config get`** — view current config (open access; others require approval)
 
-After most config changes, `restartAgentGroupContainers()` kills running sessions and schedules a wake message so the host sweep respawns them with fresh config.
+Config CLI ops only write to the DB; restart is now a separate command — see "Explicit restart" below. The host helper `restartAgentGroupContainers()` is invoked by self-mod approvals to apply config changes.
+
+### CLI scope
+
+`cli_scope` controls what an in-container agent can do via `ncl`:
+
+| Value | Behavior |
+|---|---|
+| `disabled` | Agent never learns about `ncl` (the instructions section is excluded from the composed `CLAUDE.md`). The host CLI dispatcher rejects any `cli_request`. |
+| `group` (default) | Agent can call `groups`, `sessions`, `destinations`, `members` only, scoped to its own agent group. `--id`, `--agent_group_id`, and `--group` args are auto-filled. Cross-group reads are rejected post-handler; help output reflects the scope. `cli_scope` arg is blocked outright. |
+| `global` | Unrestricted — current behavior. Set automatically for owner agent groups by `init-first-agent`. |
+
+Enforcement is host-side only — no image rebuild or env var needed.
+
+### Explicit restart
+
+```bash
+ncl groups restart --id <group-id> [--rebuild] [--message <text>]
+```
+
+- Kills running containers for the agent group; without `--message`, they come back on the next inbound message
+- With `--message`, an `on_wake` row is written to `inbound.db` and the container respawns immediately via the `onExit` callback
+- `--rebuild` forces an image rebuild before respawn (useful after package changes); package commands no longer trigger a build implicitly
+- Called from inside a container, `--id` is auto-filled and only the calling session is restarted
+
+The `on_wake` flag on `messages_in` ensures wake messages are delivered only on the new container's first poll iteration. Without it, the dying container — still in its SIGTERM grace window — could steal the message before exiting. `killContainer` accepts an `onExit` callback that fires after the process actually exits, guaranteeing race-free respawn.
 
 ## Two-database IO model
 
