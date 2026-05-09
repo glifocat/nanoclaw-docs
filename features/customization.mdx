@@ -175,6 +175,26 @@ Agents only see what you mount. The allowlist lives at `~/.config/nanoclaw/mount
 
 Per-agent-group mount requests live in `groups/<folder>/container.json`. The host validates each request against the allowlist before mounting. See [Security model](/advanced/security-model) for the full picture.
 
+## Container config changes require a restart
+
+Container config edits made through the agent's admin CLI (`ncl groups config update`) — model, provider, effort, packages, MCP servers — are written to the central DB but do **not** apply to the running container. Restart the agent group for the new config to take effect:
+
+```bash
+ncl groups config update --model claude-sonnet-4-5-20250514
+# After approval: config is saved, container still runs the old model
+ncl groups restart --message "Applying config update."
+# After approval: container restarts with the new config
+```
+
+For package changes (`config add-package`), pass `--rebuild` so the derived image is rebuilt before the container comes back up:
+
+```bash
+ncl groups config add-package --npm some-package
+ncl groups restart --rebuild --message "Installing new package."
+```
+
+Without `--message`, the container is killed but only respawns on the next user message. Use `--message` to force an immediate respawn so the new config is exercised right away.
+
 ## The `/customize` skill
 
 For guided changes without memorizing file paths:
