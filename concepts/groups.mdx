@@ -14,7 +14,7 @@ An agent group is:
 
 - A workspace with its own folder under `groups/{name}/`
 - An optional provider configuration
-- A container configuration (`container.json`) with custom packages and mounts
+- A container configuration row in the `container_configs` table (custom packages, MCP servers, mounts, `cli_scope`); materialized to `container.json` at spawn time
 - The unit of credential scoping (each gets its own OneCLI agent)
 
 ### Messaging groups
@@ -135,9 +135,21 @@ The global memory directory (`groups/global/`) provides shared context:
 - Injected into the system prompt via `systemPrompt.append`
 - Read-only for all agents
 
+## Container CLI scope
+
+Each agent group's `container_configs` row has a `cli_scope` column controlling what the in-container `ncl` admin CLI can do:
+
+| Value | Behavior |
+|-------|----------|
+| `disabled` | The agent never learns about `ncl` — its instructions are excluded from the composed `CLAUDE.md`, and the host rejects any `cli_request` from this group. |
+| `group` (default) | The agent can only access `groups`, `sessions`, `destinations`, and `members`, scoped to its own agent group. `--id`, `--agent-group-id`, and `--group` arguments are auto-filled, and cross-group access is rejected. The `cli_scope` field cannot be changed from inside the container. |
+| `global` | Unrestricted. Set automatically for the owner agent group via the first-agent init script. |
+
+Enforcement is host-side only — no image rebuild or env var change is required when the scope is updated.
+
 ## Additional mounts
 
-Agent groups can have extra directories mounted via `container.json`:
+Agent groups can have extra directories mounted via the `additional_mounts` field of their container config:
 
 ```json
 {

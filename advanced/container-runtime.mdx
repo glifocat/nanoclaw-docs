@@ -77,11 +77,12 @@ The agent container is built from `container/Dockerfile` and includes:
 
 ### Per-agent-group images
 
-Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image:
+Agent groups can specify custom packages in their `container_configs` row (managed via `ncl groups config add-package`/`remove-package`). The host builds a derived Docker image:
 
 - Tag: derived from the checkout-scoped base image and agent group
 - Built on top of `nanoclaw-agent-v2-<slug>:latest`
 - Adds custom apt and npm packages
+- Rebuilds are triggered by `ncl groups restart --rebuild` or by the `install_packages` self-mod tool (config writes alone don't restart or rebuild)
 
 ## Two-database IO model
 
@@ -121,7 +122,7 @@ Containers are spawned by the `spawnContainer` function. Wake calls are deduplic
 
 <Steps>
   <Step title="Read agent group config">
-    The host reads `container.json` and resolves provider contributions.
+    The host reads the agent group's `container_configs` row, materializes it to `groups/<folder>/container.json` for the container runner, and resolves provider contributions.
   </Step>
 
   <Step title="Build volume mounts">
@@ -151,7 +152,7 @@ Containers are spawned by the `spawnContainer` function. Wake calls are deduplic
 |------|---------------|------|---------|
 | Session folder | `/workspace` | RW | inbound.db, outbound.db, outbox/, inbox/ |
 | Agent group folder | `/workspace/agent` | RW | Working files |
-| container.json | `/workspace/agent/container.json` | RO | Nested read-only config |
+| container.json | `/workspace/agent/container.json` | RO | Materialized view of the `container_configs` row, regenerated each spawn |
 | Composed CLAUDE.md | `/workspace/agent/CLAUDE.md` | RO | Regenerated each spawn |
 | Global memory | `/workspace/global` | RO | Shared instructions |
 | Agent-runner source | `/app/src` | RO | Bind mount from host |
@@ -171,6 +172,11 @@ Containers have two timeout/detection mechanisms:
 
 - `killContainer(sessionId, reason)` stops the container via `docker stop`, falls back to SIGKILL
 - On close/error, the session is marked stopped and typing indicators are cleared
+- `killContainer` accepts an optional `onExit` callback that fires after the container process has fully exited, used by the restart flow to guarantee race-free respawn
+
+### Restart and on-wake messages
+
+`ncl groups restart` (and the agent-side self-mod handlers) kills running containers for the group and respawns them. When a wake message is supplied, it is written to `messages_in` with `on_wake = 1`, and the container poll loop only delivers `on_wake` rows on its first iteration after spawn. This prevents a dying container — still draining its SIGTERM grace window — from picking up the wake message intended for the fresh process.
 
 ## Credential injection
 
