@@ -4,7 +4,7 @@ description: Environment variables and configuration options for NanoClaw contai
 tag: "UPDATED"
 ---
 
-NanoClaw configuration is managed through environment variables, the `.env` file, and the `src/config.ts` module. In v2, some configuration has moved to `container.json` per agent group.
+NanoClaw configuration is managed through environment variables, the `.env` file, and the `src/config.ts` module. In v2, some configuration has moved to per-agent-group `container.json` (materialized from the `container_configs` table at spawn time).
 
 ## Environment variables
 
@@ -92,6 +92,27 @@ All paths are absolute and resolved from the project root:
 <ResponseField name="MOUNT_ALLOWLIST_PATH" type="string">
   `~/.config/nanoclaw/mount-allowlist.json` — mount security allowlist (never mounted into containers)
 </ResponseField>
+
+## Per-agent-group container config
+
+Each agent group has its own entry in the `container_configs` table that controls how its container is spawned. The host materializes this row into `groups/<folder>/container.json` at spawn time so the container runner can read it.
+
+Recognized fields include:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `provider` | string | Agent provider (`claude`, `opencode`, etc.). Defaults to `claude`. |
+| `model` | string | Model alias (`sonnet`, `opus`, `haiku`) or full model ID. Passed through to the provider SDK. If omitted, the SDK default is used. |
+| `effort` | string | Reasoning effort: `low`, `medium`, `high`, `xhigh`, or `max`. Passed through to the provider SDK. If omitted, the SDK default is used. |
+| `assistantName` | string | Display name used in trigger and routing. |
+| `maxMessagesPerPrompt` | number | Per-prompt message cap (default `10`). |
+| `mcpServers` | object | Additional MCP servers exposed to the agent. |
+| `packages` | object | Extra `apt` and `npm` packages to install when building the per-group image. |
+| `additionalMounts` | array | Extra host directories to mount (validated against the allowlist). |
+| `skills` | array \| `"all"` | Container skills to expose. |
+| `imageTag` | string | Override the derived per-group image tag. |
+
+Per-group `model` and `effort` overrides let different workspaces target different models or reasoning budgets without changing host environment variables.
 
 ## Trigger pattern
 

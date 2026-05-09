@@ -155,6 +155,22 @@ Agent groups can specify custom packages in `container.json`. The host builds a 
 - Built on top of the base `nanoclaw-agent-v2-<slug>:latest` image
 - Cached — only rebuilt when package lists change
 
+## Per-agent-group model and effort
+
+Each agent group can override the model and reasoning effort used by its provider. These options are stored in `container_configs` and materialized into `container.json` at spawn time:
+
+```json
+{
+  "model": "sonnet",
+  "effort": "high"
+}
+```
+
+- **`model`** — model alias (`sonnet`, `opus`, `haiku`) or full model ID. Passed straight through to the provider SDK. If omitted, the SDK default applies.
+- **`effort`** — reasoning effort level (`low`, `medium`, `high`, `xhigh`, `max`). Passed straight through to the provider SDK. If omitted, the SDK default applies.
+
+Both fields are per-agent-group, so different workspaces can use different models or effort budgets without restarting the host.
+
 ## Timeouts
 
 ### Container timeout
