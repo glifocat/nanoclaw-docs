@@ -163,7 +163,19 @@ NanoClaw uses the [OneCLI](https://github.com/onecli/onecli) Agent Vault for cen
 The OneCLI Agent Vault prevents credential exposure to containers. However, containers can still make authenticated API requests through the vault — they cannot extract the real credentials, but they can use them indirectly.
 </Warning>
 
-### 6. Delivery authorization
+### 6. In-container CLI scope
+
+Each agent group has a `cli_scope` field on its `container_configs` row controlling what the in-container `ncl` CLI can reach:
+
+| Scope | Behavior |
+|-------|----------|
+| `disabled` | The agent never learns about `ncl` — its instructions are excluded from `CLAUDE.md`, and host dispatch rejects any `cli_request`. |
+| `group` (default) | The agent can only access `groups`, `sessions`, `destinations`, and `members`, restricted to its own agent group. `--id`, `--agent-group-id`, and `--group` are auto-filled. Attempts to escalate `cli_scope` or read other groups' data are blocked at dispatch. |
+| `global` | Unrestricted. Reserved for the owner agent group. |
+
+Enforcement is purely host-side, so a compromised container cannot bypass it by tampering with its own materialized `container.json`.
+
+### 7. Delivery authorization
 
 The delivery system enforces per-agent permissions:
 
@@ -172,7 +184,7 @@ The delivery system enforces per-agent permissions:
 - Cross-channel delivery requires an explicit `agent_destinations` row
 - The `ask_question` message type creates interactive `pending_questions` cards
 
-### 7. Diagnostics and telemetry
+### 8. Diagnostics and telemetry
 
 NanoClaw includes opt-in diagnostics that run during `/setup` and `/update-nanoclaw` skill workflows only. There is no runtime telemetry in the application itself.
 

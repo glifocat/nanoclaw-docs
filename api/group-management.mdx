@@ -23,7 +23,7 @@ interface AgentGroup {
 ```
 
 - Each agent group has a folder under `groups/{folder}/`
-- Container configuration lives on disk (`container.json`), not in the database
+- Container runtime configuration lives in the `container_configs` table; `groups/{folder}/container.json` is a read-only materialized view written at spawn time
 - Each gets its own OneCLI agent identifier for credential scoping
 
 ### Messaging groups
@@ -128,6 +128,7 @@ Session resolution depends on the wiring's `session_mode`:
 | Table | Purpose |
 |-------|---------|
 | `agent_groups` | Agent workspaces |
+| `container_configs` | Per-agent-group container runtime config (provider, model, packages, MCP servers, mounts, `cli_scope`) |
 | `messaging_groups` | Platform chats/channels |
 | `messaging_group_agents` | Wirings with engage/scope/session config |
 | `users` | Namespaced platform identifiers |
@@ -180,3 +181,19 @@ When an unknown sender messages on a `request_approval` channel:
 1. Approval card sent to the designated approver
 2. **Approve** — adds sender to `agent_group_members`, replays original message
 3. **Deny** — deletes pending row (future messages re-trigger)
+
+## Container config operations
+
+In addition to the standard CRUD verbs, the `groups` resource exposes custom operations for managing the per-group container config and lifecycle:
+
+| Operation | Purpose |
+|-----------|---------|
+| `ncl groups restart` | Kill and respawn containers for the group. Accepts `--rebuild` to rebuild the per-group image and `--message <text>` to write a wake message that is delivered only to the fresh container's first poll iteration. |
+| `ncl groups config get` | Read the materialized container config for a group. |
+| `ncl groups config update` | Patch scalar fields on the `container_configs` row (e.g., `--model`, `--effort`, `--cli-scope`). |
+| `ncl groups config add-mcp-server` / `remove-mcp-server` | Wire or remove an MCP server entry. |
+| `ncl groups config add-package` / `remove-package` | Add or remove an apt or npm package. |
+
+Config writes do not restart the container — call `ncl groups restart` (with `--rebuild` if package lists changed) to apply changes. From inside a container, `--id` is auto-filled to the calling group, and `restart` only kills the calling session.
+
+The host enforces the `cli_scope` field on every `cli_request`: under `group` scope (the default) only `groups`, `sessions`, `destinations`, and `members` are reachable, group-related arguments are auto-filled, and changing `cli_scope` itself is blocked.
