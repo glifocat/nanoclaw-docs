@@ -14,7 +14,7 @@ An agent group is:
 
 - A workspace with its own folder under `groups/{name}/`
 - An optional provider configuration
-- A container configuration (`container.json`) with custom packages and mounts
+- A container configuration row in the `container_configs` table (custom packages, MCP servers, mounts, `cli_scope`)
 - The unit of credential scoping (each gets its own OneCLI agent)
 
 ### Messaging groups
@@ -137,17 +137,13 @@ The global memory directory (`groups/global/`) provides shared context:
 
 ## Additional mounts
 
-Agent groups can have extra directories mounted via `container.json`:
+Agent groups can request extra host directories on their container config row (`additional_mounts`). Each entry has the shape:
 
 ```json
 {
-  "additionalMounts": [
-    {
-      "hostPath": "/Users/you/projects/website",
-      "containerPath": "website",
-      "readonly": true
-    }
-  ]
+  "hostPath": "/Users/you/projects/website",
+  "containerPath": "website",
+  "readonly": true
 }
 ```
 
@@ -163,6 +159,24 @@ Validated mounts appear at `/workspace/extra/{name}` inside the container and ar
 <Warning>
 Additional mounts bypass group isolation. Only mount directories that are safe for the agent to access.
 </Warning>
+
+## CLI scope
+
+Each agent group has a `cli_scope` setting on its container config that controls what the agent can access via `ncl` from inside the container:
+
+| Value | Behavior |
+|-------|----------|
+| `disabled` | Agent never learns about `ncl` — CLI instructions are excluded from `CLAUDE.md` and the host rejects every request |
+| `group` (default) | Agent can only access its own group's resources (`groups`, `sessions`, `destinations`, `members`). `--id` and group-scoped args are auto-filled. Cross-group access is rejected. |
+| `global` | Unrestricted access. Set automatically for owner agent groups via `init-first-agent`. |
+
+Group-scoped agents cannot escalate their own scope — `cli_scope` updates are blocked on requests originating inside a group-scoped container. Post-handler result filtering also prevents cross-group data from leaking through `list`/`get` responses.
+
+Update via:
+
+```bash
+ncl groups config update --id <group-id> --cli-scope global
+```
 
 ## Concurrency
 
