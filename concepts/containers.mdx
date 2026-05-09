@@ -74,7 +74,7 @@ Containers only see what's explicitly mounted. The v2 mount structure is differe
 |-------|---------------|------|---------|
 | Session folder | `/workspace` | Read-write | `inbound.db`, `outbound.db`, `outbox/`, `.claude/` |
 | Agent group folder | `/workspace/agent` | Read-write | Working files, `CLAUDE.local.md` |
-| Container config | `/workspace/agent/container.json` | Read-only | Nested RO mount (agent can't modify config) |
+| Container config | `/workspace/agent/container.json` | Read-only | Materialized from the `container_configs` DB table at spawn time |
 | Composed CLAUDE.md | `/workspace/agent/CLAUDE.md` | Read-only | Regenerated each spawn |
 | CLAUDE.md fragments | `/workspace/agent/.claude-fragments` | Read-only | Fragment files for composition |
 | Global memory | `/workspace/global` | Read-only | `groups/global/` directory |
@@ -82,11 +82,11 @@ Containers only see what's explicitly mounted. The v2 mount structure is differe
 | Agent-runner source | `/app/src` | Read-only | Shared source (bind mount from host) |
 | Container skills | `/app/skills` | Read-only | Shared skill definitions |
 | Claude SDK state | `/home/node/.claude` | Read-write | SDK state + skill symlinks |
-| Additional mounts | `/workspace/extra/{name}` | Per-config | From `container.json` (validated against allowlist) |
+| Additional mounts | `/workspace/extra/{name}` | Per-config | From container config (validated against allowlist) |
 
-<Warning>
-The `container.json` file is mounted read-only as a nested mount inside the read-write agent group folder. This prevents the agent from modifying its own container configuration.
-</Warning>
+<Note>
+**Container config in the DB (v2.0.48+).** Per-agent-group container runtime config (provider, model, packages, MCP servers, mounts, skills, `cli_scope`) lives in the `container_configs` table in the central DB. The host materializes it to `groups/<folder>/container.json` at spawn time so the container runner can read it, and mounts that file read-only into the container. Existing filesystem configs are backfilled into the DB automatically on startup. Manage with `ncl groups config get/update`.
+</Note>
 
 ### Mount security
 
@@ -143,13 +143,19 @@ Container spawning is deduplicated — concurrent wake calls for the same sessio
 - **Stale detection**: host sweep detects containers with old heartbeats or stuck processing_ack
 - **Fallback**: SIGKILL if graceful stop fails
 
+### Explicit restart
+
+Config changes do not auto-kill containers. Use `ncl groups restart --id <group-id>` (with optional `--rebuild` to rebuild the image, or `--message <text>` to deliver a wake message after the new container starts). The host writes the on-wake message to `messages_in` with the `on_wake` flag set, kills the running container, and respawns via an `onExit` callback so the old container is fully gone before the new one starts.
+
+The `on_wake` flag ensures wake messages are picked up only by a fresh container's first poll iteration. This prevents the race where a dying container in its SIGTERM grace period could steal the message. Self-mod approval handlers (`install_packages`, `add_mcp_server`) use the same race-free mechanism.
+
 <Info>
 Even if the container crashes, all data in session databases and mounted directories persists. Only the container process itself is ephemeral.
 </Info>
 
 ## Per-agent-group images
 
-Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image with additional apt and npm packages:
+Agent groups can specify custom packages in their container config (use `ncl groups config add-package/remove-package`). The host builds a derived Docker image with additional apt and npm packages:
 
 - Image tag: derived from the checkout-scoped base image and agent group
 - Built on top of the base `nanoclaw-agent-v2-<slug>:latest` image
@@ -187,7 +193,19 @@ The `nanoclaw` MCP server provides tools for container-to-host communication via
 - `schedule_task`, `cancel_task`, `pause_task`, `resume_task`, `update_task` — task management
 - `list_tasks` — view scheduled tasks
 
-Additional MCP servers can be configured in `container.json`.
+Additional MCP servers can be configured per agent group via `ncl groups config add-mcp-server/remove-mcp-server`.
+
+### CLI scope
+
+Each agent group's container config has a `cli_scope` setting that controls what the agent can do with `ncl` from inside the container:
+
+| Value | Behavior |
+|-------|----------|
+| `disabled` | Agent never sees `ncl` instructions in CLAUDE.md, and the host rejects every `cli_request` from the container. |
+| `group` (default) | Agent can access `groups`, `sessions`, `destinations`, `members` only, scoped to its own agent group. `--id` and group args are auto-filled, cross-group access is rejected, and `cli_scope` changes are blocked. Post-handler result filtering prevents cross-group data leaks. |
+| `global` | Unrestricted. Set automatically for owner agent groups. |
+
+This setting is only modifiable from outside the container (host-side `ncl` over the Unix socket) — group-scoped agents cannot escalate themselves.
 
 ### Global memory injection
 

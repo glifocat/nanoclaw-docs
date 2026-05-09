@@ -23,7 +23,7 @@ interface AgentGroup {
 ```
 
 - Each agent group has a folder under `groups/{folder}/`
-- Container configuration lives on disk (`container.json`), not in the database
+- Container configuration lives in the `container_configs` table in the central DB; the host materializes it to `groups/<folder>/container.json` at spawn time. Manage with `ncl groups config get/update`.
 - Each gets its own OneCLI agent identifier for credential scoping
 
 ### Messaging groups
