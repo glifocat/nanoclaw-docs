@@ -82,6 +82,7 @@ Agent groups can specify custom packages in `container.json`. The host builds a 
 - Tag: derived from the checkout-scoped base image and agent group
 - Built on top of `nanoclaw-agent-v2-<slug>:latest`
 - Adds custom apt and npm packages
+- Build timeout: 15 minutes (accommodates large apt/npm package installs on slow networks)
 
 ## Two-database IO model
 
