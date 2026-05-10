@@ -1,0 +1,73 @@
+---
+title: "Changelog and versioning"
+description: "How NanoClaw versions releases and a condensed changelog focused on the v2.0.0 rewrite."
+keywords: ["NanoClaw changelog", "versioning", "v2.0.0", "release notes"]
+---
+
+<Info>
+**Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `CHANGELOG.md`, `package.json`, `src/db/schema.ts`, `src/db/migrations/014-container-configs.ts`, `src/db/migrations/015-cli-scope.ts`, `src/cli/`.
+</Info>
+
+## Versioning
+
+The version of record for this staged portal is release tag **`v2.0.54`** (commit `a33b1ae`), whose `package.json` version is **`2.0.54`**. The 2.x line is the ground-up rewrite; releases follow semantic versioning, with breaking changes called out explicitly in `CHANGELOG.md`.
+
+`CHANGELOG.md` in the source repo is the canonical list of notable and breaking changes. It is intentionally sparse — patch releases that only touch internals may not get an entry. For the full per-version history, use release tags and the git history of `package.json`.
+
+<Note>
+This staged portal is intentionally pinned to `v2.0.54`, not a moving `main` snapshot.
+</Note>
+
+## v2.0.54 — current staged source
+
+The latest verified source for this staged portal is `v2.0.54`:
+
+- **Per-group model and effort overrides.** Agent groups can run a specific Claude model and effort level, managed with `ncl groups config update --model <model> --effort <level>`. When unset, they inherit the host-configured defaults.
+- **Claude Code 2.1.128 in containers.** The container image bumps `claude-code` from 2.1.116 to 2.1.128.
+- **CLI help polish.** `ncl groups config` and `ncl groups restart` have clearer help text.
+
+Recent 2.0.x releases also added the admin `ncl` CLI, moved per-agent-group runtime config into the central `container_configs` table, added per-group `cli_scope`, and made group restarts explicit via `ncl groups restart` with race-free `on_wake` messages.
+
+## v2.0.0 — architectural rewrite
+
+NanoClaw v2 is a substantial architectural rewrite. It **cannot be merged into an existing v1 install** — existing forks migrate via `migrate-v2.sh` (see [Migrating from v1](/migration-from-v1)) or replay customizations onto the clean v2 base.
+
+Breaking changes in v2.0.0:
+
+- **New entity model.** Users, roles (owner/admin), messaging groups, and agent groups are tracked as separate entities, wired via `messaging_group_agents`. Privilege is user-level instead of channel-level — the old "main channel = admin" concept is retired.
+- **Two-DB session split.** Each session has `inbound.db` (host writes, container reads) and `outbound.db` (container writes, host reads), each with exactly one writer. Replaces the single shared session DB and eliminates cross-mount SQLite contention.
+- **Install flow replaced.** `bash nanoclaw.sh` is the new default — a scripted installer that hands off to Claude Code for error recovery and guided decisions. The `/setup` Claude-guided skill still works as an alternative.
+- **Channels moved to the `channels` branch.** Trunk no longer ships Discord, Slack, Telegram, WhatsApp, iMessage, Teams, Linear, GitHub, WeChat, Matrix, Google Chat, Webex, Resend, or WhatsApp Cloud. Install them per fork via `/add-<channel>` skills.
+- **Alternative providers moved to the `providers` branch.** OpenCode, Codex, and Ollama install via `/add-opencode`, `/add-codex`, `/add-ollama-provider`. Claude remains the default provider baked into trunk.
+- **Three-level channel isolation.** Wire channels to their own agent, share an agent with independent conversations (`session_mode: 'shared'`), or merge channels into one shared session (`session_mode: 'agent-shared'`).
+- **Apple Container removed from default setup.** Still available as an opt-in via `/convert-to-apple-container`.
+
+Other notable changes:
+
+- **Shared-source agent-runner.** Per-group `agent-runner-src/` overlays are gone; all groups mount the same agent-runner read-only. Per-group customization flows through a composed `CLAUDE.md`.
+- **Agent-runner runtime moved from Node to Bun.** The container image is self-contained; the host stays on Node + pnpm.
+- **OneCLI Agent Vault is the sole credential path.** Containers never receive raw API keys; credentials are injected at request time.
+
+## After v2.0.0
+
+The 2.0.x line has tracked migration robustness and setup polish — for example, hardware-spec warnings during setup, Telegram BotFather QR pairing, and fixes to the v1 → v2 migration steps (Discord DM resolution, symlink handling, `unknown_sender_policy` reconciliation). See [`CHANGELOG.md`](https://github.com/qwibitai/nanoclaw/blob/main/CHANGELOG.md) for the running list.
+
+## Selected pre-v2 history
+
+For reference, a few notable v1 milestones from `CHANGELOG.md`:
+
+- **1.2.35–1.2.36** — OneCLI Agent Vault replaced the built-in credential proxy; the pino logger was replaced with a built-in logger.
+- **1.2.13** — Skills became git branches merged via `git merge`; Docker Sandboxes support added.
+- **1.2.0** — WhatsApp removed from core and made a skill (`/add-whatsapp`); channel registry with startup self-registration.
+- **1.1.4** — Third-party model support; `/update-nanoclaw` skill for syncing with upstream.
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Migrating from v1" icon="arrow-up-right" href="/migration-from-v1">
+    The full v1 → v2 migration path.
+  </Card>
+  <Card title="Architecture overview" icon="network" href="/architecture">
+    What the v2 rewrite actually changed under the hood.
+  </Card>
+</Columns>

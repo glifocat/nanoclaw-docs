@@ -1,0 +1,59 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "NanoClaw",
+  "description": "Documentation for NanoClaw — a personal AI assistant that runs Claude agents in isolated containers.",
+  "colors": {
+    "primary": "#2DD4BF",
+    "light": "#5EEAD4",
+    "dark": "#14B8A6"
+  },
+  "appearance": {
+    "default": "dark"
+  },
+  "banner": {
+    "content": "This is a staged v2 documentation portal — MVP pages only. Detailed channel and provider guides are coming. [Join the Discord](https://discord.gg/VDdww8qS42) for help.",
+    "dismissible": true
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/qwibitai/nanoclaw"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/qwibitai/nanoclaw",
+      "discord": "https://discord.gg/VDdww8qS42",
+      "website": "https://nanoclaw.dev"
+    }
+  },
+  "search": {
+    "prompt": "Search NanoClaw docs..."
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get started",
+        "pages": [
+          "introduction",
+          "quickstart",
+          "migration-from-v1"
+        ]
+      },
+      {
+        "group": "Architecture",
+        "pages": [
+          "architecture",
+          "database-and-sessions"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "changelog"
+        ]
+      }
+    ]
+  }
+}

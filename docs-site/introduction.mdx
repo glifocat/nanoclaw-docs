@@ -1,0 +1,62 @@
+---
+title: "NanoClaw"
+description: "A personal AI assistant that runs Claude agents securely in their own containers — small enough to read, built to be forked and customized."
+keywords: ["NanoClaw", "Claude agent", "AI assistant", "Docker", "self-hosted", "v2"]
+---
+
+NanoClaw is a personal AI assistant. It runs Claude agents in isolated Linux containers, talks to you over the messaging apps you already use, and ships as a codebase small enough to read in an afternoon.
+
+It exists as a deliberately minimal alternative to large agent frameworks: one host process, a handful of source files, no microservices. Security comes from OS-level isolation — agents can only see what you explicitly mount — rather than application-level allowlists and permission checks.
+
+<Info>
+**Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `README.md`, `CLAUDE.md`, `CHANGELOG.md`.
+</Info>
+
+## What you get
+
+- **Multi-channel messaging** — WhatsApp, Telegram, Discord, Slack, Microsoft Teams, iMessage, Matrix, Google Chat, Webex, Linear, GitHub, WeChat, and email via Resend. Each is installed on demand with an `/add-<channel>` skill. Run one or many at the same time.
+- **Container isolation** — every agent session runs in its own Docker container (macOS, Linux, or Windows via WSL2). Bash access is safe because commands run inside the container, not on your host. Apple Container and Docker Sandboxes micro-VMs are opt-in alternatives.
+- **Per-agent workspace and config** — each agent group has its own `CLAUDE.md`, memory, container runtime config, model/effort overrides, and only the mounts you allow. Nothing crosses the boundary unless you wire it to.
+- **Scheduled tasks** — recurring or one-off jobs that run Claude and can message you back.
+- **Web access** — search and fetch content from the web.
+- **Credential security** — agents never hold raw API keys. Outbound requests route through OneCLI's Agent Vault, which injects credentials at request time and enforces per-agent policies and rate limits.
+
+## How it's built
+
+```text
+messaging apps → host process (router) → inbound.db → container (Bun, Claude Agent SDK) → outbound.db → host process (delivery) → messaging apps
+```
+
+A single Node host orchestrates per-session agent containers. A message arrives, the host routes it through an entity model (user → messaging group → agent group → session), writes it to the session's `inbound.db`, and wakes the container. The agent-runner inside the container polls `inbound.db`, runs Claude, and writes responses to `outbound.db`. The host polls `outbound.db` and delivers back through the channel adapter.
+
+Two SQLite files per session, each with exactly one writer — no cross-mount lock contention, no IPC, no stdin piping. See [Architecture overview](/architecture) and [Database and sessions](/database-and-sessions) for the full picture.
+
+## Design principles
+
+- **Small enough to understand.** One process, a few source files, no microservices. Ask Claude Code to walk you through the codebase.
+- **Secure by isolation.** Agents run in Linux containers and see only what's mounted.
+- **Built for the individual.** NanoClaw is meant to be forked. You make your own copy and have Claude Code shape it to your needs, instead of configuring a generic system.
+- **Customization = code changes.** No configuration sprawl. Want different behavior? Change the code — the codebase is small enough that this is safe.
+- **Skills over features.** Trunk ships the registry and infrastructure. Channels live on a long-lived `channels` branch; alternative agent providers (OpenCode, Codex, Ollama) live on `providers`. You run `/add-telegram`, `/add-opencode`, and so on, and the skill copies exactly the module you need into your fork.
+- **Best harness, best model.** NanoClaw uses Claude Code via Anthropic's Claude Agent SDK by default; other providers are drop-in options, configurable per agent group.
+
+## This documentation
+
+This is a staged v2 portal — the minimum set of pages needed to get oriented and running on NanoClaw v2:
+
+<Columns cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Go from a fresh machine to a named agent you can message.
+  </Card>
+  <Card title="Migrating from v1" icon="arrow-up-right" href="/migration-from-v1">
+    What changed in v2, and how `migrate-v2.sh` moves your install forward.
+  </Card>
+  <Card title="Architecture overview" icon="network" href="/architecture">
+    Host process, containers, the entity model, and the message flow.
+  </Card>
+  <Card title="Database and sessions" icon="database" href="/database-and-sessions">
+    The three-DB model, the two-DB session split, and cross-mount rules.
+  </Card>
+</Columns>
+
+Detailed channel and provider guides will land in later stages. For now, the source repository's `docs/` directory is the authority on subsystems not yet covered here.
