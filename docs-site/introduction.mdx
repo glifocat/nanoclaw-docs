@@ -4,32 +4,49 @@ description: "A personal AI assistant that runs Claude agents securely in their 
 keywords: ["NanoClaw", "Claude agent", "AI assistant", "Docker", "self-hosted", "v2"]
 ---
 
-NanoClaw is a personal AI assistant. It runs Claude agents in isolated Linux containers, talks to you over the messaging apps you already use, and ships as a codebase small enough to read in an afternoon.
+NanoClaw is a personal AI assistant you can talk to from the apps you already use. It runs Claude agents in isolated Linux containers, keeps each agent's workspace explicit, and ships as a codebase small enough to inspect and fork.
 
-It exists as a deliberately minimal alternative to large agent frameworks: one host process, a handful of source files, no microservices. Security comes from OS-level isolation — agents can only see what you explicitly mount — rather than application-level allowlists and permission checks.
+Use this portal by role: start with the fastest path if you just want an assistant, read the configuration pages if you are wiring channels and agents, and use the deployment pages when you need to operate NanoClaw for a team.
 
 <Info>
 **Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `README.md`, `CLAUDE.md`, `CHANGELOG.md`.
 </Info>
 
+## Choose your path
+
+<Columns cols={3}>
+  <Card title="Use NanoClaw" icon="rocket" href="/quickstart">
+    **For: everyone.** Install, pair one channel, and message your first assistant.
+  </Card>
+  <Card title="Configure agents" icon="sliders" href="/configure-overview">
+    **For: builders.** Decide which chats connect to which agent groups, models, mounts, and skills.
+  </Card>
+  <Card title="Deploy and operate" icon="server" href="/deploy-overview">
+    **For: operators.** Understand services, databases, containers, credentials, and team boundaries.
+  </Card>
+</Columns>
+
 ## What you get
 
-- **Multi-channel messaging** — WhatsApp, Telegram, Discord, Slack, Microsoft Teams, iMessage, Matrix, Google Chat, Webex, Linear, GitHub, WeChat, and email via Resend. Each is installed on demand with an `/add-<channel>` skill. Run one or many at the same time.
-- **Container isolation** — every agent session runs in its own Docker container (macOS, Linux, or Windows via WSL2). Bash access is safe because commands run inside the container, not on your host. Apple Container and Docker Sandboxes micro-VMs are opt-in alternatives.
-- **Per-agent workspace and config** — each agent group has its own `CLAUDE.md`, memory, container runtime config, model/effort overrides, and only the mounts you allow. Nothing crosses the boundary unless you wire it to.
-- **Scheduled tasks** — recurring or one-off jobs that run Claude and can message you back.
-- **Web access** — search and fetch content from the web.
-- **Credential security** — agents never hold raw API keys. Outbound requests route through OneCLI's Agent Vault, which injects credentials at request time and enforces per-agent policies and rate limits.
+- **Agents in containers.** Each running conversation is isolated from your host and from other sessions unless you choose to share state.
+- **Messaging apps as front doors.** WhatsApp, Telegram, Discord, Slack, Teams, iMessage, Matrix, Google Chat, Webex, Linear, GitHub, WeChat, and Resend email adapters install on demand with `/add-<channel>` skills.
+- **Agent groups as workspaces.** An agent group owns instructions, memory, skills, mounts, provider settings, and the files under `groups/<folder>/`.
+- **Explicit wirings.** A messaging group is a chat or channel. A wiring connects that messaging group to one or more agent groups and controls who can trigger them.
+- **Secure credentials.** Agents do not hold raw API keys. Outbound requests route through OneCLI's Agent Vault, which injects credentials at request time and enforces per-agent policy.
 
-## How it's built
+## How the isolation model works
 
 ```text
 messaging apps → host process (router) → inbound.db → container (Bun, Claude Agent SDK) → outbound.db → host process (delivery) → messaging apps
 ```
 
-A single Node host orchestrates per-session agent containers. A message arrives, the host routes it through an entity model (user → messaging group → agent group → session), writes it to the session's `inbound.db`, and wakes the container. The agent-runner inside the container polls `inbound.db`, runs Claude, and writes responses to `outbound.db`. The host polls `outbound.db` and delivers back through the channel adapter.
+A single Node host orchestrates per-session agent containers. A message arrives, the host routes it through an entity model (user → messaging group → wiring → agent group → session), writes it to the session's `inbound.db`, and wakes the container. The agent-runner inside the container polls `inbound.db`, runs Claude, and writes responses to `outbound.db`. The host polls `outbound.db` and delivers back through the channel adapter.
 
 Two SQLite files per session, each with exactly one writer — no cross-mount lock contention, no IPC, no stdin piping. See [Architecture overview](/architecture) and [Database and sessions](/database-and-sessions) for the full picture.
+
+<Tip>
+If you remember one distinction, make it this: **messaging groups are chats; agent groups are workspaces/identities; wirings connect them.** Sharing a messaging app does not automatically share an agent's memory or files.
+</Tip>
 
 ## Design principles
 
@@ -42,17 +59,25 @@ Two SQLite files per session, each with exactly one writer — no cross-mount lo
 
 ## This documentation
 
-This is a staged v2 portal — the minimum set of pages needed to get oriented and running on NanoClaw v2:
+This is a staged v2 portal. It focuses on concepts and workflows rather than copying command reference text. For exact flags, defaults, and aliases, run the CLI help next to the version you have installed:
+
+```bash
+pnpm run ncl -- help
+pnpm run ncl -- groups --help
+pnpm run ncl -- groups config --help
+```
+
+Use these pages for decisions: which isolation level to choose, how messaging groups differ from agent groups, and when to split an operator deployment from a personal install.
 
 <Columns cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
     Go from a fresh machine to a named agent you can message.
   </Card>
-  <Card title="Migrating from v1" icon="arrow-up-right" href="/migration-from-v1">
-    What changed in v2, and how `migrate-v2.sh` moves your install forward.
-  </Card>
   <Card title="Architecture overview" icon="network" href="/architecture">
     Host process, containers, the entity model, and the message flow.
+  </Card>
+  <Card title="Configure agents" icon="sliders" href="/configure-overview">
+    How chats, agents, sessions, engagement rules, and CLI help fit together.
   </Card>
   <Card title="Database and sessions" icon="database" href="/database-and-sessions">
     The three-DB model, the two-DB session split, and cross-mount rules.

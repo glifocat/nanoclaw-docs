@@ -6,6 +6,10 @@ keywords: ["NanoClaw architecture", "entity model", "agent groups", "sessions", 
 
 NanoClaw v2 is a single Node host process that orchestrates per-session agent containers. Messages route through an explicit entity model and the host and container exchange data only through two SQLite files per session. There is no IPC, no file watcher, and no stdin piping between them — everything is a message.
 
+<Note>
+**For: builders and operators.** Read this page when you need to choose an isolation level, explain where a message goes, or debug routing. If you only want a first assistant, start with [Quickstart](/quickstart).
+</Note>
+
 <Info>
 **Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `README.md`, `CLAUDE.md`, `docs/architecture.md`, `docs/isolation-model.md`, `docs/build-and-runtime.md`, `docs/db-central.md`, `src/db/schema.ts`, `src/router.ts`, `src/container-config.ts`, `src/cli/`.
 </Info>
@@ -36,7 +40,7 @@ flowchart LR
 
 ## The entity model
 
-v2 separates messaging surfaces from agent identities and wires them together explicitly:
+v2 separates messaging surfaces from agent identities and wires them together explicitly. In product terms: **messaging groups are chats/channels, agent groups are workspaces/identities, and wirings connect them.**
 
 ```text
 users (id "<channel_type>:<handle>", kind, display_name)
@@ -92,6 +96,14 @@ Trunk ships the registry and infrastructure, not specific channel adapters or no
 Each `/add-<name>` skill is idempotent: fetch the branch, copy the module(s) into the standard paths, append a self-registration import, install pinned dependencies, and build. Credentials are managed by OneCLI's Agent Vault — secrets are injected into per-agent containers at request time and never passed via env vars or chat context.
 
 The `ncl` admin CLI manages live state in the central DB. In v2.0.54, per-group runtime settings are updated with commands such as `ncl groups config update --model <model> --effort <level>` and applied on an explicit `ncl groups restart`.
+
+For exact CLI flags, defaults, aliases, and command-specific examples, use the help bundled with your installed checkout instead of copying reference text from this portal:
+
+```bash
+pnpm run ncl -- help
+pnpm run ncl -- groups config --help
+pnpm run ncl -- groups restart --help
+```
 
 ## Runtime split: Node host, Bun container
 

@@ -1,0 +1,102 @@
+---
+title: "Configure agents"
+description: "How to wire NanoClaw messaging groups to agent groups without duplicating CLI command reference text."
+keywords: ["NanoClaw configuration", "agent groups", "messaging groups", "wirings", "ncl CLI"]
+tag: "NEW"
+---
+
+Configuration in NanoClaw is mostly choosing boundaries: which chat should reach which agent, which users can trigger it, and what that agent can see inside its container.
+
+<Info>
+**Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `src/db/schema.ts`, `src/router.ts`, `src/session-manager.ts`, `src/cli/`, `docs/isolation-model.md`, and `docs/db.md`.
+</Info>
+
+## For: builders
+
+Use this page when you are adding a channel, splitting assistants by purpose, changing model/effort settings, or deciding whether two chats should share memory.
+
+<Note>
+This page explains what to decide. It does not duplicate every CLI flag. For exact command syntax on your installed version, run `pnpm run ncl -- help` and the relevant subcommand help.
+</Note>
+
+## The four terms to keep straight
+
+| Term | Plain meaning | Source-level shape |
+|------|---------------|--------------------|
+| User | A person or platform identity that sends messages | `users`, `user_roles`, `agent_group_members` |
+| Messaging group | One chat, channel, DM, room, or threadable platform surface | `messaging_groups` with `channel_type`, `platform_id`, `unknown_sender_policy` |
+| Agent group | One assistant identity and workspace | `agent_groups` plus `container_configs` and files under `groups/<folder>/` |
+| Wiring | The rule that connects a messaging group to an agent group | `messaging_group_agents` with engagement, sender, session, and priority fields |
+
+<Tip>
+A messaging group is where messages come from. An agent group is the workspace and identity that answers. A wiring is the permission and trigger rule between them.
+</Tip>
+
+## Common configuration decisions
+
+### 1. Should this chat get a new agent?
+
+Choose a **separate agent group** when the chat should have different memory, instructions, files, mounts, credentials, or model settings. This is the safest default for work/personal or customer/team boundaries.
+
+Choose the **same agent group with separate sessions** when you want the same assistant personality and workspace, but independent conversations per chat.
+
+Choose an **agent-shared session** only when messages from multiple channels should intentionally appear in one shared conversation.
+
+### 2. Who can trigger the agent?
+
+The wiring controls engagement:
+
+- `engage_mode`: mention, regex pattern, or mention-sticky behavior
+- `engage_pattern`: regex source when pattern mode is used
+- `sender_scope`: all senders or only known members
+- `ignored_message_policy`: drop ignored messages or accumulate them for later context
+- `session_mode`: separate chat session or agent-shared conversation
+- `priority`: ordering when several agents can answer
+
+Avoid old v1 wording such as `trigger_rules` as the canonical concept. In v2, engagement is stored as columns on `messaging_group_agents`.
+
+### 3. What can the agent see?
+
+Agent groups own the container-facing workspace: instructions, memory, skills, package and MCP-server config, mounts, provider/model/effort settings, and CLI scope. The container only sees what that group is configured to expose.
+
+<Warning>
+Sharing an agent group means sharing its workspace and memory. If two channels must not leak context into each other, use separate agent groups rather than relying on prompt instructions.
+</Warning>
+
+## CLI help boundary
+
+Docs should teach the model and the workflow. CLI help should remain the command reference.
+
+Use CLI help for:
+
+- exact syntax, flags, defaults, and aliases
+- fast-changing command lists
+- command-specific examples tied to the installed version
+
+Use these docs for:
+
+- why to create a separate agent group versus a shared session
+- how messaging groups differ from agent groups
+- which isolation level matches a use case
+- security and operational tradeoffs
+
+Useful entry points:
+
+```bash
+pnpm run ncl -- help
+pnpm run ncl -- groups --help
+pnpm run ncl -- groups config --help
+pnpm run ncl -- wirings --help
+pnpm run ncl -- sessions --help
+```
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Architecture overview" icon="network" href="/architecture">
+    Source-verified message flow and entity model.
+  </Card>
+  <Card title="Deploy and operate" icon="server" href="/deploy-overview">
+    Runtime, databases, credentials, and team boundaries.
+  </Card>
+</Columns>

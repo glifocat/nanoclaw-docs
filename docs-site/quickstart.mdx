@@ -6,6 +6,10 @@ keywords: ["NanoClaw install", "quickstart", "setup", "nanoclaw.sh"]
 
 `nanoclaw.sh` walks you from a fresh machine to a named agent you can message. It installs Node, pnpm, and Docker if they're missing, registers your Anthropic credential with OneCLI, builds the agent container, and pairs your first channel. If a step fails, Claude Code is invoked automatically to diagnose and resume from where it broke.
 
+<Tip>
+**For: everyone.** You do not need to understand every table or CLI flag to start. The first goal is one agent group, one messaging group, and one wiring between them.
+</Tip>
+
 <Info>
 **Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `README.md`, `nanoclaw.sh`, `package.json`, `.nvmrc`, `docs/REQUIREMENTS.md`, `CHANGELOG.md`.
 </Info>
@@ -79,6 +83,17 @@ pnpm test             # host tests (vitest)
 
 The agent-runner is a separate Bun package under `container/agent-runner/`. It runs `bun test` for its own tests and never shares modules with the host — see [Architecture overview](/architecture) for the Node-host / Bun-container split.
 
+## When you need exact command help
+
+This portal avoids copying the full command reference because the installed CLI is the version-specific source of truth. Use docs pages for concepts and workflows; use local help for syntax, flags, defaults, and aliases:
+
+```bash
+pnpm run ncl -- help
+pnpm run ncl -- groups --help
+pnpm run ncl -- wirings --help
+pnpm run ncl -- sessions --help
+```
+
 ## Next steps
 
 <Columns cols={2}>
@@ -87,5 +102,11 @@ The agent-runner is a separate Bun package under `container/agent-runner/`. It r
   </Card>
   <Card title="Architecture overview" icon="network" href="/architecture">
     Understand the host, containers, and the entity model before you customize.
+  </Card>
+  <Card title="Configure agents" icon="sliders" href="/configure-overview">
+    Learn how messaging groups, agent groups, wirings, and sessions fit together.
+  </Card>
+  <Card title="Deploy and operate" icon="server" href="/deploy-overview">
+    Service, container, credential, and backup guidance for operators.
   </Card>
 </Columns>

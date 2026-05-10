@@ -34,18 +34,30 @@
   "navigation": {
     "groups": [
       {
-        "group": "Get started",
+        "group": "Start here",
         "pages": [
           "introduction",
-          "quickstart",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Understand the model",
+        "pages": [
+          "architecture",
+          "database-and-sessions"
+        ]
+      },
+      {
+        "group": "Configure",
+        "pages": [
+          "configure-overview",
           "migration-from-v1"
         ]
       },
       {
-        "group": "Architecture",
+        "group": "Deploy and operate",
         "pages": [
-          "architecture",
-          "database-and-sessions"
+          "deploy-overview"
         ]
       },
       {
