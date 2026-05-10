@@ -1,0 +1,84 @@
+---
+title: "Deploy and operate"
+description: "Operational guidance for running NanoClaw v2: services, databases, containers, credentials, and team isolation."
+keywords: ["NanoClaw deployment", "operations", "service", "containers", "Agent Vault", "SQLite"]
+tag: "NEW"
+---
+
+NanoClaw v2 is still one host process, but an operator needs to understand the boundaries around that process: service manager, Docker or another container runtime, SQLite files, OneCLI Agent Vault, and channel credentials.
+
+<Info>
+**Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `README.md`, `docs/build-and-runtime.md`, `docs/db.md`, `docs/isolation-model.md`, `src/session-manager.ts`, `src/container-runner.ts`, and `src/db/schema.ts`.
+</Info>
+
+## For: operators, teams, and enterprise evaluators
+
+Use this page when NanoClaw is serving more than one person, more than one channel, or a long-running business workflow. If you need the security and governance decision path first, read [Operational boundaries](/operational-boundaries). If you are installing a personal assistant for the first time, start with [Quickstart](/quickstart) instead.
+
+## Operational model
+
+```text
+service manager
+  → Node host process
+  → central DB: data/v2.db
+  → per-session containers
+  → inbound.db / outbound.db pairs
+  → channel adapters and OneCLI Agent Vault
+```
+
+The host owns routing, permissions, migrations, channel adapters, and service lifecycle. Containers run agent sessions and write only their own `outbound.db`. This split is the deployment boundary: back up the host data directory, monitor the host service, and treat containers as replaceable session workers.
+
+## Isolation choices for teams
+
+| Need | Recommended shape |
+|------|-------------------|
+| Separate customers, teams, or departments | Separate agent groups |
+| Same assistant across several team chats, but independent conversations | One agent group with `session_mode: 'shared'` per wiring |
+| One conversation mirrored across several channels | One agent group with `session_mode: 'agent-shared'` |
+| Different model, effort, packages, MCP servers, mounts, or credentials | Separate agent groups or separate runtime config |
+
+<Warning>
+The safest business boundary is an agent group boundary. Prompt text cannot replace filesystem, memory, credential, and mount isolation.
+</Warning>
+
+## What to monitor
+
+- **Host service** — launchd on macOS or systemd user service on Linux.
+- **Container runtime** — Docker by default; Apple Container and Docker Sandboxes are opt-in alternatives.
+- **Data directory** — `data/v2.db` plus `data/v2-sessions/<agent_group_id>/<session_id>/`.
+- **Session liveness** — `.heartbeat` file mtimes are the liveness signal; the host sweep handles stale-session detection and due-task wakeups.
+- **Credential path** — OneCLI Agent Vault injects secrets at request time. Containers should not receive raw API keys through chat context or broad environment variables.
+
+## Backups and upgrades
+
+Back up the central DB and session folders together when preserving live state. The central DB stores identities, roles, memberships, wirings, approvals, runtime config, and session registry. Session DBs store per-conversation inbound/outbound messages, tasks, delivery state, and agent session state.
+
+Before upgrading across major behavior changes, read [Changelog and versioning](/changelog). v1 installs must use [Migrating from v1](/migration-from-v1); do not merge v2 into an existing v1 checkout.
+
+## CLI help boundary
+
+Operational pages should avoid stale command dumps. Link to the decision and safety context here, then send operators to local help for exact syntax:
+
+```bash
+pnpm run ncl -- help
+pnpm run ncl -- approvals --help
+pnpm run ncl -- groups config --help
+pnpm run ncl -- groups restart --help
+pnpm run ncl -- destinations --help
+```
+
+This keeps the docs focused on what to operate and why, while the installed CLI remains the source of truth for flags and defaults.
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Database and sessions" icon="database" href="/database-and-sessions">
+    The three-DB model and cross-mount single-writer rules.
+  </Card>
+  <Card title="Operational boundaries" icon="building-shield" href="/operational-boundaries">
+    Business isolation, credentials, approvals, monitoring, and hard limits.
+  </Card>
+  <Card title="Tinker/customize" icon="sliders" href="/tinker-customize">
+    Customize channels, providers, skills, and fork-level behavior.
+  </Card>
+</Columns>

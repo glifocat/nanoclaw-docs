@@ -1,0 +1,112 @@
+---
+title: "Quickstart"
+description: "Install NanoClaw v2 and pair your first channel — from a fresh machine to a named agent you can message."
+keywords: ["NanoClaw install", "quickstart", "setup", "nanoclaw.sh"]
+---
+
+`nanoclaw.sh` walks you from a fresh machine to a named agent you can message. It installs Node, pnpm, and Docker if they're missing, registers your Anthropic credential with OneCLI, builds the agent container, and pairs your first channel. If a step fails, Claude Code is invoked automatically to diagnose and resume from where it broke.
+
+<Tip>
+**For: everyone.** You do not need to understand every table or CLI flag to start. The first goal is one agent group, one messaging group, and one wiring between them.
+</Tip>
+
+<Info>
+**Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `README.md`, `nanoclaw.sh`, `package.json`, `.nvmrc`, `docs/REQUIREMENTS.md`, `CHANGELOG.md`.
+</Info>
+
+## Requirements
+
+- macOS or Linux (Windows via WSL2)
+- Node.js 20+ and pnpm 10+ — the installer adds both if they're missing (the repo pins Node 22 via `.nvmrc`)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) (macOS/Windows) or Docker Engine (Linux)
+- [Claude Code](https://claude.ai/download) — used for `/customize`, `/debug`, error recovery during setup, and every `/add-<channel>` skill
+- An Anthropic account — setup registers your Anthropic credential with OneCLI's Agent Vault
+
+## Install
+
+```bash
+git clone https://github.com/qwibitai/nanoclaw.git nanoclaw-v2
+cd nanoclaw-v2
+bash nanoclaw.sh
+```
+
+<Steps>
+  <Step title="Run the installer">
+    Run `bash nanoclaw.sh` from the cloned directory. It bootstraps Node, pnpm, and native modules under a progress spinner, then hands off to the scripted setup flow.
+  </Step>
+  <Step title="Install dependencies and build the container">
+    The setup flow installs Docker if missing, installs project dependencies, registers your Anthropic credential with OneCLI, and builds the `nanoclaw-agent` container image.
+  </Step>
+  <Step title="Pair your first channel">
+    Pick a channel to connect — Telegram, Discord, WhatsApp, or a local CLI for testing. The matching `/add-<channel>` skill copies the adapter into your fork and wires it up.
+  </Step>
+  <Step title="Message your agent">
+    Talk to your assistant with the trigger word (default `@Andy`). For example: `@Andy compile AI news from Hacker News and message me a briefing every weekday at 9am`.
+  </Step>
+</Steps>
+
+If a step fails, `nanoclaw.sh` hands control to Claude Code to diagnose and resume. If that doesn't resolve it, run `claude`, then `/debug`.
+
+<Note>
+Already running NanoClaw v1? Don't run `nanoclaw.sh` over it and don't `git merge` v2 into your v1 checkout — see [Migrating from v1](/migration-from-v1).
+</Note>
+
+## Run as a service
+
+NanoClaw runs as a single host process, managed by your platform's service manager:
+
+<CodeGroup>
+
+```bash macOS (launchd)
+launchctl load   ~/Library/LaunchAgents/com.nanoclaw.plist
+launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw   # restart
+```
+
+```bash Linux (systemd)
+systemctl --user start nanoclaw
+systemctl --user stop nanoclaw
+systemctl --user restart nanoclaw
+```
+
+</CodeGroup>
+
+## Develop locally
+
+```bash
+pnpm run dev          # host with hot reload
+pnpm run build        # compile host TypeScript (src/)
+pnpm run ncl -- help  # inspect the admin CLI for groups, wirings, approvals, sessions, config
+./container/build.sh  # rebuild the agent container image (nanoclaw-agent:latest)
+pnpm test             # host tests (vitest)
+```
+
+The agent-runner is a separate Bun package under `container/agent-runner/`. It runs `bun test` for its own tests and never shares modules with the host — see [Architecture overview](/architecture) for the Node-host / Bun-container split.
+
+## When you need exact command help
+
+This portal avoids copying the full command reference because the installed CLI is the version-specific source of truth. Use docs pages for concepts and workflows; use local help for syntax, flags, defaults, and aliases:
+
+```bash
+pnpm run ncl -- help
+pnpm run ncl -- groups --help
+pnpm run ncl -- wirings --help
+pnpm run ncl -- sessions --help
+```
+
+## Next steps
+
+<Columns cols={2}>
+  <Card title="Tinker/customize" icon="sliders" href="/tinker-customize">
+    Add channels/providers, split agent groups, and shape your fork.
+  </Card>
+  <Card title="Contribute" icon="code" href="/contribute-overview">
+    Understand the codebase, skills, tests, and source boundaries.
+  </Card>
+  <Card title="Business/enterprise" icon="building-shield" href="/operational-boundaries">
+    Isolation, credentials, approvals, backups, and hard limits for real workflows.
+  </Card>
+  <Card title="Migrating from v1" icon="arrow-up-right" href="/migration-from-v1">
+    Already running NanoClaw v1? Use `migrate-v2.sh` instead.
+  </Card>
+</Columns>

@@ -1,0 +1,110 @@
+---
+title: "Database and sessions"
+description: "NanoClaw v2's three-database model, the two-DB session split, sequence parity, and the cross-mount visibility rules."
+keywords: ["NanoClaw database", "session model", "SQLite", "inbound.db", "outbound.db", "central DB"]
+---
+
+NanoClaw v2 stores state in **three kinds of SQLite database**, all on the host filesystem. Every database file has exactly one writer — that single-writer rule is what keeps SQLite locking sane across the Docker (or Apple Container) mount boundary.
+
+<Info>
+**Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `docs/db.md`, `docs/db-central.md`, `docs/db-session.md`, `CLAUDE.md`, `src/db/schema.ts`, `src/session-manager.ts`, `src/db/migrations/014-container-configs.ts`, `src/db/migrations/015-cli-scope.ts`.
+</Info>
+
+## The three databases
+
+| Database | Location | Writer | Readers | Purpose |
+|----------|----------|--------|---------|---------|
+| Central | `data/v2.db` | host | host | Identity, permissions, routing, wiring — the admin plane |
+| Session inbound | `data/v2-sessions/<agent_group_id>/<session_id>/inbound.db` | host | host (sync), container (read-only) | Host → container messages plus routing projections |
+| Session outbound | `data/v2-sessions/<agent_group_id>/<session_id>/outbound.db` | container | host (poll), container | Container → host messages plus processing status |
+
+**Single-writer rule.** The host writes the central DB and every `inbound.db`; the container writes only its own `outbound.db`. No file is written from both sides of the mount.
+
+**Everything is a message.** There is no IPC, stdin piping, or file watcher between host and container. The two session DBs are the only IO surface. Liveness is a file `touch` on `.heartbeat`, not a DB write.
+
+## Database layout
+
+```text
+data/
+  v2.db                                   ← CENTRAL (host ↔ host)
+  v2-sessions/
+    <agent_group_id>/
+      .claude-shared/                     ← shared Claude state for the agent group
+      <session_id>/
+        inbound.db                        ← host writes, container reads (read-only mount)
+        outbound.db                       ← container writes, host reads (read-only open)
+        .heartbeat                        ← mtime touched by container
+        inbox/<message_id>/               ← decoded user attachments
+        outbox/<message_id>/              ← attachments the agent produced
+```
+
+Path helpers — `sessionDir()`, `inboundDbPath()`, `outboundDbPath()`, `heartbeatPath()` — all live in `src/session-manager.ts`. A session is keyed by `(agent_group_id, messaging_group_id, thread_id)` and is created on demand.
+
+## What lives where
+
+| Kind of data | Where | Why |
+|--------------|-------|-----|
+| Identities, roles, memberships | central | Stable, cross-session, rarely written |
+| Channel wiring and routing rules | central | The admin plane |
+| Per-agent-group runtime config | central `container_configs` | Provider/model/effort, packages, MCP servers, mounts, skills, and `cli_scope` need admin visibility and CLI updates |
+| Session registry (ids, status) | central | The host orchestrates session lifecycle |
+| Approvals, pending sender approvals, and pending questions | central | Survive container restarts; admin-visible |
+| Dropped-message audit | central | Global ops view |
+| Inbound messages, retry state, scheduled tasks | session `inbound.db` | Per-session workload; the host is sole writer |
+| Outbound messages, agent session state | session `outbound.db` | The container is sole writer; the host polls |
+| Delivery outcome (`delivered`) | session `inbound.db` | Host writes on success; container reads it for edit/reaction targeting |
+| Processing status (`processing_ack`) | session `outbound.db` | The container can't write to `inbound.db`, so it acks via the reverse channel |
+
+Heuristic: if the value is a message, a routing projection, or a runtime ack, it goes per-session. Everything else is central. Scheduled tasks are `messages_in` rows with `kind='task'` in a session's `inbound.db` — `process_after` (ISO8601) drives the wakeup, `recurrence` holds a cron string (`NULL` for one-shot), and `series_id` groups recurring occurrences.
+
+## The two-DB session split
+
+Each session owns two files:
+
+- **`inbound.db`** — host writes, container reads (mounted read-only). Tables: `messages_in`, `delivered`, `destinations` (a projection of the central `agent_destinations` ACL), `session_routing` (the default outbound target).
+- **`outbound.db`** — container writes, host reads. Tables: `messages_out`, `processing_ack`, `session_state`, `container_state`.
+
+The schemas are the `INBOUND_SCHEMA` and `OUTBOUND_SCHEMA` constants in `src/db/schema.ts`; `ensureSchema()` in `src/session-manager.ts` creates both files when a session folder is provisioned.
+
+Central DB schemas are created by numbered migrations. As of `v2.0.54`, the central DB includes `container_configs` for per-agent-group runtime settings and `pending_sender_approvals` for deduplicated unknown-sender approval cards. Session DB schemas are created lazily from `src/db/schema.ts`.
+
+### Sequence parity
+
+`messages_in.seq` is always **even** (the host assigns it); `messages_out.seq` is always **odd** (the container assigns it). The two namespaces are disjoint, so the agent can reference any message in the session by `seq` alone, regardless of direction.
+
+### Projections
+
+`destinations` and `session_routing` in `inbound.db` are projected from the central DB on every container wake (and again when wiring changes mid-session). This gives the container a fast, local read path for "who am I allowed to send to" and "where do replies go by default" without ever querying across the mount.
+
+### Fresh-wake messages
+
+`messages_in.on_wake = 1` marks rows that should only be delivered on a fresh container's first poll. This is used by explicit restarts and self-mod approval flows so a dying container cannot steal a restart/configuration message during its SIGTERM grace period.
+
+## Cross-mount visibility rules
+
+Session DBs are bind-mounted into the container, and SQLite's usual assumptions don't hold across that boundary. A few rules are load-bearing — read `src/session-manager.ts` and `container/agent-runner/src/db/connection.ts` before touching DB code:
+
+- **`journal_mode = DELETE`, not WAL.** WAL's memory-mapped `-shm` file doesn't refresh reliably across the mount; the container can read stale pages. DELETE mode forces each writer to flush the main file.
+- **Open-write-close on the host.** Host writes to `inbound.db` open a connection, write, and close it. Keeping a handle open leaves cached pages invisible to the container.
+- **Container reads are read-only.** The container opens `inbound.db` with `readonly: true` and never writes. All container → host state goes through `outbound.db`.
+- **Heartbeat is a file touch.** `.heartbeat` mtime is the liveness signal, not a DB column — a DB write per heartbeat would serialize behind other writers.
+- **Named SQL params in the container keep their prefix.** `bun:sqlite` does not auto-strip `$`/`@`/`:` the way `better-sqlite3` does on the host — use `$name` in both the SQL and the JS object keys.
+
+## Migrations
+
+The central DB uses numbered migrations under `src/db/migrations/` (run by `src/db/migrations/index.ts`, tracked in a `schema_version` table). Per-session DBs use `CREATE TABLE IF NOT EXISTS` plus ad-hoc `ALTER TABLE` helpers so older session folders are brought up to schema lazily on open.
+
+The current staged source includes migrations `014-container-configs.ts` and `015-cli-scope.ts`, which move per-group container settings into the central `container_configs` table and add `cli_scope` (`disabled`, `group`, or `global`) for the in-container `ncl` CLI.
+
+For the table-by-table reference, see the source docs: [`docs/db.md`](https://github.com/qwibitai/nanoclaw/blob/main/docs/db.md) (overview), [`docs/db-central.md`](https://github.com/qwibitai/nanoclaw/blob/main/docs/db-central.md) (central DB), and [`docs/db-session.md`](https://github.com/qwibitai/nanoclaw/blob/main/docs/db-session.md) (per-session DBs).
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Architecture overview" icon="network" href="/architecture">
+    Where the databases sit in the message flow and the entity model.
+  </Card>
+  <Card title="Migrating from v1" icon="arrow-up-right" href="/migration-from-v1">
+    v1's single `store/messages.db` versus v2's three-DB model.
+  </Card>
+</Columns>

@@ -1,0 +1,79 @@
+---
+title: "Migrating from v1"
+description: "What changed in NanoClaw v2 and how migrate-v2.sh moves an existing v1 install forward."
+keywords: ["NanoClaw v2 migration", "migrate-v2.sh", "v1 to v2", "upgrade"]
+---
+
+<Warning>
+NanoClaw v2 is a ground-up rewrite with breaking changes throughout. **It cannot be merged into an existing v1 install.** A `git pull` or `git merge` will produce conflicts you should not try to resolve by hand — abort the merge and run `migrate-v2.sh` from a fresh v2 checkout instead.
+</Warning>
+
+<Info>
+**Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `README.md`, `CHANGELOG.md`, `CLAUDE.md`, `migrate-v2.sh`, `docs/v1-to-v2-changes.md`, `docs/migration-dev.md`.
+</Info>
+
+## Run the migration
+
+From a fresh v2 checkout next to your v1 install:
+
+```bash
+git clone https://github.com/qwibitai/nanoclaw.git nanoclaw-v2
+cd nanoclaw-v2
+bash migrate-v2.sh
+```
+
+`migrate-v2.sh` finds your v1 install — a sibling directory, or whatever `NANOCLAW_V1_PATH=/path/to/nanoclaw` points to — installs prerequisites (Node, pnpm, dependencies), runs the deterministic migration steps, then `exec`s into Claude Code (`/migrate-from-v1`) for the parts that need judgment.
+
+<Warning>
+Run `migrate-v2.sh` directly from a real terminal, **not from inside a Claude Code session**. The deterministic side needs interactive prompts and real shell I/O for the Node/pnpm bootstrap, Docker, OneCLI, and the container build. The script refuses to run if stdin and stdout aren't a TTY.
+</Warning>
+
+The script is idempotent — safe to re-run. `migrate-v2-reset.sh` wipes v2 state back to clean for testing.
+
+### What the script does
+
+- Merges your v1 `.env` into v2 `.env`, never overwriting existing v2 keys
+- Seeds the v2 central DB from v1's `registered_groups`
+- Copies group folders (v1 `CLAUDE.md` → v2 `CLAUDE.local.md`), ports container runtime config into v2's DB-backed `container_configs`, preserves session continuity, and ports active scheduled tasks
+- Interactively selects and installs the channel adapters you used in v1
+- Copies channel auth state, including the Baileys keystore and LID mappings for WhatsApp
+- Builds the agent container image
+- Offers a service switchover so you can test v2 — your v1 install is left untouched until you choose to switch
+
+### What it doesn't do
+
+It does not flip the system service for you. Pick *"switch to v2"* at the prompt, or do it manually after testing. It also does not migrate chat history (the v1 `messages` and `chats` tables stay in the v1 checkout), `router_state`, or v1 session rows.
+
+### What Claude Code handles
+
+After the deterministic steps, `migrate-v2.sh` hands off to the `/migrate-from-v1` skill for owner seeding ("which handle is you?"), access-policy setup, `CLAUDE.local.md` cleanup, DB-backed container-config validation, and replaying any fork customizations.
+
+## What changed in v2
+
+v1 was one Node process with one SQLite file and native channel adapters. v2 is a host that spawns per-session Docker containers, splits state across a central DB plus a per-session DB pair, routes through an explicit entity model, and installs channels as skills from a sibling branch.
+
+| Area | v1 | v2 |
+|------|----|----|
+| Process model | Single Node process; the agent ran in the same process as the router | Node host spawns a Bun-runtime Docker container per session; they communicate only through the two session DBs |
+| Identity and privilege | One flat `registered_groups` table; `is_main = 1` flagged the privileged group | Explicit `users`, `user_roles` (owner, admin — global or scoped), and `agent_group_members`; privilege is user-level, not channel-level |
+| Routing | A chat was wired to one folder via an opaque `trigger_pattern` regex | `agent_groups` ↔ `messaging_group_agents` ↔ `messaging_groups` many-to-many; the wiring carries `engage_mode`, `engage_pattern`, `sender_scope`, `ignored_message_policy`, `session_mode`, and `priority` |
+| Storage | One SQLite file at `store/messages.db` | Three DB shapes: central `data/v2.db`, per-session `inbound.db` (host writes), per-session `outbound.db` (container writes) |
+| Scheduling | A dedicated `scheduled_tasks` table | Tasks are `messages_in` rows with `kind='task'` in a session's `inbound.db` |
+| Credentials | Plain `.env` environment variables passed to anything that needed them | OneCLI Agent Vault at `http://127.0.0.1:10254`; agents are scoped to specific secrets and never see raw values |
+| Channels | Native adapters imported in `src/channels/` | Adapters live on the `channels` branch; `/add-<channel>` skills copy them into your fork |
+| Providers | Third-party model support via `.env` overrides | `claude` baked into trunk; OpenCode, Codex, and Ollama install via `/add-opencode`, `/add-codex`, `/add-ollama-provider`, configurable per agent group |
+| Group folders and runtime config | `groups/<folder>/CLAUDE.md` plus filesystem config | `groups/<folder>/` holds workspace/instructions; `CLAUDE.md` is composed at container spawn from a shared base, `.claude-fragments/*`, and `CLAUDE.local.md`; runtime config lives in central `container_configs` and is managed by `ncl groups config` |
+| Channel isolation | Implicit | Three explicit levels — separate agent groups; a shared agent with separate sessions (`session_mode: 'shared'`); or one shared session across channels (`session_mode: 'agent-shared'`) |
+
+For the full vocabulary of where v1 things moved, see [`docs/v1-to-v2-changes.md`](https://github.com/qwibitai/nanoclaw/blob/main/docs/v1-to-v2-changes.md) in the source repo, and [`docs/migration-dev.md`](https://github.com/qwibitai/nanoclaw/blob/main/docs/migration-dev.md) for development notes.
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Architecture overview" icon="network" href="/architecture">
+    The v2 entity model and message flow in detail.
+  </Card>
+  <Card title="Database and sessions" icon="database" href="/database-and-sessions">
+    The three-DB model and the two-DB session split.
+  </Card>
+</Columns>

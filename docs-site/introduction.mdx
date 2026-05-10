@@ -1,0 +1,89 @@
+---
+title: "NanoClaw"
+description: "Build a small AI team you can understand, isolate, and customize — Claude agents in per-session containers, wired to the apps you already use."
+keywords: ["NanoClaw", "Claude agent", "AI team", "Docker", "self-hosted", "v2"]
+---
+
+NanoClaw is an AI team that runs from your own fork. You talk to it from messaging apps, the host routes each message through explicit wiring, and each session runs inside an isolated Linux container with only the workspace you chose to mount.
+
+It is not a generic assistant SaaS. It is small enough to read, secure by isolation, and built for bespoke workflows: channels, providers, and utilities land as skills instead of permanent product bloat.
+
+<Info>
+**Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `README.md`, `CLAUDE.md`, `CHANGELOG.md`.
+</Info>
+
+## Choose your path
+
+<Columns cols={2}>
+  <Card title="Get it running" icon="rocket" href="/quickstart">
+    Shortest path to a working install: clone, run the installer, pair one channel, message one agent.
+  </Card>
+  <Card title="Tinker/customize" icon="sliders" href="/tinker-customize">
+    Adapt behavior, add channels/providers, split agent groups, and customize your fork without turning it into bloatware.
+  </Card>
+  <Card title="Contribute" icon="code" href="/contribute-overview">
+    Understand the codebase, skills model, architecture, and validation flow before changing NanoClaw itself.
+  </Card>
+  <Card title="Business/enterprise" icon="building-shield" href="/operational-boundaries">
+    Run NanoClaw for a team or workflow: deployment, isolation, credentials, approvals, backups, and hard limits.
+  </Card>
+</Columns>
+
+## The model in one screen
+
+```text
+messaging apps
+  → Node host process
+  → central routing DB
+  → session inbound.db
+  → per-session container
+  → session outbound.db
+  → host delivery
+  → messaging apps
+```
+
+The host owns identity, routing, wirings, migrations, channel adapters, and delivery. The container owns the agent run and writes only its own outbound session DB. That split keeps SQLite single-writer rules intact and makes the isolation model inspectable.
+
+<Tip>
+If you remember one distinction, make it this: **messaging groups are chats; agent groups are workspaces and identities; wirings connect them.** Sharing a messaging app does not automatically share an agent's memory, files, mounts, or credentials.
+</Tip>
+
+## What you get
+
+- **AI teammates, not one blob.** Each agent group has its own identity, instructions, memory, skills, mounts, provider settings, and workspace.
+- **Secure by isolation.** Sessions run in containers. Agents see mounted paths, not the whole host. If data must not mix, split agent groups instead of trusting prompt text.
+- **Messaging apps as front doors.** Discord, Slack, Telegram, WhatsApp, Teams, iMessage, Matrix, Google Chat, Webex, Linear, GitHub, WeChat, and email adapters install on demand from skills.
+- **Skills over features.** Trunk stays lean. Channel, provider, and utility skills copy the pieces you need into your fork.
+- **Bespoke, not bloatware.** NanoClaw is meant to be forked and shaped with Claude Code. The codebase is the configuration surface when configuration would become sprawl.
+- **Credentials as authority.** OneCLI Agent Vault injects secrets at request time and scopes access by agent policy; raw keys do not belong in prompts or broad environment variables.
+
+## Docs stance
+
+This staged v2 portal teaches decisions and workflows. It intentionally avoids becoming a stale CLI manual. For exact flags, fields, defaults, aliases, and command lists, run local help from the checkout you installed:
+
+```bash
+pnpm run ncl -- help
+pnpm run ncl -- groups --help
+pnpm run ncl -- wirings --help
+```
+
+Use these pages to choose boundaries: when to split agent groups, how session modes differ, where credentials live, what operators must monitor, and how to contribute without breaking the host/container contract.
+
+## Next pages
+
+<Columns cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Start with one agent, one channel, one wiring.
+  </Card>
+  <Card title="Architecture overview" icon="network" href="/architecture">
+    Read the host/container split and entity model.
+  </Card>
+  <Card title="Tinker/customize" icon="sliders" href="/tinker-customize">
+    Add channels, providers, skills, and fork-level behavior.
+  </Card>
+  <Card title="Operational boundaries" icon="building-shield" href="/operational-boundaries">
+    Separate customers, teams, credentials, mounts, and risk.
+  </Card>
+</Columns>
+
+Detailed channel and provider guides will land in later stages. For subsystems not covered here yet, read the source repository's `docs/` directory next to the version you are running.

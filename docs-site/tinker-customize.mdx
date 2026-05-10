@@ -1,0 +1,93 @@
+---
+title: "Tinker/customize"
+description: "How to adapt NanoClaw behavior: channels, providers, skills, agent groups, and fork-level changes without losing the isolation model."
+keywords: ["NanoClaw customization", "channels", "providers", "skills", "agent groups"]
+tag: "NEW"
+---
+
+NanoClaw is built to be changed. The trick is to change the right layer: add a skill when you need an integration, split an agent group when you need a boundary, edit the fork when configuration would become a tiny product of its own.
+
+<Info>
+**Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `README.md`, `CLAUDE.md`, `docs/skills-as-branches.md`, `docs/isolation-model.md`, `docs/setup-wiring.md`, `docs/ollama.md`, `src/modules/self-mod/project.md`, and `container/skills/self-customize/SKILL.md`.
+</Info>
+
+## Start with the boundary
+
+Before adding a channel, provider, MCP server, package, or mount, decide what must stay separate.
+
+| If you need... | Use... |
+|----------------|--------|
+| A different personality, memory, credentials, files, mounts, packages, model, or provider | A separate agent group |
+| The same assistant on two chats, but independent conversations | One agent group with separate sessions |
+| One conversation visible from several channels | One agent group with an agent-shared session |
+| A reusable capability that should not live in trunk forever | A skill |
+| Behavior that is truly yours | A fork-level code change |
+
+<Warning>
+Do not use prompt instructions as a security boundary. If two workflows must not share files, memory, credentials, mounts, or conversation history, split the agent groups.
+</Warning>
+
+## Add channels and providers with skills
+
+Trunk ships the registry and the core runtime. Channel adapters and alternative providers are installed from long-lived skill branches:
+
+- **Channels** — Discord, Slack, Telegram, WhatsApp, Teams, Linear, GitHub, iMessage, Webex, Resend, Matrix, Google Chat, and similar adapters.
+- **Providers** — OpenCode, Codex, Ollama, and other non-default agent/provider integrations.
+- **Utility skills** — focused tools such as voice, vision, PDFs, outbound calls, or workflow-specific scripts.
+
+Each `/add-<name>` skill should be idempotent: fetch the source, copy only the module it needs, append registration imports, install pinned dependencies, and build. That keeps NanoClaw bespoke without turning trunk into a catalog of dormant integrations.
+
+<Note>
+No channel is the default. Avoid WhatsApp-centric assumptions unless you are editing a WhatsApp-specific page or skill.
+</Note>
+
+## Customize the fork, not a hidden product
+
+NanoClaw's opinionated path is direct: keep the codebase small enough that Claude Code can explain it and help you change it.
+
+Good customization targets:
+
+- channel adapter behavior
+- agent-group prompts and memory
+- per-group packages, mounts, MCP servers, model, and effort
+- utility skills under `container/skills/<name>/`
+- approval-gated tools for actions with external side effects
+- small host changes that keep the routing and database invariants intact
+
+Bad customization targets:
+
+- writing to `inbound.db` from the container
+- making the host and container both write the same SQLite file
+- hiding credential scope in prompt text
+- copying long CLI reference tables into docs
+- resurrecting v1 concepts such as `data/ipc`, `manifest.yaml`, `.nanoclaw/state.yaml`, or `apply-skill.ts`
+
+## When you need exact commands
+
+This page describes the shape of the work. Use local CLI help for exact syntax, flags, defaults, aliases, and generated examples:
+
+```bash
+pnpm run ncl -- help
+pnpm run ncl -- groups --help
+pnpm run ncl -- groups config --help
+pnpm run ncl -- wirings --help
+```
+
+If a docs change needs a long command table, the better fix is usually to improve `src/cli` help metadata and point readers there.
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Configure agents" icon="sliders" href="/configure-overview">
+    Messaging groups, agent groups, wirings, sessions, and trigger rules.
+  </Card>
+  <Card title="Architecture overview" icon="network" href="/architecture">
+    The host/container contract you should preserve while customizing.
+  </Card>
+  <Card title="Contribute" icon="code" href="/contribute-overview">
+    Codebase map, validation flow, and contribution boundaries.
+  </Card>
+  <Card title="Operational boundaries" icon="building-shield" href="/operational-boundaries">
+    Use runtime boundaries when the stakes are data, credentials, or customers.
+  </Card>
+</Columns>
