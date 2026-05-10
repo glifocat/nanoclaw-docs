@@ -1,0 +1,94 @@
+---
+title: "Contribute"
+description: "A compact contributor path for NanoClaw v2: codebase map, architecture invariants, skills, tests, and PR boundaries."
+keywords: ["NanoClaw contribute", "codebase", "skills", "tests", "architecture"]
+tag: "NEW"
+---
+
+Contributing to NanoClaw starts with the shape of the system. It is one Node host, per-session Bun containers, and SQLite files with strict writer ownership. Most good changes keep that shape obvious.
+
+<Info>
+**Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at source branch `main` (commit `e0e4f01`) and docs branch staged for `v2.0.54`. Primary sources checked: `README.md`, `CONTRIBUTING.md`, `CLAUDE.md`, `docs/skills-as-branches.md`, `docs/build-and-runtime.md`, `docs/agent-runner-details.md`, `.github/workflows/ci.yml`, `package.json`, and `container/agent-runner/package.json`.
+</Info>
+
+## Contributor stance
+
+NanoClaw favors inspectable code over extension frameworks. Before adding a new abstraction, ask whether a small skill, page, adapter, or fork-level change would be clearer.
+
+Good first contributions:
+
+- fix docs that still describe v1 behavior
+- improve generated CLI help metadata instead of duplicating command tables in docs
+- tighten tests around routing, sessions, delivery, or container startup
+- add or repair one skill installer
+- make an architecture invariant easier to see in code
+
+Avoid broad rewrites that touch routing, database writes, channels, delivery, and container startup at once. The pieces are intentionally small, but they are tightly coupled.
+
+## Codebase map
+
+| Area | Files to start with | What to preserve |
+|------|---------------------|------------------|
+| Host entrypoint | `src/index.ts` | migrations, channel startup, sweep, delivery loop |
+| Routing | `src/router.ts` | user → messaging group → wiring → agent group → session |
+| Session files | `src/session-manager.ts` | host writes `inbound.db`; container writes `outbound.db` |
+| Delivery | `src/delivery.ts` | host reads outbound and sends through adapters |
+| Runtime config | `src/container-config.ts`, `src/container-runner.ts` | per-group config, mounts, provider settings, Agent Vault injection |
+| Agent runner | `container/agent-runner/` | Bun runtime, provider query, MCP tools, outbound writes |
+| Skills | `container/skills/`, skill branches | focused changes copied into a fork |
+| Docs | `docs/`, `docs-site/` | code first, then `CLAUDE.md`, then source docs |
+
+## Load-bearing invariants
+
+- **Single writer per SQLite DB.** Host writes central DB and `inbound.db`; container writes `outbound.db`.
+- **No v1 IPC path.** `data/ipc` is obsolete. Session DBs are the boundary.
+- **Heartbeat is file mtime.** `.heartbeat` is touched by the container; it is not a DB write.
+- **Messaging groups are not agent groups.** Messaging groups are chats. Agent groups are identities/workspaces. Wirings connect them.
+- **Skills over features.** Add focused skills before growing trunk.
+- **Credentials are authority.** Use OneCLI Agent Vault policy; do not pass raw secrets through prompts, broad env vars, or docs examples.
+
+## Validate before a PR
+
+Run the smallest checks that cover the files you changed, then the standard gates before opening or updating a PR:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm run typecheck
+pnpm run build
+pnpm run format:check
+pnpm test
+
+cd container/agent-runner
+bun install
+bun run typecheck
+bun test
+```
+
+Docs-only changes in this portal should also pass:
+
+```bash
+cd docs-site
+mint validate
+mint broken-links
+```
+
+<Note>
+This page names the checks so contributors know the workflow. It is not a replacement for package scripts, CI config, or command help in the checked-out version.
+</Note>
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Architecture overview" icon="network" href="/architecture">
+    The message flow and entity model every code change should respect.
+  </Card>
+  <Card title="Database and sessions" icon="database" href="/database-and-sessions">
+    The three-DB model and single-writer rule.
+  </Card>
+  <Card title="Tinker/customize" icon="sliders" href="/tinker-customize">
+    Skills and fork-level changes before upstream contributions.
+  </Card>
+  <Card title="Changelog and versioning" icon="clock" href="/changelog">
+    Source-status notes and release context.
+  </Card>
+</Columns>

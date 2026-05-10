@@ -11,9 +11,9 @@ NanoClaw v2 is still one host process, but an operator needs to understand the b
 **Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `README.md`, `docs/build-and-runtime.md`, `docs/db.md`, `docs/isolation-model.md`, `src/session-manager.ts`, `src/container-runner.ts`, and `src/db/schema.ts`.
 </Info>
 
-## For: operators and teams
+## For: operators, teams, and enterprise evaluators
 
-Use this page when NanoClaw is serving more than one person, more than one channel, or a long-running business workflow. If you are installing a personal assistant for the first time, start with [Quickstart](/quickstart) instead.
+Use this page when NanoClaw is serving more than one person, more than one channel, or a long-running business workflow. If you need the security and governance decision path first, read [Operational boundaries](/operational-boundaries). If you are installing a personal assistant for the first time, start with [Quickstart](/quickstart) instead.
 
 ## Operational model
 
@@ -75,7 +75,10 @@ This keeps the docs focused on what to operate and why, while the installed CLI 
   <Card title="Database and sessions" icon="database" href="/database-and-sessions">
     The three-DB model and cross-mount single-writer rules.
   </Card>
-  <Card title="Configure agents" icon="sliders" href="/configure-overview">
-    Messaging groups, agent groups, wirings, and session modes.
+  <Card title="Operational boundaries" icon="building-shield" href="/operational-boundaries">
+    Business isolation, credentials, approvals, monitoring, and hard limits.
+  </Card>
+  <Card title="Tinker/customize" icon="sliders" href="/tinker-customize">
+    Customize channels, providers, skills, and fork-level behavior.
   </Card>
 </Columns>

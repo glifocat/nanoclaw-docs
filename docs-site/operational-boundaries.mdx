@@ -1,0 +1,80 @@
+---
+title: "Operational boundaries"
+description: "Business and enterprise evaluation guidance for NanoClaw: isolation, credentials, approvals, backups, monitoring, and hard limits."
+keywords: ["NanoClaw enterprise", "operations", "isolation", "credentials", "approvals", "governance"]
+tag: "NEW"
+---
+
+NanoClaw can run as the AI team behind a real workflow, but its business story is not a procurement checklist. It is a set of hard boundaries you can inspect: one host process, per-session containers, explicit agent groups, scoped credentials, approvals, and SQLite state you can back up.
+
+<Info>
+**Source status** — Verified against [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at tag `v2.0.54` (commit `a33b1ae`), package version `2.0.54`, on 2026-05-10. Primary sources checked: `README.md`, `docs/build-and-runtime.md`, `docs/db.md`, `docs/isolation-model.md`, `src/session-manager.ts`, `src/container-runner.ts`, `src/db/schema.ts`, and `src/onecli-approvals.ts`.
+</Info>
+
+## Who this path is for
+
+Use this path if NanoClaw will serve a team, a customer workflow, regulated data, or a business process where data boundaries matter. If you only need a personal assistant, start with [Quickstart](/quickstart). If you are shaping behavior, read [Tinker/customize](/tinker-customize).
+
+## Decision map
+
+| Decision | Default for real work | Why |
+|----------|-----------------------|-----|
+| Customer or department separation | Separate agent groups | Keeps memory, files, mounts, credentials, and settings apart |
+| Credential access | OneCLI Agent Vault policy | Treats credentials as authority, not configuration |
+| Human approval | Approval-gated actions for authority changes and external side effects | Keeps the agent from silently expanding power |
+| Persistence | Back up central DB and session folders together | Routing and conversations live in different SQLite files |
+| Operations | Monitor host service, container runtime, session heartbeat mtimes, delivery failures, approvals, and storage growth | Containers are replaceable; the host data directory is not |
+
+## What to separate
+
+Create separate agent groups for:
+
+- customers or tenants
+- departments or teams with different data access
+- workflows with different credentials
+- different filesystem mounts
+- different model/provider/runtime policies
+- anything where a leaked conversation or file would matter
+
+A shared session is for intentionally shared context. It is not a convenience shortcut for confidential workflows.
+
+<Warning>
+Prompt text is not an isolation boundary. If two workflows must not share files, memory, credentials, mounts, or conversation history, use separate agent groups.
+</Warning>
+
+## Credentials and approvals
+
+Treat credentials as authority. Put them behind OneCLI Agent Vault, scope them to the agent group that needs them, and keep raw keys out of prompts, chats, docs snippets, and broad environment variables.
+
+Approval-gate tools that can change authority or create external effects: sending money, placing orders, calling customers, emailing outside the team, changing credentials, installing packages, adding MCP servers, or modifying deployment config.
+
+## What NanoClaw does not promise
+
+NanoClaw gives inspectable isolation primitives. It does not replace:
+
+- OS hardening
+- network policy
+- SIEM or DLP
+- compliance review
+- MDM
+- customer-specific audit processes
+- human approval for high-risk actions
+
+That is a feature, not an apology. NanoClaw stays small enough to understand instead of pretending to be an enterprise governance platform.
+
+## Related
+
+<Columns cols={2}>
+  <Card title="Deploy and operate" icon="server" href="/deploy-overview">
+    Host service, runtime, data directory, backups, and upgrades.
+  </Card>
+  <Card title="Database and sessions" icon="database" href="/database-and-sessions">
+    Where state lives and why each SQLite DB has one writer.
+  </Card>
+  <Card title="Configure agents" icon="sliders" href="/configure-overview">
+    Messaging groups, agent groups, wirings, and session modes.
+  </Card>
+  <Card title="Architecture overview" icon="network" href="/architecture">
+    The source-verified host/container model behind the boundaries.
+  </Card>
+</Columns>

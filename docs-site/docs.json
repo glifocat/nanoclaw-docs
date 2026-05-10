@@ -2,7 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "NanoClaw",
-  "description": "Documentation for NanoClaw — a personal AI assistant that runs Claude agents in isolated containers.",
+  "description": "Documentation for NanoClaw — a small, isolated AI team you can fork, inspect, and customize.",
   "colors": {
     "primary": "#2DD4BF",
     "light": "#5EEAD4",
@@ -34,35 +34,38 @@
   "navigation": {
     "groups": [
       {
-        "group": "Start here",
+        "group": "Get it running",
         "pages": [
           "introduction",
           "quickstart"
         ]
       },
       {
-        "group": "Understand the model",
+        "group": "Tinker/customize",
         "pages": [
+          "tinker-customize",
+          "configure-overview"
+        ]
+      },
+      {
+        "group": "Contribute",
+        "pages": [
+          "contribute-overview",
           "architecture",
           "database-and-sessions"
         ]
       },
       {
-        "group": "Configure",
+        "group": "Business/enterprise",
         "pages": [
-          "configure-overview",
-          "migration-from-v1"
-        ]
-      },
-      {
-        "group": "Deploy and operate",
-        "pages": [
+          "operational-boundaries",
           "deploy-overview"
         ]
       },
       {
         "group": "Reference",
         "pages": [
+          "migration-from-v1",
           "changelog"
         ]
       }
