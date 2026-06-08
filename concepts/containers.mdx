@@ -1,7 +1,6 @@
 ---
 title: Container isolation
 description: How containers provide security isolation for agent execution
-tag: "UPDATED"
 ---
 
 NanoClaw runs all agents inside containers (lightweight Linux VMs) to provide true OS-level isolation. This is the primary security boundary that makes Bash access and code execution safe.
@@ -149,7 +148,7 @@ Even if the container crashes, all data in session databases and mounted directo
 
 ## Per-agent-group images
 
-Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image with additional apt and npm packages:
+Agent groups can specify custom packages via `ncl groups config add-package` (stored in the `container_configs` table and materialized into `container.json` at spawn). The host builds a derived Docker image with additional apt and npm packages:
 
 - Image tag: derived from the checkout-scoped base image and agent group
 - Built on top of the base `nanoclaw-agent-v2-<slug>:latest` image
@@ -187,7 +186,7 @@ The `nanoclaw` MCP server provides tools for container-to-host communication via
 - `schedule_task`, `cancel_task`, `pause_task`, `resume_task`, `update_task` — task management
 - `list_tasks` — view scheduled tasks
 
-Additional MCP servers can be configured in `container.json`.
+Additional MCP servers can be configured via `ncl groups config add-mcp-server` (stored in the `container_configs` table and materialized into `container.json` at spawn).
 
 ### Global memory injection
 

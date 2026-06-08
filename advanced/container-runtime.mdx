@@ -1,7 +1,6 @@
 ---
 title: Container runtime
 description: Container execution architecture and runtime details
-tag: "UPDATED"
 ---
 
 NanoClaw runs agents in isolated Linux containers to provide security through OS-level process and filesystem isolation. In v2, the container runtime uses a two-database IO model instead of stdin/stdout piping, and the agent-runner runs on Bun instead of Node.js.
@@ -77,7 +76,7 @@ The agent container is built from `container/Dockerfile` and includes:
 
 ### Per-agent-group images
 
-Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image:
+Agent groups can specify custom packages via `ncl groups config add-package` (stored in the `container_configs` table and materialized into `container.json` at spawn). The host builds a derived Docker image:
 
 - Tag: derived from the checkout-scoped base image and agent group
 - Built on top of `nanoclaw-agent-v2-<slug>:latest`

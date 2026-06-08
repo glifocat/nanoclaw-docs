@@ -6,6 +6,17 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.1.0" description="2026-06-07" tags={["Breaking"]}>
+  - [BREAKING] **Startup upgrade tripwire.** The host now refuses to start unless `data/upgrade-state.json` records that this install reached the current version through a sanctioned path (`/setup`, `/update-nanoclaw`, `/migrate-nanoclaw`). A raw `git pull` that skips migrations fails loudly with a self-healing message instead of silently breaking. After updating and before restarting, stamp the marker with `pnpm exec tsx scripts/upgrade-state.ts set`. The same command clears the tripwire if it has already fired. {/* TODO: confirm exact recovery command — see upstream `docs/upgrade-recovery.md` */}
+  - Tripwire banner now carries human-addressed guidance so the recovery steps are obvious when it fires.
+</Update>
+
+<Update label="v2.0.76" description="2026-06-05" tags={["Fix"]}>
+  - **HF token onboarding.** The "not signed in" message now extracts the correct OneCLI gateway URL from the credential-less proxy response (`secret_url` / `manage_url` / `connect_url`) instead of hardcoding a local + hosted URL. Works for both local and hosted deployments without extra wiring.
+  - **Secret URL path.** The pre-filled secret-creation URL leaves the `path` blank so the created secret matches all of `huggingface.co` rather than collapsing to a single endpoint.
+  - Trimmed the upload-trace not-signed-in message for clarity.
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention

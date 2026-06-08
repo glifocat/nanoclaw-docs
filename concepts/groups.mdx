@@ -1,7 +1,6 @@
 ---
 title: Group isolation
 description: How NanoClaw isolates agent groups and messaging groups
-tag: "UPDATED"
 ---
 
 In v2, NanoClaw uses a new entity model that separates **agent groups** (workspaces where agents run) from **messaging groups** (platform chats and channels). These are connected through **wirings** — many-to-many relationships that control how messages are routed to agents.
@@ -14,7 +13,7 @@ An agent group is:
 
 - A workspace with its own folder under `groups/{name}/`
 - An optional provider configuration
-- A container configuration (`container.json`) with custom packages and mounts
+- A container configuration in the `container_configs` table (custom packages, mounts, MCP servers) managed via `ncl groups config`
 - The unit of credential scoping (each gets its own OneCLI agent)
 
 ### Messaging groups
@@ -137,7 +136,7 @@ The global memory directory (`groups/global/`) provides shared context:
 
 ## Additional mounts
 
-Agent groups can have extra directories mounted via `container.json`:
+Agent groups can have extra directories mounted, configured via `ncl groups config` (stored in the `container_configs` table, materialized into `container.json` at spawn):
 
 ```json
 {

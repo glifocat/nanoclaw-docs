@@ -2,7 +2,6 @@
 title: Troubleshooting
 description: Troubleshooting guide for common NanoClaw issues including container errors, channel failures, and service problems
 keywords: ["troubleshooting", "debugging", "common issues"]
-tag: "UPDATED"
 ---
 
 This guide covers common issues you may encounter when running NanoClaw and how to resolve them.
@@ -14,7 +13,7 @@ Run these commands to get a quick overview of system health:
 ```bash
 # 1. Is the service running?
 launchctl list | grep nanoclaw
-# Expected: PID  0  com.nanoclaw (PID = running, "-" = not running, non-zero exit = crashed)
+# Expected: PID  0  com.nanoclaw-v2-<slug> (PID = running, "-" = not running, non-zero exit = crashed)
 
 # 2. Any running containers?
 docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
@@ -175,7 +174,7 @@ cat groups/{group}/logs/container-{timestamp}.log
   
   Then rebuild:
   ```bash
-  npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+  npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>
   ```
 </Accordion>
 
@@ -304,7 +303,7 @@ After updating credentials, restart the service:
 
 <CodeGroup>
 ```bash macOS
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>
 ```
 
 ```bash Linux
@@ -346,7 +345,7 @@ Scan the QR code with your phone, then restart the service:
 
 <CodeGroup>
 ```bash macOS
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>
 ```
 
 ```bash Linux
@@ -571,7 +570,7 @@ This issue was fixed by passing `resumeSessionAt` with the last assistant messag
 ### Restart the service
 
 ```bash
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>
 ```
 
 ### View live logs
@@ -587,19 +586,19 @@ Stopping the service does NOT kill running containers. They will continue runnin
 </Warning>
 
 ```bash
-launchctl bootout gui/$(id -u)/com.nanoclaw
+launchctl bootout gui/$(id -u)/com.nanoclaw-v2-<slug>
 ```
 
 ### Start the service
 
 ```bash
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw-v2-<slug>.plist
 ```
 
 ### Rebuild after code changes
 
 ```bash
-npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>
 ```
 
 ## Getting help

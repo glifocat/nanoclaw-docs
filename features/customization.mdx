@@ -1,7 +1,6 @@
 ---
 title: Customize NanoClaw
 description: Change behavior by editing code, wiring agent groups, and installing skills — no config-file sprawl.
-tag: "UPDATED"
 keywords: ["customize", "config", "trigger", "engage mode", "mount allowlist", "env vars", "buildTriggerPattern"]
 ---
 
@@ -173,7 +172,7 @@ Agents only see what you mount. The allowlist lives at `~/.config/nanoclaw/mount
 }
 ```
 
-Per-agent-group mount requests live in `groups/<folder>/container.json`. The host validates each request against the allowlist before mounting. See [Security model](/advanced/security-model) for the full picture.
+Per-agent-group mount requests are stored in the `container_configs` table (managed via `ncl groups config`) and materialized into `groups/<folder>/container.json` at spawn time. The host validates each request against the allowlist before mounting. See [Security model](/advanced/security-model) for the full picture.
 
 ## The `/customize` skill
 

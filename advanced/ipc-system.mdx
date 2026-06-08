@@ -1,7 +1,6 @@
 ---
 title: IPC system
 description: Inter-process communication architecture between host and containers
-tag: "UPDATED"
 ---
 
 In v2, NanoClaw replaced the filesystem-based IPC system with a **two-database model**. All communication between the host process and containerized agents flows through two SQLite databases per session — `inbound.db` and `outbound.db`.

@@ -1,10 +1,9 @@
 ---
 title: Configuration
 description: Environment variables and configuration options for NanoClaw containers, timeouts, and credentials
-tag: "UPDATED"
 ---
 
-NanoClaw configuration is managed through environment variables, the `.env` file, and the `src/config.ts` module. In v2, some configuration has moved to `container.json` per agent group.
+NanoClaw configuration is managed through environment variables, the `.env` file, and the `src/config.ts` module. In v2, per-agent-group container configuration (provider, model, packages, MCP servers, mounts, skills) lives in the `container_configs` table and is managed via `ncl groups config`; `groups/{folder}/container.json` is materialized from the DB at spawn time.
 
 ## Environment variables
 
