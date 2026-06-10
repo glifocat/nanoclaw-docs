@@ -20,7 +20,7 @@ Agents can change their own environment — but every change that touches the co
 
 ## Free edits: the agent's own memory
 
-The group folder is mounted read-write at `/workspace/agent/`, so the agent can edit `CLAUDE.local.md` — its persistent per-group memory and instructions — without asking anyone. This is where "remember that I prefer short answers" lands. The [self-customize skill](#how-agents-learn-this) mounted into every container teaches exactly this: workspace files and `CLAUDE.local.md` are direct edits, everything else has a workflow.
+The group folder is mounted read-write at `/workspace/agent/`, so the agent can edit `CLAUDE.local.md` — its persistent per-group memory and instructions — without asking anyone. This is where "remember that I prefer short answers" lands. The [self-customize container skill](/reference/skills-catalog#container-skills) teaches exactly this: workspace files and `CLAUDE.local.md` are direct edits, everything else has a workflow.
 
 The boundary is enforced by nested read-only mounts on top of the read-write group dir:
 
@@ -38,7 +38,7 @@ The request is fire-and-forget. On approval, the host does the whole follow-up i
 2. Rebuilds the per-agent image
 3. Kills the container and queues an on-wake message telling the fresh agent to verify the packages and report back to the user
 
-Packages installed this way persist across all future sessions — unlike a `pnpm install` in the workspace, which the self-customize skill recommends for one-off tasks precisely because it *doesn't* require approval or persist.
+Packages installed this way are baked into the image and available in every future session — unlike a `pnpm install` in the per-session workspace, which needs no approval but doesn't persist into the image or other sessions. The self-customize skill recommends exactly that for one-off tasks, and prototyping in the workspace before promoting a dependency to a container-level install.
 
 ## `add_mcp_server`: new tools
 
@@ -50,7 +50,7 @@ Two things this path can't do: it doesn't accept the `instructions` field that [
 
 Both operations use the same approvals plumbing as [credential requests](/operate/credentials#approving-credential-use). You get a DM card — "Install Packages Request" or "Add MCP Request" — naming the agent, the package list or server command, and the agent's stated reason, with Approve / Reject buttons.
 
-- **Who gets it:** admins of the requesting agent group first, then global admins, then owners — the first one with a reachable DM. No eligible approver means the request fails immediately and the agent is told why.
+- **Who gets it:** admins of the requesting agent group first, then global admins, then owners — the first one with a reachable DM, preferring approvers on the same channel type as the originating session, then falling back to list order on any channel. No eligible approver means the request fails immediately and the agent is told why.
 - **On approve:** the host executes the full change (config update, rebuild if needed, restart) and the agent gets a system message prompting it to verify and report.
 - **On reject:** the agent sees "Your `install_packages` request was rejected by admin."
 
