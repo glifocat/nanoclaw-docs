@@ -1,0 +1,53 @@
+---
+title: "CLI channel"
+description: "Talk to your agents straight from the terminal over a local Unix socket — the only channel that ships on trunk, with zero credentials and zero setup."
+tag: "NEW"
+keywords: ["cli", "terminal", "pnpm run chat", "unix socket", "cli.sock", "local channel", "init-cli-agent"]
+---
+
+{/* verified-against: src/channels/cli.ts, src/channels/index.ts, scripts/chat.ts, scripts/init-cli-agent.ts, setup/auto.ts, src/cli/socket-server.ts, package.json @ dc34ceb (v2.1.4) */}
+
+The CLI channel is the one channel built into NanoClaw trunk — `src/channels/index.ts` registers only `cli`. It needs no credentials, no platform account, and no install skill: the daemon listens on a Unix socket at `data/cli.sock`, and `pnpm run chat` connects to it from the same machine. It exists so you can talk to an agent before (or without) wiring any messaging platform — the setup wizard uses it for its first-contact ping/pong check, and CLI-only installs are a fully supported way to run NanoClaw.
+
+Messages flow through the same router and delivery path as every other channel, so session-level commands like `/clear` work identically.
+
+## Using it
+
+With the service running and an agent wired to `cli/local`:
+
+```bash
+pnpm run chat what's on my calendar today
+```
+
+`pnpm run chat` is **one-shot, not interactive**: it joins all arguments into a single message, sends it, prints replies as they arrive, and exits after 2 seconds of silence following the first reply (hard timeout: 120 seconds if no reply ever comes). For a conversation, run it again — the agent's session persists server-side, so context carries over between invocations.
+
+If no agent is wired to the CLI yet, create one:
+
+```bash
+pnpm exec tsx scripts/init-cli-agent.ts --display-name "Ethan" --agent-name "Nano"
+```
+
+This creates the synthetic `cli:local` user, an agent group with a minimal CLAUDE.md, and a "Local CLI" messaging group wired to it. It's idempotent and safe to run alongside the live service. The setup wizard runs the same script during its `cli-agent` step — first with a scratch `_ping-test` agent to confirm the sandbox responds (cleaned up afterwards), and again with a permanent agent if you choose "chat from the terminal".
+
+## How it works
+
+The channel is a Unix socket server inside the host service. On startup it binds `data/cli.sock` and chmods it to `0600`, so only the OS user that owns the NanoClaw process can connect — "connected to this socket" is the channel's entire auth model. Stale socket files from a crashed run are unlinked before binding.
+
+The wire format is one JSON object per line. A plain chat message is `{"text": "..."}` in, `{"text": "..."}` out. Clients holding the socket (i.e., the owner) can also send routed messages with a `to` address (`channelType`, `platformId`, optional `threadId`) to inject a message into any wired channel — this is how admin transports like the bootstrap script target other platforms. The CLI channel itself sets `supportsThreads: false`; the `threadId` in a routed address targets threads on the *destination* channel, not CLI sessions.
+
+Two behaviors worth knowing:
+
+- **One chat client at a time** — a second `pnpm run chat` connection supersedes the first, which receives a `[superseded by a newer client]` notice and is disconnected. Routed one-shot messages don't evict an active chat client.
+- **No client, no delivery** — if the agent replies while no terminal is connected, `deliver()` silently no-ops. The message isn't lost (it's persisted in the outbound store), but it won't reach a terminal retroactively; you'll only see replies that arrive while connected.
+
+## Not the same as `ncl`
+
+The CLI channel talks **to agents**. The [`ncl` admin CLI](/operate/ncl-cli) manages **the install** — agents, wirings, service state — over a different socket, `data/ncl.sock`. They share nothing except both being local Unix sockets in `data/`.
+
+## Troubleshooting
+
+- **"NanoClaw daemon not reachable at .../data/cli.sock"** — the host service isn't running (or crashed before the channel bound its socket). Start it via launchctl/systemd, then retry.
+- **`pnpm run chat` exits with no output (exit code 3)** — connected, but no reply arrived within 120 seconds. Usually no agent is wired to `cli/local` — run `scripts/init-cli-agent.ts` (above) or `/manage-channels`. First contact after a cold start can also take 30–60 seconds while the sandbox warms up.
+- **Replies seem to go missing between runs** — expected: replies that arrive while no client is connected aren't replayed. Keep the terminal connected while the agent is working, or check `logs/nanoclaw.log`.
+
+For service-level checks (logs, restarts, wiring queries), see [troubleshooting](/operate/troubleshooting).
