@@ -5,6 +5,25 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Full portal refactor: job-based navigation, v2-only, code-verified" description="2026-06-10" tags={["New", "Updated"]}>
+  The whole site was restructured and rewritten across nine PRs (#296–#304), replacing the feature-centric tree (`integrations/`, `features/`, `advanced/`, `api/`) with a job-based journey: **Get started → Channels → Operate → Build with agents → Extend → Understand**, plus a **Reference** tab derived entirely from source code.
+
+  ## Structure
+  - New navigation with 7 Documentation groups and a 2-group Reference tab; Changelog is a global anchor
+  - 29+ redirects — no pre-refactor URL 404s
+  - The fictional HTTP "API Reference" tab is gone; `reference/` now documents the real surfaces: the `ncl` admin CLI (all 11 resources), environment variables, container config, the skills catalog (45 + 8 container skills), the channel adapter contract, agent MCP tools, and the full database schema
+
+  ## Content
+  - Every page rewritten or written new against upstream source at `nanocoai/nanoclaw@dc34ceb` (v2.1.4) — never against upstream markdown, which has drifted
+  - Every page carries a `verified-against` comment naming the source files and SHA it was checked against, so future drift is detectable per page
+  - 12 v1 ghost pages deleted (x-twitter, parallel-ai, voice-transcription, image-vision, pdf-reader, remote-control, ipc-system and more — all verified absent from v2 code)
+  - New pages: v1/OpenClaw migration guide, Signal/iMessage/Teams/CLI-channel/more-channels, configuration, credentials, upgrading, isolation levels, self-modification, writing skills, first-agent tutorial, and the seven reference pages
+  - Code-first corrections shipped along the way: tini is not PID 1 at runtime, `groups/global/` is dead code, skills were never git branches in v2, Gmail is an MCP tool rather than a channel, `MAX_CONCURRENT_CONTAINERS` is parsed but unenforced, and the Teams wizard prints a webhook path the server 404s (documented with a warning)
+
+  ## Meta
+  - The repo's own `CLAUDE.md` and the three Mintlify automation workflows were rewritten so future sessions and automated PRs inherit the v2 model and the code-first verification rule
+</Update>
+
 <Update label="v2.0.0 launch readiness: front-door rewrites" description="2026-04-22" tags={["Updated"]}>
   Phase A of the v2 documentation sprint — bringing the pages every new user lands on into alignment with the v2 rewrite. All claims verified directly against upstream source (`src/db/schema.ts`, `src/types.ts`, `src/config.ts`, `container/Dockerfile`, `src/delivery.ts`) rather than upstream `docs/` (which includes a stale `architecture.md` draft and a `db-session.md` that omits the `container_state` table).
 
