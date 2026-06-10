@@ -6,7 +6,7 @@ keywords: ["ollama", "local models", "llm", "mcp", "self-hosted"]
 ---
 
 <Warning>
-In v2, Ollama moved from a core integration to a skill on the `providers` branch. Install via `/add-ollama-provider` (run Ollama as a full provider for an agent group) or `/add-ollama-tool` (keep Claude as the agent, expose Ollama as a tool). The MCP setup described below reflects v1 mechanics; a v2 rewrite is pending. See [Integrations overview](/integrations/overview#providers) for the v2 provider model.
+In v2, Ollama moved from a core integration to a skill on the `providers` branch. Install via `/add-ollama-provider` (run Ollama as a full provider for an agent group) or `/add-ollama-tool` (keep Claude as the agent, expose Ollama as a tool). The MCP setup described below reflects v1 mechanics; a v2 rewrite is pending. See [Integrations overview](/channels/overview#providers) for the v2 provider model.
 </Warning>
 
 NanoClaw can delegate tasks to local models running on [Ollama](https://ollama.com), while Claude remains the orchestrator. This lets you offload cheaper tasks (summarization, translation, general queries) to local models and reduce API costs.
@@ -142,6 +142,6 @@ When using custom endpoints, the secret injection layer (OneCLI Agent Vault in v
 
 ## Related pages
 
-- [Skills system](/integrations/skills-system) — How skills work
+- [Skills system](/extend/overview) — How skills work
 - [Configuration](/api/configuration) — Environment variables reference
-- [Container runtime](/advanced/container-runtime) — How agent containers work
+- [Container runtime](/concepts/container-lifecycle) — How agent containers work

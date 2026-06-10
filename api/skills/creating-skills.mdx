@@ -9,7 +9,7 @@ Skills are NanoClaw's approach to extending functionality. Instead of adding fea
 
 **Skills over features.** Instead of adding features (e.g. support for Telegram) to the codebase, contributors submit skills like `/add-telegram` that transform your fork. You end up with clean code that does exactly what you need.
 
-From the [NanoClaw README](https://github.com/qwibitai/NanoClaw):
+From the [NanoClaw README](https://github.com/nanocoai/NanoClaw):
 
 > NanoClaw isn't a monolithic framework; it's software that fits each user's exact needs. Instead of becoming bloatware, NanoClaw is designed to be bespoke. You make your own fork and have Claude Code modify it to match your needs.
 
@@ -231,13 +231,13 @@ tail -f logs/nanoclaw.log
 
 - Learn about [Skill structure](/api/skills/skill-structure) for both skill types
 - See [Examples](/api/skills/examples) of real skills from the repository
-- Read the [Skills system overview](/integrations/skills-system) for the full architecture
+- Read the [Skills system overview](/extend/overview) for the full architecture
 
 ## Contributing skills
 
 When you're ready to contribute:
 
-1. Fork `qwibitai/nanoclaw`
+1. Fork `nanocoai/nanoclaw`
 2. For feature skills: branch from `main`, make your code changes, and open a PR
 3. For utility skills: add your skill directory (SKILL.md + code files) to `.claude/skills/` and open a PR
 4. For operational or container skills: add your `SKILL.md` to the appropriate directory and open a PR
