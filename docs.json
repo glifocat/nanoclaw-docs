@@ -98,9 +98,9 @@
     { "source": "/api/message-routing", "destination": "/reference/adapter-interface" },
     { "source": "/api/group-management", "destination": "/reference/ncl-cli" },
     { "source": "/api/task-scheduling", "destination": "/reference/mcp-tools" },
-    { "source": "/api/skills/creating-skills", "destination": "/extend/overview" },
-    { "source": "/api/skills/skill-structure", "destination": "/extend/overview" },
-    { "source": "/api/skills/examples", "destination": "/extend/overview" }
+    { "source": "/api/skills/creating-skills", "destination": "/extend/writing-skills" },
+    { "source": "/api/skills/skill-structure", "destination": "/extend/writing-skills" },
+    { "source": "/api/skills/examples", "destination": "/extend/writing-skills" }
   ],
   "search": {
     "prompt": "Search NanoClaw docs..."
@@ -154,7 +154,7 @@
           {
             "group": "Extend",
             "icon": "puzzle-piece",
-            "pages": ["extend/overview", "extend/tools", "extend/providers"]
+            "pages": ["extend/overview", "extend/tools", "extend/providers", "extend/self-modification", "extend/writing-skills"]
           },
           {
             "group": "Understand",
