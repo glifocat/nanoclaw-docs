@@ -1,188 +1,106 @@
 ---
-title: Group isolation
-description: How NanoClaw isolates agent groups and messaging groups
+title: "Entity model"
+description: "The five entities behind every NanoClaw conversation — agent groups, messaging groups, wirings, users, and sessions — and how a message finds its way through them."
 tag: "UPDATED"
+keywords: ["entity model", "agent groups", "messaging groups", "wirings", "messaging_group_agents", "engage_mode", "session_mode", "sender_scope", "roles", "owner", "admin", "sessions"]
 ---
 
-In v2, NanoClaw uses a new entity model that separates **agent groups** (workspaces where agents run) from **messaging groups** (platform chats and channels). These are connected through **wirings** — many-to-many relationships that control how messages are routed to agents.
+{/* verified-against: src/db/schema.ts, src/db/migrations/{010-engage-modes,011-pending-sender-approvals,012-channel-registration}.ts, src/types.ts, src/router.ts, src/session-manager.ts, src/modules/permissions/{index.ts,access.ts}, src/command-gate.ts @ dc34ceb (v2.1.4) */}
 
-## Entity model
+Everything NanoClaw does reduces to five entities in `data/v2.db`: **agent groups** (where agents run), **messaging groups** (where people talk), **wirings** (the edge connecting them, which holds all the behavior), **users** (who is allowed to do what), and **sessions** (the conversation state in between). This page is the mental model; for column-level detail see the [database schema](/reference/db-schema).
 
-### Agent groups
-
-An agent group is:
-
-- A workspace with its own folder under `groups/{name}/`
-- An optional provider configuration
-- A container configuration (`container.json`) with custom packages and mounts
-- The unit of credential scoping (each gets its own OneCLI agent)
-
-### Messaging groups
-
-A messaging group is:
-
-- A platform chat or channel identified by `(channel_type, platform_id)`
-- Has an `unknown_sender_policy`: `strict`, `request_approval`, or `public`
-- Can be denied (sets `denied_at` to silently drop future mentions)
-- Auto-created on first mention or DM
-
-### Wirings (messaging_group_agents)
-
-Wirings connect messaging groups to agent groups with four orthogonal axes:
-
-| Axis | Options | Purpose |
-|------|---------|---------|
-| `engage_mode` | `pattern`, `mention`, `mention-sticky` | When the agent responds |
-| `engage_pattern` | Regex (e.g., `'.'` = always) | Pattern to match against messages |
-| `sender_scope` | `all`, `known` | Who can trigger the agent |
-| `ignored_message_policy` | `drop`, `accumulate` | What happens to non-triggering messages |
-
-Additional wiring properties:
-
-- `session_mode` — `shared` (one per messaging group), `per-thread` (one per thread), or `agent-shared` (one per agent group)
-- `priority` — controls evaluation order when multiple agents are wired
-
-<Info>
-The many-to-many model allows a single messaging group to be wired to multiple agent groups, and a single agent group to serve multiple messaging groups.
-</Info>
-
-## Engage modes
-
-### Pattern mode
-
-The agent responds whenever a message matches the `engage_pattern` regex. Use `'.'` to match all messages (equivalent to the old "no trigger required").
-
-### Mention mode
-
-The agent only responds when explicitly mentioned at the platform level (e.g., `@bot` in Discord, reply in WhatsApp).
-
-### Mention-sticky mode
-
-The agent responds to an explicit mention OR if there's an existing active session for this combination of agent, messaging group, and thread. Once activated by a mention, the agent continues responding in that conversation.
-
-<Note>
-In `mention-sticky` mode, the adapter's `subscribe()` method is called for platform-side bookkeeping (e.g., subscribing to a Discord thread). This is fire-and-forget.
-</Note>
-
-## Session management
-
-### Session resolution
-
-Sessions are resolved based on the wiring's `session_mode`:
-
-| Mode | Behavior |
-|------|----------|
-| `shared` | One session per messaging group (ignores thread) |
-| `per-thread` | One session per (messaging group, thread) pair |
-| `agent-shared` | One session per agent group (all messaging groups share it) |
-
-### Session directory structure
-
-```
-data/v2-sessions/{agent_group_id}/{session_id}/
-├── inbound.db      # Host writes, container reads
-├── outbound.db     # Container writes, host reads
-├── outbox/         # File attachments for outbound messages
-├── inbox/          # File attachments from inbound messages
-├── .heartbeat      # Container liveness indicator
-└── .claude/        # SDK state
-```
-
-### Two-database invariants
-
-Three critical invariants ensure correctness across Docker mount boundaries:
-
-1. **`journal_mode=DELETE`** — WAL's mmapped `-shm` file doesn't refresh host-to-guest
-2. **Host opens-writes-closes per operation** — closing invalidates the container's page cache
-3. **One writer per file** — DELETE-mode journal unlink isn't atomic across the mount
-
-## Users and roles
-
-### User model
-
-Users are identified by namespaced platform identifiers:
-
-- `phone:+15551234567` (WhatsApp, iMessage)
-- `tg:123456789` (Telegram)
-- `discord:123456789` (Discord)
-- `email:user@example.com` (Gmail)
-
-### Role hierarchy
-
-| Role | Scope | Capabilities |
-|------|-------|------------|
-| Owner | Always global | Full system access, approves channels and senders |
-| Admin | Global or per-agent-group | Approves senders within scope |
-| Member | Per-agent-group | Can interact with agents in their assigned group |
-
-<Info>
-The owner is the system administrator. There is always exactly one owner. Admins can be scoped to a specific agent group or have global access.
-</Info>
-
-## Channel approval
-
-When a message arrives on an unwired channel (no agent wirings exist), the channel-request gate escalates to the owner:
-
-1. Owner receives an approval card
-2. **Approve** — creates a wiring with defaults (`mention-sticky` for groups, `pattern='.'` for DMs), admits the triggering sender, replays the original event
-3. **Deny** — sets `denied_at` on the messaging group; future mentions drop silently
-
-## Global memory
-
-The global memory directory (`groups/global/`) provides shared context:
-
-- Contains `CLAUDE.md` loaded by all non-main agent groups
-- Injected into the system prompt via `systemPrompt.append`
-- Read-only for all agents
-
-## Additional mounts
-
-Agent groups can have extra directories mounted via `container.json`:
-
-```json
-{
-  "additionalMounts": [
-    {
-      "hostPath": "/Users/you/projects/website",
-      "containerPath": "website",
-      "readonly": true
+```mermaid
+erDiagram
+    AGENT_GROUPS ||--o{ WIRINGS : "serves chats via"
+    MESSAGING_GROUPS ||--o{ WIRINGS : "handled by agents via"
+    AGENT_GROUPS ||--o{ SESSIONS : owns
+    MESSAGING_GROUPS ||--o{ SESSIONS : scopes
+    USERS ||--o{ USER_ROLES : "owner / admin"
+    USERS ||--o{ MEMBERS : "known in"
+    AGENT_GROUPS ||--o{ MEMBERS : ""
+    WIRINGS {
+        string engage_mode "mention | mention-sticky | pattern"
+        string sender_scope "all | known"
+        string ignored_message_policy "drop | accumulate"
+        string session_mode "shared | per-thread | agent-shared"
     }
-  ]
-}
+    SESSIONS {
+        string thread_id "nullable"
+    }
 ```
 
-**Security validation:**
+## Agent groups — the unit of isolation
 
-- Checked against mount allowlist (`~/.config/nanoclaw/mount-allowlist.json`)
-- Symlinks resolved before validation
-- Blocked patterns rejected
-- RW requires both mount config AND allowed root to permit it
+An agent group is a workspace: a folder under `groups/<name>/` with its own working files, per-group memory (`CLAUDE.local.md`), a composed `CLAUDE.md`, and a container configuration (the `container_configs` table — packages, mounts, resource limits). Every session an agent group owns runs in a container that sees only that workspace. All agent groups are equal — privilege lives on users, not on groups.
 
-Validated mounts appear at `/workspace/extra/{name}` inside the container and are auto-discovered as `additionalDirectories` by the SDK.
+## Messaging groups — a platform conversation
+
+A messaging group is one chat or channel on one platform, identified by `(channel_type, platform_id)` — a Discord channel, a WhatsApp group, a DM. It carries an `unknown_sender_policy` (`strict` / `request_approval` / `public`) and can be denied (`denied_at`), after which messages from it drop silently.
+
+You don't pre-register these. When a mention or DM arrives on a chat NanoClaw has never seen, the router auto-creates the row with `unknown_sender_policy = 'request_approval'` — and if no agent is wired to it, escalates to an owner with an approve/deny card before any agent responds. Plain chatter in unwired channels is ignored entirely.
+
+## Wirings — where the behavior lives
+
+A wiring (`messaging_group_agents` row) connects one messaging group to one agent group. It's many-to-many: one chat can feed several agents, one agent can serve several chats. The wiring — not the agent, not the chat — holds the four orthogonal behavior axes:
+
+### `engage_mode` — when the agent wakes
+
+| Mode | Fires when |
+|---|---|
+| `mention` | The bot is mentioned at the platform level (`@botname` on Telegram, user-id mention on Slack/Discord). Resolved by the adapter, not by text matching. DMs count as addressed to the bot. |
+| `mention-sticky` | A platform mention, **or** a session already exists for this (agent, chat, thread). The session's existence is the subscription: once a mention activates a thread, follow-ups fire without re-mentioning. On threaded platforms the adapter also subscribes to the thread. DMs never stick without a mention. |
+| `pattern` | The message text matches the `engage_pattern` regex. `'.'` is the sentinel for "every message" — the always-on flavor. An invalid regex fails open so you notice and fix it. |
 
 <Warning>
-Additional mounts bypass group isolation. Only mount directories that are safe for the agent to access.
+The agent's NanoClaw display name is **irrelevant** to engagement. Typing an agent's name in chat does nothing — `mention` mode only responds to real platform mentions of the bot account. To disambiguate multiple agents wired to one chat, give each a `pattern` wiring with its name as the regex.
 </Warning>
 
-## Concurrency
+### `sender_scope` — who can trigger it
 
-Container concurrency is managed globally:
+`all` lets any sender through; `known` requires the sender to be an owner, admin, or member of the wired agent group. This is per-wiring and stricter than the messaging group's `unknown_sender_policy` — you can require known senders even in a `public` chat.
 
-- **Max concurrent containers**: 5 by default (`MAX_CONCURRENT_CONTAINERS`)
-- **Wake deduplication**: concurrent wake calls for the same session share a single in-flight promise
-- **Delivery polls**: active poll (1s) for running containers, sweep poll (60s) for all sessions
+### `ignored_message_policy` — what happens to everything else
 
-## Best practices
+When a message doesn't engage a wiring, `drop` skips it silently. `accumulate` still writes it into the agent's session as non-waking context (`trigger = 0`): the container isn't started, but the next time the agent does engage, it sees the conversation that happened in between. Messages refused by the access or sender-scope gate are never accumulated — that refusal is a security decision, not a missed trigger.
 
-1. **Use descriptive agent group names**: `project-x` instead of `group1`
-2. **Choose engage mode carefully**: `mention` for noisy groups, `pattern` for private contexts
-3. **Limit additional mounts**: only mount what's necessary
-4. **Use global memory for shared context**: avoid duplicating common knowledge
-5. **Set `sender_scope=known` for sensitive groups**: restricts to authorized users
+### `session_mode` — how conversations map to sessions
 
-## Related topics
+`shared` (one session for the whole chat), `per-thread` (one per thread), or `agent-shared` (one session for the entire agent group, across every chat wired with this mode — useful when GitHub and Slack should land in the same conversation).
 
-- [Security model and trust boundaries](/concepts/security)
-- [Container isolation details](/concepts/container-lifecycle)
-- [Scheduled tasks per group](/guides/scheduled-tasks)
-- [System architecture](/concepts/architecture)
+## Sessions — the conversation state
+
+A session is one conversation between an agent group and a messaging group (optionally scoped to a thread): one folder under `data/v2-sessions/`, one pair of inbound/outbound databases, and one container while running. The wiring's `session_mode` decides the lookup key, but the router applies two overrides based on what the adapter can do:
+
+1. **Thread-capable adapters force `per-thread` in group chats.** On Discord, Slack, or Teams channels, every thread gets its own session even if the wiring says `shared` — only `agent-shared` overrides this, because it's a cross-channel directive the adapter knows nothing about. DMs are exempt: sub-threads in a DM collapse into one conversation.
+2. **Thread-less adapters collapse `per-thread` to `shared`.** WhatsApp, Telegram, and iMessage have no thread IDs — the router nulls the thread before routing, and a `per-thread` lookup with no thread is identical to `shared`.
+
+What you set versus what you actually get:
+
+| Wiring `session_mode` | Threaded adapter, group chat | Threaded adapter, DM | Thread-less adapter |
+|---|---|---|---|
+| `shared` | `per-thread` (forced) | `shared` | `shared` |
+| `per-thread` | `per-thread` | `per-thread` | `shared` (collapses) |
+| `agent-shared` | `agent-shared` | `agent-shared` | `agent-shared` |
+
+## Users, roles, and members
+
+A user is a namespaced platform identifier: `channel_type:handle` — `discord:123456`, `slack:U0ABC`, `phone:+15551234567`, `email:a@x.com`. The `kind` column is the channel type. One human with accounts on three platforms is three user rows; there's no cross-channel identity linking yet.
+
+Privilege is user-level, granted in `user_roles`:
+
+- **Owner** — always global. Full access to every agent group, and the approver for channel registrations.
+- **Admin** — global, or scoped to one agent group. Admins pass the command gate (`/clear`, `/compact`, `/context`, `/cost`, `/files`, `/upload-trace` require owner or admin), approve unknown senders within their scope, and are implicitly members of the groups they administer.
+- **Member** — a row in `agent_group_members`. Being "known" in an agent group is what lets an unprivileged user interact with it at all.
+
+Access checks walk exactly this chain: owner → global admin → admin of this group → member → denied.
+
+## Sender policies
+
+Each messaging group's `unknown_sender_policy` decides what happens when someone outside that chain writes in: `strict` drops silently, `request_approval` drops and DMs an approval card to an admin (approve makes them a member and replays the message), `public` lets anyone through. Full details, including auditing dropped messages, are in [hardening](/operate/hardening#restrict-who-can-talk-to-your-agents).
+
+## Related pages
+
+- [Database schema](/reference/db-schema) — every column, default, and migration behind these tables
+- [Channels overview](/channels/overview) — how to create wirings with `/manage-channels` and `ncl wirings`
+- [Architecture](/concepts/architecture) — how the router moves a message through this model end to end
+- [Multi-agent swarm](/guides/multi-agent-swarm) — agent-to-agent messaging on top of agent groups
