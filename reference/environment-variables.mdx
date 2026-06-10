@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["environment variables", ".env", "configuration", "ASSISTANT_NAME", "CONTAINER_TIMEOUT", "LOG_LEVEL", "NANOCLAW_SKIP", "NANOCLAW_EGRESS_LOCKDOWN", "setup", "reference"]
 ---
 
-{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/container-runner.ts, src/providers/claude.ts, setup/auto.ts, setup/onecli.ts, setup/lib/setup-config.ts, setup/lib/claude-assist.ts, setup/lib/diagnostics.ts, setup/signal-auth.ts, setup/migrate-v2/select-channels.ts, container/agent-runner/src/{timezone.ts,providers/claude.ts} @ dc34ceb (v2.1.4) */}
+{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/container-runner.ts, src/providers/claude.ts, setup/auto.ts, setup/onecli.ts, setup/lib/setup-config.ts, setup/lib/claude-assist.ts, setup/lib/diagnostics.ts, setup/signal-auth.ts, setup/container.ts, setup/migrate-v2/select-channels.ts, migrate-v2.sh, container/agent-runner/src/{timezone.ts,providers/claude.ts} @ dc34ceb (v2.1.4) */}
 
 Exhaustive list of every environment variable the NanoClaw host, setup wizard, and agent runner read. For how to actually set these — `.env` editing, service definitions, restart commands — see [Configuration](/operate/configuration).
 
@@ -18,7 +18,7 @@ NanoClaw's own parser ([`src/env.ts`](https://github.com/qwibitai/nanoclaw/blob/
 | Variable | Default | Read in | Effect |
 |---|---|---|---|
 | `ASSISTANT_NAME` | `Andy` | `src/config.ts:11` | Assistant name. Also sets the default trigger, `@<name>`. |
-| `ASSISTANT_HAS_OWN_NUMBER` | `false` | `src/config.ts:12` | Set `true` when the assistant runs on its own WhatsApp number instead of yours. |
+| `ASSISTANT_HAS_OWN_NUMBER` | `false` | `src/config.ts:13` | Set `true` when the assistant runs on its own WhatsApp number instead of yours. |
 | `ONECLI_URL` | — | `src/config.ts:36` | URL of the OneCLI Agent Vault. |
 | `ONECLI_API_KEY` | — | `src/config.ts:37` | API key for the vault. See [Credentials](/operate/credentials). |
 | `TZ` | system timezone, else `UTC` | `src/config.ts:62` | IANA timezone for scheduled tasks and timestamps. Invalid values are skipped, not errored. Injected into every agent container at spawn. |
@@ -53,6 +53,8 @@ Consumed by the setup wizard (`pnpm run setup:auto`) and migration scripts, not 
 | `NANOCLAW_DISPLAY_NAME` | `$USER` | `setup/auto.ts:320` | How agents address the operator — skips the prompt. |
 | `NANOCLAW_AGENT_NAME` | — | `setup/channels/*.ts` | Pre-fills the agent name prompt in each channel setup flow. The CLI scratch agent is always "Terminal Agent". |
 | `NANOCLAW_CHANNELS` | — | `setup/migrate-v2/select-channels.ts:43` | Comma-separated channel names (e.g. `telegram,discord`) — skips the channel picker in the v2 migration flow. |
+| `NANOCLAW_V1_PATH` | sibling-directory scan | `migrate-v2.sh:196` | Explicit override for v1 install discovery in the migration flow. Validated against `$NANOCLAW_V1_PATH/store/messages.db` — the script fails with a message telling you to set it when auto-discovery misses. |
+| `INSTALL_CJK_FONTS` | `false` | `setup/container.ts:181` | Set `true` to bake CJK fonts (~200 MB) into the agent image. Read from `.env` by regex during the container build step and passed as a Docker `--build-arg` — the only build-arg passed through today. Set it in `.env`, not the service environment. |
 | `NANOCLAW_ONECLI_API_HOST` | `https://api.onecli.sh` | `setup/auto.ts:188` | Use a remote OneCLI vault instead of installing one locally. |
 | `NANOCLAW_ONECLI_API_TOKEN` | — | `setup/onecli.ts:324` | Bearer token (`oc_…`) for the remote vault. Required when the host is set. |
 | `NANOCLAW_ANTHROPIC_BASE_URL` | — | `setup/auto.ts:717` | Custom Anthropic-compatible endpoint. Setup writes `ANTHROPIC_BASE_URL` to `.env` and stores the token in the vault. |
