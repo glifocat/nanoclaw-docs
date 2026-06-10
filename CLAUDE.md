@@ -32,13 +32,28 @@ Deployment is automatic after merge to `main` (via Mintlify GitHub app).
 
 ## NanoClaw Architecture Context
 
-When editing docs, keep these architectural facts current:
-- **Multi-channel:** NanoClaw supports WhatsApp, Telegram, Discord, Slack, and Gmail as equal channels. No channel is the "default" — avoid WhatsApp-centric language in non-WhatsApp pages.
-- **Skills as git branches:** Skills are `skill/*` branches merged via `git merge`, not a custom engine. No manifest.yaml, no .nanoclaw/state.yaml, no apply-skill.ts. See `integrations/skills-system.mdx` as source of truth.
-- **Channel forks:** Channels live in separate fork repos (`nanoclaw-whatsapp`, `nanoclaw-telegram`, etc.). Channel-specific skills (image-vision, voice-transcription, reactions, pdf-reader) live on the channel fork, not upstream.
-- **Removing a skill:** `git revert -m 1 <merge-commit>`, not manual file deletion.
-- **Source of truth for NanoClaw code:** https://github.com/nanocoai/nanoclaw
-- **Credential management (v1.2.35+):** OneCLI Agent Vault is the sole credential system. The built-in credential proxy is available as an opt-in skill (`/use-native-credential-proxy`). Legacy tabs in docs cover both methods. Note: upstream source code still uses "gateway" in code — docs prose says "Agent Vault" but code snippets must match actual source.
+The site was fully rewritten for v2 (PRs #296–#303), verified against `nanocoai/nanoclaw@dc34ceb` (v2.1.4). Keep these facts current when editing:
+
+- **Upstream:** https://github.com/nanocoai/nanoclaw (org moved from `qwibitai`; old URLs redirect).
+- **Code is the ONLY source of truth.** Upstream `docs/`, README.md, CLAUDE.md, and even SKILL.md prose all drift from reality. Verify every claim against `src/`, `container/`, `setup/`, `.claude/skills/` (treat SKILL.md as the executable spec for a skill's BEHAVIOR, but never as a source of facts about core code), and the shell scripts. Every docs page carries a `{/* verified-against: <files> @ <sha> */}` comment — update it whenever you re-verify a page.
+- **Confirmed upstream-doc traps** (claims that are false in code): Apple Container support (doesn't exist; Docker is hardcoded), tini as PID 1 (image default is overridden at spawn; bun is PID 1), `groups/global/` persistence (deleted on every startup), skills-as-git-branches (never shipped in v2; upstream `docs/skills-as-branches.md` is stale), `MAX_CONCURRENT_CONTAINERS` (parsed in `src/config.ts`, never enforced), adapter SKILL.md version pins (drift from the `setup/*.sh` installer pins — prefer the `.sh`), the customize skill's persona-file claim (stale).
+- **Channels:** trunk ships infrastructure plus a CLI channel only — NO messaging channel lives on `main`. 17 adapters live on the `channels` registry branch (WhatsApp, WhatsApp Cloud, Telegram, Discord, Slack, Signal, iMessage, Teams, Google Chat, Matrix, Delta Chat, Emacs, GitHub, Linear, Resend, Webex, WeChat), installed by `/add-<channel>` skills that fetch-and-copy files — never `git merge`. 7 channels have `setup/add-*.sh` wizards (whatsapp, telegram, discord, slack, signal, imessage, teams).
+- **Skills:** SKILL.md workflows in `.claude/skills/` (channel/provider/tool installers plus operational skills) and container skills in `container/skills/` mounted into every agent container. Skills are NOT git branches.
+- **No HTTP API:** inbound webhook server (`/webhook/{adapterName}`) plus Unix sockets — the `ncl` admin CLI on `data/ncl.sock`, the CLI channel on `data/cli.sock`.
+- **Runtime:** Docker only. Host runs Node + pnpm; the agent-runner inside the container runs Bun.
+- **Entity model:** `agent_groups` ↔ `messaging_groups` connected via wirings. `engage_mode`: `pattern` | `mention` | `mention-sticky`. `session_mode`: `shared` | `per-thread` | `agent-shared` (the router forces per-thread on thread-capable group chats). Central DB is `data/v2.db`; each session gets an inbound/outbound SQLite pair — that pair IS the host↔container IPC.
+- **Credentials:** OneCLI Agent Vault invariant — containers never hold raw API keys (stub key + in-flight injection). Docs prose says "Agent Vault"; code snippets must match source (which says "gateway"). `/use-native-credential-proxy` is the opt-in alternative.
+- **Per-group customization:** `CLAUDE.local.md` is the editable per-group file. `groups/<folder>/CLAUDE.md` is composed at every spawn — never teach users to edit it.
+
+## Drift Detection
+
+Each page's `verified-against` SHA is the re-verification anchor. When upstream moves, re-check pages whose cited files changed:
+
+```bash
+git -C <upstream-checkout> diff <page-sha>..HEAD --name-only
+```
+
+Compare the output against the paths cited in each page's `verified-against` comment; re-verify and bump the SHA only on pages whose cited files actually changed.
 
 ## PR Workflow
 
@@ -56,12 +71,16 @@ When editing docs, keep these architectural facts current:
 All content is `.mdx` (Markdown + JSX components). Navigation and site config live in `docs.json`.
 
 **Content directories:**
-- `concepts/` — Architecture, security model, containers, groups, tasks
-- `features/` — Messaging, scheduled tasks, agent swarms, customization, web access
-- `integrations/` — Channel setup (WhatsApp, Telegram, Discord, Slack, Gmail) and skills system
-- `advanced/` — Deep dives: container runtime, IPC, Docker sandboxes, troubleshooting
-- `api/` — Core API reference and skills development guides
-- Root: `introduction.mdx`, `quickstart.mdx`, `installation.mdx`
+- `channels/` — Channel setup: overview, whatsapp, telegram, discord, slack, signal, imessage, teams, cli, more-channels (10 pages)
+- `operate/` — Configuration, ncl CLI, credentials, hardening, upgrading, troubleshooting (6 pages)
+- `guides/` — Agent-building tutorials: first agent, customization, scheduled tasks, multi-agent swarm (4 pages)
+- `extend/` — Skills overview, tools, providers, self-modification, writing skills (5 pages)
+- `concepts/` — Architecture, entity model, isolation levels, container lifecycle, security, contributing (6 pages)
+- `reference/` — ncl CLI, environment variables, container config, skills catalog, adapter interface, MCP tools, DB schema (7 pages)
+- `changelog/` — Product releases (`index.mdx`) and docs updates (`docs-updates.mdx`)
+- Root: `introduction.mdx`, `quickstart.mdx`, `installation.mdx`, `migrate-from-v1.mdx`
+
+Old paths (`features/`, `integrations/`, `advanced/`, `api/`) are gone — `docs.json` carries redirects for all of them.
 
 ## Mintlify Skill (`/mintlify`)
 
@@ -93,11 +112,11 @@ keywords: ["relevant", "search", "terms"]
 
 **`mint validate`**: Must be run from the directory containing `docs.json` — fails otherwise.
 
-**Non-docs files**: `mint validate` and `mint broken-links` parse ALL `.md`/`.mdx` files in the repo tree, including non-docs files (plans, specs). MDX snippets in markdown code blocks cause parsing errors. Keep non-docs markdown files outside the repo or delete them before validating.
+**Non-docs files**: `mint validate` and `mint broken-links` parse ALL `.md`/`.mdx` files in the repo tree, including non-docs files (plans, specs). MDX snippets in markdown code blocks cause parsing errors. Keep non-docs markdown files outside the repo, or list them in `.mintignore` (the `docs/` directory is already ignored there for this reason — it holds internal non-docs markdown).
 
 **Multi-issue PRs**: When closing multiple issues, put each `Closes #N` on its own line AND add matching labels via `gh pr edit --add-label`.
 
-**Navigation:** When adding or moving pages, update the `navigation` array in `docs.json`. The site has two tabs: "Documentation" (5 groups) and "API Reference" (2 groups). New pages not added to `docs.json` won't appear in the sidebar.
+**Navigation:** When adding or moving pages, update the `navigation` array in `docs.json`. The site has two tabs — "Documentation" (7 groups: Get started, Channels, Operate, Build with agents, Extend, Understand, Changelog) and "Reference" (2 groups: Operating, Internals) — plus a global Changelog anchor. New pages not added to `docs.json` won't appear in the sidebar.
 
 **File naming:** Use kebab-case (e.g., `agent-swarms.mdx`). Match existing patterns in the directory.
 
@@ -107,7 +126,7 @@ keywords: ["relevant", "search", "terms"]
 
 **Components available:** `<Note>`, `<Info>`, `<Tip>`, `<Warning>`, `<Check>`, `<Danger>`, `<Steps>/<Step>`, `<Tabs>/<Tab>`, `<CodeGroup>`, `<Columns>`, `<Card>`, `<AccordionGroup>/<Accordion>`, Mermaid diagrams, and more (see `/mintlify` skill for full list).
 
-**Version-gated features**: When documenting a breaking change where older versions are still valid, use `<Tabs>` with version labels (e.g., "OneCLI Agent Vault (v1.2.22+)" / "Credential Proxy (legacy)") for sections with substantial content, and `<Note>` callouts for passing references. Use version placeholders (`vX.Y.Z`) when the release version isn't confirmed yet.
+**Version-gated features**: When documenting a breaking change where older versions are still valid, use `<Tabs>` with version labels for sections with substantial content, and `<Note>` callouts for passing references. Use version placeholders (`vX.Y.Z`) when the release version isn't confirmed yet. The docs are v2-only — v1 behavior belongs in `migrate-from-v1.mdx`, not in version tabs.
 
 **Directory trees:** Use `<Tree>` component (not ASCII art). See `reference/components.md` for syntax.
 
@@ -125,8 +144,8 @@ Mintlify workflows generate automated PRs (`mintlify/*` branches) on upstream ch
 - **Always verify claims against source**: `gh search code "<term>" repo:nanocoai/nanoclaw` or fetch files directly
 - **Check for overlapping PRs**: Multiple automated PRs often fix the same thing (e.g., table renames). Merge the most thorough one first, then cherry-pick unique changes from the rest.
 - **Common errors in automated PRs**: fabricated commit references, incorrect renames (verify exported types), speculative feature descriptions, `allowed-tools` or other frontmatter claims that don't exist in source
-- **Common fabrications found**: inventing env vars that only exist in skill SKILL.md files (not core config), inventing skill branches that don't exist, claiming runtime-based routing that doesn't exist in code, getting enum defaults wrong (e.g., `context_mode` default is `'isolated'` not `'group'`)
-- **Telegram is NOT on main**: Automated PRs repeatedly claim Telegram is a core channel — it lives in `nanoclaw-telegram` fork. Only stubs and `/add-telegram` skill exist on main.
+- **Common fabrications found**: inventing env vars that only exist in skill SKILL.md files (not core config), repeating upstream-doc traps as fact (Apple Container, tini PID 1, skills-as-branches — see Architecture Context above), claiming runtime-based routing that doesn't exist in code, getting enum defaults wrong
+- **No messaging channel is on main**: Automated PRs repeatedly claim WhatsApp/Telegram/etc. are core channels — all 17 adapters live on the `channels` registry branch. Only the CLI channel and the `/add-<channel>` installer skills exist on trunk.
 - **Token counts in automated PRs are always wrong**: Every automated PR uses a hallucinated value. Only verify against `repo-tokens/badge.svg` in upstream.
 - **Code snippets must match source**: Automated PRs sometimes rename terms in code snippets to match marketing (e.g., "gateway" → "Agent Vault" in logger.warn). Always compare code blocks against actual upstream files — docs prose uses product names but code must match `src/`.
 - **Cascading merge conflicts**: Merging one PR invalidates others touching the same files. When triaging a batch, merge isolated-file PRs first, then tackle overlapping clusters. Close conflicting PRs and consolidate verified changes into a single new PR.
@@ -153,13 +172,13 @@ Two changelogs to maintain — update both after any docs work session:
 
 To PR changes to `nanocoai/nanoclaw` from Ethan's fork (`glifocat/nanoclaw-glifocat`):
 - Work in `/Users/ethanmunoz/Projects/clients/qwibit/nanoclaw-glifocat`
-- Remote `upstream` = `nanocoai/nanoclaw`, `origin` = `glifocat/nanoclaw-glifocat`
+- Remote `upstream` = `nanocoai/nanoclaw` (the remote URL may still read `qwibitai/nanoclaw` — GitHub redirects after the org move), `origin` = `glifocat/nanoclaw-glifocat`
 - Branch from `upstream/main`, push to `origin`, PR with `--repo nanocoai/nanoclaw --head glifocat:<branch>`
 - The fork may be on a different branch (e.g., `feat/dashboard-api`) — stash before switching
 
 ## Token Count
 
-Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated). Currently ~127k tokens (~64% of Claude's context window — jumped from 43.7k at v1.2.53 to 127k at v2.0.0 due to the ground-up rewrite). Update `introduction.mdx` and `integrations/skills-system.mdx` if the badge value changes significantly.
+Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated) — the ONLY valid source. Never cite a number from prose, memory, or an automated PR; read the badge first. Last seen: 185k (~92% of Claude's context window) at dc34ceb (v2.1.4). Update pages that cite the count (e.g., `introduction.mdx`) if the badge value changes significantly.
 
 ## Writing Standards
 
