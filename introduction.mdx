@@ -1,153 +1,68 @@
 ---
 title: "What is NanoClaw?"
-description: From AI assistant to AI team. Multiple Claude agents running in parallel, talking to each other, isolated in their own containers — installed and customized through Claude itself.
+description: "A multi-agent Claude assistant. One host process, one Docker container per session, and a SQLite queue that carries every message in the system."
 icon: "house"
 sidebarTitle: "Introduction"
 tag: "UPDATED"
-keywords: ["nanoclaw", "ai team", "multi-agent", "claude", "agent sdk", "container isolation", "v2", "chat sdk"]
+keywords: ["nanoclaw", "multi-agent", "claude", "container isolation", "inbox outbox", "sqlite", "channels", "skills", "v2"]
 ---
 
-NanoClaw started as a way to run a single Claude agent on WhatsApp. v2 turns it into a team. Spawn multiple agents, wire them to messaging channels, have them route work to each other, and keep every one of them isolated in its own Linux container.
+{/* verified-against: src/index.ts, src/router.ts, src/channels/index.ts, src/container-runtime.ts, src/container-runner.ts, src/db/schema.ts, src/modules/, container/agent-runner/src/mcp-tools/agents.ts, agents.instructions.md, core.ts, .claude/skills/, .claude/skills/add-telegram/SKILL.md, repo-tokens/badge.svg, package.json @ dc34ceb */}
 
-One host process on your machine. One container per active session. A codebase small enough to hold in your head — and small enough for Claude Code to hold in its context window.
+NanoClaw runs Claude agents that talk to you over your messaging apps — and to each other. One Node host process handles routing and delivery. Every active session gets its own Docker container, so agents can run Bash and edit files without touching your host or each other.
+
+A single pattern drives the whole system: every message is a row in a SQLite queue. A user chat, an inbound webhook, a scheduled job, an agent delegating to another agent — all of them land in an inbox table (`messages_in`), and every response leaves through an outbox (`messages_out`). A scheduled task is just a message with a `process_after` timestamp. There is no separate scheduler, RPC layer, or job system to learn.
 
 <CardGroup cols={2}>
-  <Card title="Quick start" icon="rocket" href="/quickstart">
-    Get running in one command with `bash nanoclaw.sh`
+  <Card title="Run it" icon="rocket" href="/quickstart">
+    Clone, install, and talk to your first agent.
   </Card>
-  <Card title="Installation" icon="download" href="/installation">
-    Requirements, platform notes, and what the installer does
+  <Card title="Coming from v1 or OpenClaw" icon="route" href="/migrate-from-v1">
+    What changed, what carries over, and the migration skills that do the work.
   </Card>
-  <Card title="Architecture" icon="diagram-project" href="/concepts/architecture">
-    The session DB, the entity model, and the inbox/outbox pattern
+  <Card title="Make it yours" icon="wrench" href="/extend/overview">
+    Add channels, tools, skills, and alternative agent providers to your fork.
   </Card>
-  <Card title="Security" icon="shield" href="/concepts/security">
-    Container isolation, OneCLI credentials, sender policies
-  </Card>
-</CardGroup>
-
-## From AI assistant to AI team
-
-Most agents handle one conversation at a time. NanoClaw v2 runs as many parallel conversations as you want, on as many channels as you want, with as many agents as you want — and lets them coordinate.
-
-A single pattern drives the whole system: every message goes through an inbox, every response comes out of an outbox. User chats, webhooks, scheduled jobs, and agent-to-agent calls are all just rows in a queue.
-
-Example: three agent groups sharing one Discord channel for PR review.
-
-- A **worker** agent spawns per thread — one reviewer per PR.
-- A **manager** agent reads every thread and tracks what's in flight.
-- A **supervisor** agent stays silent until a worker requests human approval, then DMs you a card to approve or reject.
-
-Three agents, one channel, one pattern. No separate scheduler, no separate RPC layer, no separate approval system — just messages addressed to different inboxes.
-
-## Why NanoClaw
-
-### Agents that stay out of each other's filesystems
-
-Every agent runs in a Linux container with true filesystem isolation — it only sees what's explicitly mounted. Bash and file-editing tools are safe because commands execute inside the container, not on your host. Credentials never enter the container; they're injected at the HTTPS layer by [OneCLI Agent Vault](/concepts/security#credential-vault).
-
-### One pattern for messages, schedules, and routing
-
-Scheduling is a timestamp column on a message row. Agent-to-agent delegation is a row written to another agent's inbox. Multi-user approvals are messages routed to an owner's DM with an action card attached. You only learn one model.
-
-### Multi-channel by design
-
-Install any subset of: Telegram, Discord, WhatsApp, Signal, Microsoft Teams, Slack, iMessage, Google Chat, Webex, Matrix, WeChat, Linear, GitHub, Resend (email), Emacs, or the local CLI channel. Channels are adapters over the NanoClaw channel interface; Chat SDK-backed channels use [Vercel's Chat SDK](https://chat-sdk.dev/docs/adapters), while native channels keep their platform-specific runtime.
-
-### Flexible isolation per channel
-
-For every channel you add, decide how it shares context with your existing agents:
-
-- **Separate agent groups** — each channel gets its own workspace, memory, and personality. Nothing crosses.
-- **Same agent, separate sessions** — one workspace and one memory, but per-channel conversation threads.
-- **Shared session** — multiple channels feed into a single conversation (GitHub webhooks + a Slack channel + email, all in one thread).
-
-Pick per channel via `/manage-channels`. See [Channel isolation model](/concepts/entity-model).
-
-### Point anyone at your agent, keep yourself in the loop
-
-Invite coworkers, clients, or friends into a group your agent is in. They get their own agent relationship in minutes — no admin setup for you. Sensitive actions (unknown senders, irreversible tools) route to your DMs as approval cards. You say yes, the agent proceeds; you say no, it stops.
-
-### Scheduled tasks
-
-Recurring jobs that run Claude and message you back:
-
-```
-@Andy send an overview of the sales pipeline every weekday morning at 9am
-@Andy review the git history for the past week each Friday and update the README if there's drift
-@Andy every Monday at 8am, compile AI news from Hacker News and TechCrunch and message me a briefing
-```
-
-Same inbox, same flow, same tools — a scheduled task is a message with a `process_after` timestamp.
-
-### Skills, not features
-
-Trunk ships the runtime and the entity model. Channels live on a `channels` branch. Alternative agent providers live on `providers`. You run `/add-telegram` or `/add-opencode` and the skill copies exactly the module you need into your fork. Your install ends up with the code that does what you asked for — and nothing else.
-
-### AI-native, hybrid by design
-
-The install and onboarding flow is a scripted, deterministic path. When a step needs judgment — a failed install, a guided decision, a customization — control hands off to Claude Code. Beyond setup, there's no monitoring dashboard either: describe the problem in chat and Claude Code handles it.
-
-## Philosophy
-
-<CardGroup cols={1}>
-  <Card title="Small enough to understand" icon="magnifying-glass">
-    One process, a few source files, no microservices. Ask Claude Code to walk you through the codebase — the whole repo fits comfortably in its context window.
-  </Card>
-
-  <Card title="Secure by isolation" icon="lock">
-    Agents run in Linux containers and see only what you mount. Credentials never enter the container — OneCLI injects them at request time.
-  </Card>
-
-  <Card title="Built for the individual user" icon="user">
-    Not a monolithic framework. You make your own fork and have Claude Code modify it to fit. Bespoke, not bloatware.
-  </Card>
-
-  <Card title="Customization = code changes" icon="code">
-    No config file sprawl. Want different behavior? Edit the code. The codebase is small enough that it's safe to do so.
-  </Card>
-
-  <Card title="Skills over features" icon="puzzle-piece">
-    Contributors ship Claude Code skills like `/add-telegram` that transform your fork. Trunk stays lean; your fork ships exactly the modules you asked for.
-  </Card>
-
-  <Card title="Best harness, best model" icon="robot">
-    Claude Code with the official Claude Agent SDK is the default. Drop in other providers per agent group: `/add-codex` for OpenAI, `/add-opencode` for OpenRouter/Google/DeepSeek, `/add-ollama-provider` for local models.
+  <Card title="How it works" icon="diagram-project" href="/concepts/architecture">
+    The entity model, session databases, and the inbox/outbox pattern in depth.
   </Card>
 </CardGroup>
 
-## Core architecture (v2)
+## How a message flows
 
-- **Host process** — Node 22 + pnpm. Runs channels, routing, delivery, and the entity model over a central SQLite database.
-- **Agent container** — Bun 1.3+ running TypeScript directly (no compile step). Each session gets its own container and its own pair of session databases.
-- **Inbox/outbox session model** — `inbound.db` (host writes, container reads) and `outbound.db` (container writes, host reads). One writer per file eliminates SQLite cross-mount contention. No stdin piping, no IPC files.
-- **Entity model** — agent groups (workspaces) and messaging groups (platform channels) are independent. `messaging_group_agents` rows wire them together with per-wiring engage mode, sender scope, and session mode.
-- **Delivery loop** — two polls: an active poll (1s) for running sessions, a sweep (60s) for liveness and recovery. Heartbeat-based stale detection, not wall-clock timeouts.
-- **Channel adapters** — modules on the `channels` branch that implement NanoClaw's channel interface. Some use [Vercel's Chat SDK](https://chat-sdk.dev/docs/adapters); native channels keep platform-specific runtime code.
-- **Credentials** — [OneCLI Agent Vault](https://github.com/onecli/onecli) is the sole credential path. Containers receive placeholder tokens; the vault injects real auth at request time and enforces per-agent policies.
+Every channel — Telegram, Discord, a webhook, the built-in CLI — feeds the same pipeline:
 
-<Info>
-**Codebase size**: ~133k tokens (~67% of Claude's context window). Big for v1; still small enough that Claude Code can reason over the whole repo.
-</Info>
+```mermaid
+flowchart LR
+    A[Channel adapter] --> B[Router]
+    B --> C[("Inbox<br/>messages_in")]
+    C --> D[Agent container]
+    D --> E[("Outbox<br/>messages_out")]
+    E --> F[Delivery poll]
+    F --> A
+```
 
-## Key source files (host)
+The router resolves who sent the message, which agent group should handle it, and which session it belongs to, then writes the row and wakes the container. The container processes its inbox and writes replies to its outbox; the host's delivery polls pick them up and hand them back to the channel adapter. Agent-to-agent messages follow the exact same path — an agent's `send_message` is a row addressed to another agent's inbox.
 
-| File | Purpose |
-|------|---------|
-| `src/index.ts` | Orchestrator: startup, channel registration, routing |
-| `src/router.ts` | Inbound routing: identity → agent group → session |
-| `src/delivery.ts` | Outbound delivery polls (active 1s, sweep 60s) |
-| `src/host-sweep.ts` | Heartbeat liveness, stuck-tool detection, processing-ack sync |
-| `src/session-manager.ts` | Session lifecycle: spawn, wake, idle-kill, DB provisioning |
-| `src/container-runner.ts` | Container spawn and OneCLI config application |
-| `src/db/schema.ts` | Reference schemas — central, inbound, outbound |
-| `src/db/session-db.ts` | Per-session DB helpers (host-side) |
-| `src/channels/` | Channel adapter interfaces |
-| `container/agent-runner/src/` | Bun-run agent-runner (read-only mounted into containers) |
-| `groups/<folder>/CLAUDE.md` | Per-agent-group memory |
+## Why it's built this way
 
-## Community and source
+**Container isolation.** Agents run in Docker containers and see only what you explicitly mount. Bash and file edits execute inside the container, never on your host. Each session gets its own container, so parallel conversations can't interfere with each other.
 
-- **Source**: [github.com/nanocoai/nanoclaw](https://github.com/nanocoai/nanoclaw)
+**Small enough to hold in context.** The codebase is ~185k tokens — small enough for Claude Code to hold in context. That's also how you customize it: edit the code, not a config sprawl.
+
+**Channels are skills, not bundled features.** Main ships exactly one channel — the local CLI. Everything else lives on the `channels` branch and gets copied into your fork by a skill: `/add-telegram`, `/add-discord`, `/add-whatsapp`, `/add-slack`, `/add-signal`, `/add-imessage`, and several more. Your install contains the adapters you asked for and nothing else. The same mechanism covers alternative agent providers (`/add-codex`, `/add-opencode`, `/add-ollama-provider`).
+
+## Agents that work together
+
+An agent can spawn long-lived companion agents with `create_agent` — each with its own container, workspace, and persistent memory — and delegate to them over the same message queue. That's enough to build real teams: a worker per task, a manager that tracks what's in flight, a supervisor that pings you for approval. See the [multi-agent swarm guide](/guides/multi-agent-swarm).
+
+## Who this is for
+
+- **Operators** — you want a personal AI assistant on your own machine, reachable from your messaging apps. Start with the [quickstart](/quickstart).
+- **Builders** — you want to extend it: new channels, tools, skills, or agent providers in your own fork. Start with [extending NanoClaw](/extend/overview).
+- **Evaluators and contributors** — you want to judge the design before trusting it. Start with the [architecture](/concepts/architecture) and the [security model](/concepts/security).
+
+## Source and community
+
+- **Source**: [github.com/nanocoai/nanoclaw](https://github.com/nanocoai/nanoclaw) (MIT)
 - **Discord**: [community server](https://discord.gg/VDdww8qS42)
-- **License**: MIT
