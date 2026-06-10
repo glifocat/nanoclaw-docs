@@ -23,7 +23,7 @@ Instructions here...
 ```
 
 - `name` — lowercase, alphanumeric plus hyphens, max 64 characters. This becomes the slash command (`/my-skill`).
-- `description` — required, and load-bearing: **it's how Claude decides whether to invoke the skill**. Write what it does *and* when to use it. `manage-mounts` even lists its trigger phrases: `Triggers on "mounts", "mount allowlist", "agent access to directories"`.
+- `description` — required, and load-bearing: **it's how Claude decides whether to invoke the skill**. Write what it does *and* when to use it. `manage-mounts` even lists its trigger phrases: `Triggers on "mounts", "mount allowlist", "agent access to directories", "container mounts"`.
 
 The body is prose an agent can run. Real skills converge on the same shape: a pre-flight check, numbered steps, then a build-and-validate step at the end. Keep it under 500 lines — move detail to separate reference files in the skill directory — and put code in separate files, never inline in the markdown.
 
@@ -33,11 +33,11 @@ Apply must be **idempotent**: upgrades re-run it (`/update-skills` works by re-r
 
 **Pre-flight check.** Start with an explicit "is this already applied?" gate. From `add-telegram`:
 
-> Skip to **Credentials** if all of these are already in place: `src/channels/telegram.ts` [...] exists, `src/channels/index.ts` contains `import './telegram.js';`, `@chat-adapter/telegram` is listed in `package.json` dependencies. Otherwise continue. Every step below is safe to re-run.
+> Skip to **Credentials** if all of these are already in place: `src/channels/telegram.ts` [...] exists, `src/channels/index.ts` contains `import './telegram.js';`, [...] `@chat-adapter/telegram` is listed in `package.json` dependencies. Otherwise continue. Every step below is safe to re-run.
 
 Each individual step also carries its own guard ("skip if already present") so a partial apply completes instead of duplicating lines.
 
-**Pinned versions.** Dependencies install at an exact version — `pnpm install @chat-adapter/telegram@4.27.0`, never `latest`. Same for Dockerfile-installed binaries: pin with an `ARG <X>_VERSION=` line.
+**Pinned versions.** Dependencies install at an exact version — `pnpm install @chat-adapter/telegram@<exact-version>`, never `latest`. Same for Dockerfile-installed binaries: pin with an `ARG <X>_VERSION=` line.
 
 **Present-tense DO steps only.** A skill is a standalone artifact with no memory of its own edits. No "earlier versions did X", no "no changes needed here" — those are flagged anti-patterns. So is a separate VERIFY.md: tests are the verification, and the final step is always `pnpm run build` plus running the skill's own tests.
 
