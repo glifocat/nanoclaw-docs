@@ -108,7 +108,7 @@ tag: "UPDATED"
 </Update>
 
 <Update label="v1.2.36" description="2026-03-27" tags={["Maintenance", "Fix", "Breaking"]}>
-  - **[BREAKING]** Replaced `pino` logger with built-in logger module — removes 2 runtime dependencies. WhatsApp users must re-merge the WhatsApp fork to pick up the Baileys logger compatibility fix: `git fetch whatsapp main && git merge whatsapp/main`. If the `whatsapp` remote is not configured: `git remote add whatsapp https://github.com/qwibitai/nanoclaw-whatsapp.git`
+  - **[BREAKING]** Replaced `pino` logger with built-in logger module — removes 2 runtime dependencies. WhatsApp users must re-merge the WhatsApp fork to pick up the Baileys logger compatibility fix: `git fetch whatsapp main && git merge whatsapp/main`. If the `whatsapp` remote is not configured: `git remote add whatsapp https://github.com/nanocoai/nanoclaw-whatsapp.git`
   - Removed `yaml` and `zod` dependencies — core runtime now uses only 3 packages
   - Updated Ollama skill with admin model management tools
   - Channel-formatting text-style fixes for WhatsApp and Telegram (contributed by @kenbolton)

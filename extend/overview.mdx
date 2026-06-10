@@ -30,7 +30,7 @@ Skills are distributed as **git branches** on the upstream repository. Applying 
 
 ### Repository structure
 
-The upstream repo (`qwibitai/nanoclaw`) maintains skill branches for features that extend core functionality:
+The upstream repo (`nanocoai/nanoclaw`) maintains skill branches for features that extend core functionality:
 
 | Branch | Description |
 |--------|-------------|
@@ -49,11 +49,11 @@ Channels (WhatsApp, Telegram, Discord, Slack, Gmail) live in **separate fork rep
 
 | Fork repo | Channel | Library |
 |-----------|---------|---------|
-| `qwibitai/nanoclaw-whatsapp` | WhatsApp | @whiskeysockets/baileys |
-| `qwibitai/nanoclaw-telegram` | Telegram | grammy |
-| `qwibitai/nanoclaw-discord` | Discord | discord.js |
-| `qwibitai/nanoclaw-slack` | Slack | @slack/bolt (Socket Mode) |
-| `qwibitai/nanoclaw-gmail` | Gmail | googleapis |
+| `nanocoai/nanoclaw-whatsapp` | WhatsApp | @whiskeysockets/baileys |
+| `nanocoai/nanoclaw-telegram` | Telegram | grammy |
+| `nanocoai/nanoclaw-discord` | Discord | discord.js |
+| `nanocoai/nanoclaw-slack` | Slack | @slack/bolt (Socket Mode) |
+| `nanocoai/nanoclaw-gmail` | Gmail | googleapis |
 
 Channels self-register at startup using the channel registry (`src/channels/registry.ts`). Each channel module calls `registerChannel()` with a factory function — the host process discovers available channels dynamically via `getRegisteredChannelNames()`.
 
@@ -106,7 +106,7 @@ Run the skill command in Claude Code. For example, `/add-discord` triggers Claud
   <Step title="Merge the channel or skill">
     For a channel fork:
     ```bash
-    git remote add discord https://github.com/qwibitai/nanoclaw-discord.git
+    git remote add discord https://github.com/nanocoai/nanoclaw-discord.git
     git fetch discord main
     git merge discord/main
     ```
@@ -132,7 +132,7 @@ Run the skill command in Claude Code. For example, `/add-discord` triggers Claud
 <Tabs>
   <Tab title="Channel (from fork repo)">
     ```bash
-    git remote add discord https://github.com/qwibitai/nanoclaw-discord.git
+    git remote add discord https://github.com/nanocoai/nanoclaw-discord.git
     git fetch discord main
     git merge discord/main
     ```
@@ -165,7 +165,7 @@ Skills are available through Claude Code's **plugin marketplace**. NanoClaw's `.
     "nanoclaw-skills": {
       "source": {
         "source": "github",
-        "repo": "qwibitai/nanoclaw-skills"
+        "repo": "nanocoai/nanoclaw-skills"
       }
     }
   }
@@ -303,7 +303,7 @@ A GitHub Action runs on every push to `main`:
 
 ### As a contributor
 
-1. Fork `qwibitai/nanoclaw`
+1. Fork `nanocoai/nanoclaw`
 2. Branch from `main` and make your code changes
 3. Open a regular PR
 
@@ -314,7 +314,7 @@ That's it. The maintainers create a `skill/<name>` branch from your PR and add t
 When a skill PR is approved:
 
 1. Create a `skill/<name>` branch from the PR's commits
-2. Add the skill's `SKILL.md` to the marketplace repo (`qwibitai/nanoclaw-skills`)
+2. Add the skill's `SKILL.md` to the marketplace repo (`nanocoai/nanoclaw-skills`)
 3. The contributor is added to `CONTRIBUTORS.md`
 
 ## Skills vs configuration files

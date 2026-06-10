@@ -40,12 +40,12 @@
   "navbar": {
     "primary": {
       "type": "github",
-      "href": "https://github.com/qwibitai/nanoclaw"
+      "href": "https://github.com/nanocoai/nanoclaw"
     }
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/qwibitai/nanoclaw",
+      "github": "https://github.com/nanocoai/nanoclaw",
       "discord": "https://discord.gg/VDdww8qS42",
       "x": "https://x.com/Gavriel_Cohen",
       "youtube": "https://www.youtube.com/@NanoClaw",
@@ -55,7 +55,7 @@
       {
         "header": "Legal",
         "items": [
-          { "label": "MIT License", "href": "https://github.com/qwibitai/nanoclaw/blob/main/LICENSE" }
+          { "label": "MIT License", "href": "https://github.com/nanocoai/nanoclaw/blob/main/LICENSE" }
         ]
       }
     ]
@@ -110,7 +110,7 @@
     "options": ["copy", "view", "chatgpt", "claude", "cursor"]
   },
   "anchors": [
-    { "anchor": "GitHub", "href": "https://github.com/qwibitai/nanoclaw", "icon": "github" },
+    { "anchor": "GitHub", "href": "https://github.com/nanocoai/nanoclaw", "icon": "github" },
     { "anchor": "Discord", "href": "https://discord.gg/VDdww8qS42", "icon": "discord" }
   ],
   "navigation": {
