@@ -27,7 +27,7 @@ The upstream [CONTRIBUTING.md](https://github.com/nanocoai/nanoclaw/blob/main/CO
 
 ## The whole repo fits in context
 
-The token badge in the README currently reads **~185k tokens** for the runtime surface (`src/`, `container/agent-runner/src/`, the Dockerfile, and `CLAUDE.md` — tests excluded). That's deliberate: the codebase is kept small enough for a coding agent to hold it in context, which is also why feature PRs are redirected to skills. The badge is auto-generated — the `update-tokens.yml` workflow runs the `repo-tokens/` action on every push to `main` that touches the counted paths and commits the new badge. Don't update it by hand.
+The token badge in the README currently reads **~185k tokens** for the runtime surface (mainly `src/`, `container/agent-runner/src/`, the Dockerfile, and `CLAUDE.md` — host tests excluded). That's deliberate: the codebase is kept small enough for a coding agent to hold it in context, which is also why feature PRs are redirected to skills. The badge is auto-generated — the `update-tokens.yml` workflow runs the `repo-tokens/` action on every push to `main` that touches `src/`, `container/`, `launchd/`, or `CLAUDE.md` and commits the new badge. Don't update it by hand.
 
 ## Dev loop
 
