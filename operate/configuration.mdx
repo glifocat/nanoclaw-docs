@@ -73,7 +73,7 @@ See [Hardening](/operate/hardening) for the full egress lockdown and sandboxing 
 
 ## Per-group container config
 
-Each agent group has a row in the `container_configs` table (the central SQLite database). At spawn time NanoClaw materializes it to `groups/<folder>/container.json` — don't edit that file by hand, it's overwritten on every spawn.
+Each agent group has a row in the `container_configs` table (the central SQLite database). At spawn time NanoClaw materializes it to `groups/<folder>/container.json` — don't edit that file by hand, it's overwritten on every spawn. The full per-field reference, including the variable tables for the whole install, lives in the [environment variables](/reference/environment-variables) and [container configuration](/reference/container-config) references.
 
 Fields per group:
 
@@ -114,6 +114,6 @@ systemctl --user restart nanoclaw-v2-<slug>
 Re-running the service setup step regenerates the plist or unit file, wiping manual `Environment` edits — re-apply them afterwards.
 </Warning>
 
-Per-group container config needs no restart — it's read fresh from the database every time a container spawns.
+Per-group container config applies at the next container spawn — it's read fresh from the database each time. A running container keeps its old config until it's restarted, and package changes need an image rebuild (`ncl groups restart --id <group-id> --rebuild`). See the [container configuration reference](/reference/container-config) for per-field semantics.
 
 See [Installation](/installation) for service management details and finding your install slug.

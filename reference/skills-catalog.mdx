@@ -1,0 +1,110 @@
+---
+title: "Skills catalog"
+description: "Every skill that ships with NanoClaw — host-side workspace skills you invoke in Claude Code, and container skills mounted into every agent container."
+tag: "NEW"
+keywords: ["skills", "catalog", "reference", "add-channel", "providers", "tools", "container skills", "workspace skills", "slash commands"]
+---
+
+{/* verified-against: .claude/skills/ and container/skills/ listings + each skill's SKILL.md frontmatter @ dc34ceb (v2.1.4) */}
+
+NanoClaw ships two kinds of skills:
+
+- **Host-side workspace skills** (`.claude/skills/`) — invoked as slash commands in Claude Code from your NanoClaw checkout. They install channels, providers, and tools, or operate and maintain your install. 45 skills total: 17 channel installs, 3 provider installs, 10 tool installs, and 15 operational skills.
+- **Container skills** (`container/skills/`) — 8 skills mounted into every agent container at `/app/skills`. The agent loads them at runtime; you don't invoke them yourself.
+
+For how skills work and how to write your own, see [Extending NanoClaw](/extend/overview).
+
+## Channel installs
+
+Each skill wires up one messaging channel. See [Channels](/channels/overview) for the full setup guides.
+
+| Skill | What it does |
+| --- | --- |
+| `/add-deltachat` | Adds the [Delta Chat](/channels/more-channels#delta-chat) channel via `@deltachat/stdio-rpc-server` — native adapter, email-based messaging with end-to-end encryption |
+| `/add-discord` | Adds the [Discord](/channels/discord) bot channel via Chat SDK |
+| `/add-emacs` | Adds [Emacs](/channels/more-channels#emacs) as a channel — interactive chat buffer and org-mode integration over a local HTTP bridge, no bot token needed |
+| `/add-gchat` | Adds the [Google Chat](/channels/more-channels#google-chat) channel via Chat SDK |
+| `/add-github` | Adds the [GitHub](/channels/more-channels#github) channel via Chat SDK — PR and issue comment threads as conversations |
+| `/add-imessage` | Adds the [iMessage](/channels/imessage) channel via Chat SDK — local (macOS) or remote (Photon API) mode |
+| `/add-linear` | Adds the [Linear](/channels/more-channels#linear) channel via Chat SDK — issue comment threads as conversations |
+| `/add-matrix` | Adds the [Matrix](/channels/more-channels#matrix) channel via Chat SDK — works with any homeserver |
+| `/add-resend` | Adds the [Resend](/channels/more-channels#resend-email) email channel via Chat SDK |
+| `/add-signal` | Adds the [Signal](/channels/signal) channel via signal-cli TCP daemon — native adapter, no Chat SDK bridge |
+| `/add-slack` | Adds the [Slack](/channels/slack) channel via Chat SDK |
+| `/add-teams` | Adds the [Microsoft Teams](/channels/teams) channel via Chat SDK |
+| `/add-telegram` | Adds the [Telegram](/channels/telegram) channel via Chat SDK |
+| `/add-webex` | Adds the [Webex](/channels/more-channels#webex) channel via Chat SDK |
+| `/add-wechat` | Adds the [WeChat](/channels/more-channels#wechat) personal channel via Tencent's official iLink Bot API — long-polling and QR scan, no webhook |
+| `/add-whatsapp` | Adds the [WhatsApp](/channels/whatsapp) channel via native Baileys adapter — QR code or pairing code authentication |
+| `/add-whatsapp-cloud` | Adds the [WhatsApp Business Cloud API](/channels/more-channels#whatsapp-cloud-api) channel via Chat SDK — official Meta API |
+
+## Provider installs
+
+Each skill swaps the agent runtime for a different provider. See [Providers](/extend/providers).
+
+| Skill | What it does |
+| --- | --- |
+| `/add-codex` | Uses Codex (CLI + AppServer) as the full agent provider in place of the Claude Agent SDK — ChatGPT subscription or `OPENAI_API_KEY`, per-group via `agent_provider` |
+| `/add-ollama-provider` | Routes an agent group to a local Ollama model instead of the Anthropic API — env var overrides and a model setting, no provider code changes |
+| `/add-opencode` | Uses OpenCode as an agent provider (`AGENT_PROVIDER=opencode`) — OpenRouter, OpenAI, Google, DeepSeek, and more via OpenCode config |
+
+## Tool installs
+
+Each skill adds a capability or MCP tool to your agents. See [Tools](/extend/tools).
+
+| Skill | What it does |
+| --- | --- |
+| `/add-atomic-chat-tool` | Adds the Atomic Chat MCP server so agents can call local models served by the Atomic Chat desktop app via its OpenAI-compatible API |
+| `/add-dashboard` | Adds a monitoring dashboard — installs `@nanoco/nanoclaw-dashboard` and a pusher that sends periodic JSON snapshots |
+| `/add-gcal-tool` | Adds Google Calendar as an MCP tool (list calendars, list/search/create events, free/busy) using OneCLI-managed OAuth — no raw credentials reach the container |
+| `/add-gmail-tool` | Adds Gmail as an MCP tool (read, search, send, label, draft) using OneCLI-managed OAuth — tokens injected at request time |
+| `/add-karpathy-llm-wiki` | Adds a persistent wiki knowledge base to a group, based on Karpathy's LLM Wiki pattern |
+| `/add-macos-statusbar` | Adds a macOS menu bar status indicator with Start, Stop, and Restart controls (macOS only) |
+| `/add-mnemon` | Adds persistent graph-based memory via mnemon — agents recall past context before responding and remember insights after each turn |
+| `/add-ollama-tool` | Adds the Ollama MCP server so agents can call local models and optionally manage the Ollama model library |
+| `/add-rtk` | Installs the rtk token-compression proxy into agent containers — routes Bash tool calls through rtk for 60–90% token savings on dev commands |
+| `/add-vercel` | Adds Vercel deployment capability — installs the Vercel CLI in agent containers with OneCLI credential injection for `api.vercel.com` |
+
+## Operational skills
+
+Setup, maintenance, migration, and day-to-day administration of your install.
+
+| Skill | What it does |
+| --- | --- |
+| `/customize` | Adds new capabilities or modifies NanoClaw behavior — interactive skill that asks questions to understand what you want |
+| `/debug` | Debugs container agent issues — logs, session DBs, mounts, authentication problems, and common failures |
+| `/get-qodo-rules` | Loads org- and repo-level coding rules from Qodo before code tasks begin, so generation follows team standards |
+| `/init-first-agent` | Walks you through creating the first agent for a DM channel — resolves your channel identity, wires the DM group, and triggers a welcome DM |
+| `/init-onecli` | Installs and initializes OneCLI Agent Vault, migrating existing `.env` credentials to the vault |
+| `/manage-channels` | Wires channels to agent groups, manages isolation levels, and adds new channel groups |
+| `/manage-mounts` | Configures which host directories agent containers can access — view, add, or remove mount allowlist entries |
+| `/migrate-from-openclaw` | Migrates from OpenClaw to NanoClaw v2 — detects an existing install, extracts identity, credentials, and tasks, then guides interactive migration |
+| `/migrate-from-v1` | Finishes migrating a NanoClaw v1 install into v2 after `migrate-v2.sh` — seeds the owner, reconciles container configs, helps port custom v1 code |
+| `/migrate-nanoclaw` | Extracts your customizations from a fork, generates a replayable migration guide, and upgrades to upstream by reapplying them on a clean base |
+| `/qodo-pr-resolver` | Reviews and resolves PR issues with Qodo — AI-powered code review fixes for GitHub, GitLab, Bitbucket, and Azure DevOps |
+| `/setup` | Runs initial NanoClaw setup — install, configure, first-time setup |
+| `/update-nanoclaw` | Brings upstream updates into a customized install with preview, selective cherry-pick, and low token usage |
+| `/update-skills` | Re-applies your installed skills to pull their latest code from upstream |
+| `/use-native-credential-proxy` | Opts out of the OneCLI gateway — reads Anthropic credentials from `.env` and injects them into the container's API requests |
+
+## Container skills
+
+Mounted into every agent container at `/app/skills`. The agent picks them up automatically based on context — channel, task, or trigger.
+
+| Skill | What it does |
+| --- | --- |
+| `agent-browser` | Browses the web for any task — research, web apps, forms, screenshots, data extraction, page testing |
+| `frontend-engineer` | Enforces a build-test-verify workflow for web projects — never done until built, tested, responsive, accessible, and visually verified |
+| `onecli-gateway` | Transparent HTTPS proxy that injects stored credentials into outbound calls — the agent makes plain HTTP requests and the gateway handles auth |
+| `self-customize` | Lets the agent customize itself — add capabilities, install packages, add MCP servers, edit code or CLAUDE.md |
+| `slack-formatting` | Formats messages for Slack using mrkdwn syntax when responding to Slack channels |
+| `vercel-cli` | Deploys apps to Vercel and manages Vercel projects, domains, and environment variables |
+| `welcome` | Introduces the agent to a newly connected channel — triggered automatically when a channel is first wired |
+| `whatsapp-formatting` | Formats messages for WhatsApp, including mentions that render as real WhatsApp tags |
+
+## Related pages
+
+- [Extending NanoClaw](/extend/overview) — how skills work and how to write your own
+- [Channels overview](/channels/overview) — channel setup guides
+- [Providers](/extend/providers) — agent provider concepts
+- [Tools](/extend/tools) — adding MCP tools to agents

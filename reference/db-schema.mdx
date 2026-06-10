@@ -1,0 +1,366 @@
+---
+title: "Database schema"
+description: "Every table in NanoClaw's central database and the per-session inbound/outbound database pairs — columns, defaults, and intent."
+tag: "NEW"
+keywords: ["database", "schema", "sqlite", "v2.db", "inbound.db", "outbound.db", "messages_in", "messages_out", "sessions", "container_configs", "pending_sender_approvals", "migrations"]
+---
+
+{/* verified-against: src/db/schema.ts, src/db/connection.ts, src/db/session-db.ts, src/session-manager.ts, src/db/migrations/{001-initial,002-chat-sdk-state,module-approvals-pending-approvals,module-agent-to-agent-destinations,module-approvals-title-options,008-dropped-messages,009-drop-pending-credentials,010-engage-modes,011-pending-sender-approvals,012-channel-registration,013-approval-render-metadata,014-container-configs,015-cli-scope,index}.ts, container/agent-runner/src/db/messages-out.ts, src/modules/scheduling/db.ts @ dc34ceb (v2.1.4) */}
+
+NanoClaw stores everything in SQLite, split across two layers:
+
+- **Central database** — `data/v2.db`. Holds the [entity model](/concepts/entity-model) (agent groups, messaging groups, users), the wiring between them, sessions, and pending approvals. Opened once at startup with `journal_mode = WAL` and `foreign_keys = ON`.
+- **Per-session databases** — one pair per session at `data/v2-sessions/<agent_group_id>/<session_id>/`. `inbound.db` is **host-written, container-read**; `outbound.db` is **container-written, host-read**. One writer per file eliminates SQLite write contention across the host–container mount boundary.
+
+Session DBs deliberately use `journal_mode = DELETE`, not WAL — WAL's memory-mapped `-shm` file doesn't refresh across the host-to-container mount, so the container would silently miss new messages. The host also opens, writes, and closes per operation (a long-lived connection would freeze the container's view), and only ever writes to `outbound.db` when no container is running.
+
+<Note>
+The schema is created by migrations (`src/db/migrations/`), not by `src/db/schema.ts` — that file is a reference copy. Migrations are tracked by name in a `schema_version` bookkeeping table, so module-installed migrations can be added without coordinating version numbers.
+</Note>
+
+## Central database
+
+`data/v2.db`. Column-level enums (`engage_mode`, `role`, `unknown_sender_policy`, and so on) are enforced in application code, not by SQL `CHECK` constraints — the database accepts any text.
+
+### agent_groups
+
+Agent workspaces: folder, skills, CLAUDE.md. All workspaces are equal — privilege lives on users, not groups. Container settings live in [`container_configs`](#container_configs), not here.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `id` | TEXT | — | Primary key |
+| `name` | TEXT | — | Display name (NOT NULL) |
+| `folder` | TEXT | — | Workspace folder under `groups/` (NOT NULL, UNIQUE) |
+| `agent_provider` | TEXT | `NULL` | Default provider for the group's sessions |
+| `created_at` | TEXT | — | ISO timestamp |
+
+### messaging_groups
+
+Platform chats and channels, one row per `(channel_type, platform_id)` pair (UNIQUE).
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `id` | TEXT | — | Primary key |
+| `channel_type` | TEXT | — | `whatsapp`, `discord`, `slack`, … |
+| `platform_id` | TEXT | — | The platform's chat/channel ID |
+| `name` | TEXT | `NULL` | Display name |
+| `is_group` | INTEGER | `0` | `1` for group chats, `0` for DMs |
+| `unknown_sender_policy` | TEXT | `'strict'` | `'strict'` \| `'request_approval'` \| `'public'` — what happens when a never-seen sender posts |
+| `denied_at` | TEXT | `NULL` | Set when the owner denies channel registration — future messages drop silently (migration 012) |
+| `created_at` | TEXT | — | ISO timestamp |
+
+The `'strict'` column default is mostly vestigial: every creation callsite passes the policy explicitly, and the router's auto-create path hardcodes `'request_approval'`.
+
+### messaging_group_agents
+
+Which agent groups handle which messaging groups. Migration 010 replaced v1's opaque `trigger_rules` JSON and `response_scope` enum with four explicit, orthogonal columns.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `id` | TEXT | — | Primary key |
+| `messaging_group_id` | TEXT | — | FK → `messaging_groups(id)` |
+| `agent_group_id` | TEXT | — | FK → `agent_groups(id)` |
+| `engage_mode` | TEXT | `'mention'` | `'pattern'` \| `'mention'` \| `'mention-sticky'` |
+| `engage_pattern` | TEXT | `NULL` | Regex; required when `engage_mode='pattern'`. `'.'` means "match every message" (the "always" flavor) |
+| `sender_scope` | TEXT | `'all'` | `'all'` \| `'known'` — who can engage the agent |
+| `ignored_message_policy` | TEXT | `'drop'` | `'drop'` \| `'accumulate'` — what to do with non-engaging messages |
+| `session_mode` | TEXT | `'shared'` | Session sharing strategy |
+| `priority` | INTEGER | `0` | Ordering when multiple agents are wired to one chat |
+| `created_at` | TEXT | — | ISO timestamp |
+
+`UNIQUE(messaging_group_id, agent_group_id)` — one wiring per pair.
+
+The `'mention'` / `'all'` / `'drop'` defaults on the four engage columns exist only in `schema.ts`'s reference copy — migration 010 adds them as bare nullable `ADD COLUMN`s with no SQL defaults, and application code always passes values explicitly. On a migrated database the effective column default is `NULL`.
+
+### users
+
+Messaging-platform identifiers, namespaced: `phone:+1555…`, `tg:123`, `discord:456`, `email:a@x.com`. One human can own multiple user rows across unrelated channels — there's no identity linking yet.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `id` | TEXT | — | Namespaced identifier (primary key) |
+| `kind` | TEXT | — | Identifier namespace (`phone`, `tg`, …) |
+| `display_name` | TEXT | `NULL` | Human-readable name |
+| `created_at` | TEXT | — | ISO timestamp |
+
+### user_roles
+
+Role grants on users. Privilege is user-level, not group-level. `role` is `owner` or `admin`: owner is always global (`agent_group_id IS NULL`); admin is global when `agent_group_id` is NULL, otherwise scoped to that agent group. Invariant (enforced in code): admin of group A is implicitly a member of A — no membership row needed.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `user_id` | TEXT | — | FK → `users(id)` |
+| `role` | TEXT | — | `'owner'` \| `'admin'` |
+| `agent_group_id` | TEXT | `NULL` | FK → `agent_groups(id)`; NULL = global |
+| `granted_by` | TEXT | `NULL` | FK → `users(id)` |
+| `granted_at` | TEXT | — | ISO timestamp |
+
+Primary key: `(user_id, role, agent_group_id)`. Indexed on `(agent_group_id, role)`.
+
+### agent_group_members
+
+"Known" membership in an agent group — required for an unprivileged user to interact with a workspace.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `user_id` | TEXT | — | FK → `users(id)` |
+| `agent_group_id` | TEXT | — | FK → `agent_groups(id)` |
+| `added_by` | TEXT | `NULL` | FK → `users(id)` |
+| `added_at` | TEXT | — | ISO timestamp |
+
+Primary key: `(user_id, agent_group_id)`.
+
+### user_dms
+
+Cached mapping from (user, channel) to that user's DM messaging group. Lets the host initiate cold DMs (pairing, approval cards) without reprobing the platform API on every send. Populated lazily by `ensureUserDm()`.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `user_id` | TEXT | — | FK → `users(id)` |
+| `channel_type` | TEXT | — | Channel namespace |
+| `messaging_group_id` | TEXT | — | FK → `messaging_groups(id)` — the DM chat |
+| `resolved_at` | TEXT | — | When the mapping was resolved |
+
+Primary key: `(user_id, channel_type)`.
+
+### sessions
+
+One folder = one session = one container when running.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `id` | TEXT | — | Primary key (also the session folder name) |
+| `agent_group_id` | TEXT | — | FK → `agent_groups(id)` |
+| `messaging_group_id` | TEXT | `NULL` | FK → `messaging_groups(id)` |
+| `thread_id` | TEXT | `NULL` | Platform thread, if any |
+| `agent_provider` | TEXT | `NULL` | Per-session provider override |
+| `status` | TEXT | `'active'` | Session lifecycle status |
+| `container_status` | TEXT | `'stopped'` | Whether a container is running for this session |
+| `last_active` | TEXT | `NULL` | Last activity timestamp |
+| `created_at` | TEXT | — | ISO timestamp |
+
+Indexed on `agent_group_id` and `(messaging_group_id, thread_id)`.
+
+### pending_questions
+
+Interactive `ask_user_question` cards awaiting an answer.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `question_id` | TEXT | — | Primary key |
+| `session_id` | TEXT | — | FK → `sessions(id)` — who's waiting for the answer |
+| `message_out_id` | TEXT | — | The outbound message that carried the question |
+| `platform_id` / `channel_type` / `thread_id` | TEXT | `NULL` | Where the card was posted |
+| `title` | TEXT | — | Question title |
+| `options_json` | TEXT | — | JSON array of answer options |
+| `created_at` | TEXT | — | ISO timestamp |
+
+### pending_approvals
+
+Host-side records for any approval-requiring request: `install_packages` / `add_mcp_server` (session-bound), and OneCLI credential approvals (`session_id` may be NULL, `action='onecli_credential'`). The OneCLI-specific columns let the host edit the admin card when a request expires and sweep stale rows on startup.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `approval_id` | TEXT | — | Primary key |
+| `session_id` | TEXT | `NULL` | FK → `sessions(id)` |
+| `request_id` | TEXT | — | The requesting side's correlation ID |
+| `action` | TEXT | — | What's being approved |
+| `payload` | TEXT | — | JSON request payload |
+| `agent_group_id` | TEXT | `NULL` | FK → `agent_groups(id)` |
+| `channel_type` / `platform_id` / `platform_message_id` | TEXT | `NULL` | Where the admin card lives, for later edits |
+| `expires_at` | TEXT | `NULL` | Expiry for credential approvals |
+| `status` | TEXT | `'pending'` | Approval status |
+| `title` | TEXT | `''` | Card title (render metadata) |
+| `options_json` | TEXT | `'[]'` | Card options (render metadata) |
+| `created_at` | TEXT | — | ISO timestamp |
+
+### pending_sender_approvals
+
+Unknown-sender approval flow (`unknown_sender_policy = 'request_approval'`). A non-member message triggers a card to the most appropriate admin. `UNIQUE(messaging_group_id, sender_identity)` gives in-flight dedup — a second message from the same unknown sender while a card is pending is silently dropped instead of spamming the admin. The row is cleared on approve or deny.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `id` | TEXT | — | Primary key |
+| `messaging_group_id` | TEXT | — | FK → `messaging_groups(id)` |
+| `agent_group_id` | TEXT | — | FK → `agent_groups(id)` |
+| `sender_identity` | TEXT | — | Namespaced user ID (`channel_type:handle`) |
+| `sender_name` | TEXT | `NULL` | Display name, if known |
+| `original_message` | TEXT | — | JSON-serialized original `InboundEvent`, replayed on approve |
+| `approver_user_id` | TEXT | — | The admin who got the card |
+| `title` / `options_json` | TEXT | `''` / `'[]'` | Card render metadata (migration 013) |
+| `created_at` | TEXT | — | ISO timestamp |
+
+### pending_channel_approvals
+
+Unknown-channel registration flow (migration 012). When an unwired channel receives a mention or DM, the router escalates to the owner. Approve creates a `messaging_group_agents` row with conservative defaults and replays the event; deny stamps `messaging_groups.denied_at` so the channel never re-prompts. Primary key on `messaging_group_id` gives free in-flight dedup.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `messaging_group_id` | TEXT | — | Primary key, FK → `messaging_groups(id)` |
+| `agent_group_id` | TEXT | — | FK → `agent_groups(id)` — the agent the approved wiring will target |
+| `original_message` | TEXT | — | JSON-serialized triggering `InboundEvent` |
+| `approver_user_id` | TEXT | — | The owner who got the card |
+| `title` / `options_json` | TEXT | `''` / `'[]'` | Card render metadata (migration 013) |
+| `created_at` | TEXT | — | ISO timestamp |
+
+### agent_destinations
+
+Per-agent named map of allowed message targets — both the routing map and the ACL. A row exists if and only if the source agent may send to the target; no row means unauthorized. Names are scoped per source agent: worker-1 may call the admin "parent" while the admin calls the child "worker-1".
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `agent_group_id` | TEXT | — | The source agent (FK → `agent_groups(id)`) |
+| `local_name` | TEXT | — | The name this agent uses for the target |
+| `target_type` | TEXT | — | `'channel'` (target = `messaging_groups.id`) \| `'agent'` (target = `agent_groups.id`) |
+| `target_id` | TEXT | — | The target's ID, interpreted per `target_type` |
+| `created_at` | TEXT | — | ISO timestamp |
+
+Primary key: `(agent_group_id, local_name)`. Indexed on `(target_type, target_id)`.
+
+### container_configs
+
+One row per agent group: how its containers spawn (migration 014, `cli_scope` added in 015). See [Container configuration](/reference/container-config) for full field semantics and the [`ncl groups config`](/reference/ncl-cli#groups) commands that edit it.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `agent_group_id` | TEXT | — | Primary key, FK → `agent_groups(id)` ON DELETE CASCADE |
+| `provider` | TEXT | `NULL` | Agent CLI provider |
+| `model` | TEXT | `NULL` | Model alias or ID |
+| `effort` | TEXT | `NULL` | Reasoning effort |
+| `image_tag` | TEXT | `NULL` | Container image override |
+| `assistant_name` | TEXT | `NULL` | Agent display name |
+| `max_messages_per_prompt` | INTEGER | `NULL` | Message batching cap |
+| `skills` | TEXT (JSON) | `'"all"'` | Skill allowlist |
+| `mcp_servers` | TEXT (JSON) | `'{}'` | Extra MCP servers |
+| `packages_apt` / `packages_npm` | TEXT (JSON) | `'[]'` | Baked-in packages |
+| `additional_mounts` | TEXT (JSON) | `'[]'` | Extra bind mounts |
+| `cli_scope` | TEXT | `'group'` | `ncl` CLI visibility scope (migration 015) |
+| `updated_at` | TEXT | — | ISO timestamp |
+
+### unregistered_senders
+
+Audit log of dropped messages from senders that didn't pass policy (migration 008). One row per `(channel_type, platform_id)` with a running count, so admins can see who's knocking.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `channel_type` / `platform_id` | TEXT | — | Composite primary key — the sender |
+| `user_id` | TEXT | `NULL` | Matched user row, if any |
+| `sender_name` | TEXT | `NULL` | Display name, if known |
+| `reason` | TEXT | — | Why the message was dropped |
+| `messaging_group_id` / `agent_group_id` | TEXT | `NULL` | Where it happened |
+| `message_count` | INTEGER | `1` | Running count of dropped messages |
+| `first_seen` / `last_seen` | TEXT | — | ISO timestamps (indexed on `last_seen`) |
+
+### chat_sdk_* tables
+
+Four small tables backing the Chat SDK bridge state (migration 002): `chat_sdk_kv` (key/value with optional `expires_at`), `chat_sdk_subscriptions` (`thread_id`, `subscribed_at`), `chat_sdk_locks` (`thread_id`, `token`, `expires_at`), and `chat_sdk_lists` (`key`, `idx`, `value`, optional `expires_at`).
+
+### schema_version
+
+Migration bookkeeping: `version` (applied-order number, auto-assigned), `name` (UNIQUE — the dedup key), `applied` (timestamp). A `pending_credentials` table from earlier builds was dropped by migration 009.
+
+## Session databases
+
+One pair per session at `data/v2-sessions/<agent_group_id>/<session_id>/`. Schemas come from `INBOUND_SCHEMA` / `OUTBOUND_SCHEMA` in `src/db/schema.ts`; columns added after the initial release (`series_id`, `trigger`, `source_session_id`, `on_wake`, `delivered.platform_message_id`, `delivered.status`) are retrofitted onto pre-existing session DBs by `migrateMessagesInTable()` / `migrateDeliveredTable()` at open time.
+
+The `seq` column is the agent-facing message ID, globally ordered across both files: the **host writes even** seq numbers into `messages_in`, the **container writes odd** into `messages_out`, so an ID is unambiguous across both tables.
+
+### inbound.db (host writes, container reads)
+
+#### messages_in
+
+Everything the agent receives — chat messages, system events, and scheduled tasks (the scheduling module stores tasks as ordinary rows with `kind='task'`; it owns no tables of its own).
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `id` | TEXT | — | Primary key |
+| `seq` | INTEGER | — | Even, UNIQUE — globally ordered agent-facing ID |
+| `kind` | TEXT | — | `'chat'` \| `'chat-sdk'` \| `'task'` \| `'webhook'` \| `'system'` (the `MessageInKind` union) — task vs. message is just this column. `'webhook'` is in the union but has no writer on main yet |
+| `timestamp` | TEXT | — | ISO timestamp |
+| `status` | TEXT | `'pending'` | `pending` → `completed` / `failed`; tasks can also be `paused` |
+| `process_after` | TEXT | `NULL` | Don't deliver before this time — scheduling and retry backoff |
+| `recurrence` | TEXT | `NULL` | Cron expression; the host sweep clones completed recurring rows for the next run |
+| `series_id` | TEXT | `NULL` | Groups a recurring task's clones (initially the original's `id`; indexed) |
+| `tries` | INTEGER | `0` | Retry counter |
+| `trigger` | INTEGER | `1` | `1` = wake the agent; `0` = accumulated context only (don't wake) |
+| `platform_id` / `channel_type` / `thread_id` | TEXT | `NULL` | Origin of the message |
+| `content` | TEXT | — | Message body |
+| `source_session_id` | TEXT | `NULL` | Agent-to-agent return path: the source session that emitted the triggering outbound. Replies route back to that exact session, not the source group's "newest" session. NULL on channel inbound |
+| `on_wake` | INTEGER | `0` | `1` = only deliver on the container's first poll (fresh start); dying containers skip these rows |
+
+#### delivered
+
+Delivery outcomes for `messages_out` IDs. Lives in `inbound.db` because the host writes it — writing into container-owned `outbound.db` would break the one-writer rule.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `message_out_id` | TEXT | — | Primary key — the outbound row this verdict is for |
+| `platform_message_id` | TEXT | `NULL` | The platform's ID for the sent message |
+| `status` | TEXT | `'delivered'` | `'delivered'` \| `'failed'` |
+| `delivered_at` | TEXT | — | ISO timestamp |
+
+#### destinations
+
+The destination map for this session's agent, derived from `agent_destinations`. The host overwrites it on every container wake and on demand (rewires, new child agents); the container queries it live on every lookup, so changes take effect mid-session without a restart.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `name` | TEXT | — | Primary key — the agent-facing destination name |
+| `display_name` | TEXT | `NULL` | Human-readable label |
+| `type` | TEXT | — | `'channel'` \| `'agent'` |
+| `channel_type` / `platform_id` | TEXT | `NULL` | Set for `type='channel'` |
+| `agent_group_id` | TEXT | `NULL` | Set for `type='agent'` |
+
+#### session_routing
+
+Default reply routing — single-row table (`CHECK (id = 1)`). The host overwrites it on every container wake from the session's messaging group and thread; the container reads it in `send_message` / `ask_user_question` to default the channel and thread when the agent doesn't name an explicit destination. Columns: `id`, `channel_type`, `platform_id`, `thread_id`.
+
+### outbound.db (container writes, host reads)
+
+#### messages_out
+
+Everything the agent sends.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `id` | TEXT | — | Primary key |
+| `seq` | INTEGER | — | Odd, UNIQUE — see the seq invariant above |
+| `in_reply_to` | TEXT | `NULL` | The `messages_in` ID this responds to (used for a2a return routing) |
+| `timestamp` | TEXT | — | ISO timestamp |
+| `deliver_after` | TEXT | `NULL` | Hold delivery until this time |
+| `recurrence` | TEXT | `NULL` | Cron expression for recurring sends |
+| `kind` | TEXT | — | Message kind |
+| `platform_id` / `channel_type` / `thread_id` | TEXT | `NULL` | Explicit destination; falls back to `session_routing` when NULL |
+| `content` | TEXT | — | Message body |
+
+#### processing_ack
+
+The container records processing status here instead of updating `messages_in` (which it can't write). The host reads it to learn which messages completed; on container startup, stale `'processing'` entries are cleared for crash recovery, and the host deletes orphan claims after killing a container.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `message_id` | TEXT | — | Primary key — the `messages_in` ID |
+| `status` | TEXT | — | `'processing'` \| `'completed'` \| `'failed'` |
+| `status_changed` | TEXT | — | ISO timestamp of the last transition |
+
+#### session_state
+
+Persistent key/value state owned by the container — among other things, the SDK session ID so the conversation resumes across container restarts. Cleared by `/clear`. Columns: `key` (primary key), `value`, `updated_at`.
+
+#### container_state
+
+Current tool-in-flight state — single-row table (`CHECK (id = 1)`). The container writes on PreToolUse and clears on PostToolUse; the host sweep reads it to extend the stuck-detection window while Bash runs with a declared timeout over 60 seconds, so long-running scripts aren't flagged as stuck.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `id` | INTEGER | — | Always `1` |
+| `current_tool` | TEXT | `NULL` | Tool currently executing |
+| `tool_declared_timeout_ms` | INTEGER | `NULL` | The tool call's declared timeout |
+| `tool_started_at` | TEXT | `NULL` | When it started |
+| `updated_at` | TEXT | — | Last write |
+
+## Related pages
+
+- [Entity model](/concepts/entity-model) — how agent groups, messaging groups, users, and sessions relate
+- [Container configuration](/reference/container-config) — full semantics of every `container_configs` field
+- [ncl CLI](/reference/ncl-cli) — the commands that read and write these tables
