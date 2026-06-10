@@ -95,9 +95,9 @@ The container runner (`src/container-runner.ts`) rebuilds the agent's world on e
 
 1. Refreshes the session's destination map and default reply routing in `inbound.db`.
 2. Materializes `container.json` from the database and syncs skill symlinks to match its selection.
-3. **Composes `groups/<folder>/CLAUDE.md`** (`src/claude-md-compose.ts`): a generated entry point that begins with `<!-- Composed at spawn — do not edit. -->` and contains only imports — the shared base (`container/CLAUDE.md`, mounted read-only at `/app/CLAUDE.md`), one fragment per skill that ships `instructions.md`, one per built-in module's MCP tool instructions, and inline instructions from user-added MCP servers. The only file you (or the agent) should edit is `CLAUDE.local.md`, the per-group memory that Claude Code auto-loads alongside it.
+3. **Composes `groups/<folder>/CLAUDE.md`** (`src/claude-md-compose.ts`) and builds the mount list: a generated entry point that begins with `<!-- Composed at spawn — do not edit. Edit CLAUDE.local.md for per-group content. -->` and contains only imports — the shared base (`container/CLAUDE.md`, mounted read-only at `/app/CLAUDE.md`), one fragment per skill that ships `instructions.md`, one per built-in module's MCP tool instructions, and inline instructions from user-added MCP servers. The only file you (or the agent) should edit is `CLAUDE.local.md`, the per-group memory that Claude Code auto-loads alongside it.
 4. Wires the OneCLI Agent Vault: `HTTPS_PROXY` plus certificates are injected so API calls are credential-injected in transit. If the vault is unreachable, the spawn fails rather than running without credentials, and the message stays pending for the next sweep.
-5. Joins the egress lockdown network when enabled (see [Security model](/concepts/security)), builds the mount list, and spawns `docker run`.
+5. Joins the egress lockdown network when enabled (see [Security model](/concepts/security)) and spawns `docker run`.
 
 The mounts define what the agent can touch: the session folder at `/workspace` (read-write), the group folder at `/workspace/agent` (read-write, with `container.json`, the composed `CLAUDE.md`, and the fragments re-mounted read-only on top), and shared read-only code at `/app/src`, `/app/skills`, and `/app/CLAUDE.md`. [Container lifecycle](/concepts/container-lifecycle) covers spawn-to-exit in detail.
 
@@ -114,8 +114,8 @@ The host sweep (`src/host-sweep.ts`) is the system's janitor. After re-healing t
 
 1. **Syncs `processing_ack`** from `outbound.db` into `messages_in` status, so completed work is recorded on the host side.
 2. **Wakes containers for due work** — rows whose `process_after` has elapsed (scheduled tasks, retries) with no container running.
-3. **Enforces the running-container SLA** — kills a container whose heartbeat is older than max(30 minutes, its declared Bash timeout), or one that claimed a message and showed no heartbeat for over 60 seconds since the claim.
-4. **Cleans up after crashes** — `processing` rows left by a dead container are reset to pending with exponential backoff; after 5 tries a message is marked failed.
+3. **Enforces the running-container SLA** — kills a container whose heartbeat is older than max(30 minutes, its declared Bash timeout), or one that claimed a message and showed no heartbeat for over max(60 seconds, its declared Bash timeout) since the claim.
+4. **Cleans up after crashes** — `processing` rows left by a dead container are reset to pending with exponential backoff (5s × 2^tries); after 5 tries a message is marked failed.
 5. **Advances recurring tasks** — completed recurring rows are cloned into their next occurrence (see [Scheduled tasks](/guides/scheduled-tasks)).
 
 There is deliberately no wall-clock idle timeout: liveness is judged from the heartbeat file and claim age, so long-running legitimate work is never killed on a timer.
