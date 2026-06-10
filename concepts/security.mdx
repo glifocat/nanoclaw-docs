@@ -1,238 +1,92 @@
 ---
-title: Security overview
-description: Understanding NanoClaw's security boundaries and trust model
+title: "Security model"
+description: "The threat model behind NanoClaw's design: assume the agent gets prompt-injected, then make sure a compromised agent has nothing to steal and nowhere to go."
 tag: "UPDATED"
-keywords: ["security", "container isolation", "trust model"]
+keywords: ["security", "threat model", "prompt injection", "container isolation", "egress lockdown", "mount allowlist", "approvals", "credentials", "defense in depth"]
 ---
 
-NanoClaw's security model is built on **true isolation** at the OS level rather than application-level permission checks. Agents run in actual Linux containers and can only access what's explicitly mounted. In v2, a new permissions system adds user roles, sender scope enforcement, and channel approval flows.
+{/* verified-against: src/container-runner.ts, src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/command-gate.ts, src/modules/permissions/{index.ts,access.ts,channel-approval.ts,sender-approval.ts}, src/modules/approvals/{index.ts,primitive.ts,onecli-approvals.ts}, src/modules/self-mod/index.ts, container/Dockerfile, pnpm-workspace.yaml, docs/SECURITY.md @ dc34ceb (v2.1.4) */}
 
-## Trust model
+NanoClaw connects an AI agent with real tools — a shell, a filesystem, network access — to chat platforms where anyone can type. Every inbound message is untrusted input fed straight into the model's context, and no model reliably distinguishes "instructions from my operator" from "instructions an attacker pasted into the group chat." So the design assumption is blunt: **prompt injection eventually succeeds, and the agent acts as if the attacker wrote its instructions.**
 
-| Entity | Trust Level | Rationale |
-|--------|-------------|-----------|
-| Owner | Fully trusted | System administrator, all privileges |
-| Admins | Trusted | Can approve senders and manage groups (global or scoped) |
-| Known users | Permitted | Members of specific agent groups |
-| Unknown senders | Untrusted | Policy-controlled per messaging group |
-| Container agents | Sandboxed | Isolated execution environment |
-| Incoming messages | User input | Potential prompt injection |
-
-## Security boundaries
-
-### 1. Container isolation (primary boundary)
-
-Agents execute in containers (lightweight Linux VMs), providing:
-
-- **Process isolation** — container processes cannot affect the host
-- **Filesystem isolation** — only explicitly mounted directories are visible
-- **Non-root execution** — runs as unprivileged `node` user (uid 1000)
-- **Signal forwarding** — `tini` as PID 1 ensures clean shutdown
-
-This is the primary security boundary. Rather than relying on application-level permission checks, the attack surface is limited by what's mounted.
+Everything below answers the question that assumption forces: *what can a fully compromised agent actually do?* Each layer shrinks that answer. This page is the why; the configuration lives in [Hardening](/operate/hardening) and [Credentials](/operate/credentials).
 
 ```mermaid
-graph TB
-    subgraph "Untrusted Zone"
-        MSG[Incoming Messages]
-    end
-
-    subgraph "Host Process (Trusted)"
-        RT[Inbound Router]
-        PERM[Permissions Module]
-        MV[Mount Validation]
-        CF[OneCLI Vault]
-    end
-
-    subgraph "Container (Isolated/Sandboxed)"
-        AG[Agent Execution]
-        BA[Bash Commands]
-        FO[File Operations]
-    end
-
-    MSG -->|Engage evaluation| RT
-    RT -->|Sender resolution, access gate| PERM
-    PERM -->|Explicit mounts only| MV
-    MV --> AG
-    AG --> BA
-    AG --> FO
-
-    style MSG fill:#fca5a5,color:#1e1e1e
-    style AG fill:#6ee7b7,color:#1e1e1e
-    style BA fill:#6ee7b7,color:#1e1e1e
-    style FO fill:#6ee7b7,color:#1e1e1e
+flowchart TD
+    M["Untrusted message"] --> S["Sender policies + engagement gates"]
+    S --> CG["Command gate (host)"]
+    CG --> C["Container — one session's blast radius"]
+    C --> F["Filesystem: mounts only,<br/>allowlist for anything extra"]
+    C --> N["Network: vault proxy,<br/>egress lockdown optional"]
+    N --> A["Approval cards for<br/>privileged actions"]
 ```
 
-<Note>
-Bash access is safe because commands run inside the container, not on your host. The container's filesystem is isolated from the host.
-</Note>
+## Container isolation — the blast radius is one session
 
-### 2. Mount security
+A compromised agent is a compromised *container*, and every active session gets its own. The container runs as the unprivileged `node` user (or your host uid/gid), with no added Linux capabilities, `tini` as PID 1, and `--rm` so nothing persists past exit. Its filesystem view is exactly the [mount table](/concepts/container-lifecycle#spawn--the-world-rebuilt-every-time): the session folder, the group workspace, and read-only shared code. No host home directory, no `.ssh`, no Docker socket. Its own `container.json` and composed `CLAUDE.md` are re-mounted read-only on top of the writable workspace, so the agent can read its configuration but not rewrite it to grant itself more.
 
-#### External allowlist
+The container is also disposable by design — the host kills it on a stale heartbeat and rebuilds the entire environment at next spawn, so a compromised process doesn't outlive its session. See [Container lifecycle](/concepts/container-lifecycle).
 
-Mount permissions stored at `~/.config/nanoclaw/mount-allowlist.json`, which is:
+## No raw credentials in containers
 
-- Outside project root
-- Never mounted into containers
-- Cannot be modified by agents
+The single most valuable thing to exfiltrate from an agent is an API key, so the invariant is that there are none: secrets live in the OneCLI Agent Vault on the host, and the vault's gateway injects them into outbound HTTPS requests in transit. Where a tool insists on finding a credential file locally, it gets a stub whose secret value is the placeholder `onecli-managed`. A compromised agent can dump its environment, its filesystem, and `/proc` and find nothing worth stealing — it can *use* the credentials its group was granted (the gateway injects them per request), but it can never *extract* them to use elsewhere. If the vault is unreachable, the spawn aborts rather than falling back to raw keys.
 
-**Default blocked patterns:**
-```json
-[
-  ".ssh", ".gnupg", ".gpg", ".aws", ".azure", ".gcloud", ".kube", ".docker",
-  "credentials", ".env", ".netrc", ".npmrc", ".pypirc", "id_rsa", "id_ed25519",
-  "private_key", ".secret"
-]
-```
+Setup, per-group secret grants, and the explicit `.env` opt-out are in [Credentials](/operate/credentials).
 
-<Warning>
-The mount allowlist is the security control that prevents agents from accessing sensitive directories. If no allowlist file exists, all additional mounts are blocked by default.
-</Warning>
+## Egress lockdown — closing the exfiltration path
 
-#### Protections
+Vault injection works through `HTTPS_PROXY`, and a proxy env var only governs clients that honor it. A compromised agent could open a raw socket — or run any non-proxy-aware tool — and ship data anywhere on the internet, bypassing credential injection, approvals, and audit. Egress lockdown closes that hole at the network layer: agent containers join a Docker `--internal` network with no route to the internet, where the vault gateway is the only reachable hop. The agent runs non-root without `NET_ADMIN`, so it can't reconfigure its way out, and NanoClaw refuses to spawn at all if lockdown is on but can't be established.
 
-- **Symlink resolution** before validation (prevents traversal attacks)
-- **Container path validation** (rejects `..` and absolute paths)
-- **Container path colon rejection** (prevents Docker `-v` option injection)
-- **RW gating** — read-write access requires both mount request AND allowed root to permit it; otherwise forced read-only
+It's **off by default** because it breaks by design: any workflow that needs a non-proxy-aware tool to reach the internet directly will fail. Turn it on when agents face untrusted audiences or hold credentials worth stealing — setup in [Hardening](/operate/hardening#lock-down-network-egress).
 
-### 3. Permissions system
+## The mount allowlist — bounding filesystem reach
 
-The v2 permissions module provides a three-level access control model:
+Mounts define the agent's entire filesystem reach, so extending them is the most direct way to widen the blast radius. Per-group `additional_mounts` requests are therefore validated against an allowlist at `~/.config/nanoclaw/mount-allowlist.json` that is deny-by-default — **no allowlist file means no additional mounts** — and lives outside the project root precisely so no container can ever reach it. Built-in blocked patterns (`.ssh`, `.aws`, `.env`, `id_rsa`, and friends) can't be removed, host paths are resolved through symlinks before checking so the agent can't alias its way past the rules, and everything is read-only unless both the request and the matching root opt into read-write.
 
-#### User roles
+Rules and tooling in [Hardening](/operate/hardening#gate-additional-mounts).
 
-| Role | Scope | Capabilities |
-|------|-------|------------|
-| Owner | Always global | All operations, approves channels and senders |
-| Admin | Global or per-agent-group | Approves senders within scope |
-| Member | Per-agent-group | Can interact with agents in their group |
+## Who can talk to your agents
 
-#### Unknown sender policy
+Every layer above limits what a compromised agent can do; this one limits who gets to attempt the compromise. Prompt injection needs a delivery channel, and the cheapest one is just *messaging the bot*. Three gates stand in the way:
 
-Each messaging group has an `unknown_sender_policy`:
+- **Channel registration** — a mention or DM in a chat NanoClaw has never seen doesn't reach any agent. It escalates to a human (group admins, then global admins, then owners) with an approve/deny card; denied chats drop silently forever.
+- **Sender policies** — each known chat carries an `unknown_sender_policy`: `strict` silently drops strangers, `request_approval` asks an admin before admitting them, `public` lets anyone in. Auto-created chats default to `request_approval`.
+- **Per-wiring scope** — `sender_scope: known` requires owner, admin, or group membership even in a `public` chat. Crucially, messages refused here are never even accumulated as context, so a rejected sender can't smuggle instructions into the agent's next batch.
 
-| Policy | Behavior |
-|--------|----------|
-| `public` | Skip access check entirely — anyone can interact |
-| `strict` | Unknown senders are silently dropped |
-| `request_approval` | Unknown senders trigger an approval card to the admin |
+Configuration in [Hardening](/operate/hardening#restrict-who-can-talk-to-your-agents); how senders, roles, and wirings fit together in the [entity model](/concepts/entity-model).
 
-#### Sender scope
+## Human-in-the-loop approvals
 
-Per-wiring enforcement via `sender_scope`:
+Some actions are too consequential to leave to a model that might be acting on injected instructions, so they pause for a human. The approvals module delivers a card to an admin DM — group admins first, then global admins, then owners, and **no reachable approver means auto-deny** — and nothing happens until someone taps Approve:
 
-- `all` — any user can trigger the agent through this wiring
-- `known` — requires the user to be an owner, admin, or group member
+- **Credential use** — vault secrets can require per-request approval; the gateway holds the HTTPS request open while the card shows an admin the method, host, path, and body preview.
+- **Self-modification** — an agent asking to install packages or add an MCP server into its own container is asking to expand its own capabilities, which is exactly what an attacker would ask for. Both actions queue an approval card.
+- **Channel registration** — new chats reaching agents, as above.
 
-#### Channel approval flow
+The credential flow in detail, including card expiry and `ncl approvals`, is in [Credentials](/operate/credentials#approving-credential-use).
 
-When a message arrives on an unwired channel (no agent wirings exist):
+## The command gate
 
-1. The channel-request gate sends an approval card to the owner
-2. **Approve** — creates a wiring with default settings, admits the triggering sender, replays the original event
-3. **Deny** — sets `denied_at` on the messaging group; future mentions drop silently
+Platform slash-commands are classified on the host before any container sees them. Commands that manipulate host-side CLI state (`/login`, `/logout`, `/config`, and friends) are dropped outright, and operational commands like `/clear` or `/upload-trace` require an owner or admin role — so a stranger in a `public` chat can't wipe an agent's context or exfiltrate a trace just by typing. The full classification is in [Hardening](/operate/hardening#the-command-gate).
 
-#### Sender approval flow
+## Supply chain
 
-When an unknown sender messages on a `request_approval` channel:
+The host process itself is in the trusted zone, so its dependencies matter: pnpm is configured with a three-day `minimumReleaseAge` (freshly published package versions won't resolve, which defeats most compromised-maintainer attacks) and an `onlyBuiltDependencies` allowlist so only four vetted native packages may run install scripts.
 
-1. An approval card is sent to the designated approver (admin or owner)
-2. **Approve** — adds sender to `agent_group_members`, replays the original message
-3. **Deny** — deletes the pending row (future messages from this sender re-trigger)
+## What this model doesn't defend
 
-### 4. Session isolation
+Be honest about the gap: **anything the agent can legitimately do, it can do while manipulated.** No layer above distinguishes a sincere action from an injected one — they only bound the action space. A compromised agent can still:
 
-Each session has isolated databases at `data/v2-sessions/{agent_group_id}/{session_id}/`:
+- **Message anyone in its destinations** — including posting attacker-chosen content to your team channel, or leaking conversation context to another chat it legitimately serves.
+- **Read and destroy its whole workspace** — every session of an agent group shares the group folder read-write, including `CLAUDE.local.md` memory and any allowlisted mounts.
+- **Spend through granted credentials** — it can't extract keys, but it can make authenticated API calls with everything its group was granted (per-request approval, where enabled, is the brake).
+- **Poison its own memory** — instructions written to `CLAUDE.local.md` today shape every future session of that group.
 
-- `inbound.db` and `outbound.db` per session
-- Sessions cannot see other sessions' data
-- Cross-session information disclosure is prevented by mount isolation
+The defense against all four is the same and it's yours, not the software's: **scoping**. An agent that talks to strangers should not share a group with your code repo and deploy credentials; chats with different audiences should not share files or memory. The decision guide is [Isolation levels](/concepts/isolation-levels).
 
-### 5. Credential handling
+## Related pages
 
-NanoClaw uses the [OneCLI](https://github.com/onecli/onecli) Agent Vault for centralized secret management. API keys are never stored in `.env` or exposed to containers — the vault intercepts outbound API traffic from containers and injects credentials at request time.
-
-- Secrets are registered once via `onecli secrets create`
-- Each non-main agent group gets its own OneCLI agent identifier for per-group credential scoping
-- The `@onecli-sh/sdk` package's `applyContainerConfig()` configures container networking
-- If the vault is unreachable, the container starts with no credentials and logs a warning
-
-<Warning>
-The OneCLI Agent Vault prevents credential exposure to containers. However, containers can still make authenticated API requests through the vault — they cannot extract the real credentials, but they can use them indirectly.
-</Warning>
-
-### 6. Delivery authorization
-
-The delivery system enforces per-agent permissions:
-
-- Source agent must be authorized to deliver to the target channel
-- Messages to the origin chat (where the conversation started) are always permitted
-- Cross-channel delivery requires an explicit `agent_destinations` row
-- The `ask_question` message type creates interactive `pending_questions` cards
-
-### 7. Diagnostics and telemetry
-
-NanoClaw includes opt-in diagnostics that run during `/setup` and `/update-nanoclaw` skill workflows only. There is no runtime telemetry in the application itself.
-
-<Info>
-Diagnostics are entirely skill-driven — they exist as markdown instructions read by Claude, not as application code. No data is ever sent without explicit user approval.
-</Info>
-
-## Privilege comparison
-
-| Capability | Owner | Admin | Member | Unknown |
-|------------|-------|-------|--------|---------|
-| All operations | ✓ | — | — | — |
-| Approve senders | ✓ | Scoped | — | — |
-| Interact with agents | ✓ | ✓ | ✓ | Policy-dependent |
-| Cross-agent messaging | ✓ | ✓ | ✓ | — |
-
-## Attack scenarios
-
-### Prompt injection
-
-**Attack**: user sends a malicious prompt to hijack agent behavior
-
-**Mitigation**:
-- Agent only has access to its own session's databases
-- Cannot deliver to unauthorized channels (delivery authorization)
-- Cannot access credential files (not mounted)
-- Cannot modify mount allowlist (external, never mounted)
-
-**Worst case**: agent sends its own session's messages to attacker (session is compromised, but other sessions remain isolated)
-
-### Container escape attempt
-
-**Attack**: agent tries to break out of container via kernel exploit
-
-**Mitigation**:
-- Container runtime provides kernel-level isolation
-- Non-root execution limits attack surface
-- `tini` as PID 1 ensures proper signal handling
-- Host filesystem only accessible via explicit mounts
-
-### Unknown sender exploitation
-
-**Attack**: unknown user floods a public channel to exhaust resources
-
-**Mitigation**:
-- `strict` policy drops unknown senders silently
-- `request_approval` requires admin action before processing
-- Per-wiring `sender_scope=known` restricts to group members even on public channels
-
-## Best practices
-
-1. **Use `request_approval` for public groups** — prevents unauthorized access while allowing legitimate users
-2. **Review mount allowlist** — before allowing new mounts, verify they don't contain secrets
-3. **Use `sender_scope=known` for sensitive wirings** — restricts to authorized users even on public channels
-4. **Set up admin roles** — delegate sender approval without giving full owner access
-5. **Monitor delivery logs** — check for unauthorized delivery attempts
-6. **Update regularly** — security fixes may be released in upstream NanoClaw updates
-
-## Related topics
-
-- [Group isolation and per-group contexts](/concepts/entity-model)
-- [Container isolation details](/concepts/container-lifecycle)
-- [System architecture](/concepts/architecture)
+- [Hardening](/operate/hardening) — the how for egress, mounts, sender policies, and the command gate
+- [Credentials](/operate/credentials) — vault mechanics, stubs, and approval cards
+- [Container lifecycle](/concepts/container-lifecycle) — the mount table and the spawn/kill cycle
+- [Isolation levels](/concepts/isolation-levels) — choosing how much your agents share
