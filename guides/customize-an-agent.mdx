@@ -1,240 +1,118 @@
 ---
-title: Customize NanoClaw
-description: Change behavior by editing code, wiring agent groups, and installing skills — no config-file sprawl.
+title: "Customize an agent"
+description: "Hands-on tutorial: change an agent's personality through CLAUDE.local.md, swap its model and effort with ncl, and verify the changes landed."
 tag: "UPDATED"
-keywords: ["customize", "config", "trigger", "engage mode", "mount allowlist", "env vars", "buildTriggerPattern"]
+keywords: ["customize", "CLAUDE.local.md", "personality", "model", "effort", "ncl groups config update", "self-customize", "/customize"]
 ---
 
-NanoClaw doesn't rely on large configuration files. Instead, customizations fall into four lanes:
+{/* verified-against: src/claude-md-compose.ts, src/container-runner.ts, src/cli/resources/groups.ts, container/agent-runner/src/providers/types.ts, container/skills/self-customize/SKILL.md, .claude/skills/customize/SKILL.md @ dc34ceb (v2.1.4) */}
 
-1. **Code changes** — for behavior baked into the orchestrator (trigger pattern, polling, timeouts)
-2. **Wiring settings** — per-messaging-group config stored in the central DB (engage mode, sender scope, session mode)
-3. **Skills** — for features and integrations (install via `/add-<name>`, uninstall via `git revert`)
-4. **Mount allowlist** — for which host directories an agent can see
+This tutorial customizes the Scout agent from [your first agent](/guides/first-agent) — any agent group works, just swap the folder and `--id`. An agent has three customization surfaces:
 
-## Philosophy
+1. **Personality and rules** — `groups/<folder>/CLAUDE.local.md`, the agent's editable persistent memory
+2. **Brain** — model, reasoning effort, and other [container config](/reference/container-config) fields, edited with `ncl`
+3. **Capabilities** — packages and MCP servers, which go through the approval flow covered in [self-modification](/extend/self-modification)
 
-<Note>
-**From the README:**
-
-> NanoClaw doesn't use configuration files. To make changes, just tell Claude Code what you want... The codebase is small enough that Claude can safely modify it.
-</Note>
-
-The result: your fork does exactly what you asked for, and nothing else. No generic system to learn — just the code you want, readable by you and by Claude Code.
-
-## Change the trigger word
-
-The default is `@Andy`, derived from `ASSISTANT_NAME` in `src/config.ts`:
-
-```typescript
-// src/config.ts (verified v2)
-export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';
-
-export function buildTriggerPattern(trigger: string): RegExp {
-  return new RegExp(`^${escapeRegex(trigger.trim())}\\b`, 'i');
-}
-
-export const DEFAULT_TRIGGER = `@${ASSISTANT_NAME}`;
-export const TRIGGER_PATTERN = buildTriggerPattern(DEFAULT_TRIGGER);
-```
-
-To change it, update `.env`:
-
-```bash
-ASSISTANT_NAME=Bob
-```
-
-Or ask Claude Code:
-
-```
-@Andy change the trigger word to @Bob
-```
-
-Claude updates `.env`, restarts the service, and verifies the new pattern matches.
-
-## Environment variables
-
-`src/config.ts` reads `ASSISTANT_NAME`, `ASSISTANT_HAS_OWN_NUMBER`, `ONECLI_URL`, `ONECLI_API_KEY`, and `TZ` from `.env` (with `process.env` taking precedence). Everything else is `process.env` only.
-
-<Tabs>
-  <Tab title="OneCLI Agent Vault (default)">
-    ```bash
-    # .env
-    ASSISTANT_NAME=Andy
-    ASSISTANT_HAS_OWN_NUMBER=false
-    ONECLI_URL=http://127.0.0.1:10254
-    # ONECLI_API_KEY=...  # only if your OneCLI instance requires auth
-    TZ=America/Los_Angeles
-    ```
-
-    Credentials are managed by the OneCLI Agent Vault. No API keys live in `.env`.
-  </Tab>
-
-  <Tab title="Legacy credential proxy (opt-in)">
-    ```bash
-    # .env
-    ASSISTANT_NAME=Andy
-    ASSISTANT_HAS_OWN_NUMBER=false
-    ANTHROPIC_API_KEY=sk-ant-...
-    ```
-
-    Requires the `/use-native-credential-proxy` skill (lives at `skill/native-credential-proxy` on upstream). The skill restores the v1-style credential proxy — the host reads `ANTHROPIC_API_KEY` from `.env` and injects it into container traffic via a local proxy on port 3001. Containers never see the raw key.
-  </Tab>
-</Tabs>
-
-### Runtime-tunable settings (process.env only)
-
-| Variable | Default | What it controls |
-|---|---|---|
-| `CONTAINER_IMAGE` | `nanoclaw-agent:latest` | Which image to spawn |
-| `CONTAINER_TIMEOUT` | `1800000` (30 min) | Hard upper bound on a single container run |
-| `CONTAINER_MAX_OUTPUT_SIZE` | `10485760` (10 MB) | Truncation threshold for container stdout |
-| `MAX_MESSAGES_PER_PROMPT` | `10` | How many queued inbound messages join one Claude turn |
-| `IDLE_TIMEOUT` | `1800000` (30 min) | How long a container stays alive after the last response |
-| `MAX_CONCURRENT_CONTAINERS` | `5` | Global cap on active containers |
-
-Bump them like:
-
-```bash
-MAX_CONCURRENT_CONTAINERS=10 systemctl --user restart nanoclaw
-```
-
-Or persist in your systemd / launchd service definition.
-
-## Per-wiring behavior (engage mode, sender scope, session mode)
-
-Every messaging group × agent group wiring (stored in `messaging_group_agents`) has orthogonal settings:
-
-| Setting | Values | Meaning |
-|---|---|---|
-| `engage_mode` | `mention` (default) \| `pattern` \| `mention-sticky` | When the agent reacts: trigger-only, regex match, or trigger-and-then-sticky |
-| `engage_pattern` | regex string | Used when `engage_mode='pattern'`. Sentinel `.` means "match every message" |
-| `sender_scope` | `all` (default) \| `known` | Respond to anyone vs. only users in the agent group's member list |
-| `ignored_message_policy` | `drop` (default) \| `accumulate` | What happens to messages that didn't trigger — forgotten, or carried into the next prompt |
-| `session_mode` | `shared` (default) \| `per-thread` \| `agent-shared` | How sessions are carved: one per messaging group, one per thread, or one across multiple messaging groups |
-
-Change them with the `/manage-channels` skill — it reads/writes the wiring directly without requiring SQL.
-
-## Polling and delivery loops (source-verified)
-
-If you need to tune the delivery cadence, the constants live in `src/delivery.ts` and `src/host-sweep.ts`:
-
-```typescript
-// src/delivery.ts
-const ACTIVE_POLL_MS = 1000;    // running sessions checked every 1s
-const SWEEP_POLL_MS = 60_000;   // liveness/recovery sweep every 60s
-
-// src/host-sweep.ts
-const SWEEP_INTERVAL_MS = 60_000;
-export const CLAIM_STUCK_MS = 60 * 1000;
-export const ABSOLUTE_CEILING_MS = 30 * 60 * 1000;
-```
-
-Most users never change these. If you do, remember: tighter active-poll = more CPU for idle-but-active sessions; looser sweep = slower stuck-detection.
-
-## Memory and per-agent-group prompts
-
-Agent-group memory lives in `groups/<folder>/CLAUDE.md`. Edit it to change the agent's persona, style, or pinned context:
-
-```markdown
-# NanoClaw Assistant
-
-You are Andy, a helpful AI assistant.
-
-## Preferences
-
-- Keep responses concise
-- Use bullet points for lists
-- Always confirm before making changes
-```
-
-`CLAUDE.md` is composed at session start — a shared base plus the per-group fragment. Per-group changes don't affect other agent groups.
-
-## Mount allowlist
-
-Agents only see what you mount. The allowlist lives at `~/.config/nanoclaw/mount-allowlist.json` (outside the project root, never mounted into containers):
-
-```json
-{
-  "allowedRoots": [
-    {
-      "path": "/Users/you/Documents/vault",
-      "allowReadWrite": false,
-      "description": "Personal vault"
-    },
-    {
-      "path": "/Users/you/code/project",
-      "allowReadWrite": true,
-      "description": "Development project"
-    }
-  ],
-  "blockedPatterns": [],
-  "nonMainReadOnly": true
-}
-```
-
-Per-agent-group mount requests live in `groups/<folder>/container.json`. The host validates each request against the allowlist before mounting. See [Security model](/concepts/security) for the full picture.
-
-## The `/customize` skill
-
-For guided changes without memorizing file paths:
-
-```
-/customize
-```
-
-Claude Code asks what you want to change — trigger, behavior, integrations, mounts — and applies the diff after showing it to you.
-
-## Adding channels, providers, and features
-
-Channels and AI providers are skills, not core features. Install from the `channels` or `providers` branch:
-
-```
-/add-telegram       # channel
-/add-codex          # alternate provider (OpenAI)
-/add-ollama-provider  # alternate provider (local models)
-```
-
-See [Integrations overview](/channels/overview) for the full list.
-
-To remove a channel or provider, `git revert` the skill's commit — restores the previous state cleanly.
-
-## Customization workflow
+One file you will **not** edit: `groups/<folder>/CLAUDE.md`. The host regenerates it on every container spawn from a shared base plus skill and MCP fragments, and mounts it read-only into the container. Anything you write there gets clobbered. `CLAUDE.local.md` is the file that's yours (and the agent's).
 
 <Steps>
-  <Step title="Describe what you want">
-    Natural language — `@Andy I want the agent to respond to every message, not just mentions` — works fine.
-  </Step>
+<Step title="Personality, the conversational way">
 
-  <Step title="Claude suggests the change">
-    For wiring changes: `/manage-channels` + update `engage_mode`. For code changes: a diff against `src/config.ts` or elsewhere.
-  </Step>
-
-  <Step title="Review the diff">
-    Claude shows the exact lines before applying.
-  </Step>
-
-  <Step title="Test">
-    Run NanoClaw, verify the change works. If not: `/debug`.
-  </Step>
-</Steps>
-
-## Debugging customizations
+The simplest path is to just tell the agent:
 
 ```bash
-tail -f logs/nanoclaw.log
+pnpm run chat scout "scout, from now on answer in haiku and sign off as 'Scout'"
 ```
 
-Or ask the agent itself:
+The `self-customize` skill (on every agent by default) teaches the agent that `CLAUDE.local.md` edits are free — no approval needed — so it writes the rule into its own `groups/scout/CLAUDE.local.md` through the read-write workspace mount. The current conversation follows the rule immediately because you just said it; the file is what makes it stick for every future session.
 
+Check what it wrote:
+
+```bash
+cat groups/scout/CLAUDE.local.md
 ```
-@Andy why did my engage mode change not take effect?
-@Andy /debug
+
+</Step>
+<Step title="Personality, the direct way">
+
+You can edit the same file yourself — useful for longer instructions you'd rather paste than dictate:
+
+```markdown groups/scout/CLAUDE.local.md
+## Style
+
+- Answer in haiku
+- Sign off as "Scout"
+
+## Standing rules
+
+- Always confirm before deleting anything
 ```
 
-## Related
+**When does this take effect?** Instructions load when a container spawns, so a warm container mid-conversation won't pick up your edit. Either wait — containers exit after idling, and the next message spawns a fresh one — or force it now:
 
-- [Messaging](/channels/overview) — inbound routing and engage evaluation
-- [Scheduled tasks](/guides/scheduled-tasks) — task model and cron
-- [Security](/concepts/security) — sender policies, user roles
-- [Architecture](/concepts/architecture) — two-DB session model
+```bash
+ncl groups restart --id <agent-id>
+```
+
+If you'd rather be guided than edit files, run `/customize` in Claude Code from your NanoClaw checkout. It's an interactive skill: it asks what you want to change, hands off to a dedicated skill when one exists (`/add-telegram`, `/manage-channels`, `/manage-mounts`, ...), and otherwise routes the change to the right surface — the agent group's memory file for persona, container config for runtime behavior, wirings for triggers.
+
+<Note>
+As of v2.1.4 the `/customize` skill's own text still points persona edits at the composed `groups/<folder>/CLAUDE.md`. Follow this tutorial instead: edit `CLAUDE.local.md` — anything written to the composed file is clobbered at the next spawn.
+</Note>
+
+</Step>
+<Step title="Swap the brain">
+
+Model and reasoning effort live in the agent group's container config, not in any file. Update them with `ncl`:
+
+```bash
+ncl groups config update --id <agent-id> --model sonnet --effort low
+```
+
+- `--model` takes an alias (`sonnet`, `opus`, `haiku`) or a full model ID. Unset means the SDK default.
+- `--effort` is one of `low`, `medium`, `high`, `xhigh`, `max`.
+
+Config values are read at every spawn, so a running container keeps its old config — the change applies to the next container automatically. To force it now:
+
+```bash
+ncl groups restart --id <agent-id>
+```
+
+A cheap-and-fast Scout (`--model haiku --effort low`) is great for routing or lookup duty in a [multi-agent swarm](/guides/multi-agent-swarm); keep `opus` with higher effort for agents that do real work. The same command also takes `--assistant-name`, `--provider`, and more — see the [container config reference](/reference/container-config#fields).
+
+</Step>
+<Step title="Verify">
+
+Ask Scout something and confirm the haiku rule and the model change both took:
+
+```bash
+pnpm run chat scout "which model are you running on?"
+```
+
+You can also peek at the composed file to see why it's off-limits:
+
+```bash
+cat groups/scout/CLAUDE.md
+```
+
+```text
+<!-- Composed at spawn — do not edit. Edit CLAUDE.local.md for per-group content. -->
+@./.claude-shared.md
+@./.claude-fragments/module-self-mod.md
+...
+```
+
+It's nothing but a header and imports — the shared base plus per-skill fragments. Your text isn't in it because it doesn't need to be: Claude Code auto-loads `CLAUDE.local.md` alongside `CLAUDE.md` on every spawn.
+
+</Step>
+</Steps>
+
+## What you changed
+
+Two surfaces, two mechanisms: personality went into a file the agent and you co-own (`CLAUDE.local.md`), the brain went into a DB row (`container_configs`). Both are read at container spawn — edits apply to the next container, and `ncl groups restart` forces one now. The third surface — capabilities — works differently because it can change what the agent is able to *do*, so it goes through admin approval.
+
+## Next steps
+
+- [Self-modification](/extend/self-modification) — let the agent install packages and MCP servers, with you as the approval gate
+- [Container config reference](/reference/container-config) — every field, including skills selection and extra mounts
+- [Multi-agent swarm](/guides/multi-agent-swarm) — put your customized agents to work together

@@ -1,205 +1,121 @@
 ---
-title: Setting up scheduled tasks
-description: A scheduled task is a message with a timestamp — same inbox, same flow, same tools as any other message.
+title: "Schedule recurring work"
+description: "Hands-on tutorial: have your agent schedule a recurring task in chat, understand what fires it, manage the series, gate frequent runs with a script, and inspect it all from the host."
 tag: "UPDATED"
-keywords: ["scheduled tasks", "cron", "recurring", "process_after", "series_id", "scripts"]
+keywords: ["scheduled tasks", "schedule_task", "cron", "recurrence", "process_after", "series_id", "host sweep", "wakeAgent", "task script", "timezone"]
 ---
 
-## Overview
+{/* verified-against: container/agent-runner/src/mcp-tools/scheduling.ts, container/agent-runner/src/mcp-tools/scheduling.instructions.md, container/agent-runner/src/scheduling/task-script.ts, container/agent-runner/src/poll-loop.ts, container/agent-runner/src/timezone.ts, src/host-sweep.ts, src/modules/scheduling/{actions,db,recurrence}.ts, src/config.ts, src/container-runner.ts, src/cli/resources/ @ dc34ceb (v2.1.4) */}
 
-v2 has no separate task scheduler. A scheduled task is a row in `messages_in` with a `process_after` timestamp (and optionally a `recurrence` cron expression). The host sweep runs every 60 seconds, finds rows whose time has come, wakes the session's container, and the agent picks it up like any other inbound message.
+v2 has no scheduler service. A scheduled task is a row in the session's `messages_in` table with `kind='task'` and a `process_after` timestamp — same inbox, same flow as any chat message. The agent is the entire scheduling interface: you create, change, and cancel tasks by asking it in chat. This tutorial assumes a working install with a wired agent (see [your first agent](/guides/first-agent)).
 
-That means everything scheduled — daily briefings, weekly reports, per-hour polls, one-time reminders — goes through the same pipeline as a user message. You only learn one model.
+<Steps>
+<Step title="Schedule a task in chat">
 
-## Task types
+Ask your agent, in whatever chat it's wired to:
 
-<Tabs>
-  <Tab title="Recurring (cron)">
-    Use cron expressions for complex recurring schedules:
-
-    ```
-    0 9 * * *     — Daily at 9am
-    0 9 * * 1-5   — Weekdays at 9am
-    0 */6 * * *   — Every 6 hours
-    0 0 * * 0     — Sundays at midnight
-    0 8 1 * *     — First day of each month at 8am
-    ```
-
-    Each occurrence creates a new row in the session database sharing a `series_id`.
-  </Tab>
-
-  <Tab title="One-time">
-    Run a task at a specific future time:
-
-    ```
-    2026-03-01T10:00:00Z
-    ```
-
-    One-time tasks are marked `completed` after execution. No new rows are created.
-  </Tab>
-</Tabs>
-
-## Creating tasks
-
-Tasks are created through natural language requests to the agent:
-
-```
-@Andy send me a summary of my calendar every weekday at 9am
-@Andy check for new GitHub issues every hour and notify me
-@Andy remind me to review the budget tomorrow at 2pm
-@Andy compile AI news from Hacker News every Monday at 8am
+```text
+Scout, every weekday at 9am remind me to post my standup update
 ```
 
-### How it works
+Mechanically, the agent calls the `schedule_task` MCP tool with a `prompt`, a `processAfter` timestamp for the first run, and a cron `recurrence` (`0 9 * * 1-5`). The container can't write the host-owned inbound database, so the tool emits a system action through `messages_out`; the host applies it, inserting a `messages_in` row with `kind='task'`, status `pending`, your `process_after`, the cron expression, and `series_id` set to the task's own id. See the [session DB schema](/reference/db-schema#session-databases) for the columns.
 
-When you request a scheduled task, the agent:
+The agent confirms with the generated id (`task-<timestamp>-<random>`). For a one-shot task — "remind me tomorrow at 2pm to review the budget" — it simply omits `recurrence`.
 
-1. Parses your request to extract the schedule and prompt
-2. Calls the `schedule_task` MCP tool (writes to `outbound.db`)
-3. The host's delivery system creates the task in `inbound.db`
-4. The host sweep picks up the task when it's due
+</Step>
+<Step title="Know what fires it">
 
-## Task execution
+Nothing watches the clock per-task. The [host sweep](/concepts/architecture#what-runs-when) visits every active session **every 60 seconds**, counts pending rows with `process_after <= now`, and wakes the session's container if one isn't already running. The agent's poll loop then picks the task up like any inbound message and executes the prompt.
 
-The host sweep runs every 60 seconds and:
+Two consequences worth internalizing:
 
-1. Finds tasks where `process_after <= now`
-2. Wakes the session's container (or spawns a new one)
-3. The agent-runner's poll loop picks up the task
-4. Agent executes the task prompt
-5. Host sweep syncs `processing_ack` and marks the task completed
-6. For recurring tasks, creates the next occurrence with updated `process_after`
+- **±60 seconds is the precision floor.** A task due at 09:00:00 fires whenever the next sweep tick lands, plus container cold-start if nothing is warm. Don't schedule anything that needs second-level timing.
+- **Recurring tasks are clones, not loops.** When a recurring occurrence completes, the next sweep tick computes the next run with cron-parser, inserts a fresh `pending` row carrying the same `series_id` forward, and clears `recurrence` on the completed row so it isn't re-cloned. The series id is the stable handle; individual occurrence ids come and go.
 
-<Note>
-Tasks share the container concurrency pool with interactive messages. If all container slots are busy (default: 5), tasks wait until a slot is available.
-</Note>
+</Step>
+<Step title="Manage it in chat">
 
-## Timezone configuration
+All management goes through the agent too:
 
-Tasks use the configured timezone for cron evaluation. The resolver checks:
+```text
+Scout, list my scheduled tasks
+Scout, pause the standup reminder
+Scout, move the standup reminder to 9:30
+Scout, cancel the standup reminder
+```
 
-1. `process.env.TZ`
-2. `.env` file's `TZ` value
-3. System locale
-4. Falls back to `UTC`
+Exact tool behaviors behind those phrases:
 
-Each candidate is validated as a real IANA timezone identifier.
+| Tool | Behavior |
+|---|---|
+| `list_tasks` | One row per series — the live `pending` or `paused` occurrence, not the pile of completed firings. The id shown is the series id, which every other tool expects. |
+| `update_task` | Edits the live occurrence in place (matches by id *or* series id). Omitted fields are untouched; an **empty string clears** `recurrence` (the task becomes one-shot) or `script`. If nothing matches, the host messages the agent back so it can tell you. |
+| `pause_task` / `resume_task` | Flip status between `pending` and `paused`. Paused rows are never counted as due, so they don't fire or wake anything. |
+| `cancel_task` | Marks all live rows in the series `completed` and nulls `recurrence` — the series ends, history rows stay. |
 
-To override:
+Full parameter schemas are in the [MCP tools reference](/reference/mcp-tools#scheduling).
+
+</Step>
+<Step title="Gate frequent tasks with a script">
+
+Every firing that reaches the agent is a Claude API call. For tasks that run more than a few times a day, `schedule_task` accepts an optional `script` — a bash script that runs *before* the agent is invoked:
+
+```text
+Scout, every hour check for open PRs needing my review. Use a script that
+curls the GitHub API and only wake yourself if there are any.
+```
+
+The contract, from `container/agent-runner/src/scheduling/task-script.ts`:
+
+1. When the task fires, the script runs first inside the container — 30-second timeout, 1 MB output cap.
+2. The **last line of stdout** must be JSON: `{ "wakeAgent": true|false, "data": ... }`.
+3. `wakeAgent: false` — or any script error, timeout, or invalid output — marks the occurrence completed without invoking the agent. A recurring series still continues: the sweep clones the next occurrence from the completed row.
+4. `wakeAgent: true` — the agent wakes with `data` injected into the task prompt as `scriptOutput`.
+
+Be honest about what this saves: the container still wakes on every firing (the sweep can't know the script's verdict in advance). The script gates the expensive part — the agent invocation — not the container spawn. Skip scripts entirely for tasks that need the agent's judgment every time, like daily briefings.
+
+</Step>
+<Step title="Set the timezone">
+
+When you say "9am", three layers have to agree on whose 9am. The chain: the host resolves `TIMEZONE` once at startup — `process.env.TZ`, then the `.env` file's `TZ`, then the system locale, falling back to `UTC`, each candidate validated as a real IANA identifier (`src/config.ts`). Every container is spawned with `-e TZ=<that value>` (`src/container-runner.ts`), and the agent-runner's `timezone.ts` resolves the same way inside.
+
+The result: naive timestamps the agent passes (`2026-06-11T09:00:00`, no offset) and **cron expressions** — both at schedule time and when the host sweep computes the next recurrence — are all interpreted in that one zone. To pin it:
 
 ```bash
-export TZ="America/New_York"
+# in .env (or the host's environment)
+TZ=Europe/Madrid
 ```
 
-## Task management
+Restart the host after changing it; the value is read once at startup.
 
-Manage tasks through natural language:
+</Step>
+<Step title="Inspect from the host">
 
-```
-@Andy list all scheduled tasks
-@Andy pause the Monday briefing task
-@Andy resume the calendar summary task
-@Andy cancel the reminder about the meeting
-@Andy update the PR monitor to check every 30 minutes instead
-```
-
-### Available operations
-
-| Operation | What it does |
-|-----------|-------------|
-| `schedule_task` | Creates a new task with `process_after` and optional `recurrence` |
-| `cancel_task` | Marks all rows in the series as completed, nulls recurrence |
-| `pause_task` | Toggles task to `paused` (skipped by host sweep) |
-| `resume_task` | Toggles task back to `pending` |
-| `update_task` | Updates prompt, script, schedule, or recurrence in-place |
-
-## Task scripts
-
-For recurring tasks, add a `script` to minimize unnecessary agent wake-ups. The script runs first, and the agent is only invoked when the script determines action is needed.
-
-### How it works
-
-1. The script runs first (30-second timeout)
-2. It prints JSON to stdout: `{ "wakeAgent": true/false, "data": {...} }`
-3. If `wakeAgent` is `false` — task completes silently, no agent invocation
-4. If `wakeAgent` is `true` — the agent wakes with the script's data in its prompt
-
-### Example
-
-```
-@Andy every hour, check for new GitHub PRs needing my review. Use this script to check first:
-curl -s https://api.github.com/repos/org/repo/pulls?state=open | jq '{wakeAgent: (length > 0), data: .}'
-```
-
-### Always test your script first
-
-Before scheduling, run the script in the sandbox:
+There is no `ncl tasks` resource — the agent is the interface, and the rows live in each session's inbound database, not the central DB. To look at them directly, find the session:
 
 ```bash
-bash -c 'curl -s https://api.github.com/repos/owner/repo/pulls?state=open | jq "{wakeAgent: (length > 0), data: .}"'
+ncl sessions list --agent-group-id <agent-id>
 ```
 
-### When NOT to use scripts
+then read its inbound database (host-owned — query read-only, never write to it):
 
-If a task requires agent judgment every time (daily briefings, reminders, reports), skip the script.
-
-### Frequent task guidance
-
-If a task runs more than roughly twice a day and a script can't reduce agent wake-ups:
-
-- Each wake-up uses API credits
-- Restructure with a script that checks conditions first
-- Find the minimum viable frequency
-
-<Note>
-Scripts have a 30-second timeout and 1 MB output limit. If the script fails or produces no output, the agent is not invoked.
-</Note>
-
-## Recurring task series
-
-Recurring tasks use a series model:
-
-- Each occurrence gets a new `messages_in` row sharing the same `series_id`
-- When an occurrence completes, the host creates the next one
-- `cancel_task` stops the entire series
-- `update_task` matches by `series_id` to hit the live next-occurrence row
-
-## Example use cases
-
-### Daily standup summary
-
-```
-@Andy every weekday at 9am, compile my calendar events for the day and send me a brief summary
+```bash
+sqlite3 "file:data/v2-sessions/<agent_group_id>/<session_id>/inbound.db?mode=ro" \
+  "SELECT id, status, process_after, recurrence, series_id
+     FROM messages_in WHERE kind='task' ORDER BY process_after"
 ```
 
-### GitHub PR monitor (with script)
+A healthy recurring series shows one `pending` row (the next run) plus one `completed` row per past firing, all sharing a `series_id`.
 
-```
-@Andy check for PRs needing review every hour. Script: curl -s https://api.github.com/repos/org/repo/pulls?state=open | jq '{wakeAgent: (length > 0), data: .}'
-```
+</Step>
+</Steps>
 
-### Weekly report
+## What you built
 
-```
-@Andy every Friday at 5pm, review the git history for the past week and compile a summary
-```
+A recurring task that is nothing but data: a `messages_in` row the 60-second host sweep wakes a container for, a clone-on-completion loop keyed by `series_id`, and an optional script gate between "the task fired" and "Claude got called". No daemon, no crontab — delete the row series (via `cancel_task`) and it's gone.
 
-### One-time reminder
+## Next steps
 
-```
-@Andy remind me tomorrow at 2pm to review the budget proposal
-```
-
-## Error handling
-
-If a task fails:
-
-1. Processing is acknowledged with error state
-2. For recurring tasks, the next occurrence is still created
-3. For one-time tasks, the task is marked completed even if it failed
-4. Check container logs for error details
-
-## Related documentation
-
-- [Messaging](/channels/overview) — the inbox/outbox pattern that scheduling rides on
-- [Customization](/guides/customize-an-agent) — sweep interval, timezone, and concurrency
+- [MCP tools reference](/reference/mcp-tools#scheduling) — exact parameters for all six scheduling tools
+- [Session DB schema](/reference/db-schema#session-databases) — every column on `messages_in`
+- [Multi-agent swarm](/guides/multi-agent-swarm) — schedule work that fans out to other agents
