@@ -70,6 +70,8 @@ Which agent groups handle which messaging groups. Migration 010 replaced v1's op
 
 `UNIQUE(messaging_group_id, agent_group_id)` — one wiring per pair.
 
+The `'mention'` / `'all'` / `'drop'` defaults on the four engage columns exist only in `schema.ts`'s reference copy — migration 010 adds them as bare nullable `ADD COLUMN`s with no SQL defaults, and application code always passes values explicitly. On a migrated database the effective column default is `NULL`.
+
 ### users
 
 Messaging-platform identifiers, namespaced: `phone:+1555…`, `tg:123`, `discord:456`, `email:a@x.com`. One human can own multiple user rows across unrelated channels — there's no identity linking yet.
@@ -273,7 +275,7 @@ Everything the agent receives — chat messages, system events, and scheduled ta
 |---|---|---|---|
 | `id` | TEXT | — | Primary key |
 | `seq` | INTEGER | — | Even, UNIQUE — globally ordered agent-facing ID |
-| `kind` | TEXT | — | `'chat'` \| `'system'` \| `'task'` — task vs. message is just this column |
+| `kind` | TEXT | — | `'chat'` \| `'chat-sdk'` \| `'task'` \| `'webhook'` \| `'system'` (the `MessageInKind` union) — task vs. message is just this column. `'webhook'` is in the union but has no writer on main yet |
 | `timestamp` | TEXT | — | ISO timestamp |
 | `status` | TEXT | `'pending'` | `pending` → `completed` / `failed`; tasks can also be `paused` |
 | `process_after` | TEXT | `NULL` | Don't deliver before this time — scheduling and retry backoff |
