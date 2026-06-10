@@ -7,7 +7,7 @@ keywords: ["telegram", "botfather", "bot token", "add-telegram", "pairing code",
 
 {/* verified-against: src/channels/telegram.ts + telegram-pairing.ts + telegram-markdown-sanitize.ts (channels branch), setup/channels/telegram.ts, .claude/skills/add-telegram/SKILL.md @ dc34ceb */}
 
-The Telegram adapter connects NanoClaw to a bot you create through @BotFather. It's built on the Chat SDK bridge (`@chat-adapter/telegram` 4.27.0, pinned) and runs in **polling mode** — NanoClaw polls Telegram's Bot API for updates, so you don't need a public URL, webhook, or open port. Works behind NAT and on a laptop.
+The Telegram adapter connects NanoClaw to a bot you create through @BotFather. It's built on the Chat SDK bridge (`@chat-adapter/telegram` 4.26.0, pinned) and runs in **polling mode** — NanoClaw polls Telegram's Bot API for updates, so you don't need a public URL, webhook, or open port. Works behind NAT and on a laptop.
 
 Because a bot token carries no user binding — anyone who finds the bot's username can DM it — registration uses **pairing**: setup prints a one-time 4-digit code, and you prove you own a chat by sending the code from it.
 
@@ -46,7 +46,7 @@ To wire more chats or groups later, run `/manage-channels` — group pairing wor
 - **How pairing works** — an interceptor wraps the adapter's inbound handler and checks every message for a pending code before it reaches the router. The message must be exactly the 4 digits ("my pin is 1234" never matches), optionally prefixed with `@<botname>` for groups with privacy ON. On match it registers the chat, upserts the paired user, promotes them to owner if the instance has no owner yet, and short-circuits — the code-bearing message never reaches an agent. Pending codes live in `data/telegram-pairings.json`; they don't expire, but one wrong guess invalidates them.
 - **The service must be running to pair** — the polling adapter is what observes the code. If pairing waits forever, check that NanoClaw is up.
 - **Group privacy** — by default Telegram bots only see @mentions and `/commands` in groups. To let the bot see all messages: @BotFather → `/mybots` → your bot → **Bot Settings** → **Group Privacy** → **Turn off** (then remove and re-add the bot to existing groups). With privacy ON you can still pair by prefixing the code: `@<botname> 1234`.
-- **No threads** — the adapter sets `supportsThreads: false`; every inbound message has a null thread ID. Wirings with `per-thread` session mode behave like `agent-shared` here — see the [entity model](/concepts/entity-model).
+- **No threads** — the adapter sets `supportsThreads: false`; every inbound message has a null thread ID. Wirings with `per-thread` session mode behave like `shared` here — see the [entity model](/concepts/entity-model).
 - **Markdown sanitization** — the Chat SDK adapter sends with Telegram's strict legacy `Markdown` parse mode, which rejects (and drops) messages containing `**bold**`, unbalanced `*`/`_` delimiters, or malformed links. NanoClaw sanitizes outbound text first: `**bold**` → `*bold*`, list dashes → `•` bullets, horizontal rules → a plain divider, and unbalanced delimiters or brackets stripped. Code blocks pass through untouched.
 - **Long replies** — outbound messages are split at 4,000 characters (paragraph breaks preferred), staying under Telegram's 4,096 limit. Attachments ride on the first chunk.
 - **Replies and IDs** — replying to a message passes the quoted text and sender to the agent as context. Chats are identified as `telegram:<chatId>`; negative chat IDs are groups.
@@ -56,7 +56,7 @@ To wire more chats or groups later, run `/manage-channels` — group pairing wor
 
 - **"Telegram didn't accept that token"** — `getMe` rejected it. Re-copy the full token from @BotFather (it's easy to truncate); it must match `<digits>:<chars>`. "Couldn't reach Telegram" instead means a network problem — check connectivity and retry setup.
 - **Pairing never completes** — the service must be running and polling for the code to be observed. Also make sure you sent *only* the 4 digits, in the chat you want to register. In a group with Group Privacy ON, the bot can't see the bare code — send `@<botname> 1234`.
-- **"Got "NNNN", not a match"** — a wrong code invalidates the pairing on the spot; the wizard prints a fresh code automatically. After 5 misses the step fails — re-run setup for a new batch.
+- **"Got "NNNN", not a match"** — a wrong code invalidates the pairing on the spot; the wizard prints a fresh code automatically, up to 5 regenerated codes per run. The step fails on the sixth wrong guess — re-run setup for a new batch.
 - **Bot ignores group messages** — that's Group Privacy doing its job. Either @mention the bot, or turn privacy off in @BotFather and re-add the bot to the group.
 - **Replies missing or formatting looks off** — Telegram's legacy Markdown mode silently drops messages it can't parse. The built-in sanitizer handles the known cases; if a reply renders with stripped `*`/`_` characters, that's the sanitizer rescuing an unbalanced-delimiter message rather than losing it.
 
