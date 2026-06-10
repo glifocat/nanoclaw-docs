@@ -1,0 +1,71 @@
+---
+title: "Upgrading"
+description: "Update NanoClaw and its skills with /update-nanoclaw and /update-skills — preview, backup, merge, validate, and restart."
+tag: "NEW"
+keywords: ["upgrade", "update", "update-nanoclaw", "update-skills", "migrate-nanoclaw", "upstream", "merge", "rollback"]
+---
+
+{/* verified-against: .claude/skills/update-nanoclaw/SKILL.md, .claude/skills/update-skills/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md, scripts/upgrade-state.ts, src/upgrade-state.ts @ dc34ceb */}
+
+Don't update with a raw `git pull`. NanoClaw records each sanctioned upgrade in `data/upgrade-state.json`, and a startup tripwire refuses to boot if the running code's version doesn't match that marker. The supported path is the `/update-nanoclaw` skill, which handles the merge, validation, and the marker stamp for you.
+
+## Updating NanoClaw
+
+Run `/update-nanoclaw` in a Claude Code session at your project root. The skill works in stages, and nothing is committed until you've seen a preview:
+
+1. **Self-refresh.** It fetches upstream and refreshes its own skill folder first, so the newest update process runs the update.
+2. **Preflight.** Stops if the working tree is dirty — commit or stash first. Adds the `upstream` remote if it's missing.
+3. **Safety net.** Creates a backup branch and tag (`backup/pre-update-<hash>-<timestamp>`) before touching anything.
+4. **Preview.** Shows upstream commits since your last sync and buckets the changed files: skills, host source (`src/`), container (`container/`, triggers a rebuild), and build config (lockfile changes trigger a dependency install). You then pick a path: full merge (default), selective cherry-pick, rebase, or abort.
+5. **Conflict preview.** Dry-runs the merge (`git merge --no-commit --no-ff`, then abort) so you see which files would conflict before committing to anything.
+6. **Merge and resolve.** Applies your chosen path. On conflicts it opens only the conflicted files, resolves the markers, and keeps your local customizations intact.
+7. **Validation.** Runs `pnpm run build` and `pnpm test`. If `container/` files changed, it also rebuilds the container image with `./container/build.sh`.
+8. **Breaking changes.** Scans the new `CHANGELOG.md` entries for `[BREAKING]` lines and offers to run each referenced migration skill.
+9. **Marker stamp.** On success, stamps the upgrade marker (`pnpm exec tsx scripts/upgrade-state.ts set "" update-nanoclaw`) so the tripwire passes on next start.
+10. **Summary.** Prints the backup tag, conflicts resolved, and the restart command for your platform.
+
+To roll back, reset to the backup tag the skill printed:
+
+```bash
+git reset --hard pre-update-<hash>-<timestamp>
+```
+
+## What happens to installed channels
+
+Channel and provider adapters are files copied into your tree from the long-lived `channels` and `providers` branches — they aren't part of the `main` merge, so the update itself doesn't refresh them. Instead, after the merge, `/update-nanoclaw` detects which channels and providers you have wired into the barrels (`src/channels/index.ts`, `src/providers/index.ts`) and offers to re-run each one's `/add-<name>` skill.
+
+Re-applying is safe and idempotent: it re-fetches the latest adapter files from upstream and overwrites only that skill's own code. Credentials in `.env`, barrel wiring, and database state are untouched. The flip side: if you edited an adapter file directly, re-applying overwrites your edits — commit first so the changes are recoverable, or skip that channel and update it manually.
+
+## Updating skills
+
+To refresh skills without a full upstream update, run `/update-skills`. Its flow:
+
+1. **Preflight.** Clean working tree, upstream remote confirmed, then `git fetch origin channels providers --prune`.
+2. **Detection.** Reads the channel and provider barrels to list which code-carrying skills are installed. Operational skills (ones that copy no code into the tree) have nothing to refresh.
+3. **Selection.** You pick which skills to re-apply.
+4. **Re-apply.** Invokes each selected skill's own `/add-<name>` apply, which fetches the latest files and overwrites the copied-in code.
+5. **Validation.** `pnpm run build` and `pnpm test` — each channel skill ships a registration test that asserts the barrel still registers the adapter.
+
+Restart the service afterwards to pick up the refreshed code.
+
+## Heavily customized forks
+
+If you've diverged far from upstream — many local commits, deep changes to core files — merging gets painful. `/migrate-nanoclaw` takes a different approach: it extracts your customizations into a replayable guide, checks out clean upstream in a worktree, and reapplies them on the new base, so there's nothing to merge. `/update-nanoclaw` suggests it automatically when it detects large drift. See the note in [Migrate from v1 or OpenClaw](/migrate-from-v1) for how it differs from the v1 migration path.
+
+## When not to update
+
+- **Dirty working tree** — the skill stops; commit or stash first. The same applies before `/update-skills`.
+- **Locally modified adapters or upstream skills** — re-applying a channel skill overwrites its files; make sure your edits are committed so you can recover them.
+- **Just want to see what changed** — pick the abort option in the preview step. It shows the changelog and changes nothing.
+- **Large drift** — prefer `/migrate-nanoclaw` over a conflict-heavy merge.
+
+## After an upgrade
+
+The skill validates the build and tests itself, but a few things are worth checking by hand:
+
+- **Restart the service.** Unit and label names are per-install; the skill prints the exact command (derived from `setup/lib/install-slug.sh`) for macOS, Linux, or a manual `pnpm run dev`.
+- **Container rebuild.** If `container/` changed, the image was rebuilt — running agent containers keep the old image until their session ends; new sessions use the new one.
+- **Send a test message** on each channel you use, and check `logs/nanoclaw.log` for errors.
+- **Tripwire trips on start?** The marker wasn't stamped (validation failed, or the update bypassed the skill). Fix the underlying issue, then stamp manually: `pnpm exec tsx scripts/upgrade-state.ts set`.
+
+If something is off, start with [Troubleshooting](/operate/troubleshooting).
