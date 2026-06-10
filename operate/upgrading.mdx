@@ -15,7 +15,7 @@ Run `/update-nanoclaw` in a Claude Code session at your project root. The skill 
 
 1. **Self-refresh.** It fetches upstream and refreshes its own skill folder first, so the newest update process runs the update.
 2. **Preflight.** Stops if the working tree is dirty — commit or stash first. Adds the `upstream` remote if it's missing.
-3. **Safety net.** Creates a backup branch and tag (`backup/pre-update-<hash>-<timestamp>`) before touching anything.
+3. **Safety net.** Creates a backup branch (`backup/pre-update-<hash>-<timestamp>`) and tag (`pre-update-<hash>-<timestamp>`) before touching anything.
 4. **Preview.** Shows upstream commits since your last sync and buckets the changed files: skills, host source (`src/`), container (`container/`, triggers a rebuild), and build config (lockfile changes trigger a dependency install). You then pick a path: full merge (default), selective cherry-pick, rebase, or abort.
 5. **Conflict preview.** Dry-runs the merge (`git merge --no-commit --no-ff`, then abort) so you see which files would conflict before committing to anything.
 6. **Merge and resolve.** Applies your chosen path. On conflicts it opens only the conflicted files, resolves the markers, and keeps your local customizations intact.
@@ -44,7 +44,7 @@ To refresh skills without a full upstream update, run `/update-skills`. Its flow
 2. **Detection.** Reads the channel and provider barrels to list which code-carrying skills are installed. Operational skills (ones that copy no code into the tree) have nothing to refresh.
 3. **Selection.** You pick which skills to re-apply.
 4. **Re-apply.** Invokes each selected skill's own `/add-<name>` apply, which fetches the latest files and overwrites the copied-in code.
-5. **Validation.** `pnpm run build` and `pnpm test` — each channel skill ships a registration test that asserts the barrel still registers the adapter.
+5. **Validation.** `pnpm run build` and `pnpm test` — each channel and provider skill ships a registration test that asserts the barrel still registers the adapter.
 
 Restart the service afterwards to pick up the refreshed code.
 
