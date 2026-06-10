@@ -1,6 +1,6 @@
 # Contributing to NanoClaw Docs
 
-Thanks for helping improve the [NanoClaw](https://github.com/qwibitai/nanoclaw) documentation! This repo powers the docs site built with [Mintlify](https://mintlify.com).
+Thanks for helping improve the [NanoClaw](https://github.com/nanocoai/nanoclaw) documentation! This repo powers the docs site built with [Mintlify](https://mintlify.com).
 
 ## Quick edits
 
@@ -50,7 +50,7 @@ Thanks for helping improve the [NanoClaw](https://github.com/qwibitai/nanoclaw) 
 
 ## Contributing to NanoClaw itself
 
-This repo is only for the documentation. To contribute code to NanoClaw, see the [main repository](https://github.com/qwibitai/nanoclaw).
+This repo is only for the documentation. To contribute code to NanoClaw, see the [main repository](https://github.com/nanocoai/nanoclaw).
 
 ## Questions?
 

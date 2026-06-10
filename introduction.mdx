@@ -44,7 +44,7 @@ Three agents, one channel, one pattern. No separate scheduler, no separate RPC l
 
 ### Agents that stay out of each other's filesystems
 
-Every agent runs in a Linux container with true filesystem isolation — it only sees what's explicitly mounted. Bash and file-editing tools are safe because commands execute inside the container, not on your host. Credentials never enter the container; they're injected at the HTTPS layer by [OneCLI Agent Vault](/advanced/security-model#credential-vault).
+Every agent runs in a Linux container with true filesystem isolation — it only sees what's explicitly mounted. Bash and file-editing tools are safe because commands execute inside the container, not on your host. Credentials never enter the container; they're injected at the HTTPS layer by [OneCLI Agent Vault](/concepts/security#credential-vault).
 
 ### One pattern for messages, schedules, and routing
 
@@ -62,7 +62,7 @@ For every channel you add, decide how it shares context with your existing agent
 - **Same agent, separate sessions** — one workspace and one memory, but per-channel conversation threads.
 - **Shared session** — multiple channels feed into a single conversation (GitHub webhooks + a Slack channel + email, all in one thread).
 
-Pick per channel via `/manage-channels`. See [Channel isolation model](/concepts/groups).
+Pick per channel via `/manage-channels`. See [Channel isolation model](/concepts/entity-model).
 
 ### Point anyone at your agent, keep yourself in the loop
 
@@ -148,6 +148,6 @@ The install and onboarding flow is a scripted, deterministic path. When a step n
 
 ## Community and source
 
-- **Source**: [github.com/qwibitai/nanoclaw](https://github.com/qwibitai/nanoclaw)
+- **Source**: [github.com/nanocoai/nanoclaw](https://github.com/nanocoai/nanoclaw)
 - **Discord**: [community server](https://discord.gg/VDdww8qS42)
 - **License**: MIT

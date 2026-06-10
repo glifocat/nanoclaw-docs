@@ -40,12 +40,12 @@
   "navbar": {
     "primary": {
       "type": "github",
-      "href": "https://github.com/qwibitai/nanoclaw"
+      "href": "https://github.com/nanocoai/nanoclaw"
     }
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/qwibitai/nanoclaw",
+      "github": "https://github.com/nanocoai/nanoclaw",
       "discord": "https://discord.gg/VDdww8qS42",
       "x": "https://x.com/Gavriel_Cohen",
       "youtube": "https://www.youtube.com/@NanoClaw",
@@ -55,7 +55,7 @@
       {
         "header": "Legal",
         "items": [
-          { "label": "MIT License", "href": "https://github.com/qwibitai/nanoclaw/blob/main/LICENSE" }
+          { "label": "MIT License", "href": "https://github.com/nanocoai/nanoclaw/blob/main/LICENSE" }
         ]
       }
     ]
@@ -63,6 +63,37 @@
   "seo": {
     "indexing": "navigable"
   },
+  "redirects": [
+    { "source": "/integrations/overview", "destination": "/channels/overview" },
+    { "source": "/integrations/whatsapp", "destination": "/channels/whatsapp" },
+    { "source": "/integrations/telegram", "destination": "/channels/telegram" },
+    { "source": "/integrations/discord", "destination": "/channels/discord" },
+    { "source": "/integrations/slack", "destination": "/channels/slack" },
+    { "source": "/integrations/skills-system", "destination": "/extend/overview" },
+    { "source": "/integrations/ollama", "destination": "/extend/providers" },
+    { "source": "/integrations/gmail", "destination": "/extend/tools" },
+    { "source": "/integrations/x-twitter", "destination": "/channels/overview" },
+    { "source": "/integrations/parallel-ai", "destination": "/extend/tools" },
+    { "source": "/features/scheduled-tasks", "destination": "/guides/scheduled-tasks" },
+    { "source": "/features/agent-swarms", "destination": "/guides/multi-agent-swarm" },
+    { "source": "/features/customization", "destination": "/guides/customize-an-agent" },
+    { "source": "/features/cli", "destination": "/operate/ncl-cli" },
+    { "source": "/features/messaging", "destination": "/channels/overview" },
+    { "source": "/features/web-access", "destination": "/extend/tools" },
+    { "source": "/features/voice-transcription", "destination": "/channels/overview" },
+    { "source": "/features/image-vision", "destination": "/channels/overview" },
+    { "source": "/features/pdf-reader", "destination": "/channels/overview" },
+    { "source": "/concepts/groups", "destination": "/concepts/entity-model" },
+    { "source": "/concepts/containers", "destination": "/concepts/container-lifecycle" },
+    { "source": "/concepts/tasks", "destination": "/guides/scheduled-tasks" },
+    { "source": "/advanced/security-model", "destination": "/concepts/security" },
+    { "source": "/advanced/container-runtime", "destination": "/concepts/container-lifecycle" },
+    { "source": "/advanced/docker-sandboxes", "destination": "/operate/hardening" },
+    { "source": "/advanced/ipc-system", "destination": "/concepts/architecture" },
+    { "source": "/advanced/remote-control", "destination": "/operate/ncl-cli" },
+    { "source": "/advanced/troubleshooting", "destination": "/operate/troubleshooting" },
+    { "source": "/advanced/contributing", "destination": "/concepts/contributing" }
+  ],
   "search": {
     "prompt": "Search NanoClaw docs..."
   },
@@ -79,107 +110,62 @@
     "options": ["copy", "view", "chatgpt", "claude", "cursor"]
   },
   "anchors": [
-    { "anchor": "GitHub", "href": "https://github.com/qwibitai/nanoclaw", "icon": "github" },
+    { "anchor": "GitHub", "href": "https://github.com/nanocoai/nanoclaw", "icon": "github" },
     { "anchor": "Discord", "href": "https://discord.gg/VDdww8qS42", "icon": "discord" }
   ],
   "navigation": {
+    "global": {
+      "anchors": [
+        { "anchor": "Changelog", "icon": "clock-rotate-left", "href": "https://nanoclaw.dev/changelog/index" }
+      ]
+    },
     "tabs": [
       {
         "tab": "Documentation",
         "groups": [
           {
-            "group": "Get Started",
+            "group": "Get started",
             "icon": "rocket",
-            "pages": [
-              "introduction",
-              "quickstart",
-              "installation"
-            ]
+            "pages": ["introduction", "quickstart", "installation"]
           },
           {
-            "group": "Core Concepts",
+            "group": "Channels",
+            "icon": "tower-broadcast",
+            "pages": ["channels/overview", "channels/whatsapp", "channels/telegram", "channels/discord", "channels/slack"]
+          },
+          {
+            "group": "Operate",
+            "icon": "gauge",
+            "pages": ["operate/ncl-cli", "operate/hardening", "operate/troubleshooting"]
+          },
+          {
+            "group": "Build with agents",
+            "icon": "wand-magic-sparkles",
+            "pages": ["guides/scheduled-tasks", "guides/multi-agent-swarm", "guides/customize-an-agent"]
+          },
+          {
+            "group": "Extend",
+            "icon": "puzzle-piece",
+            "pages": ["extend/overview", "extend/tools", "extend/providers"]
+          },
+          {
+            "group": "Understand",
             "icon": "lightbulb",
-            "pages": [
-              "concepts/architecture",
-              "concepts/security",
-              "concepts/containers",
-              "concepts/groups",
-              "concepts/tasks"
-            ]
-          },
-          {
-            "group": "Features",
-            "icon": "sparkles",
-            "pages": [
-              "features/messaging",
-              "features/scheduled-tasks",
-              "features/agent-swarms",
-              "features/customization",
-              "features/cli",
-              "features/web-access",
-              "features/voice-transcription",
-              "features/image-vision",
-              "features/pdf-reader"
-            ]
-          },
-          {
-            "group": "Integrations",
-            "icon": "plug",
-            "pages": [
-              "integrations/overview",
-              "integrations/skills-system",
-              "integrations/whatsapp",
-              "integrations/telegram",
-              "integrations/discord",
-              "integrations/slack",
-              "integrations/ollama",
-              "integrations/x-twitter",
-              "integrations/parallel-ai"
-            ]
-          },
-          {
-            "group": "Advanced",
-            "icon": "gear",
-            "pages": [
-              "advanced/security-model",
-              "advanced/container-runtime",
-              "advanced/docker-sandboxes",
-              "advanced/ipc-system",
-              "advanced/remote-control",
-              "advanced/troubleshooting",
-              "advanced/contributing"
-            ]
+            "pages": ["concepts/architecture", "concepts/entity-model", "concepts/container-lifecycle", "concepts/security", "concepts/contributing"]
           },
           {
             "group": "Changelog",
             "icon": "clock-rotate-left",
-            "pages": [
-              "changelog/index",
-              "changelog/docs-updates"
-            ]
+            "pages": ["changelog/index", "changelog/docs-updates"]
           }
         ]
       },
       {
-        "tab": "API Reference",
+        "tab": "Reference",
         "groups": [
           {
-            "group": "Core API",
-            "pages": [
-              "api/overview",
-              "api/configuration",
-              "api/message-routing",
-              "api/group-management",
-              "api/task-scheduling"
-            ]
-          },
-          {
-            "group": "Skills Development",
-            "pages": [
-              "api/skills/creating-skills",
-              "api/skills/skill-structure",
-              "api/skills/examples"
-            ]
+            "group": "Legacy API docs (being replaced)",
+            "pages": ["api/overview", "api/configuration", "api/message-routing", "api/group-management", "api/task-scheduling", "api/skills/creating-skills", "api/skills/skill-structure", "api/skills/examples"]
           }
         ]
       }
