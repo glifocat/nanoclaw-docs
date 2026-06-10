@@ -1,0 +1,82 @@
+---
+title: "Environment variables"
+description: "Every environment variable NanoClaw reads — .env keys, host process environment, setup-time variables, and container-side overrides — with defaults and source locations."
+tag: "NEW"
+keywords: ["environment variables", ".env", "configuration", "ASSISTANT_NAME", "CONTAINER_TIMEOUT", "LOG_LEVEL", "NANOCLAW_SKIP", "NANOCLAW_EGRESS_LOCKDOWN", "setup", "reference"]
+---
+
+{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/container-runner.ts, src/providers/claude.ts, setup/auto.ts, setup/onecli.ts, setup/lib/setup-config.ts, setup/lib/claude-assist.ts, setup/lib/diagnostics.ts, setup/signal-auth.ts, setup/migrate-v2/select-channels.ts, container/agent-runner/src/{timezone.ts,providers/claude.ts} @ dc34ceb (v2.1.4) */}
+
+Exhaustive list of every environment variable the NanoClaw host, setup wizard, and agent runner read. For how to actually set these — `.env` editing, service definitions, restart commands — see [Configuration](/operate/configuration).
+
+Channel adapters (Telegram bot tokens, Slack app credentials, and so on) have their own variables documented on the per-channel pages under [Channels](/channels/overview); they're not repeated here.
+
+## Read from .env
+
+NanoClaw's own parser ([`src/env.ts`](https://github.com/qwibitai/nanoclaw/blob/main/src/env.ts)) reads exactly these keys from `.env` at the project root. Values are never loaded into `process.env`, so they don't leak to child processes. For the first five, a value already in the process environment takes precedence over `.env`; `ANTHROPIC_BASE_URL` is read from `.env` only.
+
+| Variable | Default | Read in | Effect |
+|---|---|---|---|
+| `ASSISTANT_NAME` | `Andy` | `src/config.ts:11` | Assistant name. Also sets the default trigger, `@<name>`. |
+| `ASSISTANT_HAS_OWN_NUMBER` | `false` | `src/config.ts:12` | Set `true` when the assistant runs on its own WhatsApp number instead of yours. |
+| `ONECLI_URL` | — | `src/config.ts:36` | URL of the OneCLI Agent Vault. |
+| `ONECLI_API_KEY` | — | `src/config.ts:37` | API key for the vault. See [Credentials](/operate/credentials). |
+| `TZ` | system timezone, else `UTC` | `src/config.ts:62` | IANA timezone for scheduled tasks and timestamps. Invalid values are skipped, not errored. Injected into every agent container at spawn. |
+| `ANTHROPIC_BASE_URL` | — | `src/providers/claude.ts:21` | Custom Anthropic-compatible endpoint, passed into agent containers with a placeholder auth token. Only active when setup has registered the custom-endpoint provider config; the real token stays in the vault. |
+
+## Host process environment only
+
+Read from `process.env` at host startup. Putting these in `.env` has no effect — the generated launchd plist, systemd unit, and nohup wrapper don't source it. Set them in the service definition or export them before `pnpm run dev`.
+
+| Variable | Default | Read in | Effect |
+|---|---|---|---|
+| `CONTAINER_TIMEOUT` | `1800000` (30 min) | `src/config.ts:34` | Max runtime for an agent container, in milliseconds. |
+| `CONTAINER_MAX_OUTPUT_SIZE` | `10485760` (10 MB) | `src/config.ts:35` | Max output captured from a container, in bytes. |
+| `MAX_MESSAGES_PER_PROMPT` | `10` | `src/config.ts:38` | How many queued messages are batched into one agent prompt. Per-group override exists in container config. |
+| `IDLE_TIMEOUT` | `1800000` (30 min) | `src/config.ts:39` | How long a container stays alive after its last result, waiting for follow-ups. |
+| `MAX_CONCURRENT_CONTAINERS` | `5` | `src/config.ts:40` | Intended cap on simultaneous agent containers. Parsed but not enforced anywhere as of v2.1.4 — setting it has no effect. |
+| `CONTAINER_IMAGE` | per-install tag | `src/config.ts:29` | Full agent image override (name and tag). |
+| `CONTAINER_IMAGE_BASE` | per-install name | `src/config.ts:28` | Base image name override. The default embeds an install slug so two checkouts on one host don't clobber each other's image. |
+| `WEBHOOK_PORT` | `3000` | `src/webhook-server.ts:82` | Port for the local webhook server. |
+| `LOG_LEVEL` | `info` | `src/log.ts:16` | One of `debug`, `info`, `warn`, `error`, `fatal`. |
+| `NANOCLAW_EGRESS_LOCKDOWN` | `false` | `src/egress-lockdown.ts:20` | Set `true` to force all agent traffic through the OneCLI gateway on an internal Docker network. Spawns fail fast if the gateway isn't running. See [Hardening](/operate/hardening). |
+| `NANOCLAW_EGRESS_NETWORK` | `nanoclaw-egress` | `src/egress-lockdown.ts:16` | Name of the locked-down Docker network. |
+| `ONECLI_GATEWAY_CONTAINER` | `onecli` | `src/egress-lockdown.ts:18` | Name of the gateway container attached as the only egress hop. |
+
+## Setup-time variables
+
+Consumed by the setup wizard (`pnpm run setup:auto`) and migration scripts, not by the running host. Most pre-answer an interactive prompt for scripted or CI runs; each also has a matching CLI flag (e.g. `NANOCLAW_SKIP` ↔ `--skip`).
+
+| Variable | Default | Read in | Effect |
+|---|---|---|---|
+| `NANOCLAW_SKIP` | — | `setup/auto.ts:118` | Comma-separated step names to skip: `environment`, `container`, `onecli`, `auth`, `mounts`, `service`, `cli-agent`, `timezone`, `channel`, `verify`, `first-chat`. |
+| `NANOCLAW_DISPLAY_NAME` | `$USER` | `setup/auto.ts:320` | How agents address the operator — skips the prompt. |
+| `NANOCLAW_AGENT_NAME` | — | `setup/channels/*.ts` | Pre-fills the agent name prompt in each channel setup flow. The CLI scratch agent is always "Terminal Agent". |
+| `NANOCLAW_CHANNELS` | — | `setup/migrate-v2/select-channels.ts:43` | Comma-separated channel names (e.g. `telegram,discord`) — skips the channel picker in the v2 migration flow. |
+| `NANOCLAW_ONECLI_API_HOST` | `https://api.onecli.sh` | `setup/auto.ts:188` | Use a remote OneCLI vault instead of installing one locally. |
+| `NANOCLAW_ONECLI_API_TOKEN` | — | `setup/onecli.ts:324` | Bearer token (`oc_…`) for the remote vault. Required when the host is set. |
+| `NANOCLAW_ANTHROPIC_BASE_URL` | — | `setup/auto.ts:717` | Custom Anthropic-compatible endpoint. Setup writes `ANTHROPIC_BASE_URL` to `.env` and stores the token in the vault. |
+| `NANOCLAW_ANTHROPIC_AUTH_TOKEN` | — | `setup/auto.ts:718` | Bearer token for the custom endpoint. Both URL and token must be set together. |
+| `NANOCLAW_SETUP_ASSIST_MODE` | `false` | `setup/lib/setup-config.ts:128` | Use non-interactive Claude assist on step failure instead of interactive handoff. |
+| `NANOCLAW_SKIP_CLAUDE_ASSIST` | — | `setup/lib/claude-assist.ts:96` | Set `1` to disable Claude-assisted failure recovery entirely (CI/scripted runs). |
+| `NANOCLAW_NO_DIAGNOSTICS` | — | `setup/lib/diagnostics.ts:45` | Set `1` to disable setup diagnostics reporting. |
+| `SIGNAL_CLI_PATH` | `signal-cli` (on `PATH`) | `setup/signal-auth.ts:45` | Path to the `signal-cli` binary for the Signal channel flow. |
+
+<Note>
+`NANOCLAW_REEXEC_SG` and `NANOCLAW_BOOTSTRAPPED` also appear in `setup/auto.ts` — they're internal sentinels setup sets on itself when re-executing (Linux `sg docker` re-exec, bootstrap guard). Don't set them yourself.
+</Note>
+
+## Container-side variables (agent runner)
+
+Read inside the agent container by the agent runner. The host injects only `TZ` (plus provider-contributed and OneCLI proxy variables) at spawn — `src/container-runner.ts:413`. The rest are not passed through from the host environment; overriding them means baking them into a custom image or a provider container config.
+
+| Variable | Default | Read in | Effect |
+|---|---|---|---|
+| `TZ` | injected from host `TIMEZONE` | `agent-runner/src/timezone.ts:52` | Timezone for timestamps and scheduling inside the container. |
+| `NANOCLAW_CONVERSATIONS_DIR` | `/workspace/agent/conversations` | `agent-runner/src/providers/claude.ts:224` | Where pre-compaction conversation transcripts are archived as Markdown. |
+| `CLAUDE_TRANSCRIPT_ROTATE_BYTES` | `12582912` (12 MiB) | `agent-runner/src/providers/claude.ts:252` | Transcript size past which the session is rotated instead of resumed — cold resumes of huge transcripts would outlive the idle ceiling. |
+| `CLAUDE_TRANSCRIPT_ROTATE_AGE_DAYS` | `14` | `agent-runner/src/providers/claude.ts:260` | Age trigger for transcript rotation, measured from the first entry. Zero or negative disables the age check; size alone governs. |
+| `CLAUDE_CONFIG_DIR` | `~/.claude` | `agent-runner/src/providers/claude.ts:269` | Base directory the runner scans for Claude Code project transcripts. |
+| `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | `165000` | `agent-runner/src/providers/claude.ts:322` | Token window at which Claude Code auto-compacts context. Raise for 1M-context model variants. |
+
+Line numbers reference [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at v2.1.4 and will drift with future releases.
