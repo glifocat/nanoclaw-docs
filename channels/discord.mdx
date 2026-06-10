@@ -1,414 +1,65 @@
 ---
-title: Discord integration
-description: Add Discord as a messaging channel for NanoClaw using the /add-discord skill for team collaboration
+title: "Discord"
+description: "Connect NanoClaw to a Discord bot via the Chat SDK adapter — Developer Portal app, Gateway connection, and per-thread sessions."
+tag: "UPDATED"
+keywords: ["discord", "bot token", "add-discord", "gateway", "message content intent", "chat sdk", "threads", "developer portal"]
 ---
 
-import RestartService from "/snippets/restart-service.mdx";
+{/* verified-against: src/channels/discord.ts (channels branch), src/channels/chat-sdk-bridge.ts, setup/channels/discord.ts, .claude/skills/add-discord/SKILL.md @ dc34ceb */}
 
-<Warning>
-This page is pending a v2 rewrite. The `/add-discord` skill flow still works, but some mechanics described below reflect v1 architecture — in v2, channel adapters live on a single `channels` branch. See [Integrations overview](/channels/overview) for current context.
-</Warning>
+The Discord adapter connects NanoClaw to a bot you create in the Discord Developer Portal. It's built on the Chat SDK bridge (`@chat-adapter/discord` 4.26.0, pinned) and connects over Discord's **Gateway** — a WebSocket NanoClaw opens outbound, with events forwarded to a local loopback server. No public URL, webhook, or open port needed; works behind NAT and on a laptop.
 
-Add Discord as a messaging channel for NanoClaw. Perfect for team collaboration and community management.
+The bot works in server text channels, threads, and DMs.
 
-## Overview
+## Prerequisites
 
-The Discord integration uses [discord.js](https://discord.js.org/) to connect to Discord's Gateway API. It supports text channels, DMs, threads, and rich message features.
+- A Discord account, and a server you can add the bot to (the wizard walks you through creating both the app and a server if needed)
+- A working NanoClaw install ([quickstart](/quickstart))
+- A bot from the [Developer Portal](https://discord.com/developers/applications) with **Message Content Intent** enabled (under **Bot** → **Privileged Gateway Intents**) — without it the bot connects but can't read message text
+- The bot token from the **Bot** tab. That's the only thing you paste — the wizard derives the application ID and public key from the token via Discord's API.
 
-### Features
+## Install
 
-- **Text channels and DMs** - Respond in server channels or direct messages
-- **Attachment handling** - Detects and describes attachments in messages
-- **Reply context** - Shows when users reply to previous messages
-- **@Mention translation** - Converts Discord mentions to trigger format
-- **Message splitting** - Automatically splits long responses (2000 char limit)
-- **Typing indicators** - Shows when the assistant is working
-
-## Adding Discord
-
-Use the `/add-discord` skill to add Discord support:
+Discord is offered in the first-run setup wizard, or add it later by running `/add-discord` in Claude Code. The wizard flow:
 
 <Steps>
-  <Step title="Run the skill">
-    ```bash
-    claude
-    /add-discord
-    ```
+  <Step title="Create the bot (if you don't have one)">
+    The wizard opens the Developer Portal: click **New Application**, then in the **Bot** tab click **Reset Token**, copy the token, and enable **Message Content Intent**.
   </Step>
-  
-  <Step title="Choose deployment mode">
-    - **Replace existing channels** - Discord becomes the only channel
-    - **Alongside** - Add Discord alongside existing channels
+  <Step title="Paste the token">
+    The wizard format-validates it, calls `/users/@me` to confirm Discord accepts it and resolve the bot's username, then calls `/oauth2/applications/@me` to derive the application ID and public key. If a `DISCORD_BOT_TOKEN` already exists in `.env`, it offers to reuse it.
   </Step>
-  
-  <Step title="Apply code changes">
-    The skill merges the `skill/discord` branch which adds:
-    - `src/channels/discord.ts` (DiscordChannel implementation)
-    - `src/channels/discord.test.ts` (unit tests)
-    - Multi-channel support in `src/index.ts`
-    - Discord config in `src/config.ts`
-    - The `discord.js` NPM package
+  <Step title="Confirm your identity">
+    The wizard reads the app owner from the API and asks "Is @you your Discord account?". If the app is team-owned (or you decline), it falls back to a manual user-ID prompt with Developer Mode instructions.
   </Step>
-  
-  <Step title="Create Discord bot">
-    Set up a bot in the Discord Developer Portal
+  <Step title="Invite the bot to a server">
+    The bot can't DM you until you share a server. The wizard generates and opens the OAuth invite URL (scope `bot`, permissions `100416`: Send Messages, Read Message History, Add Reactions, Attach Files) — pick any server, a personal one is fine.
   </Step>
-  
-  <Step title="Configure environment">
-    Add bot token to `.env` and sync to container
+  <Step title="Adapter install">
+    `setup/add-discord.sh` copies the adapter from the `channels` branch, installs the pinned package, builds, writes `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID`, and `DISCORD_PUBLIC_KEY` to `.env` (synced to `data/env/env`), and restarts the service.
   </Step>
-  
-  <Step title="Register channels">
-    Get channel IDs and register them with NanoClaw
+  <Step title="Name the agent and get the welcome DM">
+    The wizard opens a DM channel with you via the API, asks for your operator role and an agent name (default `Nano`), wires the DM to your first agent group, and sends a welcome message.
   </Step>
 </Steps>
 
-## Creating a Discord bot
+To wire server channels or more DMs later, run `/manage-channels`. Server channels are identified as `discord:<guildId>:<channelId>` (enable Developer Mode in Discord, then right-click the server for the guild ID and the channel for the channel ID); DMs as `discord:@me:<dmChannelId>`.
 
-If you don't already have a Discord bot:
+## Platform notes
 
-<Steps>
-  <Step title="Create application">
-    1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
-    2. Click **New Application**
-    3. Give it a name (e.g., "Andy Assistant")
-    4. Click **Create App**
-  </Step>
-  
-  <Step title="Create bot user">
-    1. Go to the **Bot** tab in the left sidebar
-    2. Click **Reset Token** to generate a bot token
-    3. **Copy the token immediately** (you can only see it once)
-  </Step>
-  
-  <Step title="Enable intents">
-    Under **Privileged Gateway Intents**, enable:
-    - **Message Content Intent** (required to read message text)
-    - **Server Members Intent** (optional, for member display names)
-  </Step>
-  
-  <Step title="Generate invite URL">
-    1. Go to **OAuth2** → **URL Generator**
-    2. Select scopes:
-       - `bot`
-    3. Select bot permissions:
-       - `Send Messages`
-       - `Read Message History`
-       - `View Channels`
-    4. Copy the generated URL
-  </Step>
-  
-  <Step title="Invite bot to server">
-    Open the generated URL in your browser and select the server to add the bot to
-  </Step>
-</Steps>
-
-<Warning>
-  Without the **Message Content Intent** enabled, the bot can connect but won't be able to read message text.
-</Warning>
-
-## Configuration
-
-### Environment variables
-
-Add to `.env`:
-
-```bash
-DISCORD_BOT_TOKEN=<your-bot-token>
-```
-
-If you chose to replace existing channels:
-
-```bash
-DISCORD_ONLY=true
-```
-
-### Sync to container
-
-```bash
-cp .env data/env/env
-```
-
-## Build and restart
-
-<RestartService />
-
-## Registering channels
-
-### Get channel ID
-
-<Steps>
-  <Step title="Enable Developer Mode">
-    In Discord: **User Settings** → **Advanced** → Enable **Developer Mode**
-  </Step>
-  
-  <Step title="Copy channel ID">
-    1. Right-click the text channel you want the bot to respond in
-    2. Click **Copy Channel ID**
-    3. The ID will be a long number like `1234567890123456`
-  </Step>
-</Steps>
-
-### Register the channel
-
-For your main channel (responds to all messages):
-
-```typescript
-registerGroup("dc:<channel-id>", {
-  name: "Server Name #channel-name",
-  folder: "main",
-  trigger: `@${ASSISTANT_NAME}`,
-  added_at: new Date().toISOString(),
-  requiresTrigger: false,
-});
-```
-
-For additional channels (trigger-only):
-
-```typescript
-registerGroup("dc:<channel-id>", {
-  name: "Team Server #general",
-  folder: "team-general",
-  trigger: `@${ASSISTANT_NAME}`,
-  added_at: new Date().toISOString(),
-  requiresTrigger: true,
-});
-```
-
-<Tip>
-  Use `requiresTrigger: true` for shared channels so the assistant only responds when @mentioned.
-</Tip>
-
-## Testing the connection
-
-Send a message in your registered Discord channel:
-
-- **For main channel:** Any message works
-- **For non-main channels:** @mention the bot (Discord will autocomplete it)
-
-The bot should respond within a few seconds.
-
-### Check logs
-
-```bash
-tail -f logs/nanoclaw.log
-```
-
-Look for:
-
-```
-Connected to Discord
-Received message from dc:1234567890123456
-Agent response queued
-```
-
-## JID format
-
-Discord channels use the `dc:` prefix:
-
-- **Text channel:** `dc:1234567890123456`
-- **DM:** `dc:1234567890123456`
-- **Thread:** `dc:1234567890123456` (treated as a regular channel)
-
-## Message features
-
-### Attachment detection
-
-When a message includes attachments:
-
-```
-User message: Check out this screenshot
-[Image attachment: screenshot.png]
-```
-
-The agent sees the attachment description but not the actual file content.
-
-### Reply context
-
-When replying to previous messages:
-
-```
-[Replying to: Andy] Original message here
-User's reply text
-```
-
-### @Mention translation
-
-Discord mentions like `<@123456789>` are translated to your trigger format:
-
-```
-User: <@bot-id> hello
-Agent sees: @Andy hello
-```
-
-### Message splitting
-
-Discord has a 2000 character limit per message. Long responses are automatically split:
-
-```typescript
-if (text.length > 2000) {
-  const chunks = text.match(/[\s\S]{1,2000}/g) || [];
-  for (const chunk of chunks) {
-    await channel.send(chunk);
-  }
-}
-```
-
-## Implementation details
-
-The Discord channel implements the `Channel` interface:
-
-```typescript
-export class DiscordChannel implements Channel {
-  name = 'discord';
-  
-  async connect(): Promise<void> {
-    this.client = new Client({
-      intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.DirectMessages,
-      ],
-    });
-    
-    this.client.on('messageCreate', async (message) => {
-      if (message.author.bot) return;
-      
-      const channelJid = `dc:${message.channelId}`;
-      
-      // Build message content with attachment info
-      let content = message.content;
-      if (message.attachments.size > 0) {
-        const attachmentDesc = Array.from(message.attachments.values())
-          .map(a => `[${a.contentType} attachment: ${a.name}]`)
-          .join('\n');
-        content += '\n' + attachmentDesc;
-      }
-      
-      this.opts.onMessage(channelJid, {
-        id: message.id,
-        chat_jid: channelJid,
-        sender: message.author.id,
-        sender_name: message.author.username,
-        content,
-        timestamp: message.createdAt.toISOString(),
-        is_from_me: false,
-        is_bot_message: false,
-      });
-    });
-    
-    await this.client.login(process.env.DISCORD_BOT_TOKEN);
-  }
-}
-```
+- **Gateway connection with backoff** — the bridge starts a Gateway listener in 24-hour cycles and forwards raw events (including button clicks) to a local HTTP server bound to `127.0.0.1`. If the listener dies, it reconnects with exponential backoff (1s doubling per consecutive failure, capped at 1 hour); a run lasting over 5 minutes counts as healthy and resets the counter. The cap exists because an unrecoverable failure like a bad token would otherwise restart ~10×/sec and get the IP blocked by Discord's Cloudflare layer.
+- **Threads** — the adapter sets `supportsThreads: true`, so `per-thread` session mode works here: each Discord thread gets its own agent session. `shared` keeps one session per messaging group, `agent-shared` one session across all of an agent's messaging groups — see the [entity model](/concepts/entity-model).
+- **Mentions and engagement** — @mentioning the bot in an unwired channel is platform-confirmed and reaches the router as a mention; in mention-mode wirings the bot then sticks to that thread. DMs are always treated as addressed to the bot.
+- **Replies and attachments** — replying to a message passes the quoted text and sender (display name or username) to the agent as context. Attachments are downloaded and passed to the agent as data, not just described.
+- **Interactive questions** — when an agent asks a multiple-choice question, it renders as an embed with buttons; your click arrives via the Gateway and the card updates in place to show the selection.
+- **2,000-character limit** — Discord caps messages at 2,000 characters. The current adapter doesn't enable the bridge's automatic chunking, so longer replies can be truncated by the platform.
+- **Typing indicator** — the bot shows a typing indicator while the agent works.
 
 ## Troubleshooting
 
-<AccordionGroup>
-  <Accordion title="Bot not responding">
-    Check these items:
-    
-    1. `DISCORD_BOT_TOKEN` is set in `.env` AND synced to `data/env/env`
-    2. Channel is registered:
-       ```bash
-       sqlite3 store/messages.db "SELECT * FROM registered_groups WHERE jid LIKE 'dc:%'"
-       ```
-    3. For non-main channels: message must @mention the bot
-    4. Service is running:
-       ```bash
-       launchctl list | grep nanoclaw  # macOS
-       systemctl --user status nanoclaw  # Linux
-       ```
-    5. Bot has been invited to the server (check OAuth2 URL was used)
-  </Accordion>
-  
-  <Accordion title="Bot can't read messages">
-    The **Message Content Intent** must be enabled:
-    
-    1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-    2. Select your application → **Bot** tab
-    3. Under **Privileged Gateway Intents**, enable **Message Content Intent**
-    4. Restart NanoClaw
-  </Accordion>
-  
-  <Accordion title="Bot only responds to @mentions">
-    This is the behavior for non-main channels with `requiresTrigger: true`.
-    
-    To make it respond to all messages:
-    - Update the registered group's `requiresTrigger` to `false`, or
-    - Register the channel as your main channel
-  </Accordion>
-  
-  <Accordion title="Can't copy channel ID">
-    Ensure **Developer Mode** is enabled:
-    
-    **User Settings** → **Advanced** → **Developer Mode** → On
-    
-    Then right-click the channel name → **Copy Channel ID**
-  </Accordion>
-</AccordionGroup>
+- **"Discord didn't accept that token"** — `/users/@me` rejected it. Tokens are only shown once in the Developer Portal; click **Reset Token** and copy the fresh one (the old one stops working). "Couldn't reach Discord" instead means a network problem — check connectivity and retry setup.
+- **Bot connects but never responds to text** — **Message Content Intent** isn't enabled. Developer Portal → your app → **Bot** → **Privileged Gateway Intents** → enable it, then restart the service.
+- **"Couldn't open a DM channel with you" / no welcome message** — the bot and your account don't share a server yet. Open the invite URL, add the bot to any server you're in, then retry with `/manage-channels`.
+- **`Gateway listener error, retrying` repeating in logs** — the listener is in its backoff loop (the log line includes `consecutiveFailures` and the next `delayMs`). Growing delays usually mean an unrecoverable cause like an invalid token — fix the credential rather than waiting out the retry.
 
-## Limitations
-
-- **Threads are treated as channels** - Thread-aware routing (respond in-thread) requires pipeline-wide changes
-- **No typing indicator** - Discord bots can't show typing status via the Gateway API
-- **Basic message splitting** - Long messages split at 2000 chars, may break mid-word
-- **No file upload support** - Bot only processes text content
-
-## Removing Discord
-
-Since Discord was added via a git merge, you remove it by reverting the merge commit:
-
-<Steps>
-  <Step title="Find the merge commit">
-    ```bash
-    git log --merges --oneline | grep discord
-    ```
-
-    Look for a commit like `abc1234 Merge remote-tracking branch 'upstream/skill/discord'`.
-  </Step>
-
-  <Step title="Revert the merge">
-    ```bash
-    git revert -m 1 <merge-commit>
-    ```
-
-    This creates a new commit that undoes all of Discord's code changes.
-  </Step>
-
-  <Step title="Remove registrations">
-    ```bash
-    sqlite3 store/messages.db "DELETE FROM registered_groups WHERE jid LIKE 'dc:%'"
-    ```
-  </Step>
-
-  <Step title="Rebuild and restart">
-    ```bash
-    npm install
-    npm run build
-    launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
-    # or: systemctl --user restart nanoclaw (Linux)
-    ```
-  </Step>
-</Steps>
-
-<Warning>
-  If you later want to re-apply Discord after reverting, you must revert the revert first — git treats reverted changes as "already applied and undone". Claude handles this automatically when you run `/add-discord` again.
-</Warning>
-
-## Next steps
-
-<CardGroup cols={2}>
-  <Card title="Add Slack" icon="slack" href="/channels/slack">
-    Add Slack support to your installation
-  </Card>
-  
-  <Card title="Add Telegram" icon="telegram" href="/channels/telegram">
-    Add Telegram support to your installation
-  </Card>
-  
-  <Card title="Skills system" icon="puzzle-piece" href="/extend/overview">
-    Learn more about how skills work
-  </Card>
-</CardGroup>
+For service-level checks (logs, restarts, wiring queries), see [troubleshooting](/operate/troubleshooting).
