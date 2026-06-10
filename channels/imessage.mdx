@@ -1,0 +1,63 @@
+---
+title: "iMessage"
+description: "Connect NanoClaw to iMessage via the Chat SDK adapter — local mode on your own Mac with Full Disk Access, or remote mode through a Photon API server."
+tag: "NEW"
+keywords: ["imessage", "add-imessage", "photon", "full disk access", "chat.db", "macos", "chat sdk", "apple messages"]
+---
+
+{/* verified-against: src/channels/imessage.ts (channels branch), setup/channels/imessage.ts, setup/add-imessage.sh, .claude/skills/add-imessage/SKILL.md @ dc34ceb */}
+
+The iMessage adapter connects NanoClaw to Apple's Messages network. It's built on the Chat SDK bridge (`chat-adapter-imessage` 0.1.1, pinned — a community adapter) and runs in one of two modes:
+
+- **Local** — NanoClaw runs on a Mac and sends and receives as that Mac's signed-in iMessage account, reading the Messages database (`chat.db`) directly. No extra service, but macOS only, and the Node binary needs **Full Disk Access**.
+- **Remote (Photon API)** — NanoClaw talks over HTTP to a [Photon](https://photon.codes) server that owns an iMessage account on another Mac. Use this when your NanoClaw host is Linux, or when you'd rather keep your daily-driver Mac's chat history out of the loop.
+
+The wizard defaults to local on macOS; off macOS, remote is the only option.
+
+## Prerequisites
+
+- A working NanoClaw install ([quickstart](/quickstart))
+- **Local mode:** a Mac signed in to iMessage, and the ability to grant Full Disk Access in System Settings (the wizard walks you through it)
+- **Remote mode:** a Photon server URL and API key, copied from your Photon dashboard
+
+## Install
+
+iMessage is offered in the first-run setup wizard, or add it later by running `/add-imessage` in Claude Code. The wizard flow:
+
+<Steps>
+  <Step title="Pick a mode">
+    Local (this Mac) or remote (Photon API). On macOS the wizard pre-selects local; off macOS, remote is the only option offered.
+  </Step>
+  <Step title="Grant Full Disk Access (local) or enter Photon credentials (remote)">
+    **Local:** the wizard opens the folder containing your `node` binary in Finder, then walks you through **System Settings → Privacy & Security → Full Disk Access** → click **+** → drag the `node` file in → toggle it on. Confirm in the wizard once granted. Without this, the adapter can't read `chat.db` and inbound messages never arrive.
+
+    **Remote:** paste your Photon server URL (must start with `http://` or `https://`) and API key. If credentials already exist in `.env`, the wizard offers to reuse them.
+  </Step>
+  <Step title="Enter your iMessage handle">
+    The phone number or email you iMessage from — phone in `+`E.164 format (e.g. `+14155551234`), or any email iMessage recognises. This becomes the platform ID wired to your first agent, and where the welcome message goes.
+  </Step>
+  <Step title="Adapter install">
+    `setup/add-imessage.sh` copies the adapter from the `channels` branch, installs the pinned package, builds, writes the mode keys to `.env` (synced to `data/env/env`), and restarts the service. Idempotent: safe to re-run.
+  </Step>
+  <Step title="Name the agent and get the welcome message">
+    The wizard asks for your operator role and an agent name (default `Nano`), wires your handle to your first agent group, and sends a welcome iMessage.
+  </Step>
+</Steps>
+
+To wire more conversations later, run `/manage-channels`. Contacts are identified by phone number or email; group chat IDs are assigned internally by iMessage. Group chats are supported.
+
+## Platform notes
+
+- **Mode is resolved from `.env`** — `IMESSAGE_LOCAL` set to anything but `false` means local. Local mode additionally requires `IMESSAGE_ENABLED=true`; remote requires `IMESSAGE_SERVER_URL` (plus `IMESSAGE_API_KEY`). If the required keys for the active mode are missing, the adapter factory returns nothing and the channel silently doesn't start.
+- **Switching modes is clean** — re-running setup (or `setup/add-imessage.sh`) writes the new mode's keys and strips the opposite mode's, so stale values can't confuse the adapter.
+- **Full Disk Access binds to one specific binary** — the grant applies to the `node` file you dragged in, resolved via `which node` at setup time. If you switch Node versions (e.g. with `nvm`), the path changes and the grant no longer covers the binary NanoClaw runs under — re-grant for the new one.
+- **No threads** — the adapter sets `supportsThreads: false`; thread IDs map 1:1 to conversations. Wirings with `per-thread` session mode behave like `shared` here — see the [entity model](/concepts/entity-model).
+
+## Troubleshooting
+
+- **iMessage channel never starts** — the factory bails without its required keys. Local mode (`IMESSAGE_LOCAL` unset or anything but `false`) needs `IMESSAGE_ENABLED=true` in `.env`; remote (`IMESSAGE_LOCAL=false`) needs `IMESSAGE_SERVER_URL`. A missing `IMESSAGE_API_KEY` doesn't block startup — it surfaces later as an authentication failure against Photon. Check `.env` and confirm it's synced to `data/env/env`, then restart.
+- **Inbound messages never arrive (local mode)** — Full Disk Access is missing, or granted to a different `node` binary than the one the service runs under. Run `open "$(dirname "$(which node)")"`, re-drag that `node` file into **Full Disk Access**, and restart the service.
+- **"local mode requires macOS"** — the installer hard-fails on Linux/WSL (the wizard's version of the same error reads "Local iMessage mode only works on macOS"). Choose remote mode (Photon API), or run setup from a Mac.
+- **"Couldn't finish connecting" at the end of setup** — the welcome message didn't go out. Double-check Full Disk Access (local) or your Photon server URL and API key (remote), then re-run setup.
+
+For service-level checks (logs, restarts, wiring queries), see [troubleshooting](/operate/troubleshooting).

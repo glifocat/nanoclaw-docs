@@ -1,0 +1,64 @@
+---
+title: "Signal"
+description: "Connect NanoClaw to Signal via a native signal-cli adapter — QR-code device linking, a local JSON-RPC daemon, and no bot API required."
+tag: "NEW"
+keywords: ["signal", "signal-cli", "add-signal", "linked devices", "qr code", "json-rpc", "daemon", "secondary device"]
+---
+
+{/* verified-against: src/channels/signal.ts (channels branch), setup/channels/signal.ts, setup/add-signal.sh, setup/install-signal-cli.sh, setup/signal-auth.ts, .claude/skills/add-signal/SKILL.md @ dc34ceb */}
+
+The Signal adapter is **native** — no Chat SDK bridge, only Node.js builtins. Signal has no bot API, so NanoClaw talks to [signal-cli](https://github.com/AsamK/signal-cli), which it spawns as a local daemon and drives over a newline-delimited **JSON-RPC TCP socket** (`127.0.0.1:7583` by default). Setup links NanoClaw to your existing Signal account as a **secondary device** — no new phone number needed; your assistant sends and receives as the number on your phone. All connections are outbound, so no public URL, webhook, or open port; works behind NAT and on a laptop.
+
+## Prerequisites
+
+- A phone with Signal installed and registered — you'll scan a QR code from **Settings → Linked Devices**
+- A working NanoClaw install ([quickstart](/quickstart))
+- signal-cli — the wizard auto-installs it: Homebrew on macOS (so Homebrew is required there), or the native release binary (v0.14.3, ~96 MB, no Java, no sudo) to `~/.local/bin` on Linux. The `/add-signal` skill may fetch a newer signal-cli release.
+
+If you'd rather give NanoClaw its own dedicated number (a SIM or VoIP number it owns entirely), the `/add-signal` skill documents a manual `signal-cli register` flow with captcha and SMS/voice verification. The wizard only does device linking.
+
+## Install
+
+Signal is offered in the first-run setup wizard, or add it later by running `/add-signal` in Claude Code. The wizard flow:
+
+<Steps>
+  <Step title="signal-cli check">
+    The wizard probes for `signal-cli` on PATH (or `SIGNAL_CLI_PATH`) and auto-installs it if missing — about 30 seconds, one-time only.
+  </Step>
+  <Step title="Adapter install">
+    `setup/add-signal.sh` copies the adapter from the `channels` branch, installs `qrcode` (only used to render the linking QR — the adapter itself has no npm dependencies), and builds. Idempotent: safe to re-run without re-linking.
+  </Step>
+  <Step title="Scan the QR code">
+    The wizard runs `signal-cli link` and renders the linking URL as a terminal QR. On your phone: **Signal → Settings → Linked Devices → Link New Device**, then scan. The link times out after 3 minutes — re-run setup for a fresh code. If an account is already linked, this step is skipped and the existing account reused.
+  </Step>
+  <Step title="Credentials and restart">
+    The wizard reads the linked phone number back, writes `SIGNAL_ACCOUNT` to `.env` (synced to `data/env/env`), and restarts the service so the adapter picks it up.
+  </Step>
+  <Step title="Name the agent and get the welcome message">
+    The wizard asks for your operator role and an agent name (default `Nano`), wires your Signal DM to your first agent group, and sends a welcome message.
+  </Step>
+</Steps>
+
+To wire group chats or more DMs later, run `/manage-channels`. DMs are identified by the sender's phone number or Signal UUID; groups as `group:<groupId>`.
+
+## Platform notes
+
+- **Daemon management** — by default (`SIGNAL_MANAGE_DAEMON=true`) NanoClaw spawns `signal-cli daemon --tcp` itself and waits up to 30 seconds for the socket. Set it to `false` to run the daemon externally; the adapter then just connects to `SIGNAL_TCP_HOST:SIGNAL_TCP_PORT`. Keep the host on `127.0.0.1` — the daemon has no authentication, so binding a public interface would expose your full Signal account.
+- **One process at a time** — signal-cli holds an exclusive lock on its data directory while the daemon runs. Stop NanoClaw before running `signal-cli` commands manually, then restart.
+- **No threads** — the adapter sets `supportsThreads: false`; every inbound message has a null thread ID. Wirings with `per-thread` session mode behave like `shared` here — see the [entity model](/concepts/entity-model).
+- **Echo suppression** — signal-cli echoes your own outbound messages back as sync messages. The adapter remembers each send per recipient for 10 seconds and drops the first matching echo, so the agent doesn't loop on its own replies. **Note to Self** is the exception: messages you send to your own account from another device route to the agent as inbound.
+- **Formatting** — Markdown in replies (`**bold**`, `*italic*`, `~~strike~~`, `` `code` ``, `||spoiler||`) is converted to Signal's native offset-based text styles, nesting included. If the daemon rejects the styles, the adapter retries with the raw markup. Long replies are chunked at 4,000 characters, splitting at line breaks where possible.
+- **Attachments** — inbound images are passed to the agent as file paths it can read (`[Image: <path>]` lines plus a structured attachments array). Outbound files from the agent are delivered via signal-cli, with caption text sent first. Voice notes get transcribed if `WHISPER_BIN` (local whisper.cpp, needs ffmpeg) or `OPENAI_API_KEY` is set; otherwise the agent sees a `[Voice Message]` placeholder.
+- **Replies and mentions** — quoted replies pass the quoted text and sender to the agent as context. Inbound @mentions are resolved from Signal's placeholder protocol to display names, so the agent sees `@Alice` instead of a raw UUID.
+- **Typing indicator** — shown while the agent works, in DMs only (Signal has no group typing).
+- **Groups** — modern Signal groups (GroupV2) are detected by their group ID; group messages route to a `group:<groupId>` chat, separate from each member's DM.
+- **No auto-reconnect** — if the daemon drops the TCP connection, the adapter marks itself disconnected and logs a warning rather than retrying. Restart the service to re-establish.
+
+## Troubleshooting
+
+- **"Signal daemon failed to start. Is signal-cli installed and your account linked?"** — the managed daemon never opened its socket. Confirm `signal-cli` is on PATH (or set `SIGNAL_CLI_PATH`) and that an account is linked: `signal-cli listAccounts` should print your number.
+- **"Signal daemon not reachable at 127.0.0.1:7583"** — `SIGNAL_MANAGE_DAEMON=false` but nothing is listening. Start the daemon yourself (`signal-cli -a +YOURNUMBER daemon --tcp 127.0.0.1:7583`) or set `SIGNAL_MANAGE_DAEMON=true`.
+- **QR link failed with `qr_timeout`** — the linking code expired (3-minute window; Signal's own QR validity is shorter still). Re-run setup for a fresh code and scan promptly.
+- **"Signal channel lost TCP connection to signal-cli daemon" in logs** — the daemon dropped the connection and the adapter doesn't reconnect on its own. Check `logs/nanoclaw.log` for a daemon exit reason, then restart the service.
+
+For service-level checks (logs, restarts, wiring queries), see [troubleshooting](/operate/troubleshooting).

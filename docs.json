@@ -72,7 +72,7 @@
     { "source": "/integrations/skills-system", "destination": "/extend/overview" },
     { "source": "/integrations/ollama", "destination": "/extend/providers" },
     { "source": "/integrations/gmail", "destination": "/extend/tools" },
-    { "source": "/integrations/x-twitter", "destination": "/channels/overview" },
+    { "source": "/integrations/x-twitter", "destination": "/channels/more-channels" },
     { "source": "/integrations/parallel-ai", "destination": "/extend/tools" },
     { "source": "/features/scheduled-tasks", "destination": "/guides/scheduled-tasks" },
     { "source": "/features/agent-swarms", "destination": "/guides/multi-agent-swarm" },
@@ -131,7 +131,7 @@
           {
             "group": "Channels",
             "icon": "tower-broadcast",
-            "pages": ["channels/overview", "channels/whatsapp", "channels/telegram", "channels/discord", "channels/slack"]
+            "pages": ["channels/overview", "channels/whatsapp", "channels/telegram", "channels/discord", "channels/slack", "channels/signal", "channels/imessage", "channels/teams", "channels/cli", "channels/more-channels"]
           },
           {
             "group": "Operate",

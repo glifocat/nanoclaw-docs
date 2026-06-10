@@ -1,0 +1,107 @@
+---
+title: "More channels"
+description: "Catalog of the ten NanoClaw channels installed conversationally with /add-<channel> — Delta Chat, Emacs, GitHub, Google Chat, Linear, Matrix, Resend, Webex, WeChat, and WhatsApp Cloud API."
+tag: "NEW"
+keywords: ["channels", "add-gchat", "add-github", "add-linear", "add-matrix", "add-webex", "add-wechat", "add-deltachat", "add-emacs", "add-resend", "add-whatsapp-cloud", "chat sdk", "webhook"]
+---
+
+{/* verified-against: upstream/channels:src/channels/{whatsapp-cloud,gchat,github,linear,matrix,webex,wechat,deltachat,emacs,resend}.ts and .claude/skills/add-{whatsapp-cloud,gchat,github,linear,matrix,webex,wechat,deltachat,emacs,resend}/SKILL.md @ dc34ceb (v2.1.4) */}
+
+These ten channels don't have a guided flow in the first-run setup wizard. Instead, each one is installed by running its `/add-<channel>` skill in Claude Code — Claude copies the adapter in from the `channels` branch, wires it into the registry, then walks you through credentials conversationally. The install pattern (fetch branch, copy adapter, wire barrel, pin package, build, collect credentials) is the same for every channel — see [Channels overview](/channels/overview) for the full model.
+
+Channels that receive platform events over HTTP share NanoClaw's webhook server: point the platform at `https://<your-public-host>/webhook/<channel>`. The credentials listed below are the env vars each adapter's factory reads from `.env`.
+
+## Delta Chat
+
+Chat over email with Autocrypt/OpenPGP end-to-end encryption. A native adapter — no Chat SDK bridge — that drives the `@deltachat/stdio-rpc-server` JSON-RPC subprocess directly against the DeltaChat core library. Each DeltaChat chat becomes its own NanoClaw group.
+
+- **Transport:** native (IMAP/SMTP via DeltaChat core) — no public URL needed
+- **Credentials:** `DC_EMAIL`, `DC_PASSWORD`, `DC_IMAP_HOST`, `DC_IMAP_PORT`, `DC_SMTP_HOST`, `DC_SMTP_PORT`
+- **Threads:** no
+- **Install:** `/add-deltachat`
+
+## Emacs
+
+Talk to NanoClaw from inside Emacs (Doom, Spacemacs, or vanilla 27.1+) — a chat buffer plus org-mode integration for sending regions and getting replies as child headings. The adapter is a localhost HTTP bridge: the `nanoclaw.el` client POSTs messages and polls for replies. Single-user, single-chat — one adapter instance is one messaging group.
+
+- **Transport:** native (localhost HTTP server for `nanoclaw.el`) — no bot token or external service
+- **Credentials:** `EMACS_ENABLED=true`; optional `EMACS_CHANNEL_PORT` (default `8766`) and `EMACS_AUTH_TOKEN`
+- **Threads:** no
+- **Install:** `/add-emacs`
+
+## GitHub
+
+The agent participates in PR and issue comment threads as conversations. Requires a dedicated GitHub bot account (not your personal one) — the adapter posts replies as that account and filters its own messages to avoid loops.
+
+- **Transport:** Chat SDK bridge; events arrive at `/webhook/github`
+- **Credentials:** `GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_BOT_USERNAME`
+- **Threads:** yes
+- **Install:** `/add-github`
+
+## Google Chat
+
+Connects NanoClaw to Google Chat spaces through a Google Cloud Chat app backed by a service account.
+
+- **Transport:** Chat SDK bridge; point the Chat app's HTTP endpoint at `/webhook/gchat`
+- **Credentials:** `GCHAT_CREDENTIALS` — the service account JSON as a single-line string
+- **Threads:** yes
+- **Install:** `/add-gchat`
+
+## Linear
+
+The agent participates in Linear issue comment threads. Linear OAuth apps can't be @-mentioned, so the adapter forwards every comment — pick an engage mode that responds to plain comments, not mention-only. All issues map to one messaging group per team (set with `LINEAR_TEAM_KEY`) rather than one group per issue.
+
+- **Transport:** Chat SDK bridge; events arrive at `/webhook/linear`
+- **Credentials:** `LINEAR_CLIENT_ID` + `LINEAR_CLIENT_SECRET` (OAuth app, recommended) or `LINEAR_API_KEY`; plus `LINEAR_WEBHOOK_SECRET`, optional `LINEAR_BOT_USERNAME` and `LINEAR_TEAM_KEY`
+- **Threads:** yes
+- **Install:** `/add-linear`
+
+## Matrix
+
+Works with any Matrix homeserver — matrix.org, Element, or self-hosted. The bot logs into the homeserver as a regular user. Room invites are auto-accepted by default (`MATRIX_INVITE_AUTOJOIN`, with an optional allowlist), and DMs are keyed by user handle instead of ephemeral room IDs, so conversations survive room changes.
+
+- **Transport:** Chat SDK bridge (`@beeper/chat-adapter-matrix`)
+- **Credentials:** `MATRIX_BASE_URL` plus either `MATRIX_ACCESS_TOKEN` + `MATRIX_USER_ID` or `MATRIX_USERNAME` + `MATRIX_PASSWORD`; optional `MATRIX_RECOVERY_KEY` enables E2EE cross-signing
+- **Threads:** no
+- **Install:** `/add-matrix`
+
+## Resend (email)
+
+Async email conversations through [Resend](https://resend.com). Inbound mail reaches NanoClaw via a Resend webhook; replies go out from your configured sender address.
+
+- **Transport:** Chat SDK bridge; webhook at `/webhook/resend`
+- **Credentials:** `RESEND_API_KEY`, `RESEND_FROM_ADDRESS`, `RESEND_FROM_NAME`, `RESEND_WEBHOOK_SECRET`
+- **Threads:** no
+- **Install:** `/add-resend`
+
+## Webex
+
+Connects NanoClaw to Cisco Webex spaces through a Webex bot.
+
+- **Transport:** Chat SDK bridge; create a webhook pointing at `/webhook/webex`
+- **Credentials:** `WEBEX_BOT_TOKEN`, `WEBEX_WEBHOOK_SECRET`
+- **Threads:** yes
+- **Install:** `/add-webex`
+
+## WeChat
+
+Personal WeChat via Tencent's official iLink Bot API — first-party, free, and works with any personal account, unlike puppet-based libraries (wechaty/PadLocal) that risk bans. Login is a QR scan (the URL is written to `data/wechat/qr.txt` and logged); messages arrive by long-polling with a persisted cursor, so nothing is dropped across restarts and no public URL is needed.
+
+- **Transport:** native (Tencent iLink Bot API, long-poll)
+- **Credentials:** `WECHAT_ENABLED=true`, then scan the QR code; auth is saved under `data/wechat/`
+- **Threads:** no
+- **Install:** `/add-wechat`
+
+## WhatsApp Cloud API
+
+WhatsApp through Meta's official Business Cloud API — the hosted alternative to the [native Baileys adapter](/channels/whatsapp). No linked device or QR pairing; instead you register a Meta business app and point its webhook at NanoClaw.
+
+- **Transport:** Chat SDK bridge; webhook at `/webhook/whatsapp`, subscribed to the `messages` field
+- **Credentials:** `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`
+- **Threads:** no
+- **Install:** `/add-whatsapp-cloud`
+
+## Related pages
+
+- [Channels overview](/channels/overview) — the adapter model, registry, and webhook server
+- [CLI channel](/channels/cli) — the built-in no-credential channel that ships on trunk

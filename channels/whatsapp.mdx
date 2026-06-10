@@ -1,424 +1,66 @@
 ---
-title: WhatsApp integration
-description: WhatsApp support via the /add-whatsapp skill using the Baileys library
+title: "WhatsApp"
+description: "Connect NanoClaw to your personal WhatsApp with the native Baileys adapter — QR or pairing-code login, shared or dedicated number."
 tag: "UPDATED"
+keywords: ["whatsapp", "baileys", "qr code", "pairing code", "add-whatsapp", "ASSISTANT_HAS_OWN_NUMBER", "linked devices"]
 ---
 
-<Warning>
-This page is pending a v2 rewrite. The `/add-whatsapp` skill flow still works, but some mechanics described below (e.g., per-channel `skill/*` branch merges) reflect v1 architecture — in v2, channel adapters live on a single `channels` branch, and session IO uses two databases per session. See [Integrations overview](/channels/overview) for current context.
-</Warning>
+{/* verified-against: src/channels/whatsapp.ts (channels branch), setup/channels/whatsapp.ts, .claude/skills/add-whatsapp/SKILL.md @ dc34ceb */}
 
-WhatsApp is a messaging channel for NanoClaw, installed via the `/add-whatsapp` skill. It uses the Baileys library.
+The WhatsApp adapter connects NanoClaw to a personal WhatsApp account as a linked device — no Meta business account, no API key. It's a native adapter built directly on `@whiskeysockets/baileys` 7.0.0-rc.9 (pinned; the WhatsApp Web protocol), not the Chat SDK bridge. For Meta's official Cloud API instead, use `/add-whatsapp-cloud` — see the [channels overview](/channels/overview).
 
-## Overview
+You can run it in two modes:
 
-NanoClaw connects to WhatsApp using the [Baileys](https://github.com/WhiskeySockets/Baileys) library, which provides a clean interface to WhatsApp's Web API.
+- **Shared number** — the agent lives on your own WhatsApp account. Its replies are prefixed with the agent name (`Andy: …`) so they're distinguishable from yours.
+- **Dedicated number** — a separate phone/SIM for the agent. Setting `ASSISTANT_HAS_OWN_NUMBER=true` drops the name prefix on outbound messages and switches bot-echo detection from prefix matching to sender identity.
 
-### Features
+## Prerequisites
 
-- **Group and individual chats** - Message the assistant in any WhatsApp chat
-- **Multi-device support** - Uses WhatsApp's official multi-device protocol
-- **Automatic reconnection** - Handles disconnections gracefully
-- **Typing indicators** - Shows when the assistant is working
-- **Message queuing** - Queues messages when disconnected and flushes on reconnect
-- **LID translation** - Handles WhatsApp's Locally IDentified (LID) JID format
-- **Group metadata sync** - Automatically syncs group names every 24 hours
+- A phone with WhatsApp installed and online — you'll link NanoClaw under **Settings → Linked Devices**
+- A working NanoClaw install ([quickstart](/quickstart))
+- For pairing-code auth: the account's phone number, digits only with country code (e.g. `14155551234`)
 
-## How it works
+## Install
 
-The WhatsApp channel implementation is in `src/channels/whatsapp.ts`:
-
-```typescript
-export class WhatsAppChannel implements Channel {
-  name = 'whatsapp';
-  
-  async connect(): Promise<void> {
-    // Connects to WhatsApp using Baileys
-  }
-  
-  async sendMessage(jid: string, text: string): Promise<void> {
-    // Sends messages with assistant name prefix
-  }
-  
-  async setTyping(jid: string, isTyping: boolean): Promise<void> {
-    // Shows typing indicator
-  }
-}
-```
-
-### Architecture
-
-```
-WhatsApp (Baileys) → SQLite → Polling loop → Container (Claude Agent SDK) → Response
-```
+WhatsApp is offered in the first-run setup wizard, or add it later by running `/add-whatsapp` in Claude Code. Both flows do the same thing:
 
 <Steps>
-  <Step title="Authentication">
-    WhatsApp Web QR code authentication. Credentials stored in `store/auth/`.
+  <Step title="Pick an auth method">
+    QR code (scan with your phone's camera) or pairing code (enter an 8-character code on your phone — no camera needed). The pairing-code flow asks for your phone number first.
   </Step>
-  
-  <Step title="Message receipt">
-    Baileys emits `messages.upsert` events, filtered by registered groups.
+  <Step title="Adapter install">
+    The skill copies `src/channels/whatsapp.ts` from the `channels` branch, wires it into the channel barrel, and installs the pinned Baileys, `qrcode`, and `pino` packages.
   </Step>
-  
-  <Step title="Message storage">
-    Messages are stored in SQLite (`store/messages.db`).
+  <Step title="Link your phone">
+    A QR code renders (terminal, or a local browser page via the skill) and rotates every ~60 seconds until scanned. Pairing codes also expire in ~60 seconds — enter them immediately under **Linked Devices → Link a Device → Link with phone number instead**. Credentials land in `store/auth/`, and the wizard restarts the service so the adapter picks them up.
   </Step>
-  
-  <Step title="Queue processing">
-    The polling loop checks for messages that require agent responses.
+  <Step title="Choose your mode">
+    The wizard asks which number you'll chat from. Same number as the one you linked = shared mode, and messages land in your "You" self-chat. A different number = dedicated mode — the wizard writes `ASSISTANT_HAS_OWN_NUMBER=true` to `.env` (and `data/env/env` for containers).
   </Step>
-  
-  <Step title="Container invocation">
-    Agent runs in an isolated Linux container with the group's filesystem mounted.
-  </Step>
-  
-  <Step title="Response routing">
-    Response is sent back via `sendMessage()` with assistant name prefix.
+  <Step title="Name the agent and get the welcome DM">
+    The wizard asks for an agent name (default `Nano`), wires your DM to the first agent group, and sends a welcome message.
   </Step>
 </Steps>
 
-## Setup
+To wire more chats or groups later, run `/manage-channels`.
 
-WhatsApp is not bundled with NanoClaw's core install. Add it using the `/add-whatsapp` skill:
+## Platform notes
 
-```bash
-claude
-/add-whatsapp
-```
-
-This merges the `skill/whatsapp` branch into your fork, adding the WhatsApp channel code and its dependencies (including `@whiskeysockets/baileys`). The skill will then guide you through authentication.
-
-<Warning>
-If you updated NanoClaw core to v1.2.36+, you must re-merge the WhatsApp fork to pick up the Baileys logger compatibility fix (pino was replaced with a built-in logger):
-
-```bash
-git fetch whatsapp main && git merge whatsapp/main
-```
-
-If the `whatsapp` remote is not configured: `git remote add whatsapp https://github.com/nanocoai/nanoclaw-whatsapp.git`
-</Warning>
-
-### Authentication methods
-
-The skill offers two authentication methods:
-
-- **QR code** (recommended on desktop) — scan a QR code displayed in your browser or terminal
-- **Pairing code** (recommended on headless servers) — enter a numeric code on your phone, no camera needed
-
-<Tabs>
-  <Tab title="QR code">
-    1. A QR code is displayed in your browser or terminal
-    2. Open WhatsApp on your phone → **Linked Devices** → **Link a Device**
-    3. Scan the QR code
-    4. Credentials are stored in `store/auth/`
-  </Tab>
-  <Tab title="Pairing code">
-    1. The skill prompts you for your phone number
-    2. Enter your number as **digits only** — country code followed by your number, with no `+` prefix, spaces, or dashes (e.g., `14155551234` where `1` is the US country code and `4155551234` is the number)
-    3. A pairing code appears — enter it on your phone within 60 seconds
-    4. Credentials are stored in `store/auth/`
-  </Tab>
-</Tabs>
-
-<Note>
-  If authentication fails or expires, run `/add-whatsapp` again to re-authenticate.
-</Note>
-
-## Configuration
-
-### Assistant has own number
-
-Set this in `src/config.ts`:
-
-```typescript
-export const ASSISTANT_HAS_OWN_NUMBER = false; // Default: shared number
-```
-
-**Shared number (false):**
-- You and the assistant share the same WhatsApp number
-- Assistant messages are prefixed with the assistant name (e.g., "Andy: Hello!")
-- Required for self-chat (messaging yourself)
-
-**Own number (true):**
-- The assistant has its own dedicated WhatsApp number
-- No message prefix needed
-- Cleaner appearance in group chats
-
-### Assistant name
-
-The assistant name is used as the message prefix and trigger pattern:
-
-```typescript
-export const ASSISTANT_NAME = 'Andy';
-```
-
-Messages from the assistant appear as:
-
-```
-Andy: Your scheduled task completed successfully.
-```
-
-### Connection settings
-
-Connection logic is in `src/channels/whatsapp.ts`:
-
-```typescript
-const { version } = await fetchLatestWaWebVersion({});
-this.sock = makeWASocket({
-  version,
-  auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
-  printQRInTerminal: false,
-  logger,
-  browser: Browsers.macOS('Chrome'),
-});
-```
-
-## Message handling
-
-### Bot message detection
-
-The channel determines if a message came from the bot:
-
-```typescript
-const isBotMessage = ASSISTANT_HAS_OWN_NUMBER
-  ? fromMe
-  : content.startsWith(`${ASSISTANT_NAME}:`);
-```
-
-This prevents the bot from responding to its own messages.
-
-### Message prefix
-
-Outgoing messages are prefixed unless using a dedicated number:
-
-```typescript
-const prefixed = ASSISTANT_HAS_OWN_NUMBER
-  ? text
-  : `${ASSISTANT_NAME}: ${text}`;
-```
-
-### Group metadata sync
-
-Group names are synced from WhatsApp every 24 hours:
-
-```typescript
-async syncGroupMetadata(force = false): Promise<void> {
-  const groups = await this.sock.groupFetchAllParticipating();
-  for (const [jid, metadata] of Object.entries(groups)) {
-    if (metadata.subject) {
-      updateChatName(jid, metadata.subject);
-    }
-  }
-}
-```
-
-This ensures group names in the database match their current WhatsApp names.
-
-## JID format
-
-WhatsApp uses JIDs (Jabber IDs) to identify chats:
-
-- **Individual:** `1234567890@s.whatsapp.net`
-- **Group:** `120363012345678901@g.us`
-- **LID (newer format):** `123456:78@lid`
-
-The channel translates LID JIDs to phone JIDs automatically.
-
-## Registering chats
-
-To make the assistant respond in a chat, register it:
-
-### Main chat (self-chat)
-
-Your self-chat is the admin control channel:
-
-```typescript
-registerGroup("<your-number>@s.whatsapp.net", {
-  name: "Main",
-  folder: "main",
-  trigger: `@${ASSISTANT_NAME}`,
-  added_at: new Date().toISOString(),
-  requiresTrigger: false,
-});
-```
-
-### Group chats
-
-For WhatsApp groups:
-
-```typescript
-registerGroup("<group-jid>@g.us", {
-  name: "Family Chat",
-  folder: "family-chat",
-  trigger: `@${ASSISTANT_NAME}`,
-  added_at: new Date().toISOString(),
-  requiresTrigger: true, // Only responds when mentioned
-});
-```
-
-<Tip>
-  Use `requiresTrigger: true` for group chats so the assistant only responds when explicitly mentioned.
-</Tip>
-
-## WhatsApp-specific skills
-
-Several skills extend WhatsApp with media handling capabilities. These live on the `nanoclaw-whatsapp` fork as `skill/*` branches.
-
-| Skill | Command | What it does |
-|-------|---------|--------------|
-| Voice transcription | `/add-voice-transcription` | Transcribe voice notes via Whisper API |
-| Local whisper | `/use-local-whisper` | Offline transcription via whisper.cpp |
-| Image vision | `/add-image-vision` | Understand image attachments |
-| PDF reader | `/add-pdf-reader` | Extract text from PDF attachments |
-| Emoji reactions | `/add-reactions` | Send, receive, and search emoji reactions |
-
-See [voice transcription](/channels/overview), [image vision](/channels/overview), and [PDF reader](/channels/overview) for detailed documentation.
-
-### Emoji reactions
-
-The `/add-reactions` skill adds full emoji reaction support:
-
-- **Receive reactions**: Reactions on messages are stored in a dedicated `reactions` table with a forward-only emoji state machine (sent → delivered → read → reacted)
-- **Send reactions**: A `react_to_message` MCP tool lets the agent react to specific messages
-- **Search reactions**: Query reactions by emoji, sender, or message
-- **Database migration**: Adds a `reactions` table automatically on first run
-
-```bash
-# Install on your nanoclaw-whatsapp fork
-git fetch whatsapp skill/add-reactions
-git merge whatsapp/skill/add-reactions
-```
+- **Auth persistence** — credentials live in `store/auth/` (multi-file auth state). Restarts reuse the saved session; you only re-pair if WhatsApp logs the device out. On a server-side logout the adapter wipes `store/auth/` so the next start prompts a fresh pair.
+- **Activation** — the adapter only starts when `store/auth/creds.json` exists, `WHATSAPP_PHONE_NUMBER` is set (pairing-code mode), or `WHATSAPP_ENABLED=true` (QR mode). Otherwise it's skipped at startup.
+- **Reconnection** — on disconnect the adapter reconnects immediately (with one retry after 5s if that attempt throws) unless it was logged out. Messages sent while disconnected are queued in memory and flushed when the connection reopens.
+- **No threads** — the adapter sets `supportsThreads: false`; every inbound message has a null thread ID. Wirings with `per-thread` session mode behave like `shared` here — see the [entity model](/concepts/entity-model).
+- **DMs vs groups** — DMs always count as addressed to the agent. In groups (`…@g.us` JIDs) the agent is by default only triggered by an explicit @-mention of the bot's number, which the adapter also normalizes to `@<agent name>` for trigger matching. Group names sync from WhatsApp every 24 hours.
+- **Media** — inbound images, video, audio, and documents are downloaded to `data/attachments/` and passed to the agent (unsafe attacker-controlled filenames are replaced). Outbound files are sent as native WhatsApp media by extension, with the reply text as the first file's caption.
+- **Formatting** — the agent's markdown is converted to WhatsApp formatting (`**bold**` → `*bold*`, headings → bold, links → `text (url)`); code blocks pass through untouched. `@<phone>` in replies becomes a real tappable mention.
+- **Interactive questions** — `ask_user_question` renders as text with slash-command answers (`/approve`, `/reject`); the adapter matches your reply to the pending question. Editing and deleting sent messages isn't supported (linked-device limitation).
+- **Self-chat** — in shared mode you can message the agent in your own "You" chat. The adapter tells your typed messages apart from its own echoes via a sent-message cache.
 
 ## Troubleshooting
 
-### Authentication expired
+- **Logged out / re-pair loop** — if logs show `WhatsApp logged out` followed by `WhatsApp auth cleared`, the account was unlinked server-side (often a 401). The adapter already wiped `store/auth/`; set `WHATSAPP_ENABLED=true` and restart (or re-run `/add-whatsapp`) to scan a fresh QR.
+- **`Could not fetch current WhatsApp Web version`** — Baileys' hardcoded protocol version goes stale and WhatsApp rejects it (405), so the adapter fetches the current version at startup from wppconnect.io with web.whatsapp.com as fallback. This error means both fetches failed: check outbound network access to those hosts.
+- **Agent silent, messages arrive late in a burst** — the connection dropped; outbound messages were queued (`WA disconnected, message queued` in logs) and flushed on reconnect. Confirm the last `Connected to WhatsApp` log line and that only **one** NanoClaw process holds these credentials — a second instance causes "conflict" disconnect loops.
+- **QR or pairing code expired** — both rotate/expire in ~60 seconds. Re-run the auth step for a fresh code; for pairing codes, the number must be digits only with country code, no `+`. If pairing codes keep getting rejected, switch to the QR method — it's more reliable.
 
-If you see "WhatsApp authentication required" notifications:
-
-```bash
-claude
-/setup
-```
-
-Follow the QR code authentication flow again.
-
-### Pairing code not working
-
-Pairing codes expire in about 60 seconds. If authentication fails:
-
-1. Verify your phone number is **digits only** — country code + number, no `+` prefix, spaces, or dashes (e.g., `14155551234`)
-2. Make sure your phone has internet access
-3. Update WhatsApp to the latest version
-4. Enter the code immediately when it appears
-
-If pairing code keeps failing, try QR code authentication instead by running `/add-whatsapp` again and selecting the QR code option.
-
-### Connection issues
-
-The channel automatically reconnects on disconnection:
-
-```typescript
-if (connection === 'close') {
-  const shouldReconnect = reason !== DisconnectReason.loggedOut;
-  if (shouldReconnect) {
-    logger.info('Reconnecting...');
-    this.connectInternal().catch(...);
-  }
-}
-```
-
-Messages are queued during disconnection and flushed on reconnect.
-
-### Not receiving messages
-
-Check if the chat is registered:
-
-```bash
-sqlite3 store/messages.db "SELECT * FROM registered_groups"
-```
-
-If the chat isn't listed, register it using the process above.
-
-### Bot responding to itself
-
-Ensure `ASSISTANT_HAS_OWN_NUMBER` is set correctly in `src/config.ts`:
-
-- If sharing a number, set to `false` (bot messages will have the name prefix)
-- If using a dedicated number, set to `true` (bot messages are identified by `fromMe`)
-
-## Using other channels
-
-NanoClaw supports multiple messaging channels as equal options. You can run WhatsApp alongside other channels or use a different channel entirely.
-
-### Add another channel
-
-```bash
-/add-telegram  # Adds Telegram alongside WhatsApp
-```
-
-### Remove WhatsApp
-
-To remove the WhatsApp skill and revert to a channel-free core:
-
-```bash
-git revert -m 1 <whatsapp-merge-commit>
-```
-
-See [removing a skill](/extend/overview#removing-a-skill) for details.
-
-## Implementation details
-
-### Message queue
-
-Messages sent while disconnected are queued and flushed on reconnect:
-
-```typescript
-private async flushOutgoingQueue(): Promise<void> {
-  while (this.outgoingQueue.length > 0) {
-    const item = this.outgoingQueue.shift()!;
-    await this.sock.sendMessage(item.jid, { text: item.text });
-  }
-}
-```
-
-### Presence updates
-
-The channel announces availability on connection:
-
-```typescript
-this.sock.sendPresenceUpdate('available').catch(...);
-```
-
-And sends typing indicators per chat:
-
-```typescript
-async setTyping(jid: string, isTyping: boolean): Promise<void> {
-  const status = isTyping ? 'composing' : 'paused';
-  await this.sock.sendPresenceUpdate(status, jid);
-}
-```
-
-## Source code reference
-
-After installing the WhatsApp skill, the implementation lives in:
-
-- **`src/channels/whatsapp.ts`** - Main WhatsAppChannel class
-- **`src/config.ts`** - Configuration constants (extended by the skill)
-- **`src/index.ts`** - Channel initialization and routing
-
-<Note>
-These files are added by the `skill/whatsapp` branch merge. They do not exist in NanoClaw's core install.
-</Note>
-
-## Next steps
-
-<CardGroup cols={2}>
-  <Card title="Add Telegram" icon="telegram" href="/channels/telegram">
-    Add Telegram support alongside or instead of WhatsApp
-  </Card>
-  
-  <Card title="Add Discord" icon="discord" href="/channels/discord">
-    Add Discord support to your installation
-  </Card>
-</CardGroup>
+For service-level checks (logs, restarts, wiring queries), see [troubleshooting](/operate/troubleshooting).
