@@ -24,7 +24,7 @@ flowchart LR
     REG[Channel registry] -.->|"instantiates at startup,<br/>resolves adapter for delivery"| A
 ```
 
-The adapter normalizes platform events into inbound messages; the router matches them to a wiring (which agent group handles which chat) and writes them into the right session; the agent's reply comes back through the router, which looks up the adapter by channel type in the registry and calls `deliver()`.
+The adapter normalizes platform events into inbound messages; the router matches them to a wiring (which agent group handles which chat) and writes them into the right session; the agent's reply drains through the delivery module, which looks up the adapter by channel type in the registry and calls `deliver()`.
 
 Adapters come in two flavors:
 

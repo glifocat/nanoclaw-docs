@@ -1,359 +1,95 @@
 ---
-title: Contributing
-description: Guidelines for contributing to NanoClaw, including PR requirements, skill types, and code standards
+title: "Contributing to NanoClaw"
+description: "How the nanoclaw repo is laid out, the dev loop, the three-branch model, and what kinds of contributions get accepted."
+tag: "UPDATED"
+keywords: ["contributing", "development", "pnpm", "vitest", "bun", "channels branch", "providers branch", "repo layout", "pull requests", "token count"]
 ---
 
-NanoClaw is designed to stay small and minimal. Contributions should prioritize reducing code, not adding features.
+{/* verified-against: package.json, CONTRIBUTING.md, RELEASING.md, vitest.config.ts, vitest.skills.config.ts, eslint.config.js, .github/workflows/{ci.yml,update-tokens.yml}, repo-tokens/README.md, CLAUDE.md @ dc34ceb (v2.1.4) */}
 
-## Philosophy
+This page is for contributing to [nanocoai/nanoclaw](https://github.com/nanocoai/nanoclaw) itself — fixing bugs, simplifying code, or adding a skill to the upstream repo. If you just want to extend your own installation, you don't need any of this: see [Extending NanoClaw](/extend/overview).
 
-NanoClaw is **not** a framework that tries to support every use case. It's software that each user customizes to fit their exact needs.
+The upstream [CONTRIBUTING.md](https://github.com/nanocoai/nanoclaw/blob/main/CONTRIBUTING.md) is canonical for process. The short version: **accepted** — bug fixes, security fixes, simplifications, reducing code. **Not accepted** — features, capabilities, compatibility, enhancements. Those should be skills, so users who don't want them never inherit the code. One thing per PR, and search open PRs and issues before starting.
 
-Instead of adding features to the codebase, we contribute **skills** that teach Claude Code how to transform a NanoClaw installation.
-
-## What we accept
-
-### Source code changes
-
-<Accordion title="Accepted: Bug fixes">
-  Fixes for broken functionality, crashes, or incorrect behavior.
-  
-  **Example:** Fix message cursor advancing before agent succeeds, causing messages to be lost on timeout.
-</Accordion>
-
-<Accordion title="Accepted: Security fixes">
-  Patches for security vulnerabilities or improvements to the security model.
-  
-  **Example:** Add symlink resolution to mount validation to prevent traversal attacks.
-</Accordion>
-
-<Accordion title="Accepted: Simplifications">
-  Refactoring that reduces complexity, removes dependencies, or makes the codebase easier to understand.
-  
-  **Example:** Consolidate duplicate mount validation logic into a single function.
-</Accordion>
-
-<Accordion title="Accepted: Code reduction">
-  Removing unnecessary code, dependencies, or features.
-  
-  **Example:** Remove unused configuration options.
-</Accordion>
-
-<Accordion title="Not accepted: Features">
-  New capabilities, integrations, or functionality expansions.
-  
-  **Why:** Features should be skills, not source code.
-  
-  **Example:** Adding Telegram support, Gmail integration, or new scheduling options.
-</Accordion>
-
-<Accordion title="Not accepted: Enhancements">
-  Improvements to existing features or performance optimizations.
-  
-  **Why:** Users should customize their fork to add enhancements they need.
-  
-  **Example:** Adding caching, improving query performance, or adding retry logic.
-</Accordion>
-
-<Accordion title="Not accepted: Compatibility">
-  Support for new platforms, runtimes, or environments.
-  
-  **Why:** Compatibility changes should be skills.
-  
-  **Example:** Adding Windows support, Podman support, or ARM64 optimization.
-</Accordion>
-
-## Contributing skills
-
-A [skill](https://code.claude.com/docs/en/skills) is a markdown file that teaches Claude Code how to transform or extend a NanoClaw installation. NanoClaw has four types of skills, each serving a different purpose.
-
-### Skill types
-
-**Feature skills** — add capabilities by merging a `skill/*` branch. The SKILL.md contains setup instructions; the actual code lives on the branch.
+## Repo layout
 
 <Tree>
-  <Tree.Folder name="skill/telegram branch" defaultOpen>
-    <Tree.File name="src/channels/telegram.ts" />
-    <Tree.File name="src/index.ts" />
-    <Tree.File name="package.json" />
-    <Tree.File name=".env.example" />
+  <Tree.Folder name="nanoclaw" defaultOpen>
+    <Tree.Folder name="src — host process: routing, containers, channel registry, SQLite state (Node)" />
+    <Tree.Folder name="container — agent image: Dockerfile, entrypoint, agent-runner (Bun), container skills" />
+    <Tree.Folder name="setup — setup wizard: environment checks, channel installers, service registration" />
+    <Tree.Folder name=".claude/skills — host-side skills: /setup, /debug, /add-telegram, and the rest" />
+    <Tree.Folder name="scripts — dev and maintenance scripts: chat.ts, migrations, e2e harnesses" />
+    <Tree.Folder name="docs — developer docs: architecture, isolation model, skills model, skill guidelines" />
+    <Tree.Folder name="repo-tokens — GitHub Action that keeps the token-count badge updated" />
   </Tree.Folder>
 </Tree>
 
-**Utility skills** — standalone tools that ship code files alongside the SKILL.md. No branch merge needed.
+## The whole repo fits in context
 
-<Tree>
-  <Tree.Folder name=".claude/skills" defaultOpen>
-    <Tree.Folder name="claw" defaultOpen>
-      <Tree.File name="SKILL.md" />
-      <Tree.Folder name="scripts" defaultOpen>
-        <Tree.File name="claw" />
-      </Tree.Folder>
-    </Tree.Folder>
-  </Tree.Folder>
-</Tree>
+The token badge in the README currently reads **~185k tokens** for the runtime surface (mainly `src/`, `container/agent-runner/src/`, the Dockerfile, and `CLAUDE.md` — host tests excluded). That's deliberate: the codebase is kept small enough for a coding agent to hold it in context, which is also why feature PRs are redirected to skills. The badge is auto-generated — the `update-tokens.yml` workflow runs the `repo-tokens/` action on every push to `main` that touches `src/`, `container/`, `launchd/`, or `CLAUDE.md` and commits the new badge. Don't update it by hand.
 
-**Operational skills** — instruction-only SKILL.md files on `main` with no code changes.
+## Dev loop
 
-<Tree>
-  <Tree.Folder name=".claude/skills" defaultOpen>
-    <Tree.Folder name="debug" defaultOpen>
-      <Tree.File name="SKILL.md" />
-    </Tree.Folder>
-  </Tree.Folder>
-</Tree>
+NanoClaw uses **pnpm** for the host and **Bun** for the agent-runner inside the container — two separate package trees.
 
-**Container skills** — loaded inside agent containers at runtime from `container/skills/`.
+```bash
+# Host (Node + pnpm, repo root)
+pnpm install
+pnpm run dev          # run the host with hot reload (tsx)
+pnpm run build        # compile TypeScript (tsc)
+pnpm test             # host tests (vitest run)
+pnpm run test:watch   # vitest in watch mode
+pnpm run lint         # eslint src/
+pnpm run typecheck    # tsc --noEmit
+pnpm run format       # prettier --write
 
-### Writing a skill
+# Container image
+./container/build.sh  # rebuild nanoclaw-agent:latest
 
-<Steps>
-  <Step title="For feature skills: make code changes on a branch">
-    Branch from `main` and make your code changes directly:
+# Agent-runner (Bun, separate tree)
+cd container/agent-runner
+bun install
+bun test              # container tests (bun:test)
+```
 
-    ```bash
-    git checkout -b skill/my-integration main
-    # Add new files, modify source, update package.json
-    git commit -m "Add my-integration support"
-    ```
+CI on every PR runs `format:check`, typechecks for both trees, host tests under vitest, and agent-runner tests under `bun test`.
 
-    The branch should contain all the code needed for the integration — new files, modified source files, updated dependencies, `.env.example` additions.
-  </Step>
+## Test layout
 
-  <Step title="For utility skills: create a self-contained directory">
-    Create `.claude/skills/{name}/` with a SKILL.md and supporting code files (e.g., in a `scripts/` subfolder). Use `${CLAUDE_SKILL_DIR}` to reference files in the skill directory. Put code in separate files, not inline in the SKILL.md.
-  </Step>
+Tests are split across three configs because the two runtimes can't share one:
 
-  <Step title="For operational skills: write SKILL.md">
-    Create a `SKILL.md` in `.claude/skills/{name}/` on `main`. The skill should contain **instructions** Claude follows to execute a workflow.
+- **`vitest.config.ts`** — host tests: `src/**/*.test.ts`, `setup/**/*.test.ts`, `scripts/**/*.test.ts`. Run with `pnpm test`.
+- **`vitest.skills.config.ts`** — skill registration tests: `.claude/skills/**/tests/*.test.ts`. Run with `pnpm exec vitest run --config vitest.skills.config.ts`.
+- **`container/agent-runner`** — Bun tests, because they depend on `bun:sqlite`, which vitest (Node) can't load. Import from `bun:test`, not `vitest`.
 
-    ```markdown
-    ---
-    name: debug
-    description: Troubleshoot NanoClaw issues
-    ---
+## The three-branch model
 
-    # Debug
+Trunk (`main`) ships no specific channel adapter and no non-default provider. The adapters live on two long-lived registry branches, kept in sync with `main`:
 
-    ## 1. Check service status
-    ...
-    ```
-  </Step>
+- **`channels`** — Discord, Slack, Telegram, WhatsApp, Teams, and the other channel adapters, plus their tests and setup steps. Installed via `/add-<channel>` skills.
+- **`providers`** — non-default agent providers like OpenCode. Installed via `/add-opencode`.
 
-  <Step title="For container skills: add to container/skills/">
-    Create `container/skills/{name}/SKILL.md`. Keep skills focused — the agent's context window is shared across all container skills.
-  </Step>
+Install is an additive fetch (`git show origin/channels:<path> > <path>`), never a `git merge` — [docs/skills-model.md](https://github.com/nanocoai/nanoclaw/blob/main/docs/skills-model.md) explains why.
 
-  <Step title="Include context and rationale">
-    For feature skills, write a SKILL.md for the marketplace that explains setup steps and design decisions.
+Where your PR goes depends on what you're contributing:
 
-    ```markdown
-    ## Design decisions
+- **Bug fix or simplification** → ordinary PR against `main`.
+- **Channel or provider adapter** → fork, branch from `main`, build the adapter per [docs/skill-guidelines.md](https://github.com/nanocoai/nanoclaw/blob/main/docs/skill-guidelines.md) (self-registering module, one appended barrel import, a registration test against the real barrel), add a SKILL.md with the fetch-and-copy steps and a REMOVE.md that reverses every change, then open a PR against `main`. Maintainers land the code on the registry branch from your work — you don't push to `channels` or `providers` directly.
+- **Utility, operational, or container skill** → PR against `main`; the skill lives in `.claude/skills/` (or `container/skills/` for container skills). [CONTRIBUTING.md](https://github.com/nanocoai/nanoclaw/blob/main/CONTRIBUTING.md) describes all four skill types.
 
-    - Use polling instead of webhooks for simplicity
-    - Store Telegram credentials in the `.env` file
-    - Reuse the existing message queue system
-    ```
-  </Step>
+## Releases
 
-  <Step title="Test on a fresh clone">
-    Before submitting, test your skill on a fresh NanoClaw fork:
+Maintainers cut a GitHub Release for `package.json` version bumps that land on `main`: a `vX.Y.Z` tag, a `CHANGELOG.md` entry, and a release body that mirrors it. Every release is stable — there's no pre-release channel — and published tags are never moved, so pinning a tag is the reproducible choice for forks. Details in [RELEASING.md](https://github.com/nanocoai/nanoclaw/blob/main/RELEASING.md).
 
-    ```bash
-    git clone https://github.com/nanocoai/NanoClaw.git test-nanoclaw
-    cd test-nanoclaw
-    git merge origin/skill/my-integration
-    npm install && npm test && npm run build
-    ```
-  </Step>
-</Steps>
+## Where to go
 
-### Why skills instead of features?
-
-**Every user should have clean and minimal code that does exactly what they need.**
-
-Skills let users selectively add features to their fork without inheriting code for features they don't want.
-
-<Tabs>
-  <Tab title="With skills">
-    ```
-    # User A wants WhatsApp only
-    git clone nanoclaw
-    claude /setup
-    # Clean codebase, no Telegram code
-
-    # User B wants Telegram
-    git clone nanoclaw
-    claude /setup
-    claude /add-telegram
-    # Merges skill/telegram branch — clean code with Telegram support
-    ```
-  </Tab>
-  
-  <Tab title="Without skills (traditional approach)">
-    ```
-    # Everyone gets both
-    git clone nanoclaw
-    npm install
-    # Codebase includes WhatsApp, Telegram, Discord, Slack...
-    # Configuration sprawl to enable/disable features
-    # Unused dependencies and code
-    ```
-  </Tab>
-</Tabs>
-
-### Skill guidelines
-
-<Accordion title="Feature skills contain source changes">
-  Feature skills are `skill/*` branches that contain all code changes for the integration — including modifications to `src/`, `container/`, `package.json`, etc. This is by design: the skill branch is the complete diff from `main`.
-
-  Utility skills ship code alongside the SKILL.md but don't modify source files — the code is self-contained in the skill directory. Operational skills are instruction-only.
-</Accordion>
-
-<Accordion title="Skills should be reversible">
-  Users should be able to remove a skill's changes if they no longer want it. Include removal instructions in the skill or create a separate `/remove-{feature}` skill.
-</Accordion>
-
-<Accordion title="Skills should be composable">
-  Skills should work together without conflicts. If your skill is incompatible with another skill, document this clearly.
-</Accordion>
-
-<Accordion title="Skills should preserve security">
-  Skills that add new capabilities must respect the existing security model. Don't bypass container isolation, mount validation, or IPC authorization.
-</Accordion>
-
-## Request for skills (RFS)
-
-Skills we'd like to see contributed:
-
-### Communication channels
-
-<Note>
-  Slack, Discord, Telegram, and Gmail integrations already exist! Check the [integrations overview](/channels/overview).
-</Note>
-
-- `/add-signal` - Add Signal integration
-- `/add-matrix` - Add Matrix integration
-- `/add-whatsapp-cloud-api` - Add WhatsApp Cloud API (for business accounts)
-
-### Deployment
-
-- `/deploy-railway` - Deploy NanoClaw to Railway
-- `/deploy-fly` - Deploy NanoClaw to Fly.io
-- `/deploy-vps` - Deploy NanoClaw to a VPS with systemd
-
-### Integrations
-
-- `/add-calendar` - Google Calendar integration
-- `/add-todoist` - Todoist integration
-- `/add-notion` - Notion integration
-
-### Runtime
-
-- `/convert-to-podman` - Switch from Docker to Podman
-- `/add-windows-support` - WSL2 support for Windows
-
-## Submitting a contribution
-
-<Steps>
-  <Step title="Fork the repository">
-    ```bash
-    git clone https://github.com/nanocoai/NanoClaw.git
-    cd NanoClaw
-    git checkout -b my-contribution
-    ```
-  </Step>
-
-  <Step title="Make your changes">
-    For operational skills:
-    ```bash
-    mkdir -p .claude/skills/my-skill
-    # Write SKILL.md
-    ```
-
-    For feature skills:
-    ```bash
-    # Branch from main and make code changes
-    # Add new files, modify source, update package.json, etc.
-    npm run build
-    npm test
-    ```
-
-    For source changes (bug fixes, simplifications):
-    ```bash
-    # Edit files in src/, container/, etc.
-    npm run build
-    npm test
-    ```
-  </Step>
-
-  <Step title="Test thoroughly">
-    For feature skills:
-    ```bash
-    # Test merging into a fresh clone
-    cd /tmp
-    git clone https://github.com/nanocoai/NanoClaw.git test-nanoclaw
-    cd test-nanoclaw
-    git remote add fork /path/to/your/fork
-    git fetch fork my-contribution
-    git merge fork/my-contribution
-    npm install && npm test && npm run build
-    ```
-
-    For source changes:
-    ```bash
-    npm test
-    npm run build
-    # Manual testing
-    ```
-  </Step>
-
-  <Step title="Create a pull request">
-    ```bash
-    git add .
-    git commit -m "Add /my-skill for X functionality"
-    git push origin my-contribution
-    ```
-
-    Then open a PR on GitHub with:
-    - Clear description of what the contribution does
-    - Why it should be accepted (follows contribution guidelines)
-    - Testing notes
-
-    For feature skills, maintainers will create a `skill/<name>` branch from your PR and add the SKILL.md to the marketplace.
-  </Step>
-</Steps>
-
-## Code style
-
-When contributing source code:
-
-- Follow existing TypeScript conventions
-- Use meaningful variable names
-- Add comments for non-obvious logic
-- Keep functions small and focused
-- Prefer explicit over implicit
-
-<Note>
-NanoClaw doesn't use a linter or formatter. Code style is enforced through review. The goal is readability and simplicity, not stylistic uniformity.
-</Note>
-
-## Getting help
-
-If you're working on a contribution and need help:
-
-1. **Ask Claude Code:** Describe what you're trying to do. Claude can help write skills or refactor code.
-
-2. **Join the Discord:** [Community Discord](https://discord.gg/VDdww8qS42)
-
-3. **Open a draft PR:** Start a discussion before the work is complete.
-
-## License
-
-By contributing to NanoClaw, you agree that your contributions will be licensed under the MIT License.
+- **Issues and PRs:** [nanocoai/nanoclaw](https://github.com/nanocoai/nanoclaw) — link related issues with `Closes #N`, test on a fresh clone, keep descriptions short.
+- **Process:** [CONTRIBUTING.md](https://github.com/nanocoai/nanoclaw/blob/main/CONTRIBUTING.md) is the source of truth, including the PR-template checkboxes that auto-apply labels.
+- **Discussion:** the [NanoClaw Discord](https://discord.gg/VDdww8qS42) — good for checking alignment before you build.
 
 ## Related pages
 
-- [Security model](/concepts/security) - Understanding security boundaries
-- [IPC system](/concepts/architecture) - How agents communicate with the host
-- [Container runtime](/concepts/container-lifecycle) - Container execution details
+- [Extending NanoClaw](/extend/overview) — customizing your own install instead of upstream
+- [Architecture](/concepts/architecture) — how the pieces in `src/` and `container/` fit together
+- [Security model](/concepts/security) — boundaries your contribution must preserve

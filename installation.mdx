@@ -55,7 +55,7 @@ Every run writes two logs: a progression log at `logs/setup.log` (one entry per 
 NanoClaw deliberately splits runtimes:
 
 - **Host**: Node 20+ and pnpm. The wizard compiles TypeScript with `tsc` and the service runs `node dist/index.js`.
-- **Agent container**: Bun 1.3.12 runs the agent-runner TypeScript directly — no build step. The image (from `container/Dockerfile`) is based on `node:22-slim` with `tini` as PID 1, Chromium for browser automation, and globally installed CLIs — `@anthropic-ai/claude-code` and `vercel` pinned for reproducibility, `agent-browser` tracking latest.
+- **Agent container**: Bun 1.3.12 runs the agent-runner TypeScript directly — no build step. The image (from `container/Dockerfile`) is based on `node:22-slim` with Chromium for browser automation and globally installed CLIs — `@anthropic-ai/claude-code` and `vercel` pinned for reproducibility, `agent-browser` tracking latest.
 
 Two consequences worth knowing:
 
