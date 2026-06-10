@@ -45,7 +45,7 @@ dig in with web search, and report findings back to you with sources.
 The agent calls the `create_agent` MCP tool with a `name` and that role as `instructions`. The call is fire-and-forget — it returns immediately, and the host does the privileged work:
 
 1. Inserts an `agent_groups` row. The folder is the normalized name (`researcher`), with a numeric suffix if taken.
-2. Scaffolds `groups/researcher/` and seeds **`CLAUDE.local.md` with the `instructions` text** — that's the new agent's persistent role and personality, editable later like any agent's memory.
+2. Scaffolds `groups/researcher/` and seeds **`CLAUDE.local.md` with the `instructions` text** — that's the new agent's persistent role and personality, editable later like any agent's memory. A default `container_configs` row comes with it.
 3. Inserts **two destination rows**: the creator gets `researcher` → new agent, and the new agent gets `parent` → creator. The edge is bidirectional from birth, so replies need no extra wiring.
 4. Projects the new destination into the parent's running container immediately, then notifies it: `Agent "researcher" created. You can now message it with <message to="researcher">...</message>.`
 
@@ -104,7 +104,14 @@ ncl destinations add --agent-group-id <supervisor-id> --local-name worker-1 \
 
 Two finishing touches:
 
-- **Supervisor pings you**: wire the supervisor to your DM (`ncl wirings create --messaging-group-id <your-dm-id> --agent-group-id <supervisor-id> ...`). Wiring auto-creates the channel destination, so the supervisor can message you proactively — and use `ask_user_question` to put actual buttons under a decision.
+- **Supervisor pings you**: wire the supervisor to your DM (`ncl wirings create --messaging-group-id <your-dm-id> --agent-group-id <supervisor-id> ...`) so it receives your messages — and can reply, since an agent may always answer its origin chat. But `ncl wirings create` is a plain row insert: it does **not** create the channel destination (only the setup scripts' wiring path auto-creates one), so a *proactive* send addressed by name fails the ACL. Add the edge explicitly:
+
+  ```bash
+  ncl destinations add --agent-group-id <supervisor-id> --local-name owner-dm \
+    --target-type channel --target-id <your-dm-mg-id>
+  ```
+
+  Now the supervisor can message you unprompted — and use `ask_user_question` to put actual buttons under a decision.
 - **One conversation per task**: wire a worker to a thread-capable channel (Discord, Slack) with `--session-mode per-thread` and every thread gets its own session — each task runs in a clean context instead of one ever-growing conversation. On server channels this is [forced anyway](/concepts/entity-model); the flag matters for DMs.
 
 </Step>
@@ -128,7 +135,7 @@ The destinations list reads as the manager's address book: `parent`, `worker-1`,
 
 - **No loop protection.** There is no throttle, hop limit, or cycle detection on agent-to-agent messages — two agents told to "always reply" will ping-pong indefinitely, burning API calls. Give every agent's instructions an explicit stop condition ("report back once, then wait").
 - **No broadcast.** Each message targets one destination. Fan-out means one `<message>` block (or `send_message` call) per recipient — the parent orchestrates, the queue doesn't.
-- **Concurrency is capped.** Containers respect `MAX_CONCURRENT_CONTAINERS` (default 5). A wide team queues rather than crashing, but raise the cap if workers should genuinely run in parallel.
+- **No concurrency cap.** `MAX_CONCURRENT_CONTAINERS` (default 5) is parsed at startup but [not enforced anywhere as of v2.1.4](/reference/environment-variables) — a wide team really does run one container per active agent, so size the host accordingly.
 - **Edits to destinations outside `ncl` don't propagate live.** A running container serves a projection of its destinations, refreshed on every wake and by `ncl destinations add`/`remove` — but direct DB writes leave it stale until the next wake.
 
 ## Cleanup
