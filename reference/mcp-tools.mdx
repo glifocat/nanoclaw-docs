@@ -1,0 +1,161 @@
+---
+title: "Agent MCP tools"
+description: "Every MCP tool the agent can call inside its container — messaging, scheduling, interactive cards, sub-agents, and self-modification."
+tag: "NEW"
+keywords: ["mcp tools", "send_message", "send_file", "schedule_task", "ask_user_question", "create_agent", "install_packages", "add_mcp_server", "nanoclaw mcp server", "agent tools"]
+---
+
+{/* verified-against: container/agent-runner/src/mcp-tools/{index,server,types,core,scheduling,interactive,agents,self-mod}.ts, container/agent-runner/src/mcp-tools/{core,scheduling,interactive,agents,self-mod,cli}.instructions.md, src/modules/agent-to-agent/create-agent.ts @ dc34ceb (v2.1.4) */}
+
+These are the tools the agent (Claude) can call from inside its container. They're exposed by the built-in `nanoclaw` MCP server (`container/agent-runner/src/mcp-tools/`), so the agent sees them with the `mcp__nanoclaw__` prefix — e.g. `mcp__nanoclaw__send_message`. As an operator you never call them directly; you see their effects: messages arriving in chats, schedule changes, and approval cards.
+
+Each tool module ships with an instructions file that's composed into the agent's CLAUDE.md, telling it when and how to use the tools. Per-group MCP servers from the [container config](/reference/container-config) add more tools alongside these, under their own prefixes.
+
+All tools write to the container's outbound database — the host reads, authorizes, and applies the effects. Approval gating happens host-side; the container is untrusted and never gates itself.
+
+## Core messaging
+
+Outbound tools resolve `to` against the group's destination map — a unified namespace covering both channels (chats the group is wired to) and agents (sub-agents created with `create_agent`). If `to` is omitted, the message goes to the conversation the session is bound to; agents with multiple destinations and no session routing must specify it.
+
+### `send_message`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `text` | string | yes | Message content |
+| `to` | string | no | Destination name (e.g. `family`, `worker-1`). Optional with a single destination |
+
+Used for mid-turn updates while the agent is still working — final responses go through `<message>` blocks in the agent's output, not this tool. Sending to another agent is the same call with `to` set to the agent's name.
+
+### `send_file`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `path` | string | yes | File path, absolute or relative to `/workspace/agent/` |
+| `to` | string | no | Destination name |
+| `text` | string | no | Optional accompanying message |
+| `filename` | string | no | Display name in chat (default: basename of `path`) |
+
+Copies the file to `/workspace/outbox/<id>/` for the host to deliver. Fails if the file doesn't exist.
+
+### `edit_message`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `messageId` | integer | yes | Numeric id of a previously sent message |
+| `text` | string | yes | New message content |
+
+Targets the same destination the original message went to — the routing is looked up from the sent-message record.
+
+### `add_reaction`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `messageId` | integer | yes | Numeric id of the message to react to |
+| `emoji` | string | yes | Emoji shortcode (e.g. `thumbs_up`, `heart`), not the raw character |
+
+Lightweight acknowledgment when a full reply would be noise.
+
+## Scheduling
+
+These tools manage rows in the host's `messages_in` table (kind `task`). The container can't write that database directly, so each call emits a system action the host applies during delivery. Timestamps and cron expressions are interpreted in the user's timezone. See [Setting up scheduled tasks](/guides/scheduled-tasks) for the operator view.
+
+### `schedule_task`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `prompt` | string | yes | Task instructions |
+| `processAfter` | string | yes | ISO 8601 timestamp for the first run — UTC or naive local (interpreted in the user's timezone) |
+| `recurrence` | string | no | Cron expression for recurring tasks, evaluated in the user's timezone |
+| `script` | string | no | Pre-agent bash script — runs first and only wakes the agent if it prints `{"wakeAgent": true, ...}` |
+
+### `list_tasks`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `status` | string | no | Filter: `pending` or `paused` (default: both) |
+
+Returns one row per series — the live occurrence, not the pile of completed firings. The id shown is the series id, which is what the other task tools expect.
+
+### `update_task`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `taskId` | string | yes | Series id from `list_tasks` |
+| `prompt` | string | no | New prompt |
+| `processAfter` | string | no | New next-run timestamp |
+| `recurrence` | string | no | New cron expression; empty string clears it (task becomes one-shot) |
+| `script` | string | no | New pre-agent script; empty string clears it |
+
+Omitted fields are left unchanged. The agent is instructed to prefer this over cancel + reschedule.
+
+### `cancel_task`, `pause_task`, `resume_task`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `taskId` | string | yes | Series id of the task |
+
+Paused tasks don't fire until resumed.
+
+## Interactive
+
+### `ask_user_question`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `title` | string | yes | Short card title |
+| `question` | string | yes | The question text |
+| `options` | array | yes | Choices: plain strings or `{ label, selectedLabel?, value? }` objects |
+| `timeout` | number | no | Seconds to wait (default: 300) |
+
+Blocking — the agent's turn pauses while it polls for your answer. You see a question card with buttons; tapping one returns its `value` to the agent (`selectedLabel` replaces the button text after selection). Errors out if the timeout expires.
+
+### `send_card`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `card` | object | yes | Card structure: `title`, `description`, optional `children` and `actions` |
+| `fallbackText` | string | no | Plain-text fallback for platforms without card support |
+
+Non-blocking — renders the card and returns immediately, no response collected.
+
+## Agents
+
+### `create_agent`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Agent name — also becomes the caller's destination name for it |
+| `instructions` | string | no | CLAUDE.md content seeding the new agent's role and personality |
+
+Provisions a long-lived companion agent: its own group, container, and persistent workspace under `groups/<folder>/`, wired bidirectionally as a destination on both sides. Fire-and-forget — the call returns immediately and messages queue until the agent is up.
+
+**Approval-gated by CLI scope:** groups with `cli_scope: global` create directly; everything else (including the default `group` scope) requires admin approval. There is no `send_to_agent` tool — messaging an agent is just `send_message` with `to` set to its name. See [Agent swarms](/guides/multi-agent-swarm).
+
+## Self-modification
+
+Both tools are **always approval-gated** and fire-and-forget: the request is submitted, an admin gets an approval card, and the agent is notified of the outcome via a system message. Package names are sanitized in the container and re-validated on the host.
+
+### `install_packages`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `apt` | array | no* | apt package names (no version specs or flags) |
+| `npm` | array | no* | npm package names to install globally |
+| `reason` | string | no | Why the packages are needed |
+
+*At least one apt or npm package required; max 20 per request. On approval the per-agent image is rebuilt and the container restarts — packages persist across all future sessions, unlike a workspace `pnpm install`.
+
+### `add_mcp_server`
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Unique server name |
+| `command` | string | yes | Command to launch the server |
+| `args` | array | no | Command arguments |
+| `env` | object | no | Environment variables for the server |
+
+On approval the server is added to the group's [container config](/reference/container-config) and the container restarts (no image rebuild needed). The agent is instructed to use `"onecli-managed"` as the placeholder for credential env vars rather than asking you for keys.
+
+## The `ncl` CLI
+
+Not an MCP tool, but documented alongside them in the agent's instructions: the agent also has the `ncl` admin CLI at `/usr/local/bin/ncl` for querying and modifying NanoClaw's central configuration — its own group config, destinations, members, and sessions. Read commands are open; write commands return `approval-pending` and execute only after an admin approves. What it can reach is controlled by the group's `cli_scope` — see the [ncl CLI reference](/reference/ncl-cli#access-control).
