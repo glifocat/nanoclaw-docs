@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["providers", "agent provider", "claude", "opencode", "codex", "ollama", "local models", "agent_provider", "model", "effort"]
 ---
 
-{/* verified-against: container/agent-runner/src/providers/{types,factory,claude,provider-registry}.ts, container/agent-runner/src/{config,index}.ts, src/container-runner.ts, src/container-config.ts, src/providers/{claude,provider-container-registry}.ts, src/cli/resources/{groups,sessions}.ts, .claude/skills/{add-opencode,add-codex,add-ollama-provider}/SKILL.md, docs/ollama.md, providers branch @ dc34ceb (v2.1.4) */}
+{/* verified-against: container/agent-runner/src/providers/{types,factory,claude,provider-registry}.ts, container/agent-runner/src/{config,index}.ts, src/container-runner.ts, src/container-config.ts, src/providers/{claude,provider-container-registry}.ts, src/cli/resources/{groups,sessions}.ts, .claude/skills/{add-opencode,add-codex,add-ollama-provider}/SKILL.md, docs/ollama.md @ trunk dc34ceb (v2.1.4); opencode.ts, codex.ts, codex-app-server.ts @ providers branch 5e76b9d */}
 
 A **provider** is the agent CLI that runs inside a group's container — the thing that actually plans, calls tools, and writes replies. By default that's Claude Code via the Claude Agent SDK. The provider is pluggable: the agent runner selects an implementation from an open registry at startup, and the trunk ships only `claude` (plus a `mock` provider for tests).
 
@@ -21,7 +21,7 @@ At spawn time the host resolves the provider name with a fixed precedence ([`src
 2. `container_configs.provider` — the group's [container config](/reference/container-config#provider)
 3. `'claude'`
 
-The result is lowercased. The host then asks its provider registry whether that provider contributes extra mounts or env vars (OpenCode's XDG dirs, Codex's per-session `~/.codex`, `OPENCODE_*`/`OPENAI_*` passthrough); `claude` and `mock` contribute nothing. Inside the container, the runner reads `provider` from `container.json` — materialized fresh from the database at every spawn — and instantiates it from the in-container registry, passing the group's `model` and `effort` through unchanged.
+The result is lowercased. The host then asks its provider registry whether that provider contributes extra mounts or env vars (OpenCode's XDG dirs, Codex's per-session `~/.codex`, `OPENCODE_*`/`OPENAI_*` passthrough). `mock` contributes nothing, and `claude` contributes only when setup has wired a custom Anthropic-compatible endpoint — `ANTHROPIC_BASE_URL` from `.env` plus a placeholder auth token for the vault gateway to overwrite. Inside the container, the runner reads `provider` from `container.json` — materialized fresh from the database at every spawn — and instantiates it from the in-container registry, passing the group's `model` and `effort` through unchanged.
 
 Every code path that creates a session on trunk writes `agent_provider = null`, and `ncl sessions` is read-only (`list`/`get`) — so the per-session override exists in the resolver, but nothing ships that sets it. In practice you switch providers per group.
 
@@ -40,13 +40,13 @@ The three provider skills split into two mechanisms:
 
 ### OpenCode (`/add-opencode`)
 
-Copies `opencode.ts` (host and container sides) from the `providers` branch, appends one import line to each provider barrel, adds `@opencode-ai/sdk` to the agent runner, installs the `opencode-ai` CLI in the Dockerfile, and copies registration/Dockerfile guard tests so the wiring stays verified. The provider spawns `opencode serve` per query and routes models through OpenCode's own config — OpenRouter, DeepSeek, OpenAI, Google, Anthropic, OpenCode Zen.
+Copies `opencode.ts` (host and container sides) from the `providers` branch, appends one import line to each provider barrel, adds `@opencode-ai/sdk` to the agent runner, installs the `opencode-ai` CLI in the Dockerfile, and copies registration/Dockerfile guard tests so the wiring stays verified. The provider keeps a shared `opencode serve` runtime — spawned once, reused across queries, and torn down on abort or when the config changes — and routes models through OpenCode's own config: OpenRouter, DeepSeek, OpenAI, Google, Anthropic, OpenCode Zen.
 
 Configure via host `.env`: `OPENCODE_PROVIDER`, `OPENCODE_MODEL` (in `provider/model` form), optional `OPENCODE_SMALL_MODEL`, and `ANTHROPIC_BASE_URL` pointed at the upstream provider's API base for non-Anthropic providers. API keys go in the [OneCLI vault](/operate/credentials) with a matching host pattern — never in `.env`. SDK and CLI versions are pinned together at 1.4.17; `latest` silently breaks session IDs.
 
 ### Codex (`/add-codex`)
 
-Copies `codex.ts` and `codex-app-server.ts` from the `providers` branch, wires the same barrels and guards, and installs the `@openai/codex` CLI in the Dockerfile (no SDK dependency — Codex is a binary). The provider runs `codex app-server` as a child process and speaks JSON-RPC over stdio, which gives it native session resume, streaming events, MCP tools, and automatic compaction (at 40K cumulative input tokens, via `thread/compact/start`).
+Copies `codex.ts` and `codex-app-server.ts` from the `providers` branch, wires the same barrels and guards, and installs the `@openai/codex` CLI in the Dockerfile (no SDK dependency — Codex is a binary). The provider spawns one `codex app-server` child process per query and speaks JSON-RPC over stdio, which gives it native session resume, streaming events, and MCP tools.
 
 Auth: run `codex login` on the host to use a ChatGPT subscription (the host copies `auth.json` into a per-session `~/.codex` mount), or set `OPENAI_API_KEY` + `CODEX_MODEL` in `.env`. An experimental third path points `OPENAI_BASE_URL` at any OpenAI-compatible endpoint — Groq, Together, self-hosted vLLM.
 
@@ -86,7 +86,7 @@ ncl groups config update --id <group-id> --provider opencode --model deepseek/de
 ncl groups restart --id <group-id>
 ```
 
-Config changes are saved immediately but only take effect on the next container spawn — the restart forces it. Switching back is `--provider claude` (or clearing the field; the fallback is `claude` either way), and each provider skill ships a `REMOVE.md` to back the code out entirely.
+Config changes are saved immediately but only take effect on the next container spawn — the restart forces it. Switching back is `--provider claude` (or clearing the field; the fallback is `claude` either way). To back the code out entirely, OpenCode and Codex each ship a `REMOVE.md`; Ollama needs no removal — its SKILL.md's "Reverting to Claude" steps are just deleting the `env` and `blockedHosts` keys from the container config and the `model` setting from the shared settings file.
 
 ## Next steps
 
