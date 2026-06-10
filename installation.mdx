@@ -1,346 +1,254 @@
 ---
-title: Installation
-description: Requirements and platform-specific setup for macOS, Linux, and Windows (WSL2).
+title: "Installation"
+description: "Requirements, what the installer does under the hood, manual setup, service management, and where NanoClaw puts its files."
 icon: "download"
 tag: "UPDATED"
-keywords: ["requirements", "docker", "node", "apple container", "wsl", "onecli", "bun", "nanoclaw.sh"]
+keywords: ["requirements", "docker", "node", "pnpm", "bun", "wsl", "launchd", "systemd", "onecli", "nanoclaw.sh", "manual install"]
 ---
 
-Everything you need to know before running `bash nanoclaw.sh`. For the one-command install flow itself, see [Quick start](/quickstart).
+{/* verified-against: nanoclaw.sh, setup.sh, setup/probe.sh, setup/auto.ts, setup/index.ts, setup/install-node.sh, setup/install-docker.sh, setup/container.ts, setup/service.ts, setup/set-env.ts, container/Dockerfile, src/container-runtime.ts, src/container-runner.ts, src/claude-md-compose.ts, src/group-init.ts, src/config.ts, src/install-slug.ts, src/session-manager.ts, src/index.ts, package.json @ dc34ceb */}
 
-## System requirements
+This page is the depth companion to [Quick start](/quickstart): what the installer actually does, how to install by hand, how the background service works, and where everything lands on disk. If you just want a running assistant, run `bash nanoclaw.sh` and follow the wizard — quick start covers that flow end to end.
 
-<Tabs>
-  <Tab title="macOS">
-    - macOS 12 (Monterey) or later
-    - Intel or Apple Silicon (M1/M2/M3/M4)
-    - 4 GB RAM minimum, 8 GB recommended
-    - 4 GB free disk space (container image + node_modules)
-  </Tab>
+## Requirements
 
-  <Tab title="Linux">
-    - Ubuntu 22.04+, Debian 12+, or equivalent
-    - x86_64 or aarch64
-    - 2 GB RAM minimum, 4 GB recommended
-    - 4 GB free disk space
-    - systemd (for the user service)
-  </Tab>
-
-  <Tab title="Windows (WSL2)">
-    - Windows 10 2004+ or Windows 11
-    - WSL 2 with Ubuntu 22.04+
-    - 4 GB RAM minimum, 8 GB recommended
-    - 4 GB free disk space (inside the WSL filesystem)
-    - Docker Desktop with WSL 2 backend enabled
-
-    <Note>
-    NanoClaw runs inside WSL, not natively on Windows. All commands go in a WSL terminal.
-    </Note>
-  </Tab>
-</Tabs>
-
-## What the installer needs
-
-`nanoclaw.sh` installs most things for you. This list exists so you know the dependency surface before running it.
-
-| Dependency | Scope | Installer handles it? |
-|---|---|---|
-| Node 22 | Host (orchestrator) | Yes — via nvm if missing |
-| pnpm 10 | Host (package manager) | Yes — via `corepack enable` |
-| Docker (or Apple Container) | Host (container runtime) | Partial — prompts you to install or start it if absent |
-| Build tools (gcc, python3) | Host (for `better-sqlite3` native compile) | No — install beforehand |
-| OneCLI Agent Vault | Host (credential injection) | Yes — installs locally or reuses an existing configured instance |
-| Bun 1.3.12 | Container (agent-runner runtime) | Yes — baked into the agent container image |
-
-### Build tools
-
-`better-sqlite3` is the only host dependency that needs native compilation. Install the platform toolchain before running `nanoclaw.sh`:
-
-<Tabs>
-  <Tab title="macOS">
-    ```bash
-    xcode-select --install
-    ```
-  </Tab>
-
-  <Tab title="Linux">
-    ```bash
-    sudo apt-get update
-    sudo apt-get install -y build-essential python3
-    ```
-  </Tab>
-
-  <Tab title="Windows (WSL2)">
-    Same as Linux, inside your WSL terminal:
-    ```bash
-    sudo apt-get update
-    sudo apt-get install -y build-essential python3
-    ```
-  </Tab>
-</Tabs>
-
-### Container runtime
-
-Docker is the default and works on all three platforms. Apple Container is an opt-in alternative on macOS 15+.
-
-<Tabs>
-  <Tab title="Docker (default)">
-    **macOS:**
-    ```bash
-    brew install --cask docker
-    open -a Docker
-    ```
-
-    **Linux:**
-    ```bash
-    curl -fsSL https://get.docker.com | sh
-    sudo usermod -aG docker $USER
-    sudo systemctl enable --now docker
-    # Log out and back in for group membership to take effect
-    ```
-
-    **Windows (WSL2):** Install [Docker Desktop](https://docs.docker.com/desktop/install/windows-install/), then enable WSL integration in Settings → Resources → WSL Integration for your distro.
-
-    <Warning>
-    WSL users: do not install Docker Engine inside WSL directly. Use Docker Desktop's WSL 2 backend. Installing both causes conflicts.
-    </Warning>
-  </Tab>
-
-  <Tab title="Apple Container (macOS 15+)">
-    Lightweight native macOS runtime. Opt-in after setup via `/convert-to-apple-container`.
-
-    ```bash
-    brew install container
-    container --version
-    ```
-
-    <Note>
-    The default installer picks Docker. To switch, run `/convert-to-apple-container` after NanoClaw is running. The skill modifies the runtime integration and uses `git revert` as the rollback path.
-    </Note>
-  </Tab>
-</Tabs>
-
-### Advanced installer environment
-
-`nanoclaw.sh` and `setup:auto` read environment variables when you need to debug or script part of setup.
-
-| Env var | Use |
+| | Requirement |
 |---|---|
-| `NANOCLAW_SKIP` | Comma-separated setup steps to skip while debugging (`environment`, `container`, `onecli`, `auth`, `mounts`, `service`, `cli-agent`, `timezone`, `channel`, `verify`, `first-chat`) |
-| `NANOCLAW_DISPLAY_NAME` | Skip the operator display-name prompt |
-| `NANOCLAW_AGENT_NAME` | Set the messaging-channel agent name; the CLI scratch agent remains `Terminal Agent` |
-| `SECRET_NAME` | OneCLI secret name for `setup/register-claude-token.sh` (default: `Anthropic`) |
-| `HOST_PATTERN` | OneCLI host pattern for `setup/register-claude-token.sh` (default: `api.anthropic.com`) |
+| Platform | macOS or Linux. Windows works through WSL2 — the installer detects WSL and treats it as Linux. |
+| RAM | 4 GB+. The installer warns below 3,700 MB (a "4 GB" VM typically reports 3,700–3,900 MB after kernel reserves) and lets you override. |
+| Node.js | 20 or newer on the host (`engines` in `package.json`). Installed for you if missing. |
+| git | To clone the repository. Not auto-installed. |
+| Claude credential | A Claude subscription (sign-in via browser), an OAuth token (`sk-ant-oat…`), or an Anthropic API key (`sk-ant-api…`). |
 
-If OneCLI is already installed and configured, setup asks whether to reuse it. For custom Anthropic-compatible model endpoints, set `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in `.env`.
+Two hosts the installer explicitly flags in pre-flight:
 
-## Run the installer
+- **Google Compute Engine VMs** — GCE blocks the sudo commands setup needs, so NanoClaw is unlikely to run there. The installer detects GCE via DMI and warns before doing anything. Use a different provider.
+- **Root on Linux** — discouraged. The installer offers instructions for creating a regular user instead. If you insist, it installs a system-level systemd unit rather than a user one.
 
-Once the system dependencies above are in place:
+### What's installed for you
+
+`nanoclaw.sh` installs everything below if it's missing. You don't need to pre-install any of it.
+
+| Dependency | Where it runs | How it's installed |
+|---|---|---|
+| Homebrew (macOS only) | Host | Official installer, after a prompt. Pulls in Apple's Command Line Tools (can take 5–10 minutes on a factory Mac). |
+| Node 22 | Host | `uvx nodeenv -n lts` if `uvx` is present; otherwise `brew install node@22` (macOS) or NodeSource + `apt-get` (Linux). Skipped if you already have Node 20+. |
+| pnpm 10 | Host | `corepack enable`, falling back to `npm install -g pnpm@<pinned>` at the version from `packageManager`. |
+| Docker | Host | `brew install --cask docker` (macOS) or `get.docker.com` + `usermod -aG docker` (Linux/WSL). Setup also starts the daemon and works around stale group membership (`sg docker` re-exec, or a temporary ACL on the socket) so you don't have to log out and back in. |
+| OneCLI vault | Host | Installed by the wizard, or reuses an existing healthy OneCLI instance if it finds one. |
+| Bun 1.3.12 | Container | Baked into the agent container image. Never touches the host. |
+
+Build tools (Xcode Command Line Tools on macOS, `gcc`/`make` on Linux) are checked and reported but not installed. They only matter if `better-sqlite3` has to compile from source — setup verifies the native binding loads and fails loudly if it doesn't.
+
+## What the installer does under the hood
+
+`bash nanoclaw.sh` is a three-stage chain:
+
+1. **`nanoclaw.sh`** — pre-flight checks (RAM floor, GCE detection, root warning, Homebrew prompt on macOS), then runs the bootstrap under a spinner. Bash only — nothing else exists on the machine yet.
+2. **`setup.sh`** — detects the platform (macOS / Linux / WSL), installs Node 22 via `setup/install-node.sh` if Node 20+ isn't present, gets pnpm onto the PATH, runs `pnpm install --frozen-lockfile`, and verifies the `better-sqlite3` native module loads.
+3. **`pnpm run setup:auto`** — the interactive wizard (`setup/auto.ts`). This is where the container build, OneCLI vault, Claude auth, service install, and channel pairing happen. [Quick start](/quickstart) walks through every wizard step.
+
+Every run writes two logs: a progression log at `logs/setup.log` (one entry per step) and verbatim per-step output under `logs/setup-steps/NN-name.log`. When something fails, start there.
+
+## One runtime on the host, another in the container
+
+NanoClaw deliberately splits runtimes:
+
+- **Host**: Node 20+ and pnpm. The wizard compiles TypeScript with `tsc` and the service runs `node dist/index.js`.
+- **Agent container**: Bun 1.3.12 runs the agent-runner TypeScript directly — no build step. The image (from `container/Dockerfile`) is based on `node:22-slim` with `tini` as PID 1, Chromium for browser automation, and globally installed CLIs — `@anthropic-ai/claude-code` and `vercel` pinned for reproducibility, `agent-browser` tracking latest.
+
+Two consequences worth knowing:
+
+- **Agent source is never baked into the image.** The host bind-mounts `container/agent-runner/src` read-only at `/app/src`, so agent-runner changes take effect on the next container spawn without a rebuild. The host's own `src/` is different: the service runs the compiled `dist/`, so host changes need `pnpm run build` and a service restart.
+- **The image is per-checkout**: `nanoclaw-agent-v2-<slug>:latest`, where the slug is the first 8 hex chars of `sha1(projectRoot)`. Two NanoClaw installs on one host never clobber each other's image, service, or containers.
+
+**Docker is the only supported runtime.** `src/container-runtime.ts` hardcodes the binary (`CONTAINER_RUNTIME_BIN = 'docker'`) behind a single-file abstraction — all runtime-specific logic lives in that one file, but nothing else is wired up today.
+
+If you render Chinese, Japanese, or Korean text, set `INSTALL_CJK_FONTS=true` in `.env` before the container build — it adds Noto CJK fonts (~200 MB) to the image.
+
+## Manual installation
+
+If you'd rather not run `nanoclaw.sh` (or it failed partway), the pieces compose by hand:
 
 ```bash
 git clone https://github.com/nanocoai/nanoclaw.git
 cd nanoclaw
-bash nanoclaw.sh
+pnpm install
+pnpm run setup:auto
 ```
 
-The installer walks through bootstrap, container build, OneCLI credential registration, channel pairing, and service installation. Progress streams to your terminal; full per-step logs land in `logs/setup.log` and `logs/setup-steps/`.
+`setup:auto` is the same wizard the one-liner hands off to — it builds the container image, sets up credentials, and installs the background service. Without it, you can run the host in the foreground:
 
-For the step-by-step breakdown of what each phase does, see [Quick start](/quickstart).
+```bash
+pnpm run build && pnpm start   # compiled, what the service runs
+pnpm run dev                   # tsx, no build step
+```
 
-## File structure after install
+### Re-running individual steps
+
+`pnpm run setup` is a step runner, not a second wizard. Use it to re-run one piece of setup without going through the whole flow:
+
+```bash
+pnpm run setup -- --step container   # rebuild and re-test the agent image
+pnpm run setup -- --step service     # rebuild TypeScript and reinstall the service
+pnpm run setup -- --step verify      # end-to-end health check
+```
+
+Available steps: `timezone`, `set-env`, `environment`, `container`, `register`, `pair-telegram`, `groups`, `whatsapp-auth`, `signal-auth`, `mounts`, `service`, `verify`, `onecli`, `auth`, `cli-agent`.
+
+### Scripting the wizard
+
+`setup:auto` reads environment variables for unattended or partial runs:
+
+| Env var | Use |
+|---|---|
+| `NANOCLAW_SKIP` | Comma-separated wizard steps to skip: `environment`, `container`, `onecli`, `auth`, `mounts`, `service`, `cli-agent`, `first-chat`, `timezone`, `channel`, `verify` |
+| `NANOCLAW_DISPLAY_NAME` | Skip the "what should the assistant call you" prompt |
+| `NANOCLAW_AGENT_NAME` | Set the messaging-channel agent name |
+| `SECRET_NAME` | OneCLI secret name (default: `Anthropic`) |
+| `HOST_PATTERN` | OneCLI host pattern (default: `api.anthropic.com`) |
+
+For Anthropic-compatible custom endpoints, set `ANTHROPIC_BASE_URL` in `.env` — the host passes it through to the agent SDK inside the container.
+
+## Running as a service
+
+The wizard's service step compiles TypeScript (`pnpm run build`), writes a service definition that runs `node dist/index.js` from the project root, starts it, and symlinks `bin/ncl` into `~/.local/bin` so the [ncl CLI](/operate/ncl-cli) works from anywhere. Service names embed the per-checkout slug, so look yours up rather than guessing.
+
+<Tabs>
+  <Tab title="macOS (launchd)">
+    The plist lands at `~/Library/LaunchAgents/com.nanoclaw-v2-<slug>.plist` with `RunAtLoad` and `KeepAlive` — it starts at login and restarts on crash.
+
+    ```bash
+    # Find your label
+    launchctl list | grep nanoclaw
+
+    # Restart
+    launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>
+
+    # Stop / start
+    launchctl unload ~/Library/LaunchAgents/com.nanoclaw-v2-<slug>.plist
+    launchctl load   ~/Library/LaunchAgents/com.nanoclaw-v2-<slug>.plist
+
+    # Logs (stdout and stderr go to files, not the system log)
+    tail -f logs/nanoclaw.log logs/nanoclaw.error.log
+    ```
+  </Tab>
+
+  <Tab title="Linux (systemd)">
+    A user unit lands at `~/.config/systemd/user/nanoclaw-v2-<slug>.service` with `Restart=always`. (If you set up as root, it's a system unit at `/etc/systemd/system/` instead — drop the `--user` flag.)
+
+    ```bash
+    # Find your unit
+    systemctl --user list-units 'nanoclaw-v2-*'
+
+    systemctl --user restart nanoclaw-v2-<slug>
+    systemctl --user status  nanoclaw-v2-<slug>
+
+    # Logs append to files, not the journal
+    tail -f logs/nanoclaw.log logs/nanoclaw.error.log
+    ```
+
+    <Note>
+    Setup runs `loginctl enable-linger` so the user service survives SSH logout. Verify with `loginctl show-user $USER | grep Linger`.
+    </Note>
+  </Tab>
+
+  <Tab title="No systemd (WSL fallback)">
+    On WSL (or any Linux) without a systemd user session, setup writes a wrapper script instead of a unit:
+
+    ```bash
+    bash start-nanoclaw.sh        # start (stops any previous instance first)
+    kill $(cat nanoclaw.pid)      # stop
+    tail -f logs/nanoclaw.log     # logs
+    ```
+
+    To get a real service, enable systemd in WSL (`/etc/wsl.conf` → `[boot] systemd=true`, then `wsl --shutdown` from PowerShell) and re-run `pnpm run setup -- --step service`.
+  </Tab>
+</Tabs>
+
+## Where files live
+
+Everything stateful lives inside the checkout, with two exceptions: security allowlists in `~/.config/nanoclaw/` (kept outside the project so they're never mounted into containers) and the service definition.
 
 <Tree>
   <Tree.Folder name="nanoclaw" defaultOpen>
-    <Tree.Folder name="src">
-      <Tree.File name="index.ts" />
-      <Tree.File name="session-manager.ts" />
-      <Tree.File name="container-runner.ts" />
-      <Tree.Folder name="db" />
-      <Tree.Folder name="channels" />
-    </Tree.Folder>
+    <Tree.Folder name="src" />
+    <Tree.Folder name="dist" />
     <Tree.Folder name="container">
       <Tree.File name="Dockerfile" />
-      <Tree.File name="entrypoint.sh" />
+      <Tree.File name="build.sh" />
+      <Tree.File name="CLAUDE.md" />
       <Tree.Folder name="agent-runner" />
     </Tree.Folder>
     <Tree.Folder name="groups" defaultOpen>
       <Tree.Folder name="main" defaultOpen>
+        <Tree.File name="CLAUDE.local.md" />
         <Tree.File name="CLAUDE.md" />
         <Tree.File name="container.json" />
       </Tree.Folder>
     </Tree.Folder>
     <Tree.Folder name="data" defaultOpen>
       <Tree.File name="v2.db" />
-      <Tree.Folder name="env" />
       <Tree.Folder name="v2-sessions" defaultOpen>
         <Tree.Folder name="{agent_group_id}" defaultOpen>
-          <Tree.Folder name="{session_id}" defaultOpen>
+          <Tree.Folder name="{session_id}">
             <Tree.File name="inbound.db" />
             <Tree.File name="outbound.db" />
             <Tree.File name=".heartbeat" />
           </Tree.Folder>
+          <Tree.Folder name=".claude-shared" />
         </Tree.Folder>
       </Tree.Folder>
+      <Tree.Folder name="env">
+        <Tree.File name="env" />
+      </Tree.Folder>
+      <Tree.Folder name="ipc" />
+      <Tree.File name="cli.sock" />
     </Tree.Folder>
     <Tree.Folder name="logs">
       <Tree.File name="nanoclaw.log" />
+      <Tree.File name="nanoclaw.error.log" />
       <Tree.File name="setup.log" />
       <Tree.Folder name="setup-steps" />
     </Tree.Folder>
+    <Tree.Folder name="bin">
+      <Tree.File name="ncl" />
+    </Tree.Folder>
     <Tree.File name=".env" />
     <Tree.File name="nanoclaw.sh" />
-    <Tree.File name="package.json" />
   </Tree.Folder>
 </Tree>
 
-**External files** (outside the project directory):
+The highlights:
 
 | Path | Purpose |
-|------|---------|
-| `~/.config/nanoclaw/mount-allowlist.json` | Which host directories agents can mount |
-| `~/.config/nanoclaw/sender-allowlist.json` | Optional per-channel sender access control |
-| `~/Library/LaunchAgents/com.nanoclaw-v2-<slug>.plist` (macOS) | launchd service definition |
-| `~/.config/systemd/user/nanoclaw-v2-<slug>.service` (Linux) | systemd user-service definition |
-
-## Container image contents
-
-The agent container image is scoped per checkout, with a name like `nanoclaw-agent-v2-<slug>:latest`. It is built from `container/Dockerfile`:
-
-- **Base**: `node:22-slim`
-- **tini** as PID 1 — reaps Chromium zombies, forwards signals so `outbound.db` writes finalize on SIGTERM
-- **Bun 1.3.12** runs the agent-runner TypeScript directly (no `tsc` build step)
-- **Chromium** for browser automation via `agent-browser`
-- **Global Node CLIs (pnpm)**: `@anthropic-ai/claude-code`, `agent-browser`, `vercel`
-- **Non-root `node` user**, `/workspace/group` as working directory
-- **Source is never baked in** — `/app/src` is a read-only bind mount from the host, so code changes take effect without rebuilding
-
-Optional: `INSTALL_CJK_FONTS=true` in `.env` adds Chinese/Japanese/Korean font support (~200 MB).
-
-## Service management
-
-NanoClaw runs as a background service so the host stays responsive to channel events between your messages.
-
-<Tabs>
-  <Tab title="macOS (launchd)">
-    ```bash
-    # Start / stop
-    # Replace <label> with com.nanoclaw-v2-<slug>
-    launchctl load ~/Library/LaunchAgents/<label>.plist
-    launchctl unload ~/Library/LaunchAgents/<label>.plist
-
-    # Restart
-    launchctl kickstart -k gui/$(id -u)/<label>
-
-    # Status
-    launchctl list | grep nanoclaw
-
-    # Logs
-    tail -f logs/nanoclaw.log
-    ```
-  </Tab>
-
-  <Tab title="Linux (systemd)">
-    ```bash
-    # Replace <unit> with nanoclaw-v2-<slug>
-    systemctl --user start <unit>
-    systemctl --user stop <unit>
-    systemctl --user restart <unit>
-    systemctl --user status <unit>
-
-    # Enable on boot
-    systemctl --user enable <unit>
-
-    # Logs
-    journalctl --user -u <unit> -f
-    ```
-
-    <Note>
-    **VM / SSH users:** the installer runs `loginctl enable-linger` so the service survives SSH logout. Verify with `loginctl show-user $USER | grep Linger`.
-    </Note>
-  </Tab>
-
-  <Tab title="WSL (without systemd)">
-    If WSL doesn't have systemd enabled, the installer drops a wrapper script:
-
-    ```bash
-    bash start-nanoclaw.sh
-    pkill -f "bun.*src/index.ts"     # stop
-    tail -f logs/nanoclaw.log        # logs
-    ```
-
-    To enable systemd in WSL (recommended):
-    ```bash
-    echo -e "[boot]\nsystemd=true" | sudo tee /etc/wsl.conf
-    # Restart WSL from PowerShell: wsl --shutdown
-    ```
-  </Tab>
-</Tabs>
-
-## Troubleshooting
-
-### `better-sqlite3` build errors
-
-```bash
-pnpm rebuild better-sqlite3
-# or
-rm -rf node_modules pnpm-lock.yaml && pnpm install
-```
-
-If the error mentions Python: `sudo apt-get install python3` (Linux/WSL) or `xcode-select --install` (macOS).
-
-### Container build fails
-
-```bash
-# Docker
-docker builder prune -f
-./container/build.sh
-
-# Apple Container
-container builder stop && container builder rm && container builder start
-./container/build.sh
-```
-
-### Service won't start
-
-Check the error log and the setup progression log:
-
-```bash
-cat logs/nanoclaw.error.log
-cat logs/setup.log
-```
-
-Ask the agent itself for a diagnostic once it's up:
-
-```
-@Andy /debug
-```
-
-### WSL: Docker integration
-
-If `docker` commands aren't found in WSL, enable WSL integration in Docker Desktop (Settings → Resources → WSL Integration → toggle your distro). Restart WSL from PowerShell if needed:
-
-```powershell
-wsl --shutdown
-```
-
-### WSL: slow builds
-
-Clone into the Linux filesystem (`~/nanoclaw`), not `/mnt/c/`. The 9P bridge to Windows drives is 10-100× slower than native Linux FS operations.
+|---|---|
+| `groups/<folder>/CLAUDE.local.md` | Per-group agent instructions — this is the file you edit. |
+| `groups/<folder>/CLAUDE.md` | Regenerated at every container spawn from the shared base plus enabled skills. Don't edit it — your changes get overwritten. |
+| `groups/<folder>/container.json` | Per-group container overrides. |
+| `container/CLAUDE.md` | Shared base instructions for all agents, mounted read-only into every container. |
+| `data/v2.db` | Host state database (registered groups, tasks, sessions). |
+| `data/v2-sessions/` | Per-session message queues — `inbound.db` (host writes) and `outbound.db` (container writes). |
+| `data/env/env` | Container-mounted copy of `.env`, synced by setup. |
+| `~/.config/nanoclaw/mount-allowlist.json` | Which host directories agents may mount. Never mounted into containers. |
+| `~/.config/nanoclaw/sender-allowlist.json` | Optional per-channel sender access control. |
+| `~/.local/bin/ncl` | Symlink to `bin/ncl` so the CLI works from any directory. |
+| `~/Library/LaunchAgents/com.nanoclaw-v2-<slug>.plist` | launchd service (macOS). |
+| `~/.config/systemd/user/nanoclaw-v2-<slug>.service` | systemd user service (Linux). |
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Quick start" icon="rocket" href="/quickstart">
-    Run `bash nanoclaw.sh` and send your first message
+  <Card title="Quick start" icon="bolt" href="/quickstart">
+    The one-command flow and the wizard, step by step.
   </Card>
   <Card title="Architecture" icon="diagram-project" href="/concepts/architecture">
-    How the two-DB session model works
+    How the host, containers, and the two-DB session model fit together.
   </Card>
-  <Card title="Integrations" icon="plug" href="/channels/overview">
-    Add channels: Telegram, Slack, Discord, and more
+  <Card title="The ncl CLI" icon="terminal" href="/operate/ncl-cli">
+    Inspect agents, groups, and sessions from the command line.
   </Card>
-  <Card title="Customization" icon="wrench" href="/guides/customize-an-agent">
-    Change the trigger word, adjust timeouts, tune engage modes
+  <Card title="Troubleshooting" icon="life-ring" href="/operate/troubleshooting">
+    Setup failures start at `logs/setup.log`; runtime issues at `logs/nanoclaw.log`.
   </Card>
 </CardGroup>
