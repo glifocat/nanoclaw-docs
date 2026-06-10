@@ -60,12 +60,14 @@ The exact mounts, from `buildMounts` in `src/container-runner.ts`:
 | `groups/<folder>/container.json` | `/workspace/agent/container.json` | RO, nested over the RW group dir |
 | `groups/<folder>/CLAUDE.md` (composed) | `/workspace/agent/CLAUDE.md` | RO, nested — regenerated each spawn |
 | `groups/<folder>/.claude-fragments/` | `/workspace/agent/.claude-fragments` | RO, nested |
-| `groups/global/` | `/workspace/global` | RO — global memory, all groups |
+| `groups/global/` | `/workspace/global` | RO — dead code as of v2.1.4\* |
 | `container/CLAUDE.md` | `/app/CLAUDE.md` | RO — shared base instructions |
 | `data/v2-sessions/<group>/.claude-shared/` | `/home/node/.claude` | RW — Claude state, settings, skill symlinks |
 | `container/agent-runner/src/` | `/app/src` | RO — agent-runner source |
 | `container/skills/` | `/app/skills` | RO — shared skills |
 | `additional_mounts` entries | `/workspace/extra/<name>` | Per config, allowlist-validated |
+
+\* The `groups/global/` mount is dead code as of v2.1.4: `migrateGroupsToClaudeLocal()` (`src/claude-md-compose.ts`) deletes `groups/global/` at every host startup, so the existence check in `buildMounts` never passes and `/workspace/global` never materializes. The shared base now lives in `container/CLAUDE.md`, mounted at `/app/CLAUDE.md`.
 
 Providers can contribute extra mounts and env vars (for example OpenCode's XDG directories); these are appended last. The nested read-only mounts matter: the group dir is read-write, but `container.json`, the composed `CLAUDE.md`, and the fragments are re-mounted read-only on top, so the agent can read its config and instructions but not rewrite them. `CLAUDE.local.md` stays the one writable memory file.
 
