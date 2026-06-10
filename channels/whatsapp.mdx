@@ -5,7 +5,7 @@ tag: "UPDATED"
 ---
 
 <Warning>
-This page is pending a v2 rewrite. The `/add-whatsapp` skill flow still works, but some mechanics described below (e.g., per-channel `skill/*` branch merges) reflect v1 architecture — in v2, channel adapters live on a single `channels` branch, and session IO uses two databases per session. See [Integrations overview](/integrations/overview) for current context.
+This page is pending a v2 rewrite. The `/add-whatsapp` skill flow still works, but some mechanics described below (e.g., per-channel `skill/*` branch merges) reflect v1 architecture — in v2, channel adapters live on a single `channels` branch, and session IO uses two databases per session. See [Integrations overview](/channels/overview) for current context.
 </Warning>
 
 WhatsApp is a messaging channel for NanoClaw, installed via the `/add-whatsapp` skill. It uses the Baileys library.
@@ -273,7 +273,7 @@ Several skills extend WhatsApp with media handling capabilities. These live on t
 | PDF reader | `/add-pdf-reader` | Extract text from PDF attachments |
 | Emoji reactions | `/add-reactions` | Send, receive, and search emoji reactions |
 
-See [voice transcription](/features/voice-transcription), [image vision](/features/image-vision), and [PDF reader](/features/pdf-reader) for detailed documentation.
+See [voice transcription](/channels/overview), [image vision](/channels/overview), and [PDF reader](/channels/overview) for detailed documentation.
 
 ### Emoji reactions
 
@@ -365,7 +365,7 @@ To remove the WhatsApp skill and revert to a channel-free core:
 git revert -m 1 <whatsapp-merge-commit>
 ```
 
-See [removing a skill](/integrations/skills-system#removing-a-skill) for details.
+See [removing a skill](/extend/overview#removing-a-skill) for details.
 
 ## Implementation details
 
@@ -414,11 +414,11 @@ These files are added by the `skill/whatsapp` branch merge. They do not exist in
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Add Telegram" icon="telegram" href="/integrations/telegram">
+  <Card title="Add Telegram" icon="telegram" href="/channels/telegram">
     Add Telegram support alongside or instead of WhatsApp
   </Card>
   
-  <Card title="Add Discord" icon="discord" href="/integrations/discord">
+  <Card title="Add Discord" icon="discord" href="/channels/discord">
     Add Discord support to your installation
   </Card>
 </CardGroup>

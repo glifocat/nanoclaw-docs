@@ -7,7 +7,7 @@ import SyncEnv from "/snippets/sync-env.mdx";
 import RestartService from "/snippets/restart-service.mdx";
 
 <Warning>
-This page is pending a v2 rewrite. The `/add-telegram` skill flow still works, but some mechanics described below reflect v1 architecture — in v2, channel adapters live on a single `channels` branch. See [Integrations overview](/integrations/overview) for current context.
+This page is pending a v2 rewrite. The `/add-telegram` skill flow still works, but some mechanics described below reflect v1 architecture — in v2, channel adapters live on a single `channels` branch. See [Integrations overview](/channels/overview) for current context.
 </Warning>
 
 Add Telegram as a messaging channel for NanoClaw. Telegram can run alongside existing channels or replace them entirely.
@@ -401,7 +401,7 @@ TELEGRAM_SWARM_BOT_TOKENS=<agent1-token>,<agent2-token>,<agent3-token>
 The swarm skill has a 14KB SKILL.md with detailed setup instructions. Running `/add-telegram-swarm` in Claude Code walks you through the full configuration interactively.
 </Note>
 
-See [Agent swarms](/features/agent-swarms) for general swarm concepts.
+See [Agent swarms](/guides/multi-agent-swarm) for general swarm concepts.
 
 ## Removing Telegram
 
@@ -447,15 +447,15 @@ Since Telegram was added via a git merge, you remove it by reverting the merge c
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Add Discord" icon="discord" href="/integrations/discord">
+  <Card title="Add Discord" icon="discord" href="/channels/discord">
     Add Discord support to your installation
   </Card>
   
-  <Card title="Add Slack" icon="slack" href="/integrations/slack">
+  <Card title="Add Slack" icon="slack" href="/channels/slack">
     Add Slack support to your installation
   </Card>
   
-  <Card title="Skills system" icon="puzzle-piece" href="/integrations/skills-system">
+  <Card title="Skills system" icon="puzzle-piece" href="/extend/overview">
     Learn more about how skills work
   </Card>
 </CardGroup>
