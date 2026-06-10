@@ -23,7 +23,7 @@ flowchart TD
 
 ## Container isolation — the blast radius is one session
 
-A compromised agent is a compromised *container*, and every active session gets its own. The container runs as the unprivileged `node` user (or your host uid/gid), with no added Linux capabilities, `tini` as PID 1, and `--rm` so nothing persists past exit. Its filesystem view is exactly the [mount table](/concepts/container-lifecycle#spawn--the-world-rebuilt-every-time): the session folder, the group workspace, and read-only shared code. No host home directory, no `.ssh`, no Docker socket. Its own `container.json` and composed `CLAUDE.md` are re-mounted read-only on top of the writable workspace, so the agent can read its configuration but not rewrite it to grant itself more.
+A compromised agent is a compromised *container*, and every active session gets its own. The container runs as the unprivileged `node` user (or your host uid/gid), with no added Linux capabilities, and `--rm` so nothing persists past exit. Its filesystem view is exactly the [mount table](/concepts/container-lifecycle#spawn--the-world-rebuilt-every-time): the session folder, the group workspace, and read-only shared code. No host home directory, no `.ssh`, no Docker socket. Its own `container.json` and composed `CLAUDE.md` are re-mounted read-only on top of the writable workspace, so the agent can read its configuration but not rewrite it to grant itself more.
 
 The container is also disposable by design — the host kills it on a stale heartbeat and rebuilds the entire environment at next spawn, so a compromised process doesn't outlive its session. See [Container lifecycle](/concepts/container-lifecycle).
 
@@ -78,7 +78,7 @@ The host process itself is in the trusted zone, so its dependencies matter: pnpm
 Be honest about the gap: **anything the agent can legitimately do, it can do while manipulated.** No layer above distinguishes a sincere action from an injected one — they only bound the action space. A compromised agent can still:
 
 - **Message anyone in its destinations** — including posting attacker-chosen content to your team channel, or leaking conversation context to another chat it legitimately serves.
-- **Read and destroy its whole workspace** — every session of an agent group shares the group folder read-write, including `CLAUDE.local.md` memory and any allowlisted mounts.
+- **Read and destroy its whole workspace** — every session of an agent group shares the group folder read-write, including `CLAUDE.local.md` memory — and it can read whatever its allowlisted mounts expose (read-write only where explicitly granted).
 - **Spend through granted credentials** — it can't extract keys, but it can make authenticated API calls with everything its group was granted (per-request approval, where enabled, is the brake).
 - **Poison its own memory** — instructions written to `CLAUDE.local.md` today shape every future session of that group.
 
