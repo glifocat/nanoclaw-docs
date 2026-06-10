@@ -1,0 +1,115 @@
+---
+title: "Configuration"
+description: "Configure a NanoClaw install — environment variables in .env and per-group container config in the database."
+tag: "NEW"
+keywords: ["configuration", "environment variables", ".env", "container config", "ASSISTANT_NAME", "CONTAINER_TIMEOUT", "LOG_LEVEL", "container_configs"]
+---
+
+{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/container-config.ts, src/db/container-configs.ts, setup/set-env.ts @ dc34ceb */}
+
+NanoClaw has two configuration layers:
+
+1. **Install-wide environment variables** in `.env` at the project root — identity, container limits, logging, credentials. They apply to the whole install.
+2. **Per-group container config** in the database — each agent group has a row in the `container_configs` table controlling its provider, model, mounts, packages, and MCP servers.
+
+## Environment variables
+
+NanoClaw reads `.env` directly with its own parser — values are **not** loaded into `process.env`, so secrets don't leak to child processes. A variable set in the actual process environment takes precedence over the same key in `.env`.
+
+Some channels run in containers and can't see the host's `.env`. For those, setup mirrors `.env` to `data/env/env`, which is mounted into the channel container. The two files must stay in sync — the `set-env` setup step handles both:
+
+```bash
+pnpm exec tsx setup/index.ts --step set-env -- --key ASSISTANT_NAME --value "Jarvis" --sync-container
+```
+
+You can also edit `.env` by hand and copy it yourself: `cp .env data/env/env`.
+
+### Identity
+
+| Variable | Default | What it does |
+|---|---|---|
+| `ASSISTANT_NAME` | `Andy` | The assistant's name. Also sets the default trigger, `@<name>`. |
+| `ASSISTANT_HAS_OWN_NUMBER` | `false` | Set `true` when the assistant runs on its own WhatsApp number instead of yours. |
+
+### Containers
+
+| Variable | Default | What it does |
+|---|---|---|
+| `CONTAINER_TIMEOUT` | `1800000` (30 min) | Max runtime for an agent container, in milliseconds. |
+| `IDLE_TIMEOUT` | `1800000` (30 min) | How long a container stays alive after its last result, waiting for follow-ups. |
+| `MAX_CONCURRENT_CONTAINERS` | `5` | Cap on simultaneously running agent containers. |
+| `CONTAINER_MAX_OUTPUT_SIZE` | `10485760` (10 MB) | Max output captured from a container. |
+| `MAX_MESSAGES_PER_PROMPT` | `10` | How many queued messages are batched into a single agent prompt. |
+| `CONTAINER_IMAGE` | per-install tag | Agent image override. The default tag includes an install slug so two checkouts on one host don't clobber each other's `nanoclaw-agent` image. |
+
+### Network and time
+
+| Variable | Default | What it does |
+|---|---|---|
+| `WEBHOOK_PORT` | `3000` | Port for the local webhook server. |
+| `TZ` | system timezone, else `UTC` | IANA timezone for scheduled tasks and message timestamps. Invalid values are skipped, not errored. |
+
+### Logging
+
+| Variable | Default | What it does |
+|---|---|---|
+| `LOG_LEVEL` | `info` | One of `debug`, `info`, `warn`, `error`. |
+
+### Credentials
+
+| Variable | Default | What it does |
+|---|---|---|
+| `ONECLI_URL` | — | URL of the OneCLI Agent Vault. |
+| `ONECLI_API_KEY` | — | API key for the vault. |
+
+See [Credentials](/operate/credentials) for how agents get API keys at runtime.
+
+### Security
+
+| Variable | Default | What it does |
+|---|---|---|
+| `NANOCLAW_EGRESS_LOCKDOWN` | `false` | Set `true` to force all agent traffic through the OneCLI gateway on an internal Docker network. Fails fast if the gateway isn't running. |
+| `NANOCLAW_EGRESS_NETWORK` | `nanoclaw-egress` | Name of the locked-down Docker network. |
+| `ONECLI_GATEWAY_CONTAINER` | `onecli` | Name of the gateway container attached as the only egress hop. |
+
+See [Hardening](/operate/hardening) for the full egress lockdown and sandboxing story.
+
+## Per-group container config
+
+Each agent group has a row in the `container_configs` table (the central SQLite database). At spawn time NanoClaw materializes it to `groups/<folder>/container.json` — don't edit that file by hand, it's overwritten on every spawn.
+
+Fields per group:
+
+| Field | What it controls |
+|---|---|
+| `provider` | Which agent CLI runs in the container (e.g. Claude Code, OpenCode). |
+| `model`, `effort` | Model and reasoning effort passed to the provider. |
+| `assistant_name` | Per-group assistant name override. |
+| `max_messages_per_prompt` | Per-group override of the install-wide batching limit. |
+| `image_tag` | Custom container image for this group. |
+| `cli_scope` | What the group's agent can do via the internal CLI: `disabled`, `group` (own group only, the default), or `global`. |
+| `skills` | Skill list for the group, or `all`. |
+| `mcp_servers` | MCP servers available inside the container. |
+| `packages_apt`, `packages_npm` | Extra packages installed in the container. |
+| `additional_mounts` | Extra host directories mounted into the container (subject to the mount allowlist at `~/.config/nanoclaw/mount-allowlist.json`). |
+
+To change a group's config, ask the agent in that group, or use the [`claw` CLI](/operate/ncl-cli). For adding MCP servers, mounts, and providers, see [Extending NanoClaw](/extend/overview) and [Ollama integration](/extend/providers).
+
+## Applying changes
+
+Environment variables are read at startup, so after editing `.env`:
+
+1. If any channel runs in a container, sync the copy: `cp .env data/env/env`.
+2. Restart the service:
+
+```bash
+# macOS
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>
+
+# Linux
+systemctl --user restart nanoclaw-v2-<slug>
+```
+
+Per-group container config needs no restart — it's read fresh from the database every time a container spawns.
+
+See [Installation](/installation) for service management details and finding your install slug.
