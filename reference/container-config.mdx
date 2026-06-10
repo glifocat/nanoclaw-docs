@@ -67,7 +67,7 @@ Host-side enforcement of what the agent can do through the in-container `ncl` CL
 
 - `disabled` — all CLI requests rejected; the CLI instructions fragment is also dropped from the composed CLAUDE.md (that part applies at next spawn)
 - `group` (default) — only `groups`, `sessions`, `destinations`, and `members` resources, auto-scoped to the agent's own group; the agent cannot change `cli_scope` itself
-- `global` — full access, equivalent to a host operator
+- `global` — full resource access; mutations still require approval
 
 This is the only field **not** written to `container.json` — the host checks the database on every request. See [ncl CLI reference](/reference/ncl-cli#access-control) for the full enforcement rules.
 
@@ -90,7 +90,7 @@ External MCP servers merged with the built-in `nanoclaw` server at runner startu
 }
 ```
 
-`args` and `env` are optional. `instructions`, if present, is composed into the group's CLAUDE.md as an inline fragment at spawn. Manage with `ncl groups config add-mcp-server` / `remove-mcp-server`.
+`args` and `env` are optional. `instructions`, if present, is composed into the group's CLAUDE.md as an inline fragment at spawn — but neither `ncl groups config add-mcp-server` nor the agent's `add_mcp_server` tool accepts it as of v2.1.4; to set it, update the JSON column directly in the database. Manage the rest with `ncl groups config add-mcp-server` / `remove-mcp-server`.
 
 ### packages_apt and packages_npm
 
