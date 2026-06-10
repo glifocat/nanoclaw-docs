@@ -46,7 +46,7 @@ sequenceDiagram
     end
 ```
 
-Step by step on the inbound side ([`src/router.ts`](https://github.com/qwibitai/nanoclaw/blob/main/src/router.ts)):
+Step by step on the inbound side ([`src/router.ts`](https://github.com/nanocoai/nanoclaw/blob/main/src/router.ts)):
 
 1. The adapter normalizes a platform event and hands it to the router (see [Channels overview](/channels/overview) for the adapter side).
 2. Non-threaded adapters collapse `threadId` to null; the router looks up the messaging group for `(channel_type, platform_id)`, auto-creating one on a mention or DM. Unwired channels escalate to the owner for approval instead of routing.

@@ -15,7 +15,7 @@ Don't confuse providers with [tools](/extend/tools). A tool skill like `/add-oll
 
 ## How the provider is resolved
 
-At spawn time the host resolves the provider name with a fixed precedence ([`src/container-runner.ts`](https://github.com/qwibitai/nanoclaw/blob/main/src/container-runner.ts)):
+At spawn time the host resolves the provider name with a fixed precedence ([`src/container-runner.ts`](https://github.com/nanocoai/nanoclaw/blob/main/src/container-runner.ts)):
 
 1. `sessions.agent_provider` — per-session override
 2. `container_configs.provider` — the group's [container config](/reference/container-config#provider)
