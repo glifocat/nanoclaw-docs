@@ -14,7 +14,7 @@ erDiagram
     AGENT_GROUPS ||--o{ WIRINGS : "serves chats via"
     MESSAGING_GROUPS ||--o{ WIRINGS : "handled by agents via"
     AGENT_GROUPS ||--o{ SESSIONS : owns
-    MESSAGING_GROUPS ||--o{ SESSIONS : scopes
+    MESSAGING_GROUPS |o--o{ SESSIONS : scopes
     USERS ||--o{ USER_ROLES : "owner / admin"
     USERS ||--o{ MEMBERS : "known in"
     AGENT_GROUPS ||--o{ MEMBERS : ""
@@ -31,13 +31,13 @@ erDiagram
 
 ## Agent groups — the unit of isolation
 
-An agent group is a workspace: a folder under `groups/<name>/` with its own working files, per-group memory (`CLAUDE.local.md`), a composed `CLAUDE.md`, and a container configuration (the `container_configs` table — packages, mounts, resource limits). Every session an agent group owns runs in a container that sees only that workspace. All agent groups are equal — privilege lives on users, not on groups.
+An agent group is a workspace: a folder under `groups/<name>/` with its own working files, per-group memory (`CLAUDE.local.md`), a composed `CLAUDE.md`, and a container configuration (the `container_configs` table — packages, mounts, model and skills config). Every session an agent group owns runs in a container that sees only that workspace. All agent groups are equal — privilege lives on users, not on groups.
 
 ## Messaging groups — a platform conversation
 
 A messaging group is one chat or channel on one platform, identified by `(channel_type, platform_id)` — a Discord channel, a WhatsApp group, a DM. It carries an `unknown_sender_policy` (`strict` / `request_approval` / `public`) and can be denied (`denied_at`), after which messages from it drop silently.
 
-You don't pre-register these. When a mention or DM arrives on a chat NanoClaw has never seen, the router auto-creates the row with `unknown_sender_policy = 'request_approval'` — and if no agent is wired to it, escalates to an owner with an approve/deny card before any agent responds. Plain chatter in unwired channels is ignored entirely.
+You don't pre-register these. When a mention or DM arrives on a chat NanoClaw has never seen, the router auto-creates the row with `unknown_sender_policy = 'request_approval'` — and if no agent is wired to it, escalates to an approver (group admins first, then global admins, then owners) with an approve/deny card before any agent responds. Plain chatter in unwired channels is ignored entirely.
 
 ## Wirings — where the behavior lives
 
@@ -71,7 +71,7 @@ When a message doesn't engage a wiring, `drop` skips it silently. `accumulate` s
 
 A session is one conversation between an agent group and a messaging group (optionally scoped to a thread): one folder under `data/v2-sessions/`, one pair of inbound/outbound databases, and one container while running. The wiring's `session_mode` decides the lookup key, but the router applies two overrides based on what the adapter can do:
 
-1. **Thread-capable adapters force `per-thread` in group chats.** On Discord, Slack, or Teams channels, every thread gets its own session even if the wiring says `shared` — only `agent-shared` overrides this, because it's a cross-channel directive the adapter knows nothing about. DMs are exempt: sub-threads in a DM collapse into one conversation.
+1. **Thread-capable adapters force `per-thread` in group chats.** On Discord, Slack, or Teams channels, every thread gets its own session even if the wiring says `shared` — only `agent-shared` overrides this, because it's a cross-channel directive the adapter knows nothing about. DMs are exempt: sub-threads in a DM collapse into one conversation (for `shared` wirings — an explicit `per-thread` wiring is honored in DMs, as the table shows).
 2. **Thread-less adapters collapse `per-thread` to `shared`.** WhatsApp, Telegram, and iMessage have no thread IDs — the router nulls the thread before routing, and a `per-thread` lookup with no thread is identical to `shared`.
 
 What you set versus what you actually get:
@@ -88,7 +88,7 @@ A user is a namespaced platform identifier: `channel_type:handle` — `discord:1
 
 Privilege is user-level, granted in `user_roles`:
 
-- **Owner** — always global. Full access to every agent group, and the approver for channel registrations.
+- **Owner** — always global. Full access to every agent group, and the last-resort approver for channel registrations (cards go to group admins first, then global admins, then owners).
 - **Admin** — global, or scoped to one agent group. Admins pass the command gate (`/clear`, `/compact`, `/context`, `/cost`, `/files`, `/upload-trace` require owner or admin), approve unknown senders within their scope, and are implicitly members of the groups they administer.
 - **Member** — a row in `agent_group_members`. Being "known" in an agent group is what lets an unprivileged user interact with it at all.
 
