@@ -32,13 +32,13 @@ WhatsApp is offered in the first-run setup wizard, or add it later by running `/
     The skill copies `src/channels/whatsapp.ts` from the `channels` branch, wires it into the channel barrel, and installs the pinned Baileys, `qrcode`, and `pino` packages.
   </Step>
   <Step title="Link your phone">
-    A QR code renders (terminal, or a local browser page via the skill) and rotates every ~60 seconds until scanned. Pairing codes also expire in ~60 seconds — enter them immediately under **Linked Devices → Link a Device → Link with phone number instead**. Credentials land in `store/auth/`.
+    A QR code renders (terminal, or a local browser page via the skill) and rotates every ~60 seconds until scanned. Pairing codes also expire in ~60 seconds — enter them immediately under **Linked Devices → Link a Device → Link with phone number instead**. Credentials land in `store/auth/`, and the wizard restarts the service so the adapter picks them up.
   </Step>
   <Step title="Choose your mode">
     The wizard asks which number you'll chat from. Same number as the one you linked = shared mode, and messages land in your "You" self-chat. A different number = dedicated mode — the wizard writes `ASSISTANT_HAS_OWN_NUMBER=true` to `.env` (and `data/env/env` for containers).
   </Step>
   <Step title="Name the agent and get the welcome DM">
-    The wizard asks for an agent name (default `Nano`), restarts the service so the adapter picks up the credentials, wires your DM to the first agent group, and sends a welcome message.
+    The wizard asks for an agent name (default `Nano`), wires your DM to the first agent group, and sends a welcome message.
   </Step>
 </Steps>
 
@@ -48,9 +48,9 @@ To wire more chats or groups later, run `/manage-channels`.
 
 - **Auth persistence** — credentials live in `store/auth/` (multi-file auth state). Restarts reuse the saved session; you only re-pair if WhatsApp logs the device out. On a server-side logout the adapter wipes `store/auth/` so the next start prompts a fresh pair.
 - **Activation** — the adapter only starts when `store/auth/creds.json` exists, `WHATSAPP_PHONE_NUMBER` is set (pairing-code mode), or `WHATSAPP_ENABLED=true` (QR mode). Otherwise it's skipped at startup.
-- **Reconnection** — on disconnect the adapter reconnects automatically (retrying every 5s) unless it was logged out. Messages sent while disconnected are queued in memory and flushed when the connection reopens.
-- **No threads** — the adapter sets `supportsThreads: false`; every inbound message has a null thread ID. Wirings with `per-thread` session mode behave like `agent-shared` here — see the [entity model](/concepts/entity-model).
-- **DMs vs groups** — DMs always count as addressed to the agent. In groups (`…@g.us` JIDs) the agent is only triggered by an explicit @-mention of the bot's number, which the adapter also normalizes to `@<agent name>` for trigger matching. Group names sync from WhatsApp every 24 hours.
+- **Reconnection** — on disconnect the adapter reconnects immediately (with one retry after 5s if that attempt throws) unless it was logged out. Messages sent while disconnected are queued in memory and flushed when the connection reopens.
+- **No threads** — the adapter sets `supportsThreads: false`; every inbound message has a null thread ID. Wirings with `per-thread` session mode behave like `shared` here — see the [entity model](/concepts/entity-model).
+- **DMs vs groups** — DMs always count as addressed to the agent. In groups (`…@g.us` JIDs) the agent is by default only triggered by an explicit @-mention of the bot's number, which the adapter also normalizes to `@<agent name>` for trigger matching. Group names sync from WhatsApp every 24 hours.
 - **Media** — inbound images, video, audio, and documents are downloaded to `data/attachments/` and passed to the agent (unsafe attacker-controlled filenames are replaced). Outbound files are sent as native WhatsApp media by extension, with the reply text as the first file's caption.
 - **Formatting** — the agent's markdown is converted to WhatsApp formatting (`**bold**` → `*bold*`, headings → bold, links → `text (url)`); code blocks pass through untouched. `@<phone>` in replies becomes a real tappable mention.
 - **Interactive questions** — `ask_user_question` renders as text with slash-command answers (`/approve`, `/reject`); the adapter matches your reply to the pending question. Editing and deleting sent messages isn't supported (linked-device limitation).
