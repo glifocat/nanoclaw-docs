@@ -54,7 +54,11 @@ You can edit the same file yourself — useful for longer instructions you'd rat
 ncl groups restart --id <agent-id>
 ```
 
-If you'd rather be guided than edit files, run `/customize` in Claude Code from your NanoClaw checkout. It's an interactive skill: it asks what you want to change, hands off to a dedicated skill when one exists (`/add-telegram`, `/manage-channels`, `/manage-mounts`, ...), and otherwise routes the change to the right surface — `CLAUDE.local.md` for persona, container config for runtime behavior, wirings for triggers.
+If you'd rather be guided than edit files, run `/customize` in Claude Code from your NanoClaw checkout. It's an interactive skill: it asks what you want to change, hands off to a dedicated skill when one exists (`/add-telegram`, `/manage-channels`, `/manage-mounts`, ...), and otherwise routes the change to the right surface — the agent group's memory file for persona, container config for runtime behavior, wirings for triggers.
+
+<Note>
+As of v2.1.4 the `/customize` skill's own text still points persona edits at the composed `groups/<folder>/CLAUDE.md`. Follow this tutorial instead: edit `CLAUDE.local.md` — anything written to the composed file is clobbered at the next spawn.
+</Note>
 
 </Step>
 <Step title="Swap the brain">
@@ -68,7 +72,7 @@ ncl groups config update --id <agent-id> --model sonnet --effort low
 - `--model` takes an alias (`sonnet`, `opus`, `haiku`) or a full model ID. Unset means the SDK default.
 - `--effort` is one of `low`, `medium`, `high`, `xhigh`, `max`.
 
-Config changes are saved but **do not take effect until you restart** — the values are read once at spawn:
+Config values are read at every spawn, so a running container keeps its old config — the change applies to the next container automatically. To force it now:
 
 ```bash
 ncl groups restart --id <agent-id>
@@ -105,7 +109,7 @@ It's nothing but a header and imports — the shared base plus per-skill fragmen
 
 ## What you changed
 
-Two surfaces, two mechanisms: personality went into a file the agent and you co-own (`CLAUDE.local.md`, applied at next spawn), the brain went into a DB row (`container_configs`, applied at next restart). The third surface — capabilities — works differently because it can change what the agent is able to *do*, so it goes through admin approval.
+Two surfaces, two mechanisms: personality went into a file the agent and you co-own (`CLAUDE.local.md`), the brain went into a DB row (`container_configs`). Both are read at container spawn — edits apply to the next container, and `ncl groups restart` forces one now. The third surface — capabilities — works differently because it can change what the agent is able to *do*, so it goes through admin approval.
 
 ## Next steps
 
