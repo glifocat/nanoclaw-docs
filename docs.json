@@ -126,7 +126,7 @@
           {
             "group": "Get started",
             "icon": "rocket",
-            "pages": ["introduction", "quickstart", "installation"]
+            "pages": ["introduction", "quickstart", "installation", "migrate-from-v1"]
           },
           {
             "group": "Channels",
