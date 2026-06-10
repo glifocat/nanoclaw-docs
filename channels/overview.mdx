@@ -1,121 +1,128 @@
 ---
-title: Integrations overview
-description: Channels and providers as skills and setup flows — add only what you need.
+title: "Channels overview"
+description: "How NanoClaw channels work: the built-in CLI channel, the adapter catalog on the channels branch, and the /add-<channel> skills that install them."
 tag: "UPDATED"
-keywords: ["integrations", "channels", "providers", "skills", "add-telegram", "add-whatsapp", "add-codex", "add-opencode"]
+keywords: ["channels", "adapters", "channel registry", "chat sdk", "webhook", "add-telegram", "add-discord", "add-slack", "manage-channels"]
 ---
 
-NanoClaw trunk ships the registry and infrastructure. Channel adapters and alternative AI providers are installed on demand through setup flows and `/add-<name>` skills. This keeps your fork lean and your code legible: nothing you didn't ask for.
+{/* verified-against: src/channels/{adapter,channel-registry,index,chat-sdk-bridge,cli}.ts, src/webhook-server.ts, .claude/skills/{manage-channels,add-telegram}/SKILL.md, upstream/channels:src/channels/ @ dc34ceb (v2.1.4) */}
 
-## Two kinds of integration
+NanoClaw trunk ships channel **infrastructure** — the adapter interface, the registry, the Chat SDK bridge, the webhook server — plus one built-in channel: `cli`, an always-on local-terminal channel that needs no credentials. Every platform adapter (Telegram, Discord, Slack, WhatsApp, …) lives on the `channels` branch of the repo and is installed on demand with an `/add-<channel>` skill. Your fork only contains the channels you actually use.
 
-<CardGroup cols={2}>
-  <Card title="Channels" icon="plug" href="#channels">
-    Where messages come from: Telegram, Discord, WhatsApp, Signal, Slack, Teams, iMessage, email, the terminal, and more
-  </Card>
-  <Card title="Providers" icon="robot" href="#providers">
-    Which AI runs the agent: Claude (default), OpenAI Codex, OpenCode (OpenRouter/Google/DeepSeek), Ollama (local). Configurable per agent group.
-  </Card>
-</CardGroup>
+## How a message flows
 
-## Channels
+Adapters self-register with the channel registry on import. At startup the host instantiates every registered adapter whose credentials are present (a factory that finds no credentials returns `null` and the channel is skipped with a warning). From there, every channel takes the same path:
 
-Install through `bash nanoclaw.sh` during first setup, or with a skill invocation in Claude Code later. Channel flows install the adapter, collect platform-specific auth, register the first messaging group, and restart the service when needed.
+```mermaid
+flowchart LR
+    P["Platform<br/>(Telegram, Slack, ...)"] -->|event| A[Channel adapter]
+    A -->|onInbound| R[Router]
+    R -->|wiring| G[Agent container]
+    G -->|reply| R
+    R -->|deliver| A
+    A -->|message| P
+    REG[Channel registry] -.->|"instantiates at startup,<br/>resolves adapter for delivery"| A
+```
 
-### Documented channels
+The adapter normalizes platform events into inbound messages; the router matches them to a wiring (which agent group handles which chat) and writes them into the right session; the agent's reply comes back through the router, which looks up the adapter by channel type in the registry and calls `deliver()`.
 
-<CardGroup cols={2}>
+Adapters come in two flavors:
+
+- **Chat SDK adapters** — wrap a [Chat SDK](https://github.com/vercel/chat) platform adapter (the `chat` npm package and its `@chat-adapter/*` family) via the bridge in `src/channels/chat-sdk-bridge.ts`. The bridge handles mention detection, attachments, reply context, interactive question cards, and splitting long messages to fit platform limits. Discord, Slack, Telegram, Teams, and most others use this pattern.
+- **Native adapters** — implement the `ChannelAdapter` interface directly. Used where no Chat SDK adapter fits: WhatsApp (Baileys), Signal (signal-cli), WeChat, Delta Chat, Emacs, and the built-in CLI channel.
+
+## What an `/add-<channel>` skill does
+
+Each install skill follows the same pattern (see `/add-telegram` for the canonical example):
+
+1. **Fetch the `channels` branch** — `git fetch origin channels`
+2. **Copy the adapter** — `git show origin/channels:src/channels/<name>.ts > src/channels/<name>.ts`, along with its tests, helpers, and any setup steps
+3. **Wire the barrel** — append `import './<name>.js';` to `src/channels/index.ts` so the adapter self-registers at startup
+4. **Install the platform package, pinned** — e.g. `pnpm install @chat-adapter/telegram@4.27.0`
+5. **Build and validate** — `pnpm run build` plus the channel's registration test, which asserts the adapter actually lands in the registry
+6. **Collect credentials** — bot tokens, QR pairing, linked devices, whatever the platform needs, into `.env`
+
+The skills are idempotent — every step is safe to re-run, and each skill starts with a pre-flight check that skips straight to credentials when the files are already in place. Re-running an `/add-<channel>` skill is also how you pick up adapter improvements from the `channels` branch.
+
+## Adapter catalog
+
+Everything on the `channels` branch right now. "Setup wizard" means the channel has a guided flow in `setup/channels/` that the first-run setup offers; channels without one are installed with their `/add-<channel>` skill directly.
+
+| Channel | Setup wizard? | Install | Notes |
+|---------|---------------|---------|-------|
+| WhatsApp | Yes | `/add-whatsapp` | Native Baileys (WhatsApp Web protocol); QR or pairing-code login |
+| WhatsApp Cloud | — | `/add-whatsapp-cloud` | Chat SDK; Meta's official Cloud API |
+| Telegram | Yes | `/add-telegram` | Chat SDK; BotFather token, pair-code chat registration |
+| Discord | Yes | `/add-discord` | Chat SDK; Gateway listener — no public URL needed; thread-based |
+| Slack | Yes | `/add-slack` | Chat SDK; events delivered to the webhook server; thread-based |
+| Signal | Yes | `/add-signal` | Native; requires signal-cli with a linked account |
+| iMessage | Yes | `/add-imessage` | Chat SDK; local mode (macOS Full Disk Access) or remote mode (Photon API) |
+| Microsoft Teams | Yes | `/add-teams` | Chat SDK; webhook-based; thread-based |
+| Google Chat | — | `/add-gchat` | Chat SDK; thread-based |
+| GitHub | — | `/add-github` | Chat SDK; issue and PR conversations via webhook |
+| Linear | — | `/add-linear` | Chat SDK; issue threads |
+| Matrix | — | `/add-matrix` | Chat SDK; Element and self-hosted homeservers |
+| Webex | — | `/add-webex` | Chat SDK; thread-based |
+| WeChat | — | `/add-wechat` | Native; Tencent's official iLink Bot API, QR login |
+| Delta Chat | — | `/add-deltachat` | Native; chat over email (IMAP/SMTP) |
+| Emacs | — | `/add-emacs` | Native; localhost HTTP bridge for the nanoclaw.el client |
+| Email (Resend) | — | `/add-resend` | Chat SDK; email via Resend |
+
+The built-in `cli` channel isn't in this table because it ships on trunk — see [CLI channel](/channels/cli).
+
+## The webhook server
+
+Chat SDK channels that receive platform events over HTTP (Slack, Teams, GitHub, and others) share one webhook server. It starts lazily when the first such adapter registers and routes by path:
+
+```text
+/webhook/{adapterName}   →   that adapter's Chat SDK webhook handler
+```
+
+The port comes from the `WEBHOOK_PORT` environment variable, default `3000`. Point the platform's event subscription URL at `https://<your-public-host>/webhook/<channel>` (e.g. `/webhook/slack`) — you'll need a public URL or a tunnel for these channels. Discord is the exception: it uses a persistent Gateway listener instead of inbound webhooks, so no public URL is required. Polling channels (Telegram, WhatsApp, Signal, WeChat) don't need one either.
+
+## Wiring channels to agents
+
+Installing a channel gets messages flowing into NanoClaw; **wiring** decides which agent group handles them. A wiring connects a messaging group (a chat, channel, or thread on a platform) to an agent group — the same chat can be wired to multiple agents and vice versa.
+
+Run `/manage-channels` in Claude Code to do this conversationally. It:
+
+- Shows current state — wired, configured-but-unwired, and unconfigured channels, plus privileged users
+- Walks you through registering new chats, including platform-specific ID discovery (Telegram uses a pairing code, so you never hunt for chat IDs by hand)
+- Asks the isolation question for each new wiring: same conversation, same agent with separate conversations, or a fully separate agent
+- Moves existing channels between agent groups
+
+For scripted access, the `ncl` CLI exposes the same data: `ncl wirings` lists and edits the wiring rows directly. The isolation choice is the `session_mode` on each wiring — see the [entity model](/concepts/entity-model) for what `shared`, `agent-shared`, and `per-thread` mean.
+
+If you're setting up your very first channel, `/init-first-agent` handles the whole flow — agent group creation, wiring, owner promotion, and an end-to-end delivery test.
+
+## Channel guides
+
+<CardGroup cols={3}>
   <Card title="WhatsApp" icon="message" href="/channels/whatsapp">
-    `/add-whatsapp` (Baileys, WhatsApp Web API) or `/add-whatsapp-cloud` (Cloud API, DMs only)
+    Baileys or Cloud API
   </Card>
-
   <Card title="Telegram" icon="paper-plane" href="/channels/telegram">
-    `/add-telegram` — grammy framework, BotFather token
+    BotFather token, pair-code registration
   </Card>
-
   <Card title="Discord" icon="comments" href="/channels/discord">
-    `/add-discord` — discord.js, bot application token
+    Gateway listener, threads
   </Card>
-
   <Card title="Slack" icon="hashtag" href="/channels/slack">
-    `/add-slack` — Slack app credentials plus a public events URL
+    Events webhook, threads
   </Card>
-
-  <Card title="Signal" icon="message-circle">
-    `/add-signal` — signal-cli linked-device flow
+  <Card title="Signal" icon="message-circle" href="/channels/signal">
+    signal-cli linked device
   </Card>
-</CardGroup>
-
-### Also available on the `channels` branch
-
-| Skill | Platform | Notes |
-|-------|----------|-------|
-| `/add-teams` | Microsoft Teams | Bot Framework |
-| `/add-imessage` | Apple iMessage | macOS-only; uses AppleScript bridge |
-| `/add-matrix` | Matrix | Federated; supports Element and self-hosted homeservers |
-| `/add-gchat` | Google Chat | Workspace accounts |
-| `/add-webex` | Cisco Webex | Bot token |
-| `/add-linear` | Linear | Issue comments, triage workflows |
-| `/add-github` | GitHub | PR comments, issue reactions, webhooks |
-| `/add-wechat` | WeChat | WeChat Work API |
-| `/add-emacs` | Emacs | Talk to your agent from inside your editor |
-| `/add-resend` | Email (outbound) | Transactional sends via Resend |
-| `/claw` | Local terminal | Talk to your agent from a CLI — no platform account required |
-
-Documentation for these is rolling out post-v2 launch. The skill itself is self-documenting via `SKILL.md` — ask Claude Code to walk you through any of them.
-
-## Providers
-
-By default, NanoClaw uses Claude via the official [Claude Agent SDK](https://docs.anthropic.com/en/api/agent-sdk). Other providers drop in as skills from the `providers` branch and can be configured per agent group:
-
-| Skill | Provider | Use case |
-|-------|----------|----------|
-| `/add-codex` | OpenAI Codex | ChatGPT subscription or OpenAI API key |
-| `/add-opencode` | OpenCode | OpenRouter, Google, DeepSeek, and more via OpenCode |
-| `/add-ollama-provider` | Ollama | Local open-weight models — no cloud calls |
-| `/add-ollama-tool` | Ollama (tool mode) | Use local Ollama as a tool inside Claude agents |
-
-`agent_provider` is a column on `agent_groups` in the central database — each agent group can run a different provider. Mix and match in the same install.
-
-## How channel skills work
-
-1. **Skill or setup invocation** — you pick a channel in `bash nanoclaw.sh` or run `/add-<channel>` later from Claude Code
-2. **Adapter install** — the flow adds the channel adapter and any platform package dependencies
-3. **Platform auth** — the flow prompts for tokens, OAuth flows, QR pairing, or linked-device setup
-4. **First messaging group** — the flow registers your first chat/channel/group from that platform so you can test immediately
-5. **Verify** — a round-trip test confirms inbound + outbound work before the flow exits
-
-To pick up channel installer improvements, rerun the relevant `/add-<channel>` workflow. The installer fetches the current `channels` branch and updates the files it owns.
-
-To remove a channel, revert the commit that installed it:
-
-```
-git revert <skill-commit-sha>
-```
-
-## Running multiple channels
-
-Channels are peers — none is privileged. Run one, or run Telegram + Discord + GitHub + a local CLI all at once. For each channel you add, decide how it relates to existing agents:
-
-- **Separate agent groups** — each channel has its own workspace, memory, and personality
-- **Same agent, separate sessions** — one workspace; per-channel conversation threads
-- **Shared session** — multiple channels feed one conversation (webhook + chat is the classic case)
-
-The choice is per channel, configurable via `/manage-channels`. See [Channel isolation model](/concepts/entity-model) for details.
-
-## Next steps
-
-<CardGroup cols={2}>
-  <Card title="Skills system" icon="puzzle-piece" href="/extend/overview">
-    How skills work, how to update, and how to author your own
+  <Card title="iMessage" icon="apple" href="/channels/imessage">
+    macOS local or remote mode
   </Card>
-  <Card title="Customization" icon="wrench" href="/guides/customize-an-agent">
-    Trigger words, timeouts, engage modes, sender scope
+  <Card title="Microsoft Teams" icon="users" href="/channels/teams">
+    Bot registration, webhook
   </Card>
-  <Card title="Security" icon="shield" href="/concepts/security">
-    Sender policies, user roles, OneCLI credentials
+  <Card title="CLI" icon="terminal" href="/channels/cli">
+    Built-in terminal channel
   </Card>
-  <Card title="Channel isolation" icon="layer-group" href="/concepts/entity-model">
-    Decide how channels relate to agent groups
+  <Card title="More channels" icon="grid" href="/channels/more-channels">
+    Matrix, GitHub, Linear, WeChat, and the rest
   </Card>
 </CardGroup>
