@@ -18,7 +18,7 @@ tail -f logs/nanoclaw.log          # full routing chain: inbound, spawn/exit, de
 tail -n 50 logs/nanoclaw.error.log # delivery failures, crash-loop backoff, warnings
 ```
 
-Set `LOG_LEVEL=debug` (see [Configuration](/operate/configuration#applying-changes)) to also see resolved mount configurations, the container spawn command, and streamed container stderr tagged with `container=<group folder>`. Containers run with `--rm`, so the host log is the only place container output survives.
+Set `LOG_LEVEL=debug` (see [Configuration](/operate/configuration#applying-changes)) to also see resolved mount configurations and streamed container stderr tagged with `container=<group folder>`. Containers run with `--rm`, so the host log is the only place container output survives.
 
 Then get the system state from the [ncl CLI](/operate/ncl-cli):
 
@@ -60,14 +60,14 @@ Trace the message through the pipeline, in order:
     ```bash
     ncl dropped-messages list
     ```
-    Each row aggregates drops per sender and chat, with a `reason`:
+    Each row aggregates drops per chat, with a `reason`:
 
     | Reason | Meaning | Fix |
     |---|---|---|
     | `no_agent_wired` | No wiring exists for that chat | Create one: `ncl wirings create --messaging-group-id <id> --agent-group-id <id>` |
     | `no_agent_engaged` | A wiring exists but its engage rules didn't fire | Check `engage_mode`: `mention` needs an @mention (or a DM); `pattern` matches `engage_pattern` against each message |
     | `unknown_sender_strict` | Sender not recognized, strict policy | Add the sender, or relax the policy — see [Hardening](/operate/hardening#restrict-who-can-talk-to-your-agents) |
-    | `unknown_sender_request_approval` | Sender not recognized; an approval card was sent | Approve or reject the pending card: `ncl approvals list --status pending` |
+    | `unknown_sender_request_approval` | Sender not recognized; an Allow/Deny card was sent to an approver's DM | The approver answers the card in their DM; `ncl dropped-messages list` shows the recorded drop either way |
   </Step>
   <Step title="Did a container spawn?">
     ```bash
@@ -84,11 +84,11 @@ Trace the message through the pipeline, in order:
 
 ## Container won't spawn
 
-All three of these abort the spawn and show up in `logs/nanoclaw.log`:
+The first two of these abort the spawn; a rejected mount only degrades it (the container starts without that mount). All three appear in `logs/nanoclaw.error.log`:
 
 - **`OneCLI gateway not applied — refusing to spawn container without credentials`** — the host can't wire the credential vault, so it refuses to launch the agent. The message stays pending and the sweep retries every minute; fix the gateway (is OneCLI running on `127.0.0.1:10254`?) and the spawn recovers on its own. See [Credentials](/operate/credentials).
-- **Egress lockdown errors** — with lockdown enabled, the spawn fails fast rather than run with open egress: `the "<network>" internal network could not be created` or `the OneCLI gateway "<container>" could not be attached`. Check `docker network inspect` for the egress network and see [Hardening](/operate/hardening#lock-down-network-egress).
-- **`Additional mount REJECTED`** — a mount from your group's container config failed allowlist validation. The log line includes the `requestedPath` and `reason`; the container still starts, just without that mount. Fix the allowlist — see [Hardening](/operate/hardening#gate-additional-mounts).
+- **Egress lockdown errors** — with lockdown enabled, the spawn fails fast rather than run with open egress: `the "<network>" internal network could not be created` or `the OneCLI gateway "<container>" could not be attached to "<network>"`. Check `docker network inspect` for the egress network and see [Hardening](/operate/hardening#lock-down-network-egress).
+- **`Additional mount REJECTED`** — a mount from your group's container config failed allowlist validation. The log line includes the `requestedPath` and `reason`. Fix the allowlist — see [Hardening](/operate/hardening#gate-additional-mounts).
 
 ## Replies are slow
 
