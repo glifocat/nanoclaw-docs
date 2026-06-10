@@ -149,7 +149,7 @@
           {
             "group": "Build with agents",
             "icon": "wand-magic-sparkles",
-            "pages": ["guides/scheduled-tasks", "guides/multi-agent-swarm", "guides/customize-an-agent"]
+            "pages": ["guides/first-agent", "guides/customize-an-agent", "guides/scheduled-tasks", "guides/multi-agent-swarm"]
           },
           {
             "group": "Extend",
