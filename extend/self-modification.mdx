@@ -1,0 +1,91 @@
+---
+title: "Agent self-modification"
+description: "What agents can change about themselves — editing their own memory freely, and requesting packages or MCP servers through admin approval."
+tag: "NEW"
+keywords: ["self-modification", "install_packages", "add_mcp_server", "CLAUDE.local.md", "approval", "self-customize", "rebuild", "agent memory"]
+---
+
+{/* verified-against: src/modules/self-mod/{index,request,apply}.ts, src/modules/approvals/primitive.ts, container/agent-runner/src/mcp-tools/self-mod.ts, container/agent-runner/src/mcp-tools/self-mod.instructions.md, container/skills/self-customize/SKILL.md, src/container-runner.ts, src/claude-md-compose.ts @ dc34ceb (v2.1.4) */}
+
+Agents can change their own environment — but every change that touches the container goes through you. The self-mod module exposes exactly two operations, `install_packages` and `add_mcp_server`, and **both are always approval-gated**: the agent submits a request, an admin gets a card, and nothing changes until someone taps Approve. The one thing an agent can change freely is its own memory file.
+
+## What an agent can change
+
+| Surface | Approval | What happens |
+| --- | --- | --- |
+| `CLAUDE.local.md` and workspace files | None — direct edit | Persists immediately; it's a plain file on the host |
+| apt / npm packages | Admin card | Container config updated, image rebuilt, container restarted |
+| MCP servers | Admin card | Container config updated, container restarted (no rebuild) |
+| Its own source code, composed `CLAUDE.md`, `container.json` | Not possible | Mounted read-only |
+
+## Free edits: the agent's own memory
+
+The group folder is mounted read-write at `/workspace/agent/`, so the agent can edit `CLAUDE.local.md` — its persistent per-group memory and instructions — without asking anyone. This is where "remember that I prefer short answers" lands. The [self-customize container skill](/reference/skills-catalog#container-skills) teaches exactly this: workspace files and `CLAUDE.local.md` are direct edits, everything else has a workflow.
+
+The boundary is enforced by nested read-only mounts on top of the read-write group dir:
+
+- the composed `CLAUDE.md` is read-only and regenerated from scratch every spawn — edits would be lost anyway, so writes are blocked and the agent is told to use `CLAUDE.local.md`
+- `container.json` (the materialized [container config](/reference/container-config)) is read-only — config changes only land through the approval paths below
+- the agent-runner source at `/app/src` is read-only — code changes go through a builder agent, not in-place edits
+
+## `install_packages`: apt and npm packages
+
+The agent calls the [`install_packages` MCP tool](/reference/mcp-tools#install_packages) with `apt` and/or `npm` package lists and an optional `reason`. Constraints, validated in the container *and* re-validated on the host (the payload travels verbatim to a shell exec, so both layers matter): at least one package, max 20 per request, strict name patterns — no version specs, flags, or shell characters.
+
+The request is fire-and-forget. On approval, the host does the whole follow-up in one step:
+
+1. Appends the packages to the group's `packages_apt` / `packages_npm` config (deduplicated)
+2. Rebuilds the per-agent image
+3. Kills the container and queues an on-wake message telling the fresh agent to verify the packages and report back to the user
+
+Packages installed this way are baked into the image and available in every future session — unlike a `pnpm install` in the per-session workspace, which needs no approval but doesn't persist into the image or other sessions. The self-customize skill recommends exactly that for one-off tasks, and prototyping in the workspace before promoting a dependency to a container-level install.
+
+## `add_mcp_server`: new tools
+
+The agent calls [`add_mcp_server`](/reference/mcp-tools#add_mcp_server) with a `name` and `command` (plus optional `args` and `env`) for an MCP server it already knows how to invoke. On approval, the host adds the server to the group's `mcp_servers` config and restarts the container — no image rebuild, since bun runs TypeScript directly and the new server is wired on the next start.
+
+Two things this path can't do: it doesn't accept the `instructions` field that [`mcp_servers` entries support](/reference/container-config#mcp_servers), and it doesn't handle credentials — agents are instructed to use the `"onecli-managed"` placeholder for any credential env vars and let the [OneCLI Agent Vault](/operate/credentials) inject real values in flight, never to ask you for keys.
+
+## The approval flow, from your seat
+
+Both operations use the same approvals plumbing as [credential requests](/operate/credentials#approving-credential-use). You get a DM card — "Install Packages Request" or "Add MCP Request" — naming the agent, the package list or server command, and the agent's stated reason, with Approve / Reject buttons.
+
+- **Who gets it:** admins of the requesting agent group first, then global admins, then owners — the first one with a reachable DM, preferring approvers on the same channel type as the originating session, then falling back to list order on any channel. No eligible approver means the request fails immediately and the agent is told why.
+- **On approve:** the host executes the full change (config update, rebuild if needed, restart) and the agent gets a system message prompting it to verify and report.
+- **On reject:** the agent sees "Your `install_packages` request was rejected by admin."
+
+Pending requests are visible with `ncl approvals list --status pending`; decisions happen on the card, not in the CLI.
+
+<Note>
+Self-mod is an optional module. Without it installed, the agent's tools still submit requests, but the host drops them — no card is ever delivered and nothing changes.
+</Note>
+
+## Reviewing and reverting changes
+
+Everything an agent changed through approval lands in the group's container config, so review is one command:
+
+```bash
+ncl groups config get --id <group-id>   # shows packages_apt, packages_npm, mcp_servers
+```
+
+To undo:
+
+```bash
+# Remove a package, then rebuild
+ncl groups config remove-package --id <group-id> --apt <pkg>
+ncl groups restart --id <group-id> --rebuild
+
+# Remove an MCP server, then restart (no rebuild needed)
+ncl groups config remove-mcp-server --id <group-id> --name <server>
+ncl groups restart --id <group-id>
+```
+
+`CLAUDE.local.md` edits have no approval trail — it's a plain file at `groups/<folder>/CLAUDE.local.md` on the host, and the groups directory is not a git repository. To review, read the file; to revert, edit it (or restore from your own backups).
+
+## Where the guardrails sit
+
+An agent asking to expand its own capabilities is exactly what a prompt-injected agent would ask for — that's why both operations are approval-gated and package names are sanitized at two layers. The [security model](/concepts/security) covers self-modification in the context of the other approval gates.
+
+<Note>
+Don't confuse agent self-modification with the operator-side `/customize` skill, which you run in Claude Code against your NanoClaw checkout to change channels, wirings, and core behavior. That's covered in [Customize NanoClaw](/guides/customize-an-agent).
+</Note>
