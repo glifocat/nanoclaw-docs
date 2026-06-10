@@ -1,128 +1,103 @@
 ---
-title: Docker Sandboxes
-description: Running NanoClaw inside Docker Sandboxes for an extra layer of VM-level isolation
+title: "Hardening"
+description: "Lock down a NanoClaw install — egress lockdown, the mount allowlist, sender policies, the command gate, and container resource limits."
+tag: "UPDATED"
+keywords: ["hardening", "security", "egress lockdown", "NANOCLAW_EGRESS_LOCKDOWN", "mount allowlist", "unknown_sender_policy", "command gate", "container limits"]
 ---
 
-Docker Sandboxes wrap your entire NanoClaw instance — including its agent containers — inside a lightweight micro VM. This gives you **two layers of isolation**: the sandbox VM boundary on the outside, and per-agent Docker containers on the inside.
+{/* verified-against: src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/modules/permissions/{index.ts,access.ts,sender-approval.ts}, src/command-gate.ts, src/router.ts, src/db/schema.ts, src/config.ts, config-examples/mount-allowlist.json, .claude/skills/manage-mounts/SKILL.md, setup/mounts.ts @ dc34ceb */}
 
-## Architecture
+NanoClaw's isolation boundary is the Docker container: each agent runs in its own container with a scoped workspace mount (see [Container lifecycle](/concepts/container-lifecycle)). There is no micro-VM or alternative sandbox runtime — hardening means tightening what those containers can reach. This page walks the defense-in-depth controls from network to filesystem to people.
 
-```mermaid
-graph TB
-    subgraph Sandbox["Docker Sandbox (micro VM)"]
-        NC[NanoClaw Process - Node.js]
-        subgraph DinD["Docker-in-Docker"]
-            C1[Agent Container 1]
-            C2[Agent Container 2]
-        end
-        NC --> DinD
-    end
+## Lock down network egress
 
-    Host[Host Machine] --> Sandbox
+By default, agent containers have normal outbound internet access. Set `NANOCLAW_EGRESS_LOCKDOWN=true` to force all agent traffic through the OneCLI gateway instead:
 
-    style Sandbox fill:#f0fdfa,stroke:#2DD4BF
-    style DinD fill:#ccfbf1,stroke:#14B8A6
+- Agent containers are placed on an `--internal` Docker network (default name `nanoclaw-egress`, override with `NANOCLAW_EGRESS_NETWORK`). Internal networks have no route to the internet.
+- The OneCLI gateway container (default name `onecli`, override with `ONECLI_GATEWAY_CONTAINER`) is attached to that network with the alias `host.docker.internal`, so the injected proxy is the only reachable hop.
+- Agents run non-root without `NET_ADMIN`, so they can't reconfigure the network from inside.
+
+The setup is idempotent and self-healing — NanoClaw creates the network and re-attaches the gateway on every spawn if needed. It also **fails fast**: if lockdown is enabled but the network can't be created or the gateway container can't be attached, NanoClaw throws an `EgressLockdownError` and refuses to spawn the agent rather than silently running it with open egress. If you see that error, start the gateway container (or set `NANOCLAW_EGRESS_LOCKDOWN=false` to opt out).
+
+All three variables are read from `process.env` only — putting them in `.env` has no effect. Set them in the service definition (launchd plist or systemd unit) as described in [Configuration](/operate/configuration#applying-changes):
+
+```bash
+# Linux (systemd unit)
+Environment=NANOCLAW_EGRESS_LOCKDOWN=true
 ```
 
-## Requirements
+## Gate additional mounts
 
-- **Docker Desktop v4.40+** with sandbox capabilities enabled
-- **Anthropic API key**
-- **Platform credentials** for your messaging channels (e.g., Telegram bot token, WhatsApp phone number, Discord bot token, Slack app token)
+Per-group container config can request `additional_mounts` — extra host directories mounted into the container. Every request is validated against an allowlist at `~/.config/nanoclaw/mount-allowlist.json`. The file lives **outside the project root** on purpose: container agents can edit files in their workspace, so the security config has to sit where they can't reach it.
 
-## Setup
+**If the allowlist file doesn't exist, all additional mounts are blocked.** That's the default posture; you opt in by creating the file.
 
-<Steps>
-  <Step title="Patch the Dockerfile for proxy support">
-    Docker Sandboxes use a MITM proxy for network isolation. The Dockerfile must accept proxy build arguments so the container can install packages through the proxy:
+```json mount-allowlist.json
+{
+  "allowedRoots": [
+    { "path": "~/projects", "allowReadWrite": true, "description": "Development projects" },
+    { "path": "~/Documents/work", "allowReadWrite": false, "description": "Work documents (read-only)" }
+  ],
+  "blockedPatterns": ["password", "secret", "token"],
+  "nonMainReadOnly": true
+}
+```
 
-    ```dockerfile
-    ARG http_proxy
-    ARG https_proxy
-    ARG NODE_EXTRA_CA_CERTS
-    ```
-  </Step>
+Validation rules, in order:
 
-  <Step title="Update the build script">
-    Forward proxy environment variables during `docker build` so that package managers (apt, npm) can reach the internet through the sandbox proxy:
+1. **Container path** must be relative, non-empty, and contain no `..` or `:` (prevents path traversal and Docker `-v` option injection). Validated mounts land under `/workspace/extra/`.
+2. **Host path** is tilde-expanded and resolved through symlinks to its real path; it must exist.
+3. **Blocked patterns** — the real path must not match any pattern. Your `blockedPatterns` are merged with a built-in default set (`.ssh`, `.gnupg`, `.aws`, `.kube`, `.docker`, `credentials`, `.env`, `.netrc`, `id_rsa`, `id_ed25519`, and similar) that you can't remove.
+4. **Allowed roots** — the real path must sit under one of `allowedRoots`.
+5. **Read-only by default** — a mount is read-write only when it explicitly requests it *and* the matching root has `allowReadWrite: true`. Otherwise it's forced read-only.
 
-    ```bash
-    docker build \
-      --build-arg http_proxy="$http_proxy" \
-      --build-arg https_proxy="$https_proxy" \
-      ...
-    ```
-  </Step>
+Rejected mounts are logged with the reason and skipped; the container still starts with its valid mounts. Use the `/manage-mounts` skill to view, add, or remove entries conversationally, or write the config through the setup step:
 
-  <Step title="Patch the container runner">
-    Three changes are required in `src/container-runner.ts`:
+```bash
+pnpm exec tsx setup/index.ts --step mounts --force -- --json '{"allowedRoots":[{"path":"/path/to/dir","readOnly":false}],"blockedPatterns":[],"nonMainReadOnly":true}'
+```
 
-    1. **Replace `/dev/null` mounts** with empty files — `/dev/null` bind-mounts don't work inside sandboxes
-    2. **Forward proxy environment variables** to spawned agent containers (`http_proxy`, `https_proxy`, `NODE_EXTRA_CA_CERTS`)
-    3. **Mount the sandbox CA certificate** so agent containers trust the MITM proxy
-  </Step>
+The allowlist is cached in memory, so restart the service after changes.
 
-  <Step title="Configure upstream API calls">
-    If your code makes HTTPS requests to the Anthropic API or other services, configure `HttpsProxyAgent` to route through the sandbox proxy:
+## Restrict who can talk to your agents
 
-    ```typescript
-    import { HttpsProxyAgent } from 'https-proxy-agent';
+Each messaging group carries an `unknown_sender_policy` that decides what happens when someone who isn't an owner, admin, or member of the wired agent group writes in:
 
-    const agent = new HttpsProxyAgent(process.env.https_proxy);
-    ```
-  </Step>
+| Policy | Behavior |
+|---|---|
+| `strict` | Message dropped silently and recorded in `dropped_messages`. |
+| `request_approval` | Message dropped, and an Approve / Deny card is DM'd to an owner or admin. On approve, the sender becomes a group member and the original message is re-routed. Duplicate requests from the same sender are deduplicated while a card is pending. |
+| `public` | Anyone can talk to the agent — the access check is skipped entirely. |
 
-  <Step title="Channel-specific patches">
-    Each messaging channel may need additional proxy configuration:
+Channels auto-created by the router (someone @mentions or DMs the bot in an unwired chat) get `request_approval`. To harden a chat to silent-drop:
 
-    - **Telegram**: Ensure the grammy HTTP client uses the proxy agent
-    - **WhatsApp**: Configure proxy bypass for `web.whatsapp.com` domains, and authenticate via QR code or pairing code
-  </Step>
-</Steps>
+```bash
+ncl messaging-groups update --id <mg-id> --unknown-sender-policy strict
+```
 
-## Troubleshooting
+Check `ncl approvals list --status pending` for in-flight cards and `ncl dropped-messages list` to audit who got dropped and why. Note that the approval flow needs an owner or admin with a reachable DM channel — on a fresh install with no owner configured, approval requests are skipped and logged. Wirings can additionally set `sender_scope known`, which requires explicit membership even on a `public` messaging group — see [ncl CLI](/operate/ncl-cli).
 
-<Accordion title="SSL certificate errors">
-  The sandbox MITM proxy terminates TLS connections. If you see `UNABLE_TO_VERIFY_LEAF_SIGNATURE` or similar errors:
+## The command gate
 
-  ```bash
-  export NODE_TLS_REJECT_UNAUTHORIZED=0  # Development only!
-  ```
+Slash commands are classified on the host before they ever reach a container:
 
-  For production, mount the sandbox CA certificate and set `NODE_EXTRA_CA_CERTS`.
-</Accordion>
+- **Filtered commands** (`/help`, `/login`, `/logout`, `/doctor`, `/config`, `/remote-control`) are dropped silently — they manipulate host-side CLI state and never reach the agent.
+- **Admin commands** (`/clear`, `/compact`, `/context`, `/cost`, `/files`, `/upload-trace`) require the sender to hold an `owner` or `admin` role in `user_roles`; everyone else gets a "Permission denied" reply.
+- Everything else passes through unchanged.
 
-<Accordion title="Path mounting failures">
-  Ensure NanoClaw lives inside the sandbox workspace directory. Paths outside the workspace are not accessible from within the sandbox.
-</Accordion>
+If the permissions module isn't installed (no `user_roles` table), admin commands are allowed for everyone — install the module to get the role check.
 
-<Accordion title="Agent containers can't reach the network">
-  Verify that proxy environment variables are forwarded to agent containers. Check the container runner patch in Step 3 above.
+## Cap container resources
 
-  ```bash
-  docker exec <container> env | grep -i proxy
-  ```
-</Accordion>
+Four limits bound what a runaway agent can consume. All are read from `process.env` only — set them in the service definition, not `.env` (see [Configuration](/operate/configuration#process-environment-only)):
 
-<Accordion title="WhatsApp authentication issues">
-  WhatsApp's web client needs direct access to `web.whatsapp.com`. Configure a proxy bypass for this domain in your WhatsApp channel adapter.
-</Accordion>
+| Variable | Default | Limits |
+|---|---|---|
+| `CONTAINER_TIMEOUT` | 30 min | Max runtime for an agent container. |
+| `IDLE_TIMEOUT` | 30 min | How long an idle container survives after its last result. |
+| `MAX_CONCURRENT_CONTAINERS` | `5` | Simultaneously running agent containers. |
+| `CONTAINER_MAX_OUTPUT_SIZE` | 10 MB | Output captured from a container. |
 
-## When to use Docker Sandboxes
+## Credentials
 
-| Scenario | Recommended? |
-|----------|-------------|
-| Personal use on trusted hardware | Standard Docker is sufficient |
-| Shared server or multi-tenant environment | Yes — adds VM-level isolation |
-| Running untrusted community skills | Yes — limits blast radius |
-| CI/CD or automated testing | Yes — reproducible isolated environment |
-
-<Note>
-  Docker Sandboxes add latency to container operations due to the nested virtualization layer. For most workloads this is negligible, but latency-sensitive setups may prefer standard Docker.
-</Note>
-
-## Related pages
-
-- [Container runtime](/concepts/container-lifecycle) — Standard container execution details
-- [Security model](/concepts/security) — NanoClaw's security boundaries
-- [Troubleshooting](/operate/troubleshooting) — General debugging guide
+Keep API keys and OAuth tokens out of agent containers entirely — the OneCLI Agent Vault injects them at the proxy layer so agents never see raw secrets. See [Credentials](/operate/credentials).
