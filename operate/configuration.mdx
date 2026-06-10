@@ -48,7 +48,7 @@ These are read from `process.env` at startup. Set them in the service definition
 |---|---|---|
 | `CONTAINER_TIMEOUT` | `1800000` (30 min) | Max runtime for an agent container, in milliseconds. |
 | `IDLE_TIMEOUT` | `1800000` (30 min) | How long a container stays alive after its last result, waiting for follow-ups. |
-| `MAX_CONCURRENT_CONTAINERS` | `5` | Cap on simultaneously running agent containers. |
+| `MAX_CONCURRENT_CONTAINERS` | `5` | Intended cap on simultaneously running agent containers. Parsed at startup but not enforced anywhere as of v2.1.4 — setting it has no effect. |
 | `CONTAINER_MAX_OUTPUT_SIZE` | `10485760` (10 MB) | Max output captured from a container. |
 | `MAX_MESSAGES_PER_PROMPT` | `10` | How many queued messages are batched into a single agent prompt. |
 | `CONTAINER_IMAGE` | per-install tag | Full agent image override (name and tag). |
