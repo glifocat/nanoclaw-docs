@@ -1,0 +1,125 @@
+---
+title: "Container configuration"
+description: "Every per-group container config field — storage, defaults, spawn-time consumption, and when changes take effect."
+tag: "NEW"
+keywords: ["container config", "container_configs", "container.json", "provider", "model", "effort", "image_tag", "mcp_servers", "additional_mounts", "cli_scope", "skills", "packages"]
+---
+
+{/* verified-against: src/db/container-configs.ts, src/container-config.ts, src/container-runner.ts, src/cli/resources/groups.ts, src/cli/dispatch.ts, src/claude-md-compose.ts, src/modules/mount-security/index.ts, src/db/migrations/{014-container-configs,015-cli-scope}.ts, container/agent-runner/src/{config.ts,index.ts,db/messages-in.ts,providers/types.ts} @ dc34ceb (v2.1.4) */}
+
+Each agent group has one row in the `container_configs` table in the central SQLite database — the source of truth for how that group's containers spawn. You change it with the [`ncl groups config` subcommands](/reference/ncl-cli#groups); the row is created automatically with defaults when the group is created.
+
+At every spawn, NanoClaw materializes the row to `groups/<folder>/container.json` and mounts it read-only at `/workspace/agent/container.json` inside the container. It's a generated file — any manual edits are overwritten on the next spawn, and the agent can read but not modify it.
+
+## When changes take effect
+
+Config edits write to the database only — a **running container keeps its old config** until it exits. Since `container.json` is re-materialized at every spawn, changes apply to the next container automatically; run `ncl groups restart --id <group-id>` to force it immediately. Two exceptions:
+
+- **Packages** are baked into the group's image, not installed at spawn — they need `ncl groups restart --rebuild`.
+- **`cli_scope`** is enforced host-side and read fresh from the database on every CLI request — it takes effect immediately, no restart.
+
+## Fields
+
+| Field | Type | Default | Consumed at spawn by |
+|---|---|---|---|
+| `provider` | string | `NULL` (falls back to `claude`) | `container-runner.ts` provider resolution |
+| `model` | string | `NULL` (provider default) | Agent runner → provider options |
+| `effort` | string | `NULL` (provider default) | Agent runner → provider options |
+| `image_tag` | string | `NULL` (base image) | `container-runner.ts` image selection |
+| `assistant_name` | string | `NULL` (group name) | Agent runner system prompt |
+| `max_messages_per_prompt` | integer | `NULL` (runner default: 10) | Agent runner message batching |
+| `cli_scope` | string | `'group'` | Host-side `ncl` dispatch (not in `container.json`) |
+| `skills` | JSON | `"all"` | Skill symlink sync before mounting |
+| `mcp_servers` | JSON | `{}` | Agent runner MCP setup + CLAUDE.md fragments |
+| `packages_apt` | JSON | `[]` | Per-group image build (not spawn) |
+| `packages_npm` | JSON | `[]` | Per-group image build (not spawn) |
+| `additional_mounts` | JSON | `[]` | Mount validation + `-v` args |
+
+### provider
+
+Which agent CLI runs in the container. Resolution order at spawn (`resolveProviderName` in `container-runner.ts`):
+
+1. `sessions.agent_provider` (per-session override)
+2. `container_configs.provider`
+3. `'claude'`
+
+The result is lowercased and looked up in the provider registry, which may contribute extra mounts and env vars (e.g. OpenCode's XDG dirs).
+
+### model and effort
+
+Passed through `container.json` to the agent runner, which hands them to the provider unchanged. For Claude, `model` is an alias (`sonnet`, `opus`, `haiku`) or a full model ID, and `effort` is one of `low`, `medium`, `high`, `xhigh`, `max`. Unset means the provider's own default.
+
+### image_tag
+
+The image the container runs: `image_tag` if set, otherwise the base image (`CONTAINER_IMAGE`). You normally don't set this by hand — see [per-group images](#per-group-images-and-packages) below.
+
+### assistant_name
+
+The agent's name, injected into the system prompt ("Your name is **X**…"). Falls back to the agent group's `name` when unset (`configFromDb` applies the fallback at materialization).
+
+### max_messages_per_prompt
+
+Cap on how many pending messages are batched into a single prompt. The runner defaults to 10 when unset.
+
+### cli_scope
+
+Host-side enforcement of what the agent can do through the in-container `ncl` CLI. One of:
+
+- `disabled` — all CLI requests rejected; the CLI instructions fragment is also dropped from the composed CLAUDE.md (that part applies at next spawn)
+- `group` (default) — only `groups`, `sessions`, `destinations`, and `members` resources, auto-scoped to the agent's own group; the agent cannot change `cli_scope` itself
+- `global` — full resource access; mutations still require approval
+
+This is the only field **not** written to `container.json` — the host checks the database on every request. See [ncl CLI reference](/reference/ncl-cli#access-control) for the full enforcement rules.
+
+### skills
+
+Either the string `"all"` or an array of skill names. Before mounting, the host syncs symlinks in the group's `.claude-shared/skills/` directory to match: `"all"` re-reads `container/skills/` on every spawn (newly added skills appear automatically), an array pins the exact set. Each symlink targets `/app/skills/<name>` — valid inside the container, dangling on the host. There is no `ncl groups config` subcommand for this field as of v2.1.4; update the JSON column directly in the database.
+
+### mcp_servers
+
+External MCP servers merged with the built-in `nanoclaw` server at runner startup. Shape:
+
+```json
+{
+  "github": {
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-github"],
+    "env": { "GITHUB_TOKEN": "..." },
+    "instructions": "Use for repo operations."
+  }
+}
+```
+
+`args` and `env` are optional. `instructions`, if present, is composed into the group's CLAUDE.md as an inline fragment at spawn — but neither `ncl groups config add-mcp-server` nor the agent's `add_mcp_server` tool accepts it as of v2.1.4; to set it, update the JSON column directly in the database. Manage the rest with `ncl groups config add-mcp-server` / `remove-mcp-server`.
+
+### packages_apt and packages_npm
+
+Extra packages for the group's container. They are **not** installed at spawn — `buildAgentGroupImage` bakes them into a per-group image (see below). Manage with `ncl groups config add-package` / `remove-package`, then `ncl groups restart --rebuild --id <group-id>`.
+
+### additional_mounts
+
+Extra host directories mounted into the container:
+
+```json
+[
+  { "hostPath": "~/projects/repo", "containerPath": "repo", "readonly": false }
+]
+```
+
+`containerPath` is relative — the mount lands at `/workspace/extra/<containerPath>` (defaults to the host path's basename). Every entry is validated at spawn against the allowlist at `~/.config/nanoclaw/mount-allowlist.json`: no allowlist file means **all additional mounts are blocked**, paths matching blocked patterns (`.ssh`, `.aws`, `.env`, …) are always rejected, and read-write requires both `"readonly": false` and an allowed root with `allowReadWrite: true` — otherwise the mount is forced read-only. Rejected mounts are logged and skipped, not fatal. Full allowlist setup in [Hardening](/operate/hardening#gate-additional-mounts).
+
+## Per-group images and packages
+
+When a group has packages configured, `buildAgentGroupImage` generates a Dockerfile `FROM` the base image, installs the apt packages (`apt-get install`) and npm packages (`pnpm install -g`, with each npm package allowlisted for build scripts so postinstall hooks like Playwright's browser download actually run), builds it as `CONTAINER_IMAGE_BASE:<agent-group-id>`, and stores that tag in `image_tag`. From then on the group spawns from its custom image.
+
+The build is triggered by `ncl groups restart --rebuild` or by the agent's own `install_packages` tool. It throws if both package lists are empty.
+
+## Reading and editing
+
+```bash
+ncl groups config get --id <group-id>
+ncl groups config update --id <group-id> --model opus --effort high
+ncl groups restart --id <group-id>
+```
+
+`config get` is open access; all mutations require approval. Full flag listing in the [ncl CLI reference](/reference/ncl-cli#groups).

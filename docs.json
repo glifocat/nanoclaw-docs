@@ -92,7 +92,15 @@
     { "source": "/advanced/ipc-system", "destination": "/concepts/architecture" },
     { "source": "/advanced/remote-control", "destination": "/operate/ncl-cli" },
     { "source": "/advanced/troubleshooting", "destination": "/operate/troubleshooting" },
-    { "source": "/advanced/contributing", "destination": "/concepts/contributing" }
+    { "source": "/advanced/contributing", "destination": "/concepts/contributing" },
+    { "source": "/api/overview", "destination": "/reference/ncl-cli" },
+    { "source": "/api/configuration", "destination": "/reference/environment-variables" },
+    { "source": "/api/message-routing", "destination": "/reference/adapter-interface" },
+    { "source": "/api/group-management", "destination": "/reference/ncl-cli" },
+    { "source": "/api/task-scheduling", "destination": "/reference/mcp-tools" },
+    { "source": "/api/skills/creating-skills", "destination": "/extend/overview" },
+    { "source": "/api/skills/skill-structure", "destination": "/extend/overview" },
+    { "source": "/api/skills/examples", "destination": "/extend/overview" }
   ],
   "search": {
     "prompt": "Search NanoClaw docs..."
@@ -164,8 +172,12 @@
         "tab": "Reference",
         "groups": [
           {
-            "group": "Legacy API docs (being replaced)",
-            "pages": ["api/overview", "api/configuration", "api/message-routing", "api/group-management", "api/task-scheduling", "api/skills/creating-skills", "api/skills/skill-structure", "api/skills/examples"]
+            "group": "Operating",
+            "pages": ["reference/ncl-cli", "reference/environment-variables", "reference/container-config", "reference/skills-catalog"]
+          },
+          {
+            "group": "Internals",
+            "pages": ["reference/adapter-interface", "reference/mcp-tools", "reference/db-schema"]
           }
         ]
       }

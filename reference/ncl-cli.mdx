@@ -1,0 +1,193 @@
+---
+title: "ncl CLI reference"
+description: "Every ncl resource, verb, flag, enum, and default — extracted from the v2 CLI registry."
+tag: "NEW"
+keywords: ["ncl", "cli", "reference", "commands", "flags", "groups", "wirings", "sessions", "roles", "members", "destinations", "approvals", "cli_scope"]
+---
+
+{/* verified-against: src/cli/dispatch.ts, src/cli/crud.ts, src/cli/client.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/registry.ts, src/cli/frame.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,roles,sessions,user-dms,users,wirings}.ts, bin/ncl @ dc34ceb (v2.1.4) */}
+
+Exhaustive reference for the `ncl` admin CLI. For a task-oriented walkthrough, see [The ncl admin CLI](/operate/ncl-cli).
+
+## Invocation
+
+```bash
+ncl <resource> <verb> [target] [--key value ...] [--json]
+```
+
+`bin/ncl` resolves the project root and execs the client via `tsx` — symlink it onto your `PATH` (`ln -s "$(pwd)/bin/ncl" /usr/local/bin/ncl`) or run `pnpm ncl ...` from the checkout. The client sends one request frame over the Unix socket at `data/ncl.sock` and exits.
+
+Conventions that apply to every command:
+
+- **Positional IDs only work without dashes.** Positional words join into the command name; the dispatcher trims one trailing dash-segment as the target ID. `ncl groups get abc123` works, but a real UUID (four hyphens) does not — always pass `--id <uuid>`.
+- **Kebab and snake case are interchangeable.** `--agent-group-id` and `--agent_group_id` are the same flag; hyphens normalize to underscores.
+- **`list` accepts column filters and `--limit`.** Any non-generated column is a filter (`ncl sessions list --container-status running`), except a column literally named `id` — the list handler always skips the `id` arg, so `ncl users list --id ...` is silently ignored (affects users). Filters combine with AND. Default `--limit` is 200 (minimum 1). No ordering or offset flags.
+- **`get`, `update`, `delete` require `--id`** — the value of the resource's ID column.
+- **`create` validates enums, applies defaults, auto-generates** the UUID primary key and `*_at` timestamps.
+- **`update` requires at least one updatable column flag**, validates enums, and returns the full updated row.
+- **`--json`** prints the raw response frame; default output is an aligned table for lists, pretty JSON otherwise, `error (<code>): <message>` on failure.
+- **Exit codes:** `0` success, `1` command error, `2` transport error (host unreachable, missing command).
+- **Error codes** in response frames: `unknown-command`, `invalid-args`, `forbidden`, `approval-pending`, `handler-error`, `transport-error` (plus reserved `permission-denied`, `not-found`).
+- **Help is introspected:** `ncl help` lists resources and verbs; `ncl <resource> help` shows its fields, enums, and defaults.
+
+## Access control
+
+Each operation has an access level: `open` or `approval`. **Host callers (your terminal) bypass approval entirely** — every command runs inline. When a containerized agent calls an `approval` operation, the command is not executed; an approval card goes to an admin, the call returns `approval-pending`, and on approval the host executes it and notifies the agent. Across all resources the rule is uniform: reads (`list`, `get`, `config get`) are `open`; every mutation is `approval`.
+
+Agent callers are also subject to the group's `cli_scope` (set via `ncl groups config update --cli-scope`):
+
+| `cli_scope` | Effect on agent callers |
+| --- | --- |
+| `disabled` | All CLI access rejected (`forbidden`). |
+| `group` (default) | Only `groups`, `sessions`, `destinations`, `members` (plus `help`). Group args (`--agent-group-id`, `--group`, and `--id` on groups/destinations) are auto-filled to the caller's group and rejected if they point elsewhere. `list`/`get` results are filtered to the caller's group. Changing `cli_scope` is blocked. |
+| `global` | Full resource access; mutations still require approval. |
+
+## approvals
+
+In-flight approval cards waiting for an admin response. Read-only; rows are deleted after approve/reject/expiry.
+
+| Operation | Invocation | Access |
+| --- | --- | --- |
+| list | `ncl approvals list [--<column> <value>] [--limit N]` | open |
+| get | `ncl approvals get --id <approval-id>` | open |
+
+Columns (all usable as list filters): `approval_id`, `session_id`, `request_id`, `action` (e.g. `install_packages`, `add_mcp_server`, `onecli_credential`), `payload` (JSON), `created_at`, `agent_group_id`, `channel_type`, `platform_id`, `platform_message_id`, `expires_at`, `status` (`pending` | `approved` | `rejected` | `expired`), `title`, `options_json`.
+
+## destinations
+
+Per-agent routing entries and ACL — each row lets an agent send to a target (channel or another agent) under a local name. Local names are unique per agent. No `get`, `create`, `update`, or `delete`; mutations go through `add`/`remove`, which also project the change into every active session's `inbound.db` so running containers pick it up without restart.
+
+| Operation | Invocation | Access |
+| --- | --- | --- |
+| list | `ncl destinations list [--agent-group-id <id>] [...]` | open |
+| add | `ncl destinations add --agent-group-id <id> --local-name <name> --target-type <channel\|agent> --target-id <id>` | approval |
+| remove | `ncl destinations remove --agent-group-id <id> --local-name <name>` | approval |
+
+`--target-id` is a `messaging_groups.id` when `--target-type channel`, an `agent_groups.id` when `agent`.
+
+## dropped-messages
+
+Log of messages dropped by the router or access gate, aggregated by `(channel_type, platform_id)` with a running count. List-only.
+
+| Operation | Invocation | Access |
+| --- | --- | --- |
+| list | `ncl dropped-messages list [--reason <value>] [...]` | open |
+
+Columns: `channel_type`, `platform_id`, `user_id`, `sender_name`, `reason` (`no_agent_wired` | `no_agent_engaged` | `unknown_sender_strict` | `unknown_sender_request_approval`), `messaging_group_id`, `agent_group_id`, `message_count`, `first_seen`, `last_seen`.
+
+## groups
+
+Agent groups — logical agent identities with their own workspace folder, history, and container image.
+
+| Operation | Invocation | Access | Notes |
+| --- | --- | --- | --- |
+| list | `ncl groups list` | open | |
+| get | `ncl groups get --id <id>` | open | |
+| create | `ncl groups create --name <name> --folder <folder>` | approval | `--name` and `--folder` required; `--folder` must be unique and is immutable. |
+| update | `ncl groups update --id <id> --name <name>` | approval | `name` is the only updatable column. |
+| delete | `ncl groups delete --id <id>` | approval | Custom cascading handler (not the generic single-table delete): removes sessions, destinations, approvals, role grants, memberships, and wirings in one FK-ordered transaction. Does **not** kill running containers or clean up `groups/<folder>/` and `data/v2-sessions/<id>/` on disk. |
+| restart | `ncl groups restart --id <id> [--rebuild] [--message <text>]` | approval | Host caller: restarts all running containers in the group. Agent caller: `--id` auto-filled, only the calling session restarts. `--rebuild` rebuilds the image first (required after package changes). `--message` queues an on-wake instruction so the fresh container starts and acts on it; without it the container stays stopped until the next user message. |
+| config get | `ncl groups config get --id <id>` | open | Shows `agent_group_id`, `provider`, `model`, `effort`, `image_tag`, `assistant_name`, `max_messages_per_prompt`, `skills`, `mcp_servers`, `packages_apt`, `packages_npm`, `additional_mounts`, `cli_scope`, `updated_at`. |
+| config update | `ncl groups config update --id <id> [--provider] [--model] [--effort] [--image-tag] [--assistant-name] [--max-messages-per-prompt] [--cli-scope <disabled\|group\|global>]` | approval | At least one flag required. Changes are saved but take effect only after `ncl groups restart`. |
+| config add-mcp-server | `ncl groups config add-mcp-server --id <id> --name <server> --command <cmd> [--args <json-array>] [--env <json-object>]` | approval | Restart required to take effect. |
+| config remove-mcp-server | `ncl groups config remove-mcp-server --id <id> --name <server>` | approval | Restart required to take effect. |
+| config add-package | `ncl groups config add-package --id <id> --apt <pkg> \| --npm <pkg>` | approval | At least one of `--apt`/`--npm`. Requires `ncl groups restart --rebuild`. |
+| config remove-package | `ncl groups config remove-package --id <id> --apt <pkg> \| --npm <pkg>` | approval | Requires `ncl groups restart --rebuild`. |
+
+## members
+
+Membership rows granting unprivileged users access to an agent group. Admins/owners are implicitly members and need no row. Checked by the router when a wiring's `sender_scope` is `known`.
+
+| Operation | Invocation | Access | Notes |
+| --- | --- | --- | --- |
+| list | `ncl members list [--agent-group-id <id>] [...]` | open | Columns: `user_id`, `agent_group_id`, `added_by`, `added_at`. |
+| add | `ncl members add --user <user-id> --group <group-id> [--added-by <user-id>]` | approval | Idempotent (`INSERT OR IGNORE`). `--user` must reference an existing `users.id`. |
+| remove | `ncl members remove --user <user-id> --group <group-id>` | approval | Errors if no matching row. |
+
+## messaging-groups
+
+One chat or channel on one platform. Identity is the unique `(channel_type, platform_id)` pair.
+
+| Operation | Invocation | Access |
+| --- | --- | --- |
+| list / get | `ncl messaging-groups list` / `ncl messaging-groups get --id <id>` | open |
+| create | `ncl messaging-groups create --channel-type <type> --platform-id <pid> [flags]` | approval |
+| update | `ncl messaging-groups update --id <id> [flags]` | approval |
+| delete | `ncl messaging-groups delete --id <id>` | approval |
+
+| Flag | Type | Notes |
+| --- | --- | --- |
+| `--channel-type` | string | Required on create. Adapter type registered by `/add-<channel>` (e.g. `telegram`, `discord`, `slack`, `whatsapp`). |
+| `--platform-id` | string | Required on create. Platform chat ID (Telegram chat ID, Discord snowflake, Slack channel ID, phone number, email address). |
+| `--name` | string | Updatable. Display name, often auto-populated by the adapter. |
+| `--is-group` | number | Updatable, default `0`. `1` = multi-user group chat, `0` = DM. Affects session scoping. |
+| `--unknown-sender-policy` | enum | Updatable, default `strict`. `strict` drops silently; `request_approval` sends an approval card to an admin; `public` allows anyone. |
+| `--denied-at` | string | Updatable. Set when the owner denies registering the channel; router drops all messages silently while set. Cleared by any explicit wiring mutation. |
+
+## roles
+
+Privilege grants. `owner` is always global; `admin` can be global (`agent_group_id` null) or scoped to one group. Admin at a group implies membership.
+
+| Operation | Invocation | Access | Notes |
+| --- | --- | --- | --- |
+| list | `ncl roles list [--role <owner\|admin>] [...]` | open | Columns: `user_id`, `role` (`owner` \| `admin`), `agent_group_id`, `granted_by`, `granted_at`. |
+| grant | `ncl roles grant --user <user-id> --role <owner\|admin> [--group <group-id>] [--granted-by <user-id>]` | approval | Idempotent. Passing `--group` with `--role owner` is rejected — owner is always global. |
+| revoke | `ncl roles revoke --user <user-id> --role <role> [--group <group-id>]` | approval | Match includes scope: omit `--group` for global grants, pass it for scoped ones. |
+
+## sessions
+
+The runtime unit — one `(agent_group, messaging_group, thread)` combination mapped to a container. Created automatically by the router; read-only in the CLI.
+
+| Operation | Invocation | Access |
+| --- | --- | --- |
+| list | `ncl sessions list [--agent-group-id <id>] [--status active] [...]` | open |
+| get | `ncl sessions get --id <session-id>` | open |
+
+Columns: `id`, `agent_group_id`, `messaging_group_id` (null for agent-shared sessions), `thread_id` (per-thread mode only), `agent_provider` (null = inherit from group), `status` (`active` | `closed`), `container_status` (`running` | `idle` | `stopped` — `idle` is reserved and currently unused), `last_active`, `created_at`.
+
+## user-dms
+
+DM route cache mapping `(user, channel_type)` to the messaging group used for cold DMs (approvals, pairing). Populated lazily; list-only.
+
+| Operation | Invocation | Access |
+| --- | --- | --- |
+| list | `ncl user-dms list [--user-id <id>] [...]` | open |
+
+Columns: `user_id`, `channel_type`, `messaging_group_id`, `resolved_at`.
+
+## users
+
+Messaging-platform identities — one row per sender per channel (no cross-channel linking yet). No delete.
+
+| Operation | Invocation | Access |
+| --- | --- | --- |
+| list / get | `ncl users list` / `ncl users get --id <user-id>` | open |
+| create | `ncl users create --id <channel:handle> --kind <type> [--display-name <name>]` | approval |
+| update | `ncl users update --id <user-id> --display-name <name>` | approval |
+
+| Flag | Type | Notes |
+| --- | --- | --- |
+| `--id` | string | Required on create (not auto-generated). Namespaced `channel_type:handle` — e.g. `tg:6037840640`, `discord:123456789`, `email:user@example.com`. |
+| `--kind` | string | Required on create. Channel type identifier (e.g. `telegram`, `discord`) — free string, no enum. Fallback for DM resolution when the id prefix doesn't match a registered adapter. |
+| `--display-name` | string | Updatable. Shown in approval cards and logs. |
+
+## wirings
+
+Connects a messaging group to an agent group — which agent handles which chat. Many-to-many in both directions.
+
+| Operation | Invocation | Access |
+| --- | --- | --- |
+| list / get | `ncl wirings list` / `ncl wirings get --id <id>` | open |
+| create | `ncl wirings create --messaging-group-id <id> --agent-group-id <id> [flags]` | approval |
+| update | `ncl wirings update --id <id> [flags]` | approval |
+| delete | `ncl wirings delete --id <id>` | approval |
+
+| Flag | Type | Notes |
+| --- | --- | --- |
+| `--messaging-group-id` | string | Required on create. References `messaging_groups.id`. Not updatable. |
+| `--agent-group-id` | string | Required on create. References `agent_groups.id`. Not updatable. |
+| `--engage-mode` | enum | Updatable, default `mention`. `mention` — only when @mentioned or in DMs. `mention-sticky` — after one mention in a thread, responds to all subsequent messages there. `pattern` — matches every message against `engage_pattern`. |
+| `--engage-pattern` | string | Updatable. Regex, required when `engage_mode=pattern`; use `.` for always-on. Ignored in mention modes. |
+| `--sender-scope` | enum | Updatable, default `all`. `all` — any sender (subject to `unknown_sender_policy`). `known` — only users with a role or membership in the agent group. |
+| `--ignored-message-policy` | enum | Updatable, default `drop`. `drop` — agent never sees non-engaging messages. `accumulate` — stored as background context so the agent has prior context when triggered. |
+| `--session-mode` | enum | Updatable, default `shared`. `shared` — one session per (agent, messaging group). `per-thread` — one per thread/topic. `agent-shared` — one across all messaging groups wired to the agent. Threaded adapters in group chats force per-thread regardless. |
