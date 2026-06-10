@@ -6,7 +6,7 @@ keywords: ["skills", "git branches", "plugins", "marketplace"]
 ---
 
 <Warning>
-This page describes the v1 skill model (one `skill/*` branch per feature, merged into your fork). v2 consolidated channel adapters onto a single `channels` branch and alternative providers onto a `providers` branch — `/add-<name>` skills now copy from the relevant branch rather than merging a dedicated skill branch. A v2-focused rewrite is pending. See [Integrations overview](/integrations/overview) for the current model.
+This page describes the v1 skill model (one `skill/*` branch per feature, merged into your fork). v2 consolidated channel adapters onto a single `channels` branch and alternative providers onto a `providers` branch — `/add-<name>` skills now copy from the relevant branch rather than merging a dedicated skill branch. A v2-focused rewrite is pending. See [Integrations overview](/channels/overview) for the current model.
 </Warning>
 
 NanoClaw's skills system lets you add integrations and features by merging git branches into your fork. This keeps the base codebase minimal while enabling powerful customization — all using standard git operations.
@@ -346,19 +346,19 @@ Skills extend this philosophy: instead of a config file with `integrations: [tel
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Add Telegram" icon="paper-plane" href="/integrations/telegram">
+  <Card title="Add Telegram" icon="paper-plane" href="/channels/telegram">
     Add Telegram support to your installation
   </Card>
 
-  <Card title="Add Discord" icon="comments" href="/integrations/discord">
+  <Card title="Add Discord" icon="comments" href="/channels/discord">
     Add Discord support to your installation
   </Card>
 
-  <Card title="Add Slack" icon="hashtag" href="/integrations/slack">
+  <Card title="Add Slack" icon="hashtag" href="/channels/slack">
     Add Slack support to your installation
   </Card>
 
-  <Card title="Add Gmail" icon="envelope" href="/integrations/gmail">
+  <Card title="Add Gmail" icon="envelope" href="/extend/tools">
     Add Gmail integration to your installation
   </Card>
 </CardGroup>

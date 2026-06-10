@@ -173,7 +173,7 @@ Agents only see what you mount. The allowlist lives at `~/.config/nanoclaw/mount
 }
 ```
 
-Per-agent-group mount requests live in `groups/<folder>/container.json`. The host validates each request against the allowlist before mounting. See [Security model](/advanced/security-model) for the full picture.
+Per-agent-group mount requests live in `groups/<folder>/container.json`. The host validates each request against the allowlist before mounting. See [Security model](/concepts/security) for the full picture.
 
 ## The `/customize` skill
 
@@ -195,7 +195,7 @@ Channels and AI providers are skills, not core features. Install from the `chann
 /add-ollama-provider  # alternate provider (local models)
 ```
 
-See [Integrations overview](/integrations/overview) for the full list.
+See [Integrations overview](/channels/overview) for the full list.
 
 To remove a channel or provider, `git revert` the skill's commit — restores the previous state cleanly.
 
@@ -234,7 +234,7 @@ Or ask the agent itself:
 
 ## Related
 
-- [Messaging](/features/messaging) — inbound routing and engage evaluation
-- [Scheduled tasks](/features/scheduled-tasks) — task model and cron
+- [Messaging](/channels/overview) — inbound routing and engage evaluation
+- [Scheduled tasks](/guides/scheduled-tasks) — task model and cron
 - [Security](/concepts/security) — sender policies, user roles
 - [Architecture](/concepts/architecture) — two-DB session model

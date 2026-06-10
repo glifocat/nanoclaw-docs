@@ -25,19 +25,19 @@ Install through `bash nanoclaw.sh` during first setup, or with a skill invocatio
 ### Documented channels
 
 <CardGroup cols={2}>
-  <Card title="WhatsApp" icon="message" href="/integrations/whatsapp">
+  <Card title="WhatsApp" icon="message" href="/channels/whatsapp">
     `/add-whatsapp` (Baileys, WhatsApp Web API) or `/add-whatsapp-cloud` (Cloud API, DMs only)
   </Card>
 
-  <Card title="Telegram" icon="paper-plane" href="/integrations/telegram">
+  <Card title="Telegram" icon="paper-plane" href="/channels/telegram">
     `/add-telegram` — grammy framework, BotFather token
   </Card>
 
-  <Card title="Discord" icon="comments" href="/integrations/discord">
+  <Card title="Discord" icon="comments" href="/channels/discord">
     `/add-discord` — discord.js, bot application token
   </Card>
 
-  <Card title="Slack" icon="hashtag" href="/integrations/slack">
+  <Card title="Slack" icon="hashtag" href="/channels/slack">
     `/add-slack` — Slack app credentials plus a public events URL
   </Card>
 
@@ -101,21 +101,21 @@ Channels are peers — none is privileged. Run one, or run Telegram + Discord + 
 - **Same agent, separate sessions** — one workspace; per-channel conversation threads
 - **Shared session** — multiple channels feed one conversation (webhook + chat is the classic case)
 
-The choice is per channel, configurable via `/manage-channels`. See [Channel isolation model](/concepts/groups) for details.
+The choice is per channel, configurable via `/manage-channels`. See [Channel isolation model](/concepts/entity-model) for details.
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Skills system" icon="puzzle-piece" href="/integrations/skills-system">
+  <Card title="Skills system" icon="puzzle-piece" href="/extend/overview">
     How skills work, how to update, and how to author your own
   </Card>
-  <Card title="Customization" icon="wrench" href="/features/customization">
+  <Card title="Customization" icon="wrench" href="/guides/customize-an-agent">
     Trigger words, timeouts, engage modes, sender scope
   </Card>
   <Card title="Security" icon="shield" href="/concepts/security">
     Sender policies, user roles, OneCLI credentials
   </Card>
-  <Card title="Channel isolation" icon="layer-group" href="/concepts/groups">
+  <Card title="Channel isolation" icon="layer-group" href="/concepts/entity-model">
     Decide how channels relate to agent groups
   </Card>
 </CardGroup>
