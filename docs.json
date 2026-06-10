@@ -124,7 +124,7 @@
   "navigation": {
     "global": {
       "anchors": [
-        { "anchor": "Changelog", "icon": "clock-rotate-left", "href": "https://nanoclaw.dev/changelog/index" }
+        { "anchor": "Changelog", "icon": "clock-rotate-left", "href": "/changelog" }
       ]
     },
     "tabs": [
