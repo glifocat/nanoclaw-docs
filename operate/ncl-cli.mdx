@@ -26,7 +26,7 @@ The general shape is:
 ncl <resource> <verb> [target] [--key value ...] [--json]
 ```
 
-Positional words join into the command name, and a trailing positional becomes the target ID — `ncl groups get abc123` and `ncl groups get --id abc123` are the same call. Flags map to columns; hyphens and underscores are interchangeable (`--agent-group-id` = `--agent_group_id`). Run `ncl help` to list every resource, and `ncl <resource> help` for its verbs, columns, and enums.
+Positional words join into the command name. A trailing positional becomes the target ID only if the ID contains no dashes — the dispatcher trims a single dash-segment, so `ncl groups get abc123` works, but a real NanoClaw ID (a UUID, four hyphens) does not resolve. In practice, always pass `--id <uuid>`. Flags map to columns; hyphens and underscores are interchangeable (`--agent-group-id` = `--agent_group_id`). Run `ncl help` to list every resource, and `ncl <resource> help` for its verbs, columns, and enums.
 
 ## Output and errors
 
@@ -37,6 +37,9 @@ If the host isn't running, `ncl` can't reach the socket and tells you so:
 ```text
 ncl: cannot reach NanoClaw host (connect ENOENT .../data/ncl.sock).
 Is the host running? Start it with: pnpm run dev
+Or, if installed as a service:
+  macOS:  launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>
+  Linux:  systemctl --user restart nanoclaw-v2-<slug>
 ```
 
 ## Agents can run ncl too
@@ -50,7 +53,7 @@ The same command surface is exposed to agents inside containers. What an agent m
 Regardless of scope, mutating verbs (`create`, `update`, `delete`, `grant`, `restart`, ...) are approval-gated for agents: the agent gets `approval-pending` and an admin receives a card showing the exact command. From the host socket, the same verbs run immediately — the socket file permissions are the auth boundary. Change the scope with:
 
 ```bash
-ncl groups config update <group-id> --cli-scope disabled
+ncl groups config update --id <group-id> --cli-scope disabled
 ```
 
 ## Working with resources
@@ -63,7 +66,7 @@ Agent groups: the agent identities with their own folder, history, and container
 
 ```bash
 ncl groups create --name "Research" --folder research
-ncl groups restart <group-id> --rebuild
+ncl groups restart --id <group-id> --rebuild
 ```
 
 `restart` kills and respawns the group's containers (`--rebuild` rebuilds the image first — required after package changes; `--message <text>` leaves an on-wake instruction). `delete` cascades through sessions, wirings, roles, memberships, and destinations in one transaction.
@@ -71,10 +74,10 @@ ncl groups restart <group-id> --rebuild
 Config subcommands edit the group's `container_configs` row — changes apply on the next `restart`:
 
 ```bash
-ncl groups config get <group-id>
-ncl groups config update <group-id> --model claude-sonnet-4-5 --effort high
-ncl groups config add-mcp-server <group-id> --name fetch --command npx --args '["mcp-fetch"]'
-ncl groups config add-package <group-id> --apt ffmpeg
+ncl groups config get --id <group-id>
+ncl groups config update --id <group-id> --model claude-sonnet-4-5 --effort high
+ncl groups config add-mcp-server --id <group-id> --name fetch --command npx --args '["mcp-fetch"]'
+ncl groups config add-package --id <group-id> --apt ffmpeg
 ```
 
 `config update` accepts `--provider`, `--model`, `--effort`, `--image-tag`, `--assistant-name`, `--max-messages-per-prompt`, and `--cli-scope`.
@@ -86,7 +89,7 @@ A messaging group is one chat on one platform (unique `channel_type` + `platform
 ```bash
 ncl messaging-groups list --channel_type telegram
 ncl wirings create --messaging-group-id <mg-id> --agent-group-id <group-id> --engage-mode mention-sticky
-ncl wirings update <wiring-id> --session-mode per-thread
+ncl wirings update --id <wiring-id> --session-mode per-thread
 ```
 
 Wiring columns: `engage_mode` (`mention` | `mention-sticky` | `pattern`), `engage_pattern`, `sender_scope` (`all` | `known`), `ignored_message_policy` (`drop` | `accumulate`), `session_mode` (`shared` | `per-thread` | `agent-shared`).
@@ -105,7 +108,7 @@ ncl members add --user tg:6037840640 --group <group-id>
 
 ### sessions
 
-Read-only view of the runtime units — one row per (agent group, messaging group, thread) with its container status (`running` | `stopped`):
+Read-only view of the runtime units — one row per (agent group, messaging group, thread) with its container status (`running` | `stopped`; `idle` is reserved and currently unused):
 
 ```bash
 ncl sessions list --agent_group_id <group-id>
