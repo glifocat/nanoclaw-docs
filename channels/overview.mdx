@@ -38,7 +38,7 @@ Each install skill follows the same pattern (see `/add-telegram` for the canonic
 1. **Fetch the `channels` branch** — `git fetch origin channels`
 2. **Copy the adapter** — `git show origin/channels:src/channels/<name>.ts > src/channels/<name>.ts`, along with its tests, helpers, and any setup steps
 3. **Wire the barrel** — append `import './<name>.js';` to `src/channels/index.ts` so the adapter self-registers at startup
-4. **Install the platform package, pinned** — e.g. `pnpm install @chat-adapter/telegram@4.27.0`
+4. **Install the platform package, pinned** — e.g. `pnpm install @chat-adapter/telegram@<exact-version>` (each skill pins its own version)
 5. **Build and validate** — `pnpm run build` plus the channel's registration test, which asserts the adapter actually lands in the registry
 6. **Collect credentials** — bot tokens, QR pairing, linked devices, whatever the platform needs, into `.env`
 
