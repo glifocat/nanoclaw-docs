@@ -21,7 +21,7 @@ Conventions that apply to every command:
 
 - **Positional IDs only work without dashes.** Positional words join into the command name; the dispatcher trims one trailing dash-segment as the target ID. `ncl groups get abc123` works, but a real UUID (four hyphens) does not — always pass `--id <uuid>`.
 - **Kebab and snake case are interchangeable.** `--agent-group-id` and `--agent_group_id` are the same flag; hyphens normalize to underscores.
-- **`list` accepts column filters and `--limit`.** Any non-generated column is a filter (`ncl sessions list --container-status running`). Filters combine with AND. Default `--limit` is 200 (minimum 1). No ordering or offset flags.
+- **`list` accepts column filters and `--limit`.** Any non-generated column is a filter (`ncl sessions list --container-status running`), except a column literally named `id` — the list handler always skips the `id` arg, so `ncl users list --id ...` is silently ignored (affects users). Filters combine with AND. Default `--limit` is 200 (minimum 1). No ordering or offset flags.
 - **`get`, `update`, `delete` require `--id`** — the value of the resource's ID column.
 - **`create` validates enums, applies defaults, auto-generates** the UUID primary key and `*_at` timestamps.
 - **`update` requires at least one updatable column flag**, validates enums, and returns the full updated row.
@@ -87,7 +87,7 @@ Agent groups — logical agent identities with their own workspace folder, histo
 | update | `ncl groups update --id <id> --name <name>` | approval | `name` is the only updatable column. |
 | delete | `ncl groups delete --id <id>` | approval | Custom cascading handler (not the generic single-table delete): removes sessions, destinations, approvals, role grants, memberships, and wirings in one FK-ordered transaction. Does **not** kill running containers or clean up `groups/<folder>/` and `data/v2-sessions/<id>/` on disk. |
 | restart | `ncl groups restart --id <id> [--rebuild] [--message <text>]` | approval | Host caller: restarts all running containers in the group. Agent caller: `--id` auto-filled, only the calling session restarts. `--rebuild` rebuilds the image first (required after package changes). `--message` queues an on-wake instruction so the fresh container starts and acts on it; without it the container stays stopped until the next user message. |
-| config get | `ncl groups config get --id <id>` | open | Shows `provider`, `model`, `effort`, `image_tag`, `assistant_name`, `max_messages_per_prompt`, `skills`, `mcp_servers`, `packages_apt`, `packages_npm`, `additional_mounts`, `cli_scope`, `updated_at`. |
+| config get | `ncl groups config get --id <id>` | open | Shows `agent_group_id`, `provider`, `model`, `effort`, `image_tag`, `assistant_name`, `max_messages_per_prompt`, `skills`, `mcp_servers`, `packages_apt`, `packages_npm`, `additional_mounts`, `cli_scope`, `updated_at`. |
 | config update | `ncl groups config update --id <id> [--provider] [--model] [--effort] [--image-tag] [--assistant-name] [--max-messages-per-prompt] [--cli-scope <disabled\|group\|global>]` | approval | At least one flag required. Changes are saved but take effect only after `ncl groups restart`. |
 | config add-mcp-server | `ncl groups config add-mcp-server --id <id> --name <server> --command <cmd> [--args <json-array>] [--env <json-object>]` | approval | Restart required to take effect. |
 | config remove-mcp-server | `ncl groups config remove-mcp-server --id <id> --name <server>` | approval | Restart required to take effect. |
