@@ -78,7 +78,7 @@ Chat SDK channels that receive platform events over HTTP (Slack, Teams, GitHub, 
 /webhook/{adapterName}   →   that adapter's Chat SDK webhook handler
 ```
 
-The port comes from the `WEBHOOK_PORT` environment variable, default `3000`. Point the platform's event subscription URL at `https://<your-public-host>/webhook/<channel>` (e.g. `/webhook/slack`) — you'll need a public URL or a tunnel for these channels. Discord is the exception: it uses a persistent Gateway listener instead of inbound webhooks, so no public URL is required. Polling channels (Telegram, WhatsApp, Signal, WeChat) don't need one either.
+The port comes from the `WEBHOOK_PORT` environment variable, default `3000`. Point the platform's event subscription URL at `https://<your-public-host>/webhook/<channel>` (e.g. `/webhook/slack`) — you'll need a public URL or a tunnel for these channels. Discord is the exception: it uses a persistent Gateway listener instead of inbound webhooks, so no public URL is required. Telegram (long polling), WhatsApp, Signal, and WeChat hold their own outbound connections, so they don't need one either.
 
 ## Wiring channels to agents
 
