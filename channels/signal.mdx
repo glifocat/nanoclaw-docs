@@ -59,6 +59,6 @@ To wire group chats or more DMs later, run `/manage-channels`. DMs are identifie
 - **"Signal daemon failed to start. Is signal-cli installed and your account linked?"** — the managed daemon never opened its socket. Confirm `signal-cli` is on PATH (or set `SIGNAL_CLI_PATH`) and that an account is linked: `signal-cli listAccounts` should print your number.
 - **"Signal daemon not reachable at 127.0.0.1:7583"** — `SIGNAL_MANAGE_DAEMON=false` but nothing is listening. Start the daemon yourself (`signal-cli -a +YOURNUMBER daemon --tcp 127.0.0.1:7583`) or set `SIGNAL_MANAGE_DAEMON=true`.
 - **QR link failed with `qr_timeout`** — the linking code expired (3-minute window; Signal's own QR validity is shorter still). Re-run setup for a fresh code and scan promptly.
-- **"Signal channel lost TCP connection to signal-cli daemon" in logs** — the daemon dropped the connection and the adapter doesn't reconnect on its own. Check `logs/nanoclaw.log` for a daemon exit reason, then restart the service. A common cause: running a `signal-cli` command manually while NanoClaw was up, hitting the data-directory lock.
+- **"Signal channel lost TCP connection to signal-cli daemon" in logs** — the daemon dropped the connection and the adapter doesn't reconnect on its own. Check `logs/nanoclaw.log` for a daemon exit reason, then restart the service.
 
 For service-level checks (logs, restarts, wiring queries), see [troubleshooting](/operate/troubleshooting).
