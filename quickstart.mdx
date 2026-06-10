@@ -19,11 +19,11 @@ This guide covers the default installer. If you want to skip steps, reuse an exi
     Clone upstream directly if you just want to try things out:
 
     ```bash
-    git clone https://github.com/qwibitai/nanoclaw.git
+    git clone https://github.com/nanocoai/nanoclaw.git
     cd nanoclaw
     ```
 
-    If you plan to customize, fork [qwibitai/nanoclaw](https://github.com/qwibitai/nanoclaw) on GitHub first and clone your fork. You can always add the fork remote later — the installer and `/update-nanoclaw` skill handle both shapes.
+    If you plan to customize, fork [nanocoai/nanoclaw](https://github.com/nanocoai/nanoclaw) on GitHub first and clone your fork. You can always add the fork remote later — the installer and `/update-nanoclaw` skill handle both shapes.
   </Step>
 
   <Step title="Run the installer">
@@ -196,5 +196,5 @@ To pull upstream changes and merge with your customizations:
 This skill fetches `upstream/main`, merges with your local changes, runs any migrations, rebuilds the container if needed, restarts the service, and scans the changelog for `[BREAKING]` entries — offering to run the `/migrate-nanoclaw` skill when a breaking change applies.
 
 <Tip>
-Migrating from v1? Run `/migrate-nanoclaw` for a clean-base replay of your customizations on top of v2, or `/update-nanoclaw` for a selective cherry-pick. A dedicated v1 → v2 migration guide is coming; until then, the upstream [CHANGELOG](https://github.com/qwibitai/nanoclaw/blob/main/CHANGELOG.md) covers every breaking change.
+Migrating from v1? Run `/migrate-nanoclaw` for a clean-base replay of your customizations on top of v2, or `/update-nanoclaw` for a selective cherry-pick. A dedicated v1 → v2 migration guide is coming; until then, the upstream [CHANGELOG](https://github.com/nanocoai/nanoclaw/blob/main/CHANGELOG.md) covers every breaking change.
 </Tip>

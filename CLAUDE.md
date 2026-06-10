@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Mintlify-powered documentation site for **NanoClaw** — a lightweight, secure AI assistant that runs Claude agents in isolated Docker containers with multi-messenger support. The main NanoClaw repo is at https://github.com/qwibitai/nanoclaw; this repo is the docs site deployed to https://nanoclaw.dev.
+Mintlify-powered documentation site for **NanoClaw** — a lightweight, secure AI assistant that runs Claude agents in isolated Docker containers with multi-messenger support. The main NanoClaw repo is at https://github.com/nanocoai/nanoclaw; this repo is the docs site deployed to https://nanoclaw.dev.
 
-**GitHub:** `glifocat/nanoclaw-docs` (not `qwibitai` — that's the upstream NanoClaw source repo)
+**GitHub:** `glifocat/nanoclaw-docs` (not `nanocoai` — that's the upstream NanoClaw source repo)
 
 ## Mintlify CLI
 
@@ -37,7 +37,7 @@ When editing docs, keep these architectural facts current:
 - **Skills as git branches:** Skills are `skill/*` branches merged via `git merge`, not a custom engine. No manifest.yaml, no .nanoclaw/state.yaml, no apply-skill.ts. See `integrations/skills-system.mdx` as source of truth.
 - **Channel forks:** Channels live in separate fork repos (`nanoclaw-whatsapp`, `nanoclaw-telegram`, etc.). Channel-specific skills (image-vision, voice-transcription, reactions, pdf-reader) live on the channel fork, not upstream.
 - **Removing a skill:** `git revert -m 1 <merge-commit>`, not manual file deletion.
-- **Source of truth for NanoClaw code:** https://github.com/qwibitai/nanoclaw
+- **Source of truth for NanoClaw code:** https://github.com/nanocoai/nanoclaw
 - **Credential management (v1.2.35+):** OneCLI Agent Vault is the sole credential system. The built-in credential proxy is available as an opt-in skill (`/use-native-credential-proxy`). Legacy tabs in docs cover both methods. Note: upstream source code still uses "gateway" in code — docs prose says "Agent Vault" but code snippets must match actual source.
 
 ## PR Workflow
@@ -122,7 +122,7 @@ Mintlify workflows in `.mintlify/workflows/` auto-manage `tag` frontmatter:
 ## Automated PR Triage
 
 Mintlify workflows generate automated PRs (`mintlify/*` branches) on upstream changes. These need manual review:
-- **Always verify claims against source**: `gh search code "<term>" repo:qwibitai/nanoclaw` or fetch files directly
+- **Always verify claims against source**: `gh search code "<term>" repo:nanocoai/nanoclaw` or fetch files directly
 - **Check for overlapping PRs**: Multiple automated PRs often fix the same thing (e.g., table renames). Merge the most thorough one first, then cherry-pick unique changes from the rest.
 - **Common errors in automated PRs**: fabricated commit references, incorrect renames (verify exported types), speculative feature descriptions, `allowed-tools` or other frontmatter claims that don't exist in source
 - **Common fabrications found**: inventing env vars that only exist in skill SKILL.md files (not core config), inventing skill branches that don't exist, claiming runtime-based routing that doesn't exist in code, getting enum defaults wrong (e.g., `context_mode` default is `'isolated'` not `'group'`)
@@ -131,11 +131,11 @@ Mintlify workflows generate automated PRs (`mintlify/*` branches) on upstream ch
 - **Code snippets must match source**: Automated PRs sometimes rename terms in code snippets to match marketing (e.g., "gateway" → "Agent Vault" in logger.warn). Always compare code blocks against actual upstream files — docs prose uses product names but code must match `src/`.
 - **Cascading merge conflicts**: Merging one PR invalidates others touching the same files. When triaging a batch, merge isolated-file PRs first, then tackle overlapping clusters. Close conflicting PRs and consolidate verified changes into a single new PR.
 - **Bulk branch cleanup**: `gh api -X DELETE repos/OWNER/REPO/git/refs/heads/BRANCH` — use after closing automated PRs to prevent clutter
-- **Verify upstream PRs exist**: `gh pr view NUMBER --repo qwibitai/nanoclaw --json title,state` — automated PRs cite upstream PRs that may not exist
+- **Verify upstream PRs exist**: `gh pr view NUMBER --repo nanocoai/nanoclaw --json title,state` — automated PRs cite upstream PRs that may not exist
 - **Watch for destructive automated PRs**: PRs that remove legacy/deprecated content may conflict with intentional version-tabbed documentation. Verify the removal is actually desired before merging.
 - **"Superseded" PRs may have unique changes**: Always diff line-by-line before closing — never rely solely on PR descriptions
 - **After large manual docs PRs**: Check for and close overlapping automated `mintlify/*` PRs immediately after merge — they pile up fast on upstream releases
-- **Finding the upstream version**: `gh api 'repos/qwibitai/nanoclaw/commits?path=package.json&per_page=5' --jq '.[] | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"'` — version bumps show in commit messages
+- **Finding the upstream version**: `gh api 'repos/nanocoai/nanoclaw/commits?path=package.json&per_page=5' --jq '.[] | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"'` — version bumps show in commit messages
 - **Changelog conflicts are the #1 blocker**: Automated PRs insert changelog entries relative to their base, which goes stale fast. Close conflicting PRs and recreate with correct insertion order rather than attempting conflict resolution.
 - **Use `/triage-docs-prs` skill**: Project-level skill at `.claude/skills/triage-docs-prs/` — structured 5-phase workflow for batch PR triage with upstream validation, build checks, and executable action plans.
 - **Chain testing gotcha**: `git merge --no-commit` after a fast-forward produces nothing to commit. Use `git merge --no-edit` for merge chain validation in worktrees.
@@ -146,15 +146,15 @@ Mintlify workflows generate automated PRs (`mintlify/*` branches) on upstream ch
 Two changelogs to maintain — update both after any docs work session:
 - `changelog/index.mdx` — Product releases (newest version first, uses `<Update>` component)
 - `changelog/docs-updates.mdx` — Documentation site changes (newest entry first)
-- **Upstream CHANGELOG is sparse** — often skips 10+ versions. Reconstruct by mapping commits between version bumps: `gh api 'repos/qwibitai/nanoclaw/commits?per_page=100' --jq '.[] | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"'` and tracing features between "bump to X" commits.
+- **Upstream CHANGELOG is sparse** — often skips 10+ versions. Reconstruct by mapping commits between version bumps: `gh api 'repos/nanocoai/nanoclaw/commits?per_page=100' --jq '.[] | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"'` and tracing features between "bump to X" commits.
 - **Pre-release CHANGELOG headers**: Upstream CHANGELOG may have headers for unreleased versions (package.json not yet bumped). Don't add changelog entries for versions that aren't in `package.json` yet.
 
 ## Upstream PRs
 
-To PR changes to `qwibitai/nanoclaw` from Ethan's fork (`glifocat/nanoclaw-glifocat`):
+To PR changes to `nanocoai/nanoclaw` from Ethan's fork (`glifocat/nanoclaw-glifocat`):
 - Work in `/Users/ethanmunoz/Projects/clients/qwibit/nanoclaw-glifocat`
-- Remote `upstream` = `qwibitai/nanoclaw`, `origin` = `glifocat/nanoclaw-glifocat`
-- Branch from `upstream/main`, push to `origin`, PR with `--repo qwibitai/nanoclaw --head glifocat:<branch>`
+- Remote `upstream` = `nanocoai/nanoclaw`, `origin` = `glifocat/nanoclaw-glifocat`
+- Branch from `upstream/main`, push to `origin`, PR with `--repo nanocoai/nanoclaw --head glifocat:<branch>`
 - The fork may be on a different branch (e.g., `feat/dashboard-api`) — stash before switching
 
 ## Token Count

@@ -26,10 +26,10 @@ Follow each phase sequentially. Do NOT skip build validation.
 gh pr list --state open --json number,title,author,createdAt,headRefName,labels,additions,deletions,changedFiles --limit 50
 
 # Current upstream version
-gh api repos/qwibitai/nanoclaw/contents/package.json --jq '.content' | base64 -d | jq -r '.version'
+gh api repos/nanocoai/nanoclaw/contents/package.json --jq '.content' | base64 -d | jq -r '.version'
 
 # Upstream token badge (use -oE for macOS compatibility)
-gh api repos/qwibitai/nanoclaw/contents/repo-tokens/badge.svg --jq '.content' | base64 -d | grep -oE '[0-9.]+k'
+gh api repos/nanocoai/nanoclaw/contents/repo-tokens/badge.svg --jq '.content' | base64 -d | grep -oE '[0-9.]+k'
 
 # Scan for orphan mintlify/* branches with no open PR
 git fetch --prune origin
@@ -60,16 +60,16 @@ Mark each claim: **VERIFIED** (confirmed in source), **FABRICATED** (contradicte
 **Verification commands:**
 ```bash
 # Search upstream code for a term
-gh search code "TERM" repo:qwibitai/nanoclaw
+gh search code "TERM" repo:nanocoai/nanoclaw
 
 # Fetch a specific upstream file
-gh api repos/qwibitai/nanoclaw/contents/PATH --jq '.content' | base64 -d
+gh api repos/nanocoai/nanoclaw/contents/PATH --jq '.content' | base64 -d
 
 # Check if an upstream PR exists
-gh pr view NUMBER --repo qwibitai/nanoclaw --json title,state
+gh pr view NUMBER --repo nanocoai/nanoclaw --json title,state
 
 # Recent upstream commits (for version reconstruction)
-gh api 'repos/qwibitai/nanoclaw/commits?per_page=30' --jq '.[] | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"'
+gh api 'repos/nanocoai/nanoclaw/commits?per_page=30' --jq '.[] | "\(.sha[0:7]) \(.commit.message | split("\n")[0])"'
 ```
 
 **Known automated PR pitfalls** (verify these specifically):

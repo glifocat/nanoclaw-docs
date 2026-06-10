@@ -1,13 +1,13 @@
 <div align="center">
   <h1>NanoClaw Docs</h1>
   <p>
-    Documentation for <a href="https://github.com/qwibitai/nanoclaw">NanoClaw</a> — a lightweight, secure AI assistant that runs Claude agents in isolated containers and connects to your messaging platforms.
+    Documentation for <a href="https://github.com/nanocoai/nanoclaw">NanoClaw</a> — a lightweight, secure AI assistant that runs Claude agents in isolated containers and connects to your messaging platforms.
   </p>
 </div>
 
 <p align="center">
-  <a href="https://github.com/qwibitai/nanoclaw/blob/main/LICENSE"><img src="https://img.shields.io/github/license/qwibitai/nanoclaw?style=flat-square" alt="License"></a>
-  <a href="https://github.com/qwibitai/nanoclaw"><img src="https://img.shields.io/github/stars/qwibitai/nanoclaw?style=flat-square" alt="Stars"></a>
+  <a href="https://github.com/nanocoai/nanoclaw/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nanocoai/nanoclaw?style=flat-square" alt="License"></a>
+  <a href="https://github.com/nanocoai/nanoclaw"><img src="https://img.shields.io/github/stars/nanocoai/nanoclaw?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/VDdww8qS42"><img src="https://img.shields.io/discord/1470188214710046894?style=flat-square&label=Discord&color=5865F2" alt="Discord"></a>
   <a href="https://www.mintlify.com/oss-program"><img src="https://img.shields.io/badge/Docs_by-Mintlify-18181B?style=flat-square" alt="Mintlify"></a>
 </p>
@@ -81,5 +81,5 @@ Questions or ideas? [Join the Discord](https://discord.gg/VDdww8qS42).
 ---
 
 <p align="center">
-  <a href="https://github.com/qwibitai/nanoclaw">NanoClaw</a> is MIT licensed. Docs hosted through <a href="https://www.mintlify.com/oss-program">Mintlify's OSS program</a>.
+  <a href="https://github.com/nanocoai/nanoclaw">NanoClaw</a> is MIT licensed. Docs hosted through <a href="https://www.mintlify.com/oss-program">Mintlify's OSS program</a>.
 </p>
