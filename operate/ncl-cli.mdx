@@ -1,184 +1,138 @@
 ---
-title: Command-line interface
-description: Run NanoClaw agents from the terminal with the claw CLI — send prompts, pipe input, resume sessions, and script agent interactions
-keywords: ["cli", "claw", "terminal", "command line", "scripting", "automation"]
+title: "The ncl admin CLI"
+description: "Administer a running NanoClaw host from the terminal — inspect and modify groups, wirings, users, sessions, and approvals over the ncl Unix socket."
+tag: "UPDATED"
+keywords: ["ncl", "cli", "admin", "unix socket", "cli_scope", "groups", "wirings", "sessions", "approvals"]
 ---
 
-## Overview
+{/* verified-against: src/cli/client.ts, src/cli/dispatch.ts, src/cli/socket-server.ts, src/cli/crud.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,roles,sessions,user-dms,users,wirings}.ts, src/db/container-configs.ts, bin/ncl, setup/service.ts @ dc34ceb */}
 
-`claw` is a Python CLI that sends prompts directly to a NanoClaw agent container from the terminal. It reads registered groups from the NanoClaw database, picks up secrets from `.env`, and pipes a JSON payload into a container run — no chat app required.
+`ncl` is the admin CLI for a running NanoClaw host. It sends one request frame over a Unix socket at `data/ncl.sock` and prints the response — every command reads or mutates the host's central database live, no restart needed. The socket is `chmod 0600`, so only the user that started the host can connect.
 
-Use cases include:
+Don't confuse it with the [CLI channel](/channels/cli), which is a chat adapter for talking *to an agent* from the terminal — `ncl` is for operating the host itself.
 
-- **Scripting and automation** — pipe output from one tool into an agent, or pipe the agent's result into another tool
-- **CI/CD hooks** — call an agent from a GitHub Action or git hook
-- **Dev workflow** — stay in the terminal without context-switching to a chat app
-- **Bootstrapping** — use an agent immediately before any messaging channel is set up
-- **Testing** — faster feedback loop than sending a message through a chat app
+## Invoking ncl
 
-## Prerequisites
-
-- Python 3.8 or later
-- NanoClaw installed with a built checkout-scoped container image (`nanoclaw-agent-v2-<slug>:latest`)
-- Either `container` (Apple Container, macOS 15+) or `docker` available in `PATH`
-
-## Installation
-
-Run the `/claw` skill in Claude Code from your NanoClaw directory:
+Setup symlinks `bin/ncl` into `~/.local/bin`, so after install you can run `ncl` from anywhere. From the project root, `pnpm ncl` works too:
 
 ```bash
-/claw
+ncl groups list
+pnpm ncl groups list   # equivalent, from the checkout
 ```
 
-The skill copies the script into `scripts/claw` and symlinks it to `~/bin/claw`. Verify with:
+The general shape is:
 
 ```bash
-claw --list-groups
+ncl <resource> <verb> [target] [--key value ...] [--json]
 ```
 
-<Note>
-If NanoClaw isn't running or the database doesn't exist yet, the group list will be empty — that's expected.
-</Note>
+Positional words join into the command name, and a trailing positional becomes the target ID — `ncl groups get abc123` and `ncl groups get --id abc123` are the same call. Flags map to columns; hyphens and underscores are interchangeable (`--agent-group-id` = `--agent_group_id`). Run `ncl help` to list every resource, and `ncl <resource> help` for its verbs, columns, and enums.
 
-## Usage
+## Output and errors
 
-### Send a prompt
+By default `ncl` prints a human format: a small aligned table for list results, pretty-printed JSON for single objects, and `error (<code>): <message>` on failure. Pass `--json` to get the raw response frame instead — use that for scripting. Exit codes: `0` success, `1` command error, `2` transport error.
+
+If the host isn't running, `ncl` can't reach the socket and tells you so:
+
+```text
+ncl: cannot reach NanoClaw host (connect ENOENT .../data/ncl.sock).
+Is the host running? Start it with: pnpm run dev
+```
+
+## Agents can run ncl too
+
+The same command surface is exposed to agents inside containers. What an agent may do is controlled per group by `cli_scope` in its container config:
+
+- **`disabled`** — all `ncl` commands are rejected.
+- **`group`** (default) — the agent only sees the `groups`, `sessions`, `destinations`, and `members` resources, pinned to its own group: IDs are auto-filled, rows from other groups are filtered out, and it cannot change its own `cli_scope`.
+- **`global`** — full access to every resource.
+
+Regardless of scope, mutating verbs (`create`, `update`, `delete`, `grant`, `restart`, ...) are approval-gated for agents: the agent gets `approval-pending` and an admin receives a card showing the exact command. From the host socket, the same verbs run immediately — the socket file permissions are the auth boundary. Change the scope with:
 
 ```bash
-# Send to the main group (default)
-claw "What's on my calendar today?"
-
-# Send to a specific group by name (fuzzy match)
-claw -g "family" "Remind everyone about dinner at 7"
-
-# Send to a group by exact JID
-claw -j "120363336345536173@g.us" "Hello"
+ncl groups config update <group-id> --cli-scope disabled
 ```
 
-### Resume a session
+## Working with resources
+
+Representative commands per resource — `ncl <resource> help` shows the full set.
+
+### groups
+
+Agent groups: the agent identities with their own folder, history, and container image. Beyond CRUD, `groups` carries the container-config and lifecycle verbs.
 
 ```bash
-claw -s abc123 "Continue where we left off"
+ncl groups create --name "Research" --folder research
+ncl groups restart <group-id> --rebuild
 ```
 
-The session ID is printed to stderr after each run. Pass it back with `-s` to continue the conversation.
+`restart` kills and respawns the group's containers (`--rebuild` rebuilds the image first — required after package changes; `--message <text>` leaves an on-wake instruction). `delete` cascades through sessions, wirings, roles, memberships, and destinations in one transaction.
 
-### Pipe input from stdin
+Config subcommands edit the group's `container_configs` row — changes apply on the next `restart`:
 
 ```bash
-# Read prompt from stdin
-echo "Summarize this" | claw --pipe -g dev
-
-# Pipe a file
-cat report.txt | claw --pipe "Summarize this report"
+ncl groups config get <group-id>
+ncl groups config update <group-id> --model claude-sonnet-4-5 --effort high
+ncl groups config add-mcp-server <group-id> --name fetch --command npx --args '["mcp-fetch"]'
+ncl groups config add-package <group-id> --apt ffmpeg
 ```
 
-When using `--pipe`, you can combine a positional prompt argument with stdin — the positional argument is prepended to the piped content.
+`config update` accepts `--provider`, `--model`, `--effort`, `--image-tag`, `--assistant-name`, `--max-messages-per-prompt`, and `--cli-scope`.
 
-### List registered groups
+### messaging-groups and wirings
+
+A messaging group is one chat on one platform (unique `channel_type` + `platform_id`); a wiring connects it to an agent group and sets engagement rules. List commands accept column filters and `--limit`:
 
 ```bash
-claw --list-groups
+ncl messaging-groups list --channel_type telegram
+ncl wirings create --messaging-group-id <mg-id> --agent-group-id <group-id> --engage-mode mention-sticky
+ncl wirings update <wiring-id> --session-mode per-thread
 ```
 
-Displays all registered groups with their name, folder, and JID.
+Wiring columns: `engage_mode` (`mention` | `mention-sticky` | `pattern`), `engage_pattern`, `sender_scope` (`all` | `known`), `ignored_message_policy` (`drop` | `accumulate`), `session_mode` (`shared` | `per-thread` | `agent-shared`).
 
-### Advanced options
+### users, roles, and members
+
+Users are per-channel identities (`tg:6037840640`, `discord:1234...`). Roles grant privilege (`owner` is always global; `admin` can be global or scoped to one group with `--group`). Members let unprivileged users talk to a group when its wiring has `sender_scope known`.
 
 ```bash
-# Force a specific container runtime
-claw --runtime docker "Hello"
-
-# Use a custom image tag
-claw --image nanoclaw-agent:dev "Hello"
-
-# Custom timeout for long-running tasks (default: 300s)
-claw --timeout 600 "Run the full analysis"
-
-# Verbose mode — shows command, redacted payload, and exit code
-claw -v "Hello"
+ncl users create --id tg:6037840640 --kind telegram --display-name "Ethan"
+ncl roles grant --user tg:6037840640 --role admin --group <group-id>
+ncl members add --user tg:6037840640 --group <group-id>
 ```
 
-## How it works
+`roles revoke` and `members remove` take the same flags.
 
-`claw` bypasses the messaging channel layer entirely. It:
+### sessions
 
-1. Reads registered groups from the NanoClaw SQLite database
-2. Resolves the target group (by name, folder, or JID)
-3. Loads secrets from `.env` (API keys, OAuth tokens)
-4. Constructs a JSON payload with the prompt, group context, and secrets
-5. Pipes the payload into a container run (`docker run -i --rm` or `container run -i --rm`)
-6. Streams stderr in real time and waits for the output sentinel
-7. Parses the structured output and prints the agent's response to stdout
-
-The agent running inside the container has the same capabilities as when invoked through a chat channel — including group memory, file mounts, and MCP tools.
-
-## Scripting examples
-
-### CI/CD post-deploy check
+Read-only view of the runtime units — one row per (agent group, messaging group, thread) with its container status (`running` | `stopped`):
 
 ```bash
-claw -g ops "Deploy to production just finished. Check for errors in the last 10 minutes."
+ncl sessions list --agent_group_id <group-id>
 ```
 
-### Pipe git diff for code review
+### dropped-messages
+
+Read-only log of messages the router dropped, aggregated per sender and chat with a `reason` (`no_agent_wired`, `no_agent_engaged`, `unknown_sender_strict`, `unknown_sender_request_approval`). Your first stop when a message got no reply:
 
 ```bash
-git diff main..HEAD | claw --pipe -g dev "Review this diff for issues"
+ncl dropped-messages list
 ```
 
-### Daily summary via cron
+### approvals
+
+Read-only view of in-flight approval cards waiting for an admin response:
 
 ```bash
-claw "Summarize today's standups" >> daily-brief.txt
+ncl approvals list --status pending
 ```
 
-### Chain with other tools
+### destinations and user-dms
+
+Destinations are per-agent send ACLs — each row lets an agent address a channel or another agent by a local name. `user-dms` is the read-only DM-route cache the host uses to cold-DM users.
 
 ```bash
-claw "What are the open P0 bugs?" | mail -s "P0 Bug Report" team@example.com
+ncl destinations list --agent_group_id <group-id>
+ncl destinations add --agent-group-id <group-id> --local-name ops-channel --target-type channel --target-id <mg-id>
+ncl user-dms list
 ```
-
-## Troubleshooting
-
-<AccordionGroup>
-  <Accordion title="'neither container nor docker found'">
-    Install Docker Desktop or Apple Container (macOS 15+), or pass `--runtime` explicitly.
-  </Accordion>
-
-  <Accordion title="'no secrets found in .env'">
-    The script reads `.env` from your NanoClaw directory. Verify it exists and contains at least one of: `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`.
-  </Accordion>
-
-  <Accordion title="Container times out">
-    The default timeout is 300 seconds. For longer tasks, pass `--timeout 600` (or higher). If the container consistently hangs, rebuild the image with `./container/build.sh`.
-  </Accordion>
-
-  <Accordion title="'group not found'">
-    Run `claw --list-groups` to see registered groups. Group lookup does fuzzy partial matching on name and folder — if your query matches multiple groups, you get an error listing the ambiguous matches.
-  </Accordion>
-
-  <Accordion title="Container crashes mid-stream">
-    Containers run with `--rm` so they're automatically removed. If the agent crashes before emitting the output sentinel, `claw` falls back to printing raw stdout. Use `-v` to inspect output. Rebuild the image if crashes are consistent.
-  </Accordion>
-
-  <Accordion title="Override the NanoClaw directory">
-    If `claw` can't find your database or `.env`, set the `NANOCLAW_DIR` environment variable:
-
-    ```bash
-    export NANOCLAW_DIR=/path/to/your/nanoclaw
-    ```
-  </Accordion>
-</AccordionGroup>
-
-## Next steps
-
-<CardGroup cols={2}>
-  <Card title="Scheduled tasks" icon="clock" href="/guides/scheduled-tasks">
-    Automate recurring agent tasks with the built-in scheduler
-  </Card>
-
-  <Card title="Container runtime" icon="box" href="/concepts/container-lifecycle">
-    Learn how agent containers are configured and managed
-  </Card>
-</CardGroup>
