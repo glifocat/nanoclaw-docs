@@ -1,0 +1,119 @@
+---
+title: "Writing skills"
+description: "How to author a NanoClaw skill: SKILL.md anatomy, idempotent apply steps, REMOVE.md, registration tests, and the path from a private skill to an upstream PR."
+tag: "NEW"
+keywords: ["writing skills", "SKILL.md", "REMOVE.md", "skill authoring", "idempotency", "registration test", "skill-guidelines", "vitest", "integration points"]
+---
+
+{/* verified-against: docs/skill-guidelines.md, CONTRIBUTING.md, vitest.skills.config.ts, .claude/skills/{add-telegram,manage-mounts,update-skills,add-ollama-tool}/SKILL.md, .claude/skills/add-telegram/REMOVE.md @ dc34ceb (v2.1.4) */}
+
+A skill is a markdown file that Claude Code executes — there's no engine to integrate with, so writing one is mostly writing good instructions. The bar upstream holds skills to is [docs/skill-guidelines.md](https://github.com/nanocoai/nanoclaw/blob/main/docs/skill-guidelines.md), and it boils down to two principles: **minimal integration surface** (mostly add files; keep reach-ins into existing code to a line or two that calls your own code) and **a test for every functional integration point** (one that goes red if the wiring is deleted or drifts). This page covers the conventions; [the overview](/extend/overview) explains the model.
+
+## Anatomy of a SKILL.md
+
+Every skill is a directory under `.claude/skills/<name>/` with a `SKILL.md` in the [Claude Code skills format](https://code.claude.com/docs/en/skills):
+
+```markdown
+---
+name: my-skill
+description: What this skill does and when to use it.
+---
+
+Instructions here...
+```
+
+- `name` — lowercase, alphanumeric plus hyphens, max 64 characters. This becomes the slash command (`/my-skill`).
+- `description` — required, and load-bearing: **it's how Claude decides whether to invoke the skill**. Write what it does *and* when to use it. `manage-mounts` even lists its trigger phrases: `Triggers on "mounts", "mount allowlist", "agent access to directories", "container mounts"`.
+
+The body is prose an agent can run. Real skills converge on the same shape: a pre-flight check, numbered steps, then a build-and-validate step at the end. Keep it under 500 lines — move detail to separate reference files in the skill directory — and put code in separate files, never inline in the markdown.
+
+## Conventions that make a skill safe to re-run
+
+Apply must be **idempotent**: upgrades re-run it (`/update-skills` works by re-running each installed skill's own apply), and a skill that half-applies twice is a bug. Three conventions from the in-tree skills:
+
+**Pre-flight check.** Start with an explicit "is this already applied?" gate. From `add-telegram`:
+
+> Skip to **Credentials** if all of these are already in place: `src/channels/telegram.ts` [...] exists, `src/channels/index.ts` contains `import './telegram.js';`, [...] `@chat-adapter/telegram` is listed in `package.json` dependencies. Otherwise continue. Every step below is safe to re-run.
+
+Each individual step also carries its own guard ("skip if already present") so a partial apply completes instead of duplicating lines.
+
+**Pinned versions.** Dependencies install at an exact version — `pnpm install @chat-adapter/telegram@<exact-version>`, never `latest`. Same for Dockerfile-installed binaries: pin with an `ARG <X>_VERSION=` line.
+
+**Present-tense DO steps only.** A skill is a standalone artifact with no memory of its own edits. No "earlier versions did X", no "no changes needed here" — those are flagged anti-patterns. So is a separate VERIFY.md: tests are the verification, and the final step is always `pnpm run build` plus running the skill's own tests.
+
+## REMOVE.md
+
+`REMOVE.md` is required **exactly when apply leaves anything behind**. A pure instruction-only skill that copies nothing needs none. When it's required, it must reverse *every* change apply made — the most common review rejection is an incomplete one. `add-telegram`'s REMOVE.md is the template; it mirrors the apply step for step:
+
+1. Delete the barrel import line from `src/channels/index.ts` (delete, never comment out), then `rm` every copied file — adapter, helpers, setup step, *and tests*
+2. Delete the `STEPS` map entry from `setup/index.ts`
+3. Remove the skill's env vars from `.env` and re-sync to the container
+4. `pnpm uninstall` the dependency
+5. Rebuild and restart the service
+
+Each removal step is itself idempotent ("skip if already gone").
+
+## Testing your skill
+
+Every reach-in with a functional consequence gets a test that goes red if the wiring is deleted or drifts. Tests targeting host code use vitest; container code uses `bun:test` under `container/agent-runner/`. Tests **travel with the skill** — they ship in the skill's directory (or on the registry branch) and apply copies them into the project tree, so they run against the composed system via `pnpm test`. There's also a dedicated config, `vitest.skills.config.ts`, that picks up tests under `.claude/skills/**/tests/` — run it with `pnpm exec vitest run --config vitest.skills.config.ts`.
+
+The most common shape is the **registration test**: import the real barrel, assert the registry contains your entry. `add-telegram`'s `telegram-registration.test.ts` imports `src/channels/index.ts` and asserts `telegram` is registered — it goes red if the import line is deleted, if the barrel fails to evaluate, *or* if the adapter package isn't installed (the unmocked import throws), so it guards the dependency for free. Don't test your function directly instead: calling your own code bypasses the wiring and stays green when the barrel line is deleted.
+
+When the edit lives somewhere you can't invoke (a `main()` call, a container boot file), fall back to a **structural test**. `add-ollama-tool` ships one that parses the container's `index.ts` with the TypeScript compiler API and asserts the `mcpServers` object literal has an `ollama` entry pointing at the right module.
+
+Two rules apply across all of them: mock only genuinely external services (a fake HTTP server, stubbed creds), never the package you're guarding; and `pnpm run build` is an always-on leg, because typed drift slips past runtime tests. Finally, the robustness check from the guidelines: apply your skill with a small, cheap model. If it fumbles the instructions, the instructions are too vague — fix them, don't blame the model.
+
+## A minimal template
+
+A template for a small operational skill — instruction-only, so no REMOVE.md and no integration tests, just idempotent steps. Adapt the phases to your task:
+
+````markdown
+---
+name: rotate-agent-logs
+description: Archive and truncate NanoClaw agent logs. Triggers on "rotate logs",
+  "logs too big", "archive agent logs".
+---
+
+# Rotate Agent Logs
+
+## Pre-flight
+
+Check `ls data/logs/*.log` — if no log file exceeds 50MB, tell the user
+nothing needs rotating and stop. Every step below is safe to re-run.
+
+## 1. Archive
+
+For each oversized log, copy it to `data/logs/archive/<name>-<date>.log.gz`
+(create the directory if missing, skip files already archived today).
+
+## 2. Truncate and restart
+
+Truncate the rotated logs, then restart the service so file handles reopen:
+
+```bash
+source setup/lib/install-slug.sh
+launchctl kickstart -k gui/$(id -u)/$(launchd_label)  # macOS
+systemctl --user restart $(systemd_unit)              # Linux
+```
+
+## Verify
+
+Confirm the archive files exist and the live logs are small again. Report
+both paths to the user.
+````
+
+## Private skill or upstream contribution?
+
+**For your own install**, just create the directory: drop `.claude/skills/<name>/SKILL.md` into your checkout and Claude Code picks it up as `/<name>` — no registration, no build step. This is the right home for anything specific to your setup, and where every skill should start.
+
+**To contribute upstream**, your skill needs to be useful beyond your own setup and meet the guidelines bar above. Upstream recognizes four types — channel/provider skills (code on the registry branches), utility skills (code files in the skill directory), operational skills (instructions only), and container skills (`container/skills/`, loaded by the agent inside the container) — each with its own PR path. See [Contributing](/concepts/contributing) for the flow, and note that for channel and provider skills you PR against `main` and maintainers land the code on the registry branch from your work.
+
+<Warning>
+Skills are not sandboxed. Unlike agent containers, a skill runs in your Claude Code session on the host, with whatever permissions that session has — read untrusted skills before running them.
+</Warning>
+
+## Related pages
+
+- [Skills: how NanoClaw extends itself](/extend/overview) — the model: additive fetch, registry branches, the skill categories
+- [Contributing](/concepts/contributing) — repo layout, test configs, and the upstream PR flow
+- [Skills catalog](/reference/skills-catalog) — every skill that ships with NanoClaw, for more worked examples
