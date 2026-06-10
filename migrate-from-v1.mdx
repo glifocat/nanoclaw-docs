@@ -1,0 +1,179 @@
+---
+title: "Migrate from v1 or OpenClaw"
+description: "Move a NanoClaw v1 install to v2 with migrate-v2.sh and the /migrate-from-v1 skill, or import an OpenClaw setup with /migrate-from-openclaw."
+icon: "route"
+tag: "NEW"
+keywords: ["migration", "v1", "v2", "upgrade", "OpenClaw", "migrate-v2.sh", "migrate-from-v1", "migrate-from-openclaw", "handoff"]
+---
+
+{/* verified-against: migrate-v2.sh, migrate-v2-reset.sh, setup/migrate-v2/*.ts, .claude/skills/migrate-from-v1/SKILL.md, .claude/skills/migrate-from-openclaw/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md @ dc34ceb */}
+
+NanoClaw v2 is a ground-up rewrite — you don't upgrade in place, you migrate into a fresh v2 checkout. There are two supported paths:
+
+- **From NanoClaw v1**: run `bash migrate-v2.sh` in the v2 checkout. It copies your state deterministically, then hands off to Claude to finish the judgment calls.
+- **From OpenClaw**: run the `/migrate-from-openclaw` skill in Claude Code. It's a guided conversation, not a batch script — see [Migrating from OpenClaw](#migrating-from-openclaw).
+
+Starting fresh with no previous install? You don't need this page — go to the [quick start](/quickstart).
+
+<Note>
+There's also a `/migrate-nanoclaw` skill in the repo. That one is for upgrading a **customized fork** to a newer upstream — it extracts your customizations into a guide and replays them on a clean base instead of `git merge`. It's not a v1 → v2 or OpenClaw path; use it later, once you're on v2 and tracking upstream.
+</Note>
+
+## What carries over — and what doesn't
+
+The migration never modifies your v1 install. It reads from it (the v1 checkout is treated as read-only throughout) and writes into the v2 checkout.
+
+| v1 state | What happens in v2 |
+|---|---|
+| `.env` keys | Merged into v2's `.env`. Existing v2 keys are never overwritten. |
+| Registered groups | Seeded into the central database (`data/v2.db`) as agent groups, messaging groups, and the wiring between them. |
+| Group folders | Copied into `groups/`. Each v1 `CLAUDE.md` becomes `CLAUDE.local.md` — v2 composes `CLAUDE.md` at container spawn, so your customizations move to the local file. v1 `container_config` becomes `container.json` (or a `.v1-container-config.json` sidecar if it can't be parsed). |
+| Conversations | Session state and Claude Code transcripts are copied, and the v1 session ID is written as the continuation — your agent resumes the exact same conversation in v2. |
+| Scheduled tasks | Active tasks are ported into v2's task model (task rows in each session's inbound database). |
+| Channel auth | Credentials for the channels you select — both env keys and on-disk auth state like the WhatsApp keystore — are copied, and the channel code is installed. |
+| Container skills | Skills under `container/skills/` that v2 doesn't already ship are copied over. |
+
+Two things are intentionally left behind, plus one the script defers:
+
+- **Message history.** The script reads v1's `store/messages.db` to discover groups and tasks, but never copies the messages themselves — v2 has no equivalent table, and your agent's memory of past conversations carries over through the session transcripts instead.
+- **v1 source customizations.** v2's architecture is fundamentally different; forked `src/` code isn't portable. The post-migration skill helps you copy portable pieces (skills, docs) and stashes the rest as reference.
+- **Your owner account and access policy.** The script doesn't seed users or roles — that needs human confirmation, so the `/migrate-from-v1` skill handles it after the handoff.
+
+## Run the migration
+
+The script is idempotent — re-running it skips what's already done, so a failed step never forces you to start over.
+
+<Steps>
+  <Step title="Get a v2 checkout next to v1">
+    Clone v2 as a sibling of your v1 directory — the script auto-detects v1 by scanning sibling directories for a `store/messages.db`:
+
+    ```bash
+    git clone https://github.com/nanocoai/nanoclaw.git nanoclaw-v2
+    cd nanoclaw-v2
+    ```
+
+    If v1 lives somewhere else, point at it explicitly:
+
+    ```bash
+    NANOCLAW_V1_PATH=~/path/to/nanoclaw bash migrate-v2.sh
+    ```
+  </Step>
+
+  <Step title="Run the script in a real terminal">
+    ```bash
+    bash migrate-v2.sh
+    ```
+
+    The script refuses to run inside a tool subprocess — it has interactive prompts (channel selection, service switchover) and streams progress. If you're in Claude Code, exit first or open a separate terminal.
+  </Step>
+
+  <Step title="Phase 0: preflight">
+    Installs prerequisites (Node, pnpm, dependencies) via the standard bootstrap, locates your v1 install, and validates its database — it aborts if the `registered_groups` table is missing. Then it reports what it found:
+
+    ```text
+    ·  v1 state: 4 groups, 2 active tasks, 12 env keys
+    ✓  Phase 0 complete — ready to migrate
+    ```
+  </Step>
+
+  <Step title="Phase 1: core state">
+    Five sub-steps, each logged separately under `logs/migrate-steps/`: merge `.env`, seed the v2 database, copy group folders, copy session data, port scheduled tasks. Steps that exit successfully but skip some rows surface their errors inline so partial migrations don't go unnoticed.
+  </Step>
+
+  <Step title="Phase 2: channels">
+    An interactive multiselect asks which channels to bring over (Telegram, Discord, Slack, WhatsApp, Teams, Matrix, iMessage, and more). For each selection the script copies the channel's auth state and runs its installer. To skip the prompt — for unattended runs — set `NANOCLAW_CHANNELS=telegram,discord` before running.
+  </Step>
+
+  <Step title="Phase 3: infrastructure">
+    Installs Docker if missing, sets up the OneCLI credential vault, registers your Anthropic credential (skipped if `.env` already has `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`), copies v1 container skills v2 doesn't have, and builds the agent container image.
+  </Step>
+
+  <Step title="Service switchover">
+    If your v1 service is running, the script offers to switch: it stops v1, installs and starts the v2 service, and asks you to send a real test message to your bot. Then you choose — **keep v2** (v1 is disabled but its service file is kept on disk for rollback) or **revert** (v2 stops, v1 restarts). Switching is non-destructive either way; rolling back later is one command:
+
+    ```bash
+    # Linux
+    systemctl --user stop <v2-unit> && systemctl --user start nanoclaw
+    # macOS
+    launchctl unload ~/Library/LaunchAgents/<v2-label>.plist && launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
+    ```
+
+    The v2 unit name is install-specific (`nanoclaw-v2-<slug>` / `com.nanoclaw-v2-<slug>`) — the script prints it in the summary.
+  </Step>
+
+  <Step title="Phase 4: handoff">
+    The script writes `logs/setup-migration/handoff.json` — per-step results, overall status, and a follow-up list — prints a summary of what was done and what still needs a human, then launches Claude with the `/migrate-from-v1` skill automatically (if the `claude` CLI is installed; otherwise run it yourself).
+  </Step>
+</Steps>
+
+## After the handoff
+
+`/migrate-from-v1` picks up where the script stopped — the parts that need human judgment. It reads `handoff.json` first, then works through:
+
+1. **Get v2 routing real messages.** Fixes any failed steps that block message routing, then has you send a test message before going deeper. v1 stays paused, not modified.
+2. **Owner and access.** v2 auto-creates a `users` row for every sender it sees; the skill confirms which one is you and grants the `owner` role. Then it asks how open the bot should be — the script left every group on `public` so the switchover test would work, and the skill offers to tighten it to `strict` (known users only) or `request_approval`, seeding known senders from your v1 message history if you want.
+3. **Clean up `CLAUDE.local.md`.** The migration copied your entire v1 `CLAUDE.md` per group, including v1 boilerplate that v2 now provides through composed fragments. The skill diffs each file against the v1 template, strips the stock sections, keeps your customizations and agent identity, and shows you the result before writing.
+4. **Container config.** Verifies that `container.json` mount paths still exist on this machine, and resolves any `.v1-container-config.json` sidecars left by unparseable v1 configs.
+5. **Fork customizations.** If your v1 was a customized fork, the skill walks the commits with you — portable items (container skills, Claude skills, docs) get copied; v1 source changes get stashed to `docs/v1-fork-reference/` since they don't translate.
+
+When it's done it runs an end-to-end health check (`setup/index.ts --step verify`) and restarts the service.
+
+## Starting over
+
+`migrate-v2-reset.sh` wipes the v2 checkout back to clean so you can re-run the migration from scratch:
+
+```bash
+bash migrate-v2-reset.sh && bash migrate-v2.sh
+```
+
+It removes `data/`, `logs/`, the merged `.env`, group folders copied from v1, and untracked skills and channel code added during migration, then restores the tracked versions of those paths from git. It keeps `node_modules/` (expensive to reinstall) and **never touches your v1 install**.
+
+## Migrating from OpenClaw
+
+OpenClaw users skip the script entirely — there's no deterministic mapping between the two systems, so the migration is a conversation. From the v2 checkout, open Claude Code and run:
+
+```text
+/migrate-from-openclaw
+```
+
+The skill detects your OpenClaw installation at the standard locations (`~/.openclaw`, `~/.clawdbot`, or a path you give it), summarizes what it found, and then works through each area with you — reading your data, explaining where it belongs in v2, and showing every change before applying it. Credentials are always masked when displayed.
+
+What maps where:
+
+| OpenClaw | NanoClaw v2 |
+|---|---|
+| An agent | An agent group (its own container, workspace, and memory) |
+| A chat or group | A messaging group, wired to an agent group |
+| `IDENTITY.md` / `SOUL.md` | `container/CLAUDE.md` (shared across agents) or a group's `CLAUDE.local.md`, your choice |
+| `USER.md`, `MEMORY.md`, daily memory files | `user-context.md`, `memories.md`, and `daily-memories/` in the group folder |
+| Skills | Copied into `container/skills/` — the SKILL.md format is shared, so they're portable |
+| Channel tokens (Telegram, Discord, Slack) | `.env` — the host process reads them |
+| Anthropic and other API keys | The OneCLI vault — injected per request, never in container env |
+| Cron jobs | v2 scheduled tasks, created through the agent's `schedule_task` tool |
+| MCP servers | Per-agent-group container config |
+| `allowFrom` / `dmPolicy` allowlists | `unknown_sender_policy` per messaging group, plus user roles and group members |
+
+A few OpenClaw-specific notes:
+
+- **WhatsApp re-authenticates from scratch.** Stale Baileys encryption sessions break decryption, so the skill deliberately doesn't copy WhatsApp auth state — you scan a QR code again during setup.
+- **Some features don't map.** Exec approvals are replaced by container isolation; webhooks, human delay, and TTS have no v2 primitive — the skill discusses alternatives case by case.
+- **Progress is recoverable.** The skill keeps a `migration-state.md` file in the project root as its source of truth, so a lost session picks up where it left off.
+
+The skill ends by validating its own work with a shipped test suite, then points you at `/setup` to finish the install — select the channels you migrated when setup asks.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Connect more channels" icon="tower-broadcast" href="/channels/overview">
+    Anything you didn't migrate installs any time with `/add-<name>`.
+  </Card>
+  <Card title="The entity model" icon="diagram-project" href="/concepts/entity-model">
+    Agent groups, messaging groups, users, and roles — the v2 model your v1 state was mapped onto.
+  </Card>
+  <Card title="The ncl CLI" icon="terminal" href="/operate/ncl-cli">
+    Inspect the migrated groups, sessions, and users from the command line.
+  </Card>
+  <Card title="Troubleshooting" icon="life-ring" href="/operate/troubleshooting">
+    Migration logs live in `logs/migrate-v2.log` and `logs/migrate-steps/`.
+  </Card>
+</CardGroup>
