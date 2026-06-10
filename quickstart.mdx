@@ -3,198 +3,88 @@ title: Quick start
 description: Get NanoClaw running in one command with the scripted installer.
 icon: "bolt"
 tag: "UPDATED"
-keywords: ["setup", "install", "getting started", "nanoclaw.sh", "bash", "claude code"]
+keywords: ["setup", "install", "getting started", "nanoclaw.sh", "setup wizard", "first agent"]
 ---
 
-From a fresh machine to an agent you can message — one command, a handful of prompts, a few minutes.
+{/* verified-against: nanoclaw.sh, setup.sh, setup/auto.ts, setup/probe.sh, setup/install-node.sh, setup/channels/*.ts, scripts/init-first-agent.ts, .claude/skills/setup/SKILL.md, package.json @ dc34ceb */}
 
-<Note>
-This guide covers the default installer. If you want to skip steps, reuse an existing OneCLI instance, or point Anthropic traffic at a custom endpoint, see [Installation](/installation).
-</Note>
+From a fresh machine to an agent you can message — one command and a handful of prompts.
+
+## Prerequisites
+
+- **macOS or Linux** (WSL works) with **4 GB+ RAM** — the installer warns below ~3.7 GB
+- **git** to clone the repository
+- A **Claude subscription** (Pro or Max), an OAuth token, or an Anthropic API key
+
+Everything else — Homebrew on macOS, Node 22, pnpm, Docker, the OneCLI vault — is installed by the script if missing. Two caveats from the installer's pre-flight checks: don't run as root on Linux (it walks you through creating a user instead), and Google Cloud VMs are known not to work.
 
 ## The one-command flow
 
 <Steps>
-  <Step title="Clone the repository">
-    Clone upstream directly if you just want to try things out:
-
+  <Step title="Clone and run">
     ```bash
     git clone https://github.com/nanocoai/nanoclaw.git
     cd nanoclaw
-    ```
-
-    If you plan to customize, fork [nanocoai/nanoclaw](https://github.com/nanocoai/nanoclaw) on GitHub first and clone your fork. You can always add the fork remote later — the installer and `/update-nanoclaw` skill handle both shapes.
-  </Step>
-
-  <Step title="Run the installer">
-    ```bash
     bash nanoclaw.sh
     ```
 
-    This is the whole install command. `nanoclaw.sh` walks you through:
-
-    - Installing Node 22, pnpm, and Docker if they're missing
-    - Verifying your environment (platform, WSL detection, container runtime)
-    - Building the agent container image
-    - Registering your Anthropic credential with [OneCLI](https://github.com/onecli/onecli)
-    - Pairing your first channel (Telegram, Discord, WhatsApp, Signal, Teams, Slack, iMessage, or the local CLI)
-    - Installing a systemd or launchd service so NanoClaw starts with your machine
-
-    If any step fails, Claude Code is invoked automatically to diagnose and resume from where it broke. You don't have to debug the installer yourself.
+    The script runs pre-flight checks (RAM, root user, Homebrew on macOS), installs the basics — Node 22, pnpm, and native modules — under a single spinner, then hands off to the interactive setup wizard (`pnpm run setup:auto`). If a step fails during the wizard, it offers Claude-assisted recovery inline and resumes from the step that broke instead of starting over.
   </Step>
 
-  <Step title="Answer the setup prompts">
-    Running through [clack](https://github.com/natemoo-re/clack), you'll be asked:
+  <Step title="Answer the wizard">
+    Press Enter on **Standard setup** (or pick **Advanced** to override defaults), then the wizard walks through:
 
-    - **Display name** — what you want your agent to be called (default: `Andy`)
-    - **Anthropic credential method** — Claude subscription (OAuth), Anthropic API key, or skip
-    - **First channel** — Telegram, Discord, WhatsApp, Signal, Teams, Slack, iMessage, or local CLI. You can add more later.
-    - **Channel-specific auth** — pairing code, QR code, bot token, app credentials, or no extra auth for CLI, depending on the platform
-
-    The flow is linear. One question at a time. You can Ctrl+C and restart; the installer picks up where you left off.
-  </Step>
-
-  <Step title="Authorize Anthropic">
-    The one step that hands off from the scripted flow: `claude setup-token` opens a browser for OAuth and prints a long-lived token back into your terminal. The installer captures the status and returns to the clack flow once the token is stored in OneCLI.
-
-    If you chose to skip Anthropic auth or use an API key instead, this step is skipped or replaced with a password prompt.
+    1. **System check** — verifies your environment
+    2. **Sandbox build** — builds the agent container image. First build pulls a base image and takes 3–10 minutes on a fresh machine.
+    3. **OneCLI vault** — installs the credential vault, or offers to reuse an existing OneCLI instance. Your agent never sees your API keys; the vault injects them into approved requests as they leave the sandbox.
+    4. **Connect to Claude** — sign in with your Claude subscription (opens a browser), paste an OAuth token (`sk-ant-oat…`), or paste an API key (`sk-ant-api…`)
+    5. **Access rules** — writes the assistant's filesystem access rules (empty to start — the sandbox only sees what you explicitly share later)
+    6. **Background service** — starts NanoClaw under launchd (macOS) or a systemd user service (Linux)
+    7. **Your name** — what the assistant should call you
+    8. **First contact** — the wizard pings your assistant and waits for a reply. First startup takes 30–60 seconds while the sandbox warms up. You can pause here and chat from the terminal.
+    9. **Timezone** — auto-detected, confirmed with you
+    10. **Channel** — connect Telegram (recommended), Discord, WhatsApp, Signal, iMessage, Slack, or Microsoft Teams — or skip and use the terminal. Other channels install after setup with `/add-<name>` in Claude Code.
+    11. **Final check** — makes sure everything works together: credentials, service, and configured channels, flagging anything left to fix
   </Step>
 
   <Step title="Send your first message">
-    When the installer finishes, it prints the invocation pattern for your chosen channel. For Telegram that looks like:
+    If you connected a channel, the wizard wires your first agent and the assistant DMs you a welcome — check your phone and say hi.
 
-    ```
-    @Andy hello!
-    ```
-
-    For the local CLI:
+    If you skipped the channel step, chat from the terminal:
 
     ```bash
     pnpm run chat hi
     ```
 
-    Your agent responds. You're set.
+    Either way, you can watch what's happening live:
+
+    ```bash
+    tail -f logs/nanoclaw.log
+    ```
   </Step>
 </Steps>
 
-## What the installer writes to disk
+## What just happened
 
-NanoClaw is transparent about what it does. Every run produces three log streams:
+You now have a host service (launchd or systemd) running NanoClaw from this checkout. It routes messages between your channels and agents, where each agent runs in its own Docker container sandbox that wakes on incoming messages and sleeps when idle. Your Anthropic credential lives in the OneCLI vault — never inside the container. Agent workspaces live under `groups/`, runtime state under `data/`, and logs under `logs/`. See [Architecture](/concepts/architecture) for the full picture.
 
-| Level | Where | What's in it |
-|-------|-------|--------------|
-| Terminal (clack) | Your screen | Branded status + prompts, spinner per step |
-| Progression log | `logs/setup.log` | One entry per step: timestamp, duration, status, key facts |
-| Raw per-step logs | `logs/setup-steps/NN-step-name.log` | Full verbatim stdout + stderr from the step |
-
-If something looks wrong after install, `logs/setup.log` is the first file to read.
-
-## What happens behind the scenes
-
-<AccordionGroup>
-  <Accordion title="Phase 1 — bootstrap (bash)">
-    - Installs Node 22 via nvm, corepack-enables pnpm
-    - Runs `pnpm install --frozen-lockfile`
-    - Verifies `better-sqlite3` loads on your platform
-    - Detects WSL, headless environments, and Apple Silicon
-    - Emits a `BOOTSTRAP` status block to the progression log
-  </Accordion>
-
-  <Accordion title="Phase 2 — setup:auto (TypeScript via pnpm)">
-    Driven by `setup/auto.ts`. Each sub-step emits a structured status block and writes its raw output to `logs/setup-steps/NN-<name>.log`:
-
-    - **environment** — Docker / Apple Container detection, runtime selection
-    - **container** — builds the checkout-scoped agent image via `container/build.sh`
-    - **onecli** — installs OneCLI Agent Vault or reuses an existing configured instance
-    - **auth** — registers Anthropic credentials in OneCLI
-    - **cli-agent** — wires the terminal agent and confirms it responds before optional channel setup
-    - **timezone** — detects or resolves your IANA timezone
-    - **channel pairing** — runs the selected setup flow for Telegram, Discord, WhatsApp, Signal, Teams, Slack, or iMessage
-    - **service** — launchd (macOS) / systemd (Linux) / `start-nanoclaw.sh` wrapper (WSL without systemd)
-    - **verify** — checks credentials, service status, registered groups, and first-agent connectivity
-    - **diagnostics** — optional opt-in PostHog event with platform + channel choice
-  </Accordion>
-
-  <Accordion title="The Anthropic exception">
-    `claude setup-token` owns the TTY during OAuth. It opens your browser, prints the token, and inherits stdio fully — we don't mirror the token to any log file (that would add attack surface). Control returns to the clack flow on exit.
-  </Accordion>
-
-  <Accordion title="Service installation">
-    - **macOS** — creates a launchd service named like `com.nanoclaw-v2-<slug>` in `~/Library/LaunchAgents/`
-    - **Linux (systemd)** — user service named like `nanoclaw-v2-<slug>.service`; enables `loginctl linger` so the service survives SSH logout
-    - **WSL without systemd** — creates a `start-nanoclaw.sh` wrapper; you run it manually on login or wire it to `.bashrc`
-  </Accordion>
-</AccordionGroup>
-
-## Usage examples
-
-<CodeGroup>
-```text Basic conversation
-@Andy what's the weather like today?
-@Andy write a Python script to parse CSV files
-@Andy summarize this document [attach file]
-```
-
-```text Scheduled tasks
-@Andy send me a daily standup reminder at 9am on weekdays
-@Andy every Friday at 5pm, review this week's git commits and summarize changes
-@Andy monitor Hacker News and message me when there's a trending AI article
-```
-
-```text Admin commands (from a channel you own or administer)
-@Andy list all scheduled tasks
-@Andy pause the standup reminder
-@Andy manage-channels
-@Andy show me what groups I'm in
-```
-</CodeGroup>
-
-## Monitoring and logs
-
-```bash
-# Live log stream
-tail -f logs/nanoclaw.log
-
-# Service status
-launchctl list | grep nanoclaw     # macOS
-systemctl --user list-units 'nanoclaw*'  # Linux
-```
-
-Or just ask:
-
-```
-@Andy why isn't the scheduler running?
-@Andy show me the last 50 log lines
-@Andy why did this message not get a response?
-```
+<Note>
+Coming from NanoClaw v1? Run `bash migrate-v2.sh` before setup — see the [migration guide](/migrate-from-v1).
+</Note>
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Add more channels" icon="plus" href="/channels/overview">
-    `/add-slack`, `/add-whatsapp`, `/add-signal` — install or wire channels from the current channel setup flows
+  <Card title="Add more channels" icon="tower-broadcast" href="/channels/overview">
+    Connect Telegram, Discord, WhatsApp, Slack, and more — during setup or any time after.
   </Card>
-  <Card title="Customize" icon="wrench" href="/guides/customize-an-agent">
-    Change the trigger word, tune timeouts, adjust engage modes
+  <Card title="The ncl CLI" icon="terminal" href="/operate/ncl-cli">
+    Inspect agents, groups, and sessions from the command line.
   </Card>
-  <Card title="Security model" icon="shield" href="/concepts/security">
-    Sender allowlists, user roles, unknown-sender policies
+  <Card title="Customize an agent" icon="wand-magic-sparkles" href="/guides/customize-an-agent">
+    Edit instructions, mounts, and behavior for your first agent.
   </Card>
   <Card title="Troubleshooting" icon="life-ring" href="/operate/troubleshooting">
-    Common issues and how Claude Code helps you fix them
+    Setup logs live in `logs/setup.log`; runtime issues start at `logs/nanoclaw.log`.
   </Card>
 </CardGroup>
-
-## Updating NanoClaw
-
-To pull upstream changes and merge with your customizations:
-
-```
-/update-nanoclaw
-```
-
-This skill fetches `upstream/main`, merges with your local changes, runs any migrations, rebuilds the container if needed, restarts the service, and scans the changelog for `[BREAKING]` entries — offering to run the `/migrate-nanoclaw` skill when a breaking change applies.
-
-<Tip>
-Migrating from v1? Run `/migrate-nanoclaw` for a clean-base replay of your customizations on top of v2, or `/update-nanoclaw` for a selective cherry-pick. A dedicated v1 → v2 migration guide is coming; until then, the upstream [CHANGELOG](https://github.com/nanocoai/nanoclaw/blob/main/CHANGELOG.md) covers every breaking change.
-</Tip>
