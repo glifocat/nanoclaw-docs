@@ -159,7 +159,7 @@
           {
             "group": "Understand",
             "icon": "lightbulb",
-            "pages": ["concepts/architecture", "concepts/entity-model", "concepts/container-lifecycle", "concepts/security", "concepts/contributing"]
+            "pages": ["concepts/architecture", "concepts/entity-model", "concepts/isolation-levels", "concepts/container-lifecycle", "concepts/security", "concepts/contributing"]
           },
           {
             "group": "Changelog",

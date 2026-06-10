@@ -192,7 +192,7 @@ Unknown-sender approval flow (`unknown_sender_policy = 'request_approval'`). A n
 
 ### pending_channel_approvals
 
-Unknown-channel registration flow (migration 012). When an unwired channel receives a mention or DM, the router escalates to the owner. Approve creates a `messaging_group_agents` row with conservative defaults and replays the event; deny stamps `messaging_groups.denied_at` so the channel never re-prompts. Primary key on `messaging_group_id` gives free in-flight dedup.
+Unknown-channel registration flow (migration 012). When an unwired channel receives a mention or DM, the router escalates to an approver (group admins first, then global admins, then owners). Approve creates a `messaging_group_agents` row with conservative defaults and replays the event; deny stamps `messaging_groups.denied_at` so the channel never re-prompts. Primary key on `messaging_group_id` gives free in-flight dedup.
 
 | Column | Type | Default | Meaning |
 |---|---|---|---|
