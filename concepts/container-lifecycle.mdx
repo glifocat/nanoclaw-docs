@@ -16,11 +16,11 @@ Docker is the only supported runtime. All runtime-specific logic lives in a sing
 Setup builds one base image per install from `container/Dockerfile` (see [Installation](/installation)). It's tagged `nanoclaw-agent-v2-<slug>:latest`, where the slug is the first 8 hex characters of `sha1(projectRoot)` — two NanoClaw checkouts on one host get distinct images and never clobber each other. What's inside:
 
 - **`node:22-slim`** base with **Bun** as the agent-runner's runtime — TypeScript runs directly, no compile step
-- **`tini` as PID 1** — reaps zombies and forwards signals so `outbound.db` writes finalize cleanly on `docker stop`
+- **`tini`** as the image's default entrypoint — though production spawns override the entrypoint entirely, so Bun runs as PID 1 (see the spawn section below)
 - **Chromium** plus its library stack for browser automation (`agent-browser` drives it; CJK fonts are an opt-in `INSTALL_CJK_FONTS=true` build arg)
 - **Pinned global CLIs** via pnpm: `@anthropic-ai/claude-code` and `vercel` at fixed versions, `agent-browser` tracking latest
 
-The agent-runner source is **never baked in** — the host bind-mounts it read-only at `/app/src` on every spawn, so source changes never require a rebuild. Rebuilds are only for the Dockerfile itself or CLI version bumps.
+The agent-runner source is **never baked in** — the host bind-mounts it read-only at `/app/src` on every spawn, so source changes never require a rebuild. Rebuilds are only for the Dockerfile itself, CLI version bumps, or agent-runner dependency changes — `package.json` and `bun.lock` are copied in and `bun install`ed at build time.
 
 When a group installs apt or npm packages, the host generates a Dockerfile `FROM` the base image, builds it as `nanoclaw-agent-v2-<slug>:<agent-group-id>`, and stores the tag in the group's config — that group spawns from its custom image from then on. Mechanics in [Container configuration](/reference/container-config#per-group-images-and-packages).
 
@@ -71,13 +71,13 @@ The exact mounts, from `buildMounts` in `src/container-runner.ts`:
 
 Providers can contribute extra mounts and env vars (for example OpenCode's XDG directories); these are appended last. The nested read-only mounts matter: the group dir is read-write, but `container.json`, the composed `CLAUDE.md`, and the fragments are re-mounted read-only on top, so the agent can read its config and instructions but not rewrite them. `CLAUDE.local.md` stays the one writable memory file.
 
-The `docker run` invocation itself: `--rm` (self-removing), a name of `nanoclaw-v2-<folder>-<timestamp>`, the install label `nanoclaw-install=<slug>`, and `TZ` as the only NanoClaw-set env var — everything else the runner needs comes from `container.json`. The OneCLI Agent Vault then injects `HTTPS_PROXY` and certificates so the agent's API calls get credentials in transit; if the vault can't be wired, the spawn aborts rather than running credential-less. When the host user isn't uid 0 or 1000, the container runs `--user <hostUid>:<hostGid>` so mounted files keep sane ownership. The entrypoint is overridden to `exec bun run /app/src/index.ts`, and the image is the group's `image_tag` if set, otherwise the base.
+The `docker run` invocation itself: `--rm` (self-removing), a name of `nanoclaw-v2-<folder>-<timestamp>`, the install label `nanoclaw-install=<slug>`, and `TZ` as the only env var NanoClaw always sets — everything else the runner needs comes from `container.json`. The OneCLI Agent Vault then injects `HTTPS_PROXY` and certificates so the agent's API calls get credentials in transit; if the vault can't be wired, the spawn aborts rather than running credential-less. When the host user isn't uid 0 or 1000, the container runs `--user <hostUid>:<hostGid>` so mounted files keep sane ownership, with `HOME=/home/node` set alongside. The image is the group's `image_tag` if set, otherwise the base — and the image's tini entrypoint is **overridden**: the runner passes `--entrypoint bash` with `-c 'exec bun run /app/src/index.ts'`, so bash `exec`s into Bun and **Bun is PID 1** (there's no `--init` flag either).
 
 When egress lockdown is enabled (`NANOCLAW_EGRESS_LOCKDOWN=true`), the container joins a Docker `--internal` network with the vault gateway as the only reachable hop — no internet route exists, and the agent runs non-root without `NET_ADMIN`, so it can't undo it. If lockdown is on but can't be established, the spawn fails rather than running with open egress. Setup in [Hardening](/operate/hardening#lock-down-network-egress).
 
 ### Running
 
-`tini` is PID 1; Bun runs the agent-runner, which polls `inbound.db` and touches `/workspace/.heartbeat` on every provider event — the host's only liveness signal. Container stderr is streamed into the host log at debug level; stdout is unused, since all IO is database rows. There is deliberately **no wall-clock idle timeout** on the host side.
+Bun runs the agent-runner as PID 1 (the spawn's entrypoint override bypasses the image's tini); the runner polls `inbound.db` and touches `/workspace/.heartbeat` on every provider event — the host's only liveness signal. Container stderr is streamed into the host log at debug level; stdout is unused, since all IO is database rows. There is deliberately **no wall-clock idle timeout** on the host side.
 
 ### Death
 
@@ -86,7 +86,7 @@ The host sweep kills a running container under exactly two conditions — both h
 - **Absolute ceiling** — no heartbeat for longer than max(30 minutes, the container's declared Bash timeout).
 - **Claim-stuck** — a message was claimed and the container showed no heartbeat for over max(60 seconds, declared Bash timeout) since the claim.
 
-A kill is `docker stop -t 1` (SIGTERM, forwarded by tini so DB writes finalize), with SIGKILL as fallback. On any exit — clean or killed — the close handler removes the session from the active map, marks the container stopped, and logs `Container exited` with the exit code. Orphaned `processing` rows are reset to pending with exponential backoff; after 5 tries a message is marked failed.
+A kill is `docker stop -t 1` — SIGTERM delivered directly to Bun as PID 1, with one second to finalize DB writes before Docker escalates — and a host-side SIGKILL as fallback if the stop command itself fails. On any exit — clean or killed — the close handler removes the session from the active map, marks the container stopped, and logs `Container exited` with the exit code. Orphaned `processing` rows are reset to pending with exponential backoff; after 5 tries a message is marked failed.
 
 At host startup, `cleanupOrphans` stops any containers left over from a previous run — filtered by the `nanoclaw-install=<slug>` label, so a second NanoClaw install on the same machine can never reap this install's containers, nor vice versa.
 
