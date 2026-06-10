@@ -1,319 +1,146 @@
 ---
-title: Agent Swarms
-description: Spin up teams of specialized Claude agents that collaborate on complex tasks in your chat
-keywords: ["agent swarms", "multi-agent", "collaboration"]
+title: "Build a multi-agent team"
+description: "Hands-on tutorial: have an agent spawn a helper with create_agent, watch the approval gate, message between them, and scale the pattern to a worker/manager/supervisor trio."
+tag: "UPDATED"
+keywords: ["multi-agent", "create_agent", "agent-to-agent", "agent destinations", "send_message", "sub-agents", "approval", "ncl destinations"]
 ---
 
+{/* verified-against: src/modules/agent-to-agent/{create-agent,agent-route,write-destinations,index}.ts, src/modules/agent-to-agent/db/agent-destinations.ts, src/modules/approvals/primitive.ts, container/agent-runner/src/mcp-tools/agents.ts + agents.instructions.md, container/agent-runner/src/destinations.ts, src/cli/resources/{destinations,groups,wirings}.ts, src/group-init.ts, src/db/messaging-groups.ts @ dc34ceb (v2.1.4) */}
 
-<Warning>
-This page describes the v1 "Agent Swarms" framing. v2 ships **agent-to-agent** primitives instead — `TeamCreate` / `TeamDelete` SDK tools plus the `src/modules/agent-to-agent/` host module for cross-agent message routing within an install. A v2 rewrite is pending. See [Integrations overview](/channels/overview) for current context.
-</Warning>
+The [introduction](/introduction) promises real teams: a worker per task, a manager that tracks what's in flight, a supervisor that pings you. This tutorial builds the smallest working version — one agent spawning and delegating to another — then scales the same three primitives into that trio. It continues from [your first agent](/guides/first-agent); you'll reuse Scout to see the approval gate.
 
-## Overview
+## The model in 60 seconds
 
-NanoClaw is the first personal AI assistant to support **Agent Swarms** - teams of specialized agents that collaborate on complex tasks. This feature is powered by Claude Code's experimental agent teams functionality.
+There is no swarm engine. Multi-agent in NanoClaw is the same three things everything else is:
 
-<Note>
-Agent Swarms is an experimental feature from Claude Code. NanoClaw enables it by default in all agent containers.
-</Note>
+- **Agent groups are fully isolated.** Each agent has its own container, workspace, and memory. Agents never share state — they can only message each other.
+- **Agent-to-agent messages are queue rows.** A message to another agent travels through the same SQLite inbox/outbox pipeline as a WhatsApp message; only `channel_type` differs (`agent` instead of a platform).
+- **Destinations are the permission edges.** A row in `agent_destinations` means "agent A may send to target B, and calls it `local-name`". No row, no delivery — the host rejects unauthorized sends. Channels and agents share one namespace, so messaging an agent is just `send_message` with `to` set to its name.
 
-## What are Agent Swarms?
-
-Agent Swarms allow a single Claude agent to orchestrate multiple sub-agents, each specialized for different tasks. The main agent coordinates the team, delegates work, and synthesizes results.
-
-### Use cases
-
-- **Research projects**: One agent searches the web, another analyzes data, a third writes the report
-- **Code reviews**: One agent checks style, another tests functionality, a third reviews security
-- **Content creation**: One agent researches topics, another drafts content, a third edits and refines
-- **Data processing**: Multiple agents process different data sources in parallel
-
-## How it works
-
-When you give NanoClaw a complex task, the main agent can spawn sub-agents automatically:
-
-```
-@Andy research AI developments this week, analyze trends, and write a detailed report
+```mermaid
+graph TD
+    You["Your DM (channel)"]
+    S["Supervisor"]
+    M["Manager"]
+    W1["Worker 1"]
+    W2["Worker 2"]
+    You <-->|wiring + destination| S
+    S <-->|destination: manager / parent| M
+    M <-->|destination: worker-1 / parent| W1
+    M <-->|destination: worker-2 / parent| W2
 ```
 
-The main agent might:
-1. Spawn a research agent to search and gather information
-2. Spawn an analysis agent to identify patterns and trends
-3. Spawn a writing agent to compile the final report
-4. Coordinate between them and synthesize the results
+Every arrow is one or two `agent_destinations` rows. Each direction is a separate row — A having an edge to B does not give B an edge back.
 
-## Enabling Agent Swarms
+<Steps>
+<Step title="Ask your agent to create a helper">
 
-Agent Swarms are enabled automatically in NanoClaw through the container configuration:
+Message the agent the setup wizard created (the one in your main chat):
 
-```typescript
-// From src/container-runner.ts — session settings
-env: {
-  // Enable agent swarms (subagent orchestration)
-  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
-  // ... other settings
-}
+```text
+Create an agent called researcher. Its job: take a research question from you,
+dig in with web search, and report findings back to you with sources.
 ```
 
-This environment variable is set in each group's `.claude/settings.json`:
+The agent calls the `create_agent` MCP tool with a `name` and that role as `instructions`. The call is fire-and-forget — it returns immediately, and the host does the privileged work:
 
-```json
-{
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1",
-    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "0"
-  }
-}
-```
+1. Inserts an `agent_groups` row. The folder is the normalized name (`researcher`), with a numeric suffix if taken.
+2. Scaffolds `groups/researcher/` and seeds **`CLAUDE.local.md` with the `instructions` text** — that's the new agent's persistent role and personality, editable later like any agent's memory.
+3. Inserts **two destination rows**: the creator gets `researcher` → new agent, and the new agent gets `parent` → creator. The edge is bidirectional from birth, so replies need no extra wiring.
+4. Projects the new destination into the parent's running container immediately, then notifies it: `Agent "researcher" created. You can now message it with <message to="researcher">...</message>.`
 
-<Warning>
-This is an experimental Claude Code feature. Behavior may change in future releases.
-</Warning>
+No container starts yet — like any agent, researcher's container spawns on its first message.
 
-## Agent team architecture
+</Step>
+<Step title="The approval gate">
 
-Each sub-agent runs in its own Claude Code session with:
+Why did that just work without asking you? Authorization depends on the calling group's `cli_scope` in its [container config](/reference/container-config). The wizard's first agent is trusted (`cli_scope: global`), so it creates directly. Every other group — including Scout, since `ncl groups create` leaves the default `group` scope — is a potential prompt-injection victim, so the host queues an approval instead. Ask Scout to create an agent and an approval card lands in an admin DM:
 
-- Independent context and memory
-- Access to the same mounted filesystems as the parent
-- Ability to use all available tools (Bash, browser automation, etc.)
-- Communication channel back to the main orchestrator agent
+> **Create agent: researcher**
+>
+> Agent "Scout" wants to create a new sub-agent "researcher" (a new agent group with its own workspace and container). Approve?
+>
+> [ Approve ] [ Reject ]
 
-### Session isolation
-
-Sub-agents are isolated from each other but coordinated by the main agent:
-
-```
-┌─────────────────────────────────────┐
-│  Main Agent (orchestrator)          │
-│  - Delegates tasks to sub-agents    │
-│  - Coordinates results               │
-│  - Responds to user                  │
-└──────────┬──────────────────────────┘
-           │
-           ├─────────────┬─────────────┬──────────────
-           │             │             │
-    ┌──────▼──────┐ ┌───▼──────┐ ┌────▼─────────┐
-    │ Sub-Agent 1 │ │Sub-Agent2│ │ Sub-Agent 3  │
-    │ (Research)  │ │(Analysis)│ │  (Writing)   │
-    └─────────────┘ └──────────┘ └──────────────┘
-```
-
-## Example interactions
-
-### Research and analysis
-
-```
-@Andy analyze the top 10 posts on Hacker News today, categorize by topic, 
-and identify emerging trends
-```
-
-The agent might spawn:
-- A web scraping agent to fetch HN posts
-- Multiple analysis agents to categorize in parallel
-- A synthesis agent to compile trends
-
-### Multi-source data aggregation
-
-```
-@Andy compile a weekly report from:
-- Recent commits in the GitHub repo
-- Updates in the Slack #engineering channel  
-- Tickets closed in Linear
-```
-
-The agent might spawn:
-- A GitHub agent to analyze commit history
-- A Slack agent to summarize channel activity
-- A Linear agent to fetch closed tickets
-- A reporting agent to compile everything
-
-### Parallel document processing
-
-```
-@Andy summarize all the PDFs in the research folder and create 
-a comparison table
-```
-
-The agent might spawn:
-- Multiple document reading agents (one per PDF)
-- A synthesis agent to create the comparison table
-
-## Memory and context sharing
-
-All agents in a swarm have access to:
-
-- **Group memory**: The `CLAUDE.md` file in the group folder
-- **Mounted directories**: Same filesystem access as the main agent
-- **Additional memory directories**: Via `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD`
-
-```typescript
-// From src/container-runner.ts — session settings
-env: {
-  // Load CLAUDE.md from additional mounted directories
-  CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1',
-}
-```
-
-This allows sub-agents to read context from:
-- `/workspace/group/CLAUDE.md` (main group memory)
-- `/workspace/project/CLAUDE.md` (for main channel only)
-- `/workspace/global/CLAUDE.md` (read-only shared memory)
-
-## Coordination patterns
-
-The main agent coordinates sub-agents through various patterns:
-
-### Sequential workflow
-
-```
-Main agent:
-1. Spawn research agent → wait for results
-2. Spawn analysis agent with research results → wait
-3. Spawn writing agent with analysis → wait
-4. Return final report to user
-```
-
-### Parallel execution
-
-```
-Main agent:
-1. Spawn 3 research agents in parallel
-2. Wait for all to complete
-3. Synthesize results
-4. Return summary to user
-```
-
-### Hierarchical delegation
-
-```
-Main agent:
-1. Spawn coordinator agent for web research
-   → Coordinator spawns multiple scraper agents
-2. Spawn coordinator agent for data analysis  
-   → Coordinator spawns multiple analysis agents
-3. Synthesize both coordinators' results
-4. Return to user
-```
-
-## Performance considerations
-
-### Container limits
-
-Agent Swarms respect the global concurrent container limit:
-
-```typescript
-// From src/config.ts
-export const MAX_CONCURRENT_CONTAINERS = Math.max(
-  1,
-  parseInt(process.env.MAX_CONCURRENT_CONTAINERS || '5', 10) || 5,
-);
-```
-
-If you use Agent Swarms heavily, consider increasing this limit:
+The approver is picked in order: admins of that agent group → global admins → owners, preferring one reachable on the same channel the request came from. If no owner or admin with a reachable DM exists, the request fails and the agent is told why. To promote an agent you trust to create freely:
 
 ```bash
-export MAX_CONCURRENT_CONTAINERS=10
+ncl groups config update --id <agent-id> --cli-scope global
+ncl groups restart --id <agent-id>
 ```
 
-### Resource usage
+</Step>
+<Step title="Watch them talk">
 
-Each sub-agent:
-- Runs in its own Claude Code session (API calls)
-- May spawn its own container processes
-- Shares CPU/memory with other containers
+Now delegate through the parent:
 
-For complex swarms, monitor system resources:
+```text
+Ask researcher what changed in the EU AI Act this quarter, then summarize its answer for me.
+```
+
+What happens on the wire:
+
+- The parent sends `send_message({ to: "researcher", text: ... })` (or a `<message to="researcher">` block — same delivery). The host resolves `researcher` against the parent's destinations, checks the ACL, and copies the message into researcher's inbox. If researcher has never run, the host creates an `agent-shared` session for it and spawns its container.
+- Researcher sees `<message from="parent">…</message>` — destination names are local, so the child knows its creator only as `parent`. Its base instructions say to reply to the `from` destination, so it answers `to="parent"`.
+- **The return path is precise.** Every routed a2a message is stamped with the sender's `source_session_id`. When researcher replies, the router looks up which parent session started the exchange and delivers there — not to whichever parent session happens to be newest. Files survive the hop too: `send_file` attachments are copied from the sender's outbox into the receiver's inbox.
+
+The parent then summarizes in your chat. You can also message researcher directly by wiring it to a chat of its own, exactly like Scout in the [first agent tutorial](/guides/first-agent).
+
+</Step>
+<Step title="Scale to worker / manager / supervisor">
+
+The trio from the diagram is the same pattern with more edges. The conversational route: tell your trusted agent to create a `manager` (instructions: track tasks in flight, delegate, chase stragglers) and have the manager create its own workers — `create_agent` works from any agent, subject to the same scope/approval rule, and each creator gets its own edge to its children.
+
+Sibling and cross-level edges don't exist by default (workers can't reach the supervisor) — add them by hand. Each `ncl destinations add` is one direction:
 
 ```bash
-# Check running containers
-docker ps | grep nanoclaw
-
-# Monitor resource usage
-docker stats
+ncl destinations add --agent-group-id <worker-id> --local-name supervisor \
+  --target-type agent --target-id <supervisor-id>
+ncl destinations add --agent-group-id <supervisor-id> --local-name worker-1 \
+  --target-type agent --target-id <worker-id>
 ```
 
-## Debugging Agent Swarms
+`ncl destinations add`/`remove` project the change into running containers immediately — no restart needed.
 
-To see what's happening inside agent swarms:
+Two finishing touches:
 
-### Check container logs
+- **Supervisor pings you**: wire the supervisor to your DM (`ncl wirings create --messaging-group-id <your-dm-id> --agent-group-id <supervisor-id> ...`). Wiring auto-creates the channel destination, so the supervisor can message you proactively — and use `ask_user_question` to put actual buttons under a decision.
+- **One conversation per task**: wire a worker to a thread-capable channel (Discord, Slack) with `--session-mode per-thread` and every thread gets its own session — each task runs in a clean context instead of one ever-growing conversation. On server channels this is [forced anyway](/concepts/entity-model); the flag matters for DMs.
+
+</Step>
+<Step title="Observe the topology">
+
+Everything is rows, so the whole team is inspectable:
 
 ```bash
-# View logs for a specific group
-tail -f groups/{group-name}/logs/agent.log
+ncl groups list                                      # all agent identities
+ncl destinations list --agent-group-id <manager-id>  # who the manager may talk to, and as what
+ncl sessions list --agent-group-id <worker-id>       # live conversations and container status
+docker ps --filter name=nanoclaw-v2                  # the containers themselves
 ```
 
-### Ask the agent
+The destinations list reads as the manager's address book: `parent`, `worker-1`, `worker-2`, plus any channel it's wired to.
 
-```
-@Andy what sub-agents did you spawn for that task?
-@Andy show me the breakdown of how you delegated the work
-```
+</Step>
+</Steps>
 
-### Check session files
+## Limits
 
-Each sub-agent creates session files in `.claude/sessions/`:
+- **No loop protection.** There is no throttle, hop limit, or cycle detection on agent-to-agent messages — two agents told to "always reply" will ping-pong indefinitely, burning API calls. Give every agent's instructions an explicit stop condition ("report back once, then wait").
+- **No broadcast.** Each message targets one destination. Fan-out means one `<message>` block (or `send_message` call) per recipient — the parent orchestrates, the queue doesn't.
+- **Concurrency is capped.** Containers respect `MAX_CONCURRENT_CONTAINERS` (default 5). A wide team queues rather than crashing, but raise the cap if workers should genuinely run in parallel.
+- **Edits to destinations outside `ncl` don't propagate live.** A running container serves a projection of its destinations, refreshed on every wake and by `ncl destinations add`/`remove` — but direct DB writes leave it stale until the next wake.
+
+## Cleanup
 
 ```bash
-ls -la data/sessions/{group-folder}/.claude/sessions/
+ncl groups delete --id <agent-id>
 ```
 
-## Limitations
+This cascades through the central DB in one transaction: sessions, destination rows in **both directions** (its own and every edge pointing at it), pending approvals, wirings, memberships, and the container config. It does **not** kill a running container or delete `groups/<folder>/` and `data/v2-sessions/<group-id>/` — stop the container and remove those by hand if you want the workspace gone.
 
-<Warning>
-Agent Swarms has some current limitations:
+## Next steps
 
-- **Experimental**: The feature may change as Claude Code evolves
-- **Resource intensive**: Multiple agents consume more API calls and system resources
-- **No direct control**: You can't manually spawn specific sub-agents (orchestration is automatic)
-- **Coordination overhead**: The main agent needs to coordinate, which adds latency
-</Warning>
-
-## Best practices
-
-### When to use Agent Swarms
-
-✅ **Good use cases:**
-- Complex multi-step tasks with clear delegation opportunities
-- Parallel data processing across multiple sources
-- Tasks requiring different specialized skills
-- Research projects with distinct gathering/analysis/writing phases
-
-❌ **Avoid for:**
-- Simple single-step queries
-- Highly interactive conversations (stick to single agent)
-- Time-sensitive requests (coordination adds latency)
-- Tasks with strict resource constraints
-
-### Optimize swarm performance
-
-1. **Be explicit about delegation**: Help the agent understand when to spawn sub-agents
-   ```
-   @Andy research X using multiple agents in parallel, then synthesize results
-   ```
-
-2. **Provide clear sub-tasks**: Break down your request to guide delegation
-   ```
-   @Andy:
-   1. Fetch data from sources A, B, and C (parallel)
-   2. Analyze each dataset
-   3. Create comparison report
-   ```
-
-3. **Monitor resource usage**: Check if swarms are worth the overhead
-   ```
-   @Andy how many sub-agents did that task require?
-   ```
-
-## Related documentation
-
-- [Scheduled tasks](/guides/scheduled-tasks) - Run agent swarms on a schedule
-- [Customization](/guides/customize-an-agent) - Adjust container limits and behavior
-- [Web access](/extend/tools) - Sub-agents can use browser automation
-
-## External resources
-
-- [Claude Code Agent Teams documentation](https://code.claude.com/docs/en/agent-teams)
-- [Agent orchestration patterns](https://code.claude.com/docs/en/agent-teams#orchestrate-teams-of-claude-code-sessions)
+- [Scheduled tasks](/guides/scheduled-tasks) — have the manager run its review on a timer
+- [MCP tools reference](/reference/mcp-tools) — `create_agent`, `send_message`, `ask_user_question` parameters
+- [Entity model](/concepts/entity-model) — sessions, wirings, and session modes in depth
