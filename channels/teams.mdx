@@ -7,7 +7,7 @@ keywords: ["teams", "microsoft teams", "add-teams", "azure bot", "app registrati
 
 {/* verified-against: src/channels/teams.ts (channels branch), src/channels/chat-sdk-bridge.ts, src/webhook-server.ts, setup/channels/teams.ts, setup/add-teams.sh, .claude/skills/add-teams/SKILL.md @ dc34ceb */}
 
-The Teams adapter connects NanoClaw to a bot you register in Azure. It's built on the Chat SDK bridge (`@chat-adapter/teams` 4.26.0, pinned by the setup script) and receives messages over **webhooks**: Azure Bot Service POSTs to NanoClaw's shared webhook server, so Teams needs a **public HTTPS URL** that reaches your machine.
+The Teams adapter connects NanoClaw to a bot you register in Azure. It's built on the Chat SDK bridge (`@chat-adapter/teams` 4.26.0, pinned — the `/add-teams` skill may pin a slightly newer adapter version) and receives messages over **webhooks**: Azure Bot Service POSTs to NanoClaw's shared webhook server, so Teams needs a **public HTTPS URL** that reaches your machine.
 
 Teams is the most involved channel NanoClaw supports — there's no "paste a token" shortcut. Setup walks ~7 steps across the Azure portal and Teams admin: app registration, client secret, Azure Bot resource, messaging endpoint, Teams channel enable, app manifest, and sideload. The wizard guides each step in the terminal, and at any prompt you can type `?` (or pick **Stuck** at a step gate) to hand off to interactive Claude with your progress so far. Every step gate also offers **← Back to channel selection**, so you can bail out to the channel picker at any point.
 
@@ -71,8 +71,7 @@ To wire team channels or more chats later, run `/manage-channels`. Platform IDs 
 ## Troubleshooting
 
 - **Teams channel never starts** — the adapter factory returns nothing without `TEAMS_APP_ID` in the environment the service reads. Verify `.env` and `data/env/env` contain the four `TEAMS_*` keys (three for multi tenant), then restart the service.
-- **Bot never receives messages** — check the chain in order: your tunnel is up and serving HTTPS, the Azure Bot messaging endpoint matches the path the webhook server actually routes (see the warning above), the Teams channel is enabled on the bot resource, and the app is sideloaded. The webhook server logs each registered adapter and its path on startup.
-- **Webhook returns 404 `Unknown adapter: teams`** — the adapter never registered, usually because `TEAMS_APP_ID` is missing from the environment. Same fix as the channel never starting.
+- **Bot never receives messages** — check the chain in order: your tunnel is up and serving HTTPS, the Azure Bot messaging endpoint matches the path the webhook server actually routes (see the warning above), the Teams channel is enabled on the bot resource, and the app is sideloaded. The webhook server logs each registered adapter and its path on startup. A 404 `Unknown adapter: teams` from the webhook means the adapter never registered — same fix as the channel never starting.
 - **"Upload a custom app" missing in Teams** — your tenant blocks sideloading. A tenant admin must enable it (Teams Admin Center → Teams apps → Setup policies → Upload custom apps = On). Free personal Teams can't sideload at all — use a Microsoft 365 Business or developer tenant.
 - **Auth errors from Azure Bot Service** — usually a mismatched secret or tenant type: `TEAMS_APP_PASSWORD` must be the client secret **Value** (not the Secret ID), and `TEAMS_APP_TYPE` must match the account type chosen at registration. Expired client secrets (default 180 days) also surface here — create a new secret and re-run setup.
 
