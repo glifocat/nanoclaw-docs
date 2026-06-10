@@ -13,7 +13,7 @@ Channel adapters (Telegram bot tokens, Slack app credentials, and so on) have th
 
 ## Read from .env
 
-NanoClaw's own parser ([`src/env.ts`](https://github.com/qwibitai/nanoclaw/blob/main/src/env.ts)) reads exactly these keys from `.env` at the project root. Values are never loaded into `process.env`, so they don't leak to child processes. For the first five, a value already in the process environment takes precedence over `.env`; `ANTHROPIC_BASE_URL` is read from `.env` only.
+NanoClaw's own parser ([`src/env.ts`](https://github.com/nanocoai/nanoclaw/blob/main/src/env.ts)) reads exactly these keys from `.env` at the project root. Values are never loaded into `process.env`, so they don't leak to child processes. For the first five, a value already in the process environment takes precedence over `.env`; `ANTHROPIC_BASE_URL` is read from `.env` only.
 
 | Variable | Default | Read in | Effect |
 |---|---|---|---|
@@ -81,4 +81,4 @@ Read inside the agent container by the agent runner. The host injects only `TZ` 
 | `CLAUDE_CONFIG_DIR` | `~/.claude` | `agent-runner/src/providers/claude.ts:269` | Base directory the runner scans for Claude Code project transcripts. |
 | `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | `165000` | `agent-runner/src/providers/claude.ts:322` | Token window at which Claude Code auto-compacts context. Raise for 1M-context model variants. |
 
-Line numbers reference [`qwibitai/nanoclaw`](https://github.com/qwibitai/nanoclaw) at v2.1.4 and will drift with future releases.
+Line numbers reference [`nanocoai/nanoclaw`](https://github.com/nanocoai/nanoclaw) at v2.1.4 and will drift with future releases.
