@@ -87,7 +87,7 @@ How the host calls each member:
 | `supportsThreads` | Yes | `true`: one thread = one session, replies go to the originating thread. `false`: the router strips thread ids and the channel itself is the conversation. This shapes [session identity](/concepts/entity-model). |
 | `setup(config)` | Yes | Called once at startup by `initChannelAdapters()`. Connect to the platform here and hold on to `config` — its callbacks are how you hand messages to the host. |
 | `teardown()` | Yes | Called on shutdown by `teardownChannelAdapters()`. Close connections; errors are logged, not fatal. |
-| `isConnected()` | Yes | Health probe. The bridge always returns `true`; native adapters should report real connection state. |
+| `isConnected()` | Yes | Part of the contract, but not currently called by the host outside tests. The bridge always returns `true`; native adapters should still report real connection state. |
 | `deliver(platformId, threadId, message)` | Yes | Called by the delivery module for every outbound message in a wired group. `message.content` is parsed JSON from the session outbox (`messages_out`), `message.files` carries attachments. Return the platform message id so later edits and reactions can target it. |
 | `setTyping?` | No | Called by the typing module while an agent is working, and re-fired on an interval to keep platforms' short-lived typing indicators alive. |
 | `syncConversations?` | No | Returns discovered conversations (`platformId`, `name`, `isGroup`) for bulk import. |
@@ -127,8 +127,12 @@ export interface ChannelSetup {
 | `kind` | `'chat' \| 'chat-sdk'` | Payload shape marker — `'chat-sdk'` for bridge messages, `'chat'` for native adapters. |
 | `content` | `unknown` | A JS object; the host `JSON.stringify`s it before writing to the session database. |
 | `timestamp` | `string` | ISO timestamp. |
-| `isMention?` | `boolean` | Platform-confirmed bot mention. The bridge sets it from the SDK's mention/DM dispatch paths. Leave it `undefined` in native adapters and the router falls back to text-matching the agent group name. |
+| `isMention?` | `boolean` | Platform-confirmed bot mention. The bridge sets it from the SDK's mention/DM dispatch paths. Without it, the router never auto-creates a messaging group for the conversation and `mention`/`mention-sticky` wirings never engage — only `pattern` wirings fire on text. |
 | `isGroup?` | `boolean` | `true` for group/channel threads, `false` for DMs. |
+
+<Note>
+The doc comment on `InboundMessage.isMention` in `src/channels/adapter.ts` describes a router fallback that text-matches the agent group name — that comment is stale. At dc34ceb no such fallback exists; `pattern` mode is the disambiguator (see `evaluateEngage` in `src/router.ts`).
+</Note>
 
 `InboundEvent` (used by `onInboundEvent`) adds an explicit `channelType` plus an optional `replyTo: DeliveryAddress` that redirects the agent's reply elsewhere — a router-layer concept for admin transports like the CLI. Regular chat adapters never set it.
 
@@ -161,7 +165,7 @@ export interface ChannelRegistration {
 
 - **Inbound dispatch** — wires all four SDK paths (subscribed threads, new mentions, DMs, plain messages) into `onInbound`, with the platform-confirmed `isMention` flag set correctly for each.
 - **Webhook or gateway registration** — gateway-capable adapters (Discord) get a supervised gateway listener with exponential backoff; everything else is registered on the shared webhook server at `/webhook/{adapterName}` (port `WEBHOOK_PORT`, default 3000).
-- **Chunking** — set `maxTextLength` and outbound text longer than the platform limit is split on paragraph → line → hard-character boundaries into multiple messages. Files ride on the first chunk, and the first chunk's id is returned so edits and reactions still target the head of the reply. Without it, platforms like Discord (2000) and Telegram (4096) truncate silently.
+- **Chunking** — set `maxTextLength` and outbound text longer than the platform limit is split on paragraph → line → word (space) → hard-character boundaries into multiple messages. Files ride on the first chunk, and the first chunk's id is returned so edits and reactions still target the head of the reply. Without it, platforms like Discord (2000) and Telegram (4096) truncate silently.
 - **Reply context** — pass `extractReplyContext` to pull quoted-reply text and sender out of the platform's raw message.
 - **Attachments** — inbound attachments are downloaded and base64-embedded before serialization; outbound `message.files` are posted as uploads.
 - **Cards and actions** — `ask_user_question` renders as a card with buttons; clicks are decoded and dispatched to `onAction`, and the card is edited to show the selected answer.
