@@ -1,268 +1,142 @@
 ---
-title: System architecture
-description: Understanding NanoClaw's design and how the components work together
+title: "Architecture"
+description: "How NanoClaw works from the top down: a host process that routes messages between channel adapters and per-session agent containers, with SQLite files as the only transport."
 tag: "UPDATED"
-keywords: ["architecture", "system design", "single process"]
+keywords: ["architecture", "host process", "router", "delivery", "host sweep", "inbound.db", "outbound.db", "container", "agent-runner", "poll loop", "IPC"]
 ---
 
-NanoClaw is a lightweight AI assistant that runs agents in isolated containers. The v2 architecture is a ground-up rewrite built on a two-database session model, a pluggable module system, and a new entity model that separates users, agent groups, messaging groups, and wirings.
+{/* verified-against: src/index.ts, src/router.ts, src/delivery.ts, src/session-manager.ts, src/host-sweep.ts, src/container-runner.ts, src/claude-md-compose.ts, src/webhook-server.ts, container/agent-runner/src/{index,poll-loop,formatter,compact-instructions}.ts @ dc34ceb (v2.1.4) */}
 
-## High-level overview
+NanoClaw is one Node.js host process plus one Docker container per active session. The host owns the channels, the routing, and the container lifecycle; the agent runs inside the container and never talks to the network on NanoClaw's behalf. Between them sits the core idea: **every message is a row in SQLite**. There is no internal message bus, no RPC, no shared memory — the host writes rows the container reads, the container writes rows the host reads, and everything else is polling.
 
-NanoClaw consists of a single Node.js host process that orchestrates everything:
+Each session owns a pair of database files in its session folder:
+
+- `inbound.db` — host writes, container reads. Inbound messages, scheduled tasks, routing defaults.
+- `outbound.db` — container writes, host reads. Agent replies, processing acknowledgements, session state.
+
+One writer per file, opposite directions. A crashed container can never corrupt the host's queue, and the host never contends with an agent for a write lock across the Docker mount boundary.
+
+## A message, end to end
 
 ```mermaid
-graph TB
-    WA[WhatsApp] --> CA[Channel Adapters]
-    TG[Telegram] --> CA
-    DC[Discord] --> CA
-    SL[Slack] --> CA
-    GM[Gmail] --> CA
-    CA --> Router[Inbound Router]
-    Router --> SM[Session Manager]
-    SM --> Container[Isolated Container]
-    Container --> Agent[Agent Runner / Bun]
-    Agent --> OutDB[(outbound.db)]
-    OutDB --> Delivery[Delivery Polls]
-    Delivery --> CA
+sequenceDiagram
+    participant P as Platform
+    participant A as Channel adapter
+    participant R as Router
+    participant I as inbound.db
+    participant C as Container (agent-runner)
+    participant O as outbound.db
+    participant D as Delivery poll
 
-    Sweep[Host Sweep] --> SM
-    Modules[Modules] --> Router
-
-    CentralDB[(Central DB)] --> Router
-    CentralDB --> Delivery
-
-    style Container fill:#6ee7b7,color:#1e1e1e
-    style Agent fill:#34d399,color:#1e1e1e
-    style CA fill:#a7f3d0,color:#1e1e1e
+    P->>A: platform event
+    A->>R: onInbound(event)
+    R->>R: thread policy, wiring lookup,<br/>engage + sender checks
+    R->>I: insert messages_in row
+    R->>C: wakeContainer (spawn if not running)
+    loop poll loop (1s)
+        C->>I: read pending rows
+        C->>C: format batch, call provider
+        C->>O: insert messages_out row
+    end
+    loop active 1s / sweep 60s
+        D->>O: read undelivered rows
+        D->>A: adapter.deliver()
+        A->>P: send reply
+        D->>I: mark delivered
+    end
 ```
 
-## Core components
+Step by step on the inbound side ([`src/router.ts`](https://github.com/qwibitai/nanoclaw/blob/main/src/router.ts)):
 
-### Channel adapters
+1. The adapter normalizes a platform event and hands it to the router (see [Channels overview](/channels/overview) for the adapter side).
+2. Non-threaded adapters collapse `threadId` to null; the router looks up the messaging group for `(channel_type, platform_id)`, auto-creating one on a mention or DM. Unwired channels escalate to the owner for approval instead of routing.
+3. The sender is resolved to a namespaced user ID, then the message fans out to every wired agent independently: engage mode (`pattern`, `mention`, `mention-sticky`), access gate, and sender scope decide per agent. Agents that decline but have `ignored_message_policy='accumulate'` still get the row stored as silent context (`trigger=0`).
+4. For each engaging agent, the router resolves a session (`shared`, `per-thread`, or `agent-shared` — see [Entity model](/concepts/entity-model)), writes the row to that session's `inbound.db`, and wakes the container.
 
-NanoClaw uses a self-registering adapter pattern for messaging channels. Installed adapters such as Telegram, Discord, WhatsApp, Signal, Slack, Teams, iMessage, and the local CLI register at startup. Channels with missing credentials are skipped with a warning.
+On the outbound side, `src/delivery.ts` drains `messages_out`: an in-flight set prevents the two polls from double-delivering, rows are filtered against the `delivered` table in `inbound.db`, then routed by kind — `system` actions are handled by the host itself, `channel_type='agent'` rows go to the agent-to-agent module, and everything else passes a destination permission check before `adapter.deliver()`. Three failed attempts marks a message permanently failed.
 
-All adapters implement a common interface with `onInbound`, `onInboundEvent`, `onMetadata`, and `onAction` callbacks, allowing the rest of the system to be channel-agnostic.
+## The host process
 
-### Inbound router
+`src/index.ts` is a thin orchestrator. What it starts, in order:
 
-The router (`src/router.ts`) is the central message routing pipeline:
+1. **Circuit breaker** — backs off on rapid restart loops, then an upgrade tripwire refuses to start if the install was updated outside `/update-nanoclaw`.
+2. **Central DB** — opens `data/v2.db`, runs migrations, backfills container configs, and performs the one-time `CLAUDE.local.md` filesystem cutover.
+3. **Container runtime** — verifies Docker is running and removes orphan containers from a previous run.
+4. **Channel adapters** — every adapter registered via the channel barrel is initialized; adapters with missing credentials are skipped with a warning.
+5. **Delivery adapter bridge** — connects the delivery system to the adapter registry for `deliver()` and `setTyping()`.
+6. **Delivery polls** — the active poll (1s, sessions with a running container) and the sweep poll (60s, all active sessions).
+7. **Host sweep** — the 60-second maintenance loop described below.
+8. **`ncl` CLI socket server** — admin commands over a Unix socket at `data/ncl.sock` (see [ncl CLI](/reference/ncl-cli)).
 
-1. **Thread policy** — non-threaded adapters (Telegram, WhatsApp, iMessage) collapse `threadId` to null
-2. **Messaging group lookup** — finds or auto-creates messaging groups on mentions/DMs
-3. **Unwired channel handling** — if no agents are wired, the channel-request gate escalates to the owner for approval
-4. **Sender resolution** — the permissions module extracts namespaced user IDs and upserts users
-5. **Fan-out** — each wired agent is evaluated independently against engage mode, sender scope, and access gates
-6. **Engage evaluation** — per-agent decision based on `pattern`, `mention`, or `mention-sticky` mode
-7. **Delivery** — engaging agents get a session wake and container spawn; non-engaging agents with `accumulate` policy store the message for future context
-
-<Info>
-Message IDs are namespaced by agent group ID to prevent collisions during fan-out to multiple agents.
-</Info>
-
-### Session manager
-
-The session manager (`src/session-manager.ts`) manages the two-database session model:
-
-- **Session resolution** — `shared` (one per messaging group), `per-thread` (one per thread), or `agent-shared` (one per agent group)
-- **Two-DB split** — each session has an `inbound.db` (host writes, container reads) and `outbound.db` (container writes, host reads)
-- **Cross-mount invariants** — `journal_mode=DELETE` (WAL doesn't refresh across Docker mounts), host opens-writes-closes per operation, one writer per file
-
-<Warning>
-The two-DB split is critical for correctness. SQLite WAL mode's memory-mapped shared memory file doesn't refresh across Docker bind mounts, so `journal_mode=DELETE` is required.
-</Warning>
-
-### Container runner
-
-The container runner (`src/container-runner.ts`) spawns and manages isolated agent execution:
-
-- **Wake deduplication** — concurrent wake calls for the same session are deduplicated via an in-flight promise map
-- **Per-agent-group images** — custom Docker images with additional apt/npm packages can be built per agent group
-- **Shared source** — `/app/src` is a read-only bind mount from the host; source changes never require an image rebuild
-- **No stdin/stdout** — all IO is via the two-DB split; no stdin piping or output markers
-
-### Delivery system
-
-The delivery system (`src/delivery.ts`) uses a two-poll architecture:
-
-- **Active poll** (1s) — polls `outbound.db` for all running-container sessions
-- **Sweep poll** (60s) — polls all active sessions, catching messages from containers that exited between active polls
-- **Delivery pipeline** — routes based on message kind (`system`, `agent`, or channel), with permission checks for cross-channel delivery
-- **Retry** — 3 attempts per message, then permanently failed
+Modules (permissions, scheduling, approvals, agent-to-agent, typing, and so on) self-register through barrel imports before `main()` runs — they hook into the router and delivery pipeline rather than being called by name from core.
 
 <Note>
-Deduplication via an in-flight set prevents double-delivery when both polls hit the same session simultaneously.
+There is no HTTP API. The webhook server (`src/webhook-server.ts`) starts lazily when the first Chat SDK adapter registers, listens on `WEBHOOK_PORT` (default 3000), and only accepts inbound platform webhooks at `/webhook/{adapter}`. The admin surface is the `ncl` CLI over the Unix socket, not HTTP.
 </Note>
 
-### Host sweep
+## Inside the container
 
-The host sweep (`src/host-sweep.ts`) runs every 60 seconds:
+The container runs the **agent-runner** (`container/agent-runner/src/`) directly with Bun — no compile step, since the source is a read-only bind mount at `/app/src`. All IO goes through the session DB pair mounted at `/workspace`; there is no stdin, no stdout markers.
 
-- Syncs `processing_ack` from `outbound.db` to update inbound message status
-- Detects stale containers via heartbeat mtime and processing_ack age
-- Wakes containers for due messages (scheduled tasks with `process_after <= now`)
-- Advances recurring task series (creates next-occurrence rows)
+The poll loop (`poll-loop.ts`) drives everything:
 
-### Database
+- Every second it reads pending `messages_in` rows. Batches containing only `trigger=0` (accumulated context) rows don't wake the agent — they ride along with the next real trigger.
+- A batch is marked `processing`, formatted into XML (`<message>`, `<task>`, `<webhook>` blocks with a timezone header — `formatter.ts`), and sent to the provider as one prompt.
+- While the query streams, a 500ms follow-up poll pushes newly arrived messages into the open stream instead of restarting the provider subprocess.
+- Result text must wrap output in `<message to="name">` blocks; each block becomes a `messages_out` row addressed to a named destination. Bare text is treated as scratchpad and never sent.
+- The provider's session ID (continuation) is persisted to `outbound.db` so the next container resumes the conversation, and a `PreCompact` hook injects instructions that preserve routing context through context compaction.
+- On every provider event the runner touches `/workspace/.heartbeat` — the host's only liveness signal.
 
-**Central database** (`data/v2.db`) stores the entity model:
+The agent itself talks to NanoClaw through a built-in MCP server (`send_message`, `schedule_task`, `ask_user_question`, and friends — see [MCP tools](/reference/mcp-tools)). The provider behind `provider.query()` is pluggable: Claude Code is the default, and others self-register the same way channels do (see [Providers](/extend/providers)).
 
-- **agent_groups** — workspaces with folder, name, and optional provider
-- **messaging_groups** — platform chats with `unknown_sender_policy` (`strict`, `request_approval`, or `public`)
-- **messaging_group_agents** — many-to-many wirings with engage mode, pattern, sender scope, ignored message policy, session mode, and priority
-- **users** — namespaced platform identifiers (e.g., `phone:+1555...`, `tg:123`, `discord:456`)
-- **user_roles** — owner (always global) or admin (global or scoped to agent group)
-- **sessions** — status tracking for both session and container
+## Composed at spawn
 
-**Session inbound.db** (host writes, container reads):
+The container runner (`src/container-runner.ts`) rebuilds the agent's world on every spawn. Concurrent wakes for the same session are deduplicated through an in-flight promise map, then the runner:
 
-- **messages_in** — inbound messages with status, `process_after`, recurrence, `series_id`, and trigger flag
-- **delivered** — tracks delivery outcomes
-- **destinations** — live destination map (channels and other agents)
-- **session_routing** — default reply routing
+1. Refreshes the session's destination map and default reply routing in `inbound.db`.
+2. Materializes `container.json` from the database and syncs skill symlinks to match its selection.
+3. **Composes `groups/<folder>/CLAUDE.md`** (`src/claude-md-compose.ts`): a generated entry point that begins with `<!-- Composed at spawn — do not edit. -->` and contains only imports — the shared base (`container/CLAUDE.md`, mounted read-only at `/app/CLAUDE.md`), one fragment per skill that ships `instructions.md`, one per built-in module's MCP tool instructions, and inline instructions from user-added MCP servers. The only file you (or the agent) should edit is `CLAUDE.local.md`, the per-group memory that Claude Code auto-loads alongside it.
+4. Wires the OneCLI Agent Vault: `HTTPS_PROXY` plus certificates are injected so API calls are credential-injected in transit. If the vault is unreachable, the spawn fails rather than running without credentials, and the message stays pending for the next sweep.
+5. Joins the egress lockdown network when enabled (see [Security model](/concepts/security)), builds the mount list, and spawns `docker run`.
 
-**Session outbound.db** (container writes, host reads):
+The mounts define what the agent can touch: the session folder at `/workspace` (read-write), the group folder at `/workspace/agent` (read-write, with `container.json`, the composed `CLAUDE.md`, and the fragments re-mounted read-only on top), and shared read-only code at `/app/src`, `/app/skills`, and `/app/CLAUDE.md`. [Container lifecycle](/concepts/container-lifecycle) covers spawn-to-exit in detail.
 
-- **messages_out** — outbound messages with `deliver_after` and recurrence
-- **processing_ack** — tracks which inbound messages the container has processed
-- **session_state** — persistent key/value store (e.g., SDK session ID for resume)
-- **container_state** — tool-in-flight state for stuck-detection
+## What runs when
 
-### Module system
+| Loop | Interval | Scope |
+|---|---|---|
+| Active delivery poll | 1s | Sessions with a running container |
+| Container poll loop | 1s (500ms during an active query) | Its own `inbound.db` |
+| Sweep delivery poll | 60s | All active sessions (catches replies from containers that already exited) |
+| Host sweep | 60s | All active sessions |
 
-Modules self-register via barrel imports and provide optional hooks into the router and delivery pipeline:
+The host sweep (`src/host-sweep.ts`) is the system's janitor. After re-healing the egress network, for each active session it:
 
-- **Permissions** — sender resolution, access gating, channel approval, sender approval
-- **Scheduling** — task creation, pause/resume/cancel/update via delivery actions
-- **Agent-to-agent** — cross-agent message routing
-- **Approvals** — interactive question cards
-- **Self-mod** — agent self-modification requests
-- **Typing** — typing indicator management
+1. **Syncs `processing_ack`** from `outbound.db` into `messages_in` status, so completed work is recorded on the host side.
+2. **Wakes containers for due work** — rows whose `process_after` has elapsed (scheduled tasks, retries) with no container running.
+3. **Enforces the running-container SLA** — kills a container whose heartbeat is older than max(30 minutes, its declared Bash timeout), or one that claimed a message and showed no heartbeat for over 60 seconds since the claim.
+4. **Cleans up after crashes** — `processing` rows left by a dead container are reset to pending with exponential backoff; after 5 tries a message is marked failed.
+5. **Advances recurring tasks** — completed recurring rows are cloned into their next occurrence (see [Scheduled tasks](/guides/scheduled-tasks)).
 
-## Data flow
+There is deliberately no wall-clock idle timeout: liveness is judged from the heartbeat file and claim age, so long-running legitimate work is never killed on a timer.
 
-### Incoming message flow
+## The two database layers
 
-```mermaid
-sequenceDiagram
-    participant PL as Platform
-    participant CA as Channel Adapter
-    participant RT as Router
-    participant SM as Session Manager
-    participant CR as Container Runner
-    participant AG as Agent (Bun)
+All persistent state lives in SQLite, split across two layers — the [database schema reference](/reference/db-schema) documents every table.
 
-    PL->>CA: New message
-    CA->>RT: onInbound(message)
-    RT->>RT: Thread policy, sender resolution
-    RT->>RT: Fan-out to wired agents
-    RT->>SM: writeSessionMessage()
-    SM->>SM: Write to inbound.db
-    RT->>CR: wakeContainer(session)
-    CR->>AG: Spawn container
-    AG->>AG: Poll inbound.db
-    AG->>AG: Process message
-    AG->>AG: Write to outbound.db
-```
+- **Central database** (`data/v2.db`) — the entity model: agent groups, messaging groups, users, wirings, sessions, approvals. Host-only, opened once, WAL mode.
+- **Session pairs** (`data/v2-sessions/<agent_group_id>/<session_id>/`) — `inbound.db` and `outbound.db`, shared with exactly one container via bind mount.
 
-### Outbound delivery flow
+The session pair **is** the host-container IPC system — there is no other channel. Files in `inbox/` and `outbox/` carry attachments alongside their message rows, and `.heartbeat` carries liveness. Three invariants make SQLite safe across a Docker mount (from the comments in `src/session-manager.ts`):
 
-```mermaid
-sequenceDiagram
-    participant AG as Agent (Bun)
-    participant DL as Delivery Poll
-    participant SM as Session Manager
-    participant CA as Channel Adapter
-    participant PL as Platform
+1. **`journal_mode=DELETE`, not WAL** — WAL's memory-mapped `-shm` file doesn't refresh across the host-to-container mount, so a WAL-mode container would silently miss every new message.
+2. **The host opens, writes, and closes per operation** — a long-lived host connection would freeze the container's view of the file at first read.
+3. **One writer per file** — DELETE-mode journal unlinking isn't atomic across the mount, so concurrent writers would corrupt the database. Hence the split into two files with opposite ownership; the host only writes `outbound.db` when no container is running.
 
-    AG->>AG: Write to outbound.db
-    DL->>DL: Poll outbound.db (1s active, 60s sweep)
-    DL->>DL: Filter already-delivered
-    DL->>DL: Route by kind (system/agent/channel)
-    DL->>CA: deliver(message)
-    CA->>PL: Send response
-    DL->>SM: Mark delivered in inbound.db
-```
+## Related pages
 
-## File system layout
-
-<Tree>
-  <Tree.Folder name="nanoclaw" defaultOpen>
-    <Tree.Folder name="src" />
-    <Tree.Folder name="container" defaultOpen>
-      <Tree.File name="Dockerfile" />
-      <Tree.Folder name="agent-runner" />
-      <Tree.Folder name="skills" />
-    </Tree.Folder>
-    <Tree.Folder name="groups" defaultOpen>
-      <Tree.Folder name="main" defaultOpen>
-        <Tree.File name="CLAUDE.md" />
-      </Tree.Folder>
-      <Tree.Folder name="global" defaultOpen>
-        <Tree.File name="CLAUDE.md" />
-      </Tree.Folder>
-      <Tree.Folder name="{agent-group}" />
-    </Tree.Folder>
-    <Tree.Folder name="data" defaultOpen>
-      <Tree.File name="v2.db" />
-      <Tree.Folder name="v2-sessions" defaultOpen>
-        <Tree.Folder name="{agent_group_id}" defaultOpen>
-          <Tree.Folder name="{session_id}" defaultOpen>
-            <Tree.File name="inbound.db" />
-            <Tree.File name="outbound.db" />
-            <Tree.Folder name="outbox" />
-            <Tree.Folder name="inbox" />
-            <Tree.File name=".heartbeat" />
-          </Tree.Folder>
-        </Tree.Folder>
-      </Tree.Folder>
-    </Tree.Folder>
-  </Tree.Folder>
-</Tree>
-
-## Container image
-
-The agent container (`container/Dockerfile`) includes:
-
-- **Base**: `node:22-slim`
-- **Runtime**: Bun (runs agent-runner TypeScript directly, no compilation)
-- **Browser**: Chromium with all required dependencies
-- **Tools**: `agent-browser`, `vercel` CLI, `curl`, `git`
-- **SDK**: `@anthropic-ai/claude-code` (Claude Agent SDK)
-- **PID 1**: `tini` for proper signal forwarding
-- **User**: Runs as `node` user (uid 1000, non-root)
-- **Working directory**: `/workspace/group`
-
-<Info>
-Source code is NOT baked into the image. `/app/src` is a read-only bind mount from the host, so source-only changes never require an image rebuild.
-</Info>
-
-## Startup sequence
-
-1. **Central DB initialization** — opens `data/v2.db`, runs migrations, performs one-time filesystem cutover
-2. **Container runtime check** — ensures Docker is running, cleans up orphan containers
-3. **Channel adapter initialization** — registers all channel adapters with `onInbound`, `onInboundEvent`, `onMetadata`, and `onAction` callbacks
-4. **Delivery adapter bridge** — bridges the delivery system to channel adapters for `deliver()` and `setTyping()` calls
-5. **Delivery polls** — starts active poll (1s for running containers) and sweep poll (60s for all active sessions)
-6. **Host sweep** — 60s sweep for processing_ack sync, stale detection, due-message wake, and recurrence advancement
-
-## Graceful shutdown
-
-On `SIGTERM` or `SIGINT`:
-
-1. Registered shutdown callbacks execute in order
-2. Delivery polls stop
-3. Channel adapters tear down gracefully
-4. Process exits
-
-<Warning>
-Modules and channel adapters register their own shutdown callbacks. The shutdown sequence is determined by registration order.
-</Warning>
-
-## Related topics
-
-- [Security model and isolation](/concepts/security)
-- [Group isolation and privileges](/concepts/entity-model)
-- [Container isolation details](/concepts/container-lifecycle)
-- [Scheduled tasks system](/guides/scheduled-tasks)
+- [Entity model](/concepts/entity-model) — agent groups, messaging groups, wirings, sessions
+- [Container lifecycle](/concepts/container-lifecycle) — spawn, heartbeat, kill, and respawn in detail
+- [Security model](/concepts/security) — isolation boundaries and egress lockdown
+- [Database schema](/reference/db-schema) — every table in `v2.db` and the session pairs
+- [Channels overview](/channels/overview) — the adapter side of the inbound path
