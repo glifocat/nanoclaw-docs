@@ -18,7 +18,7 @@ Every time you wire a chat to an agent, you answer one question: should this con
 
 ## Separate agent groups — nothing shared
 
-Each agent group is its own world: a workspace folder under `groups/<folder>/`, its own per-group memory (`CLAUDE.local.md`), its own composed `CLAUDE.md`, its own container config (packages, mounts, model, skills), and its own Agent Vault credential scope — the OneCLI agent identifier *is* the agent group id, so secrets granted to one group never reach another. Sessions of different groups share only the host and a read-only global memory directory.
+Each agent group is its own world: a workspace folder under `groups/<folder>/`, its own per-group memory (`CLAUDE.local.md`), its own composed `CLAUDE.md`, its own container config (packages, mounts, model, skills), and its own Agent Vault credential scope — the OneCLI agent identifier *is* the agent group id, so secrets granted to one group never reach another. Sessions of different groups share only the host and the read-only pieces every container gets: the shared base instructions (`container/CLAUDE.md`, mounted at `/app/CLAUDE.md`) plus the agent-runner source and skills.
 
 Choose this when:
 
@@ -36,7 +36,7 @@ Conversations are isolated; the **filesystem is not**. Every session of an agent
 
 ## A session per thread — `per-thread`
 
-The same idea at finer grain: one session per `(chat, thread)`, so each Discord or Slack thread is its own conversation. You rarely set this by hand — on thread-capable adapters the router **forces** per-thread in group chats regardless of a `shared` wiring (only `agent-shared` overrides it), DM sub-threads collapse into one session, and thread-less adapters like WhatsApp or Telegram collapse `per-thread` back to `shared`. The full requested-versus-effective table is in the [entity model](/concepts/entity-model)'s sessions section. The shared-filesystem caveat above applies here identically.
+The same idea at finer grain: one session per `(chat, thread)`, so each Discord or Slack thread is its own conversation. You rarely set this by hand — on thread-capable adapters the router **forces** per-thread in group chats regardless of a `shared` wiring (only `agent-shared` overrides it), DM sub-threads collapse into one session (for `shared` wirings — an explicit `per-thread` wiring is honored in DMs), and thread-less adapters like WhatsApp or Telegram collapse `per-thread` back to `shared`. The full requested-versus-effective table is in the [entity model](/concepts/entity-model)'s sessions section. The shared-filesystem caveat above applies here identically.
 
 ## One conversation everywhere — `agent-shared`
 
@@ -80,7 +80,7 @@ Session and agent-group boundaries separate agents from each other, not from the
 
 - **The container boundary** is what stands between an agent and the host — see [container lifecycle](/concepts/container-lifecycle) for what's mounted where and why.
 - **Network egress and additional mounts** are per-group container config and open by default beyond the proxy — lock them down in [hardening](/operate/hardening).
-- **Global memory** (`groups/global/`, mounted read-only at `/workspace/global`) is visible to every agent group by design. Don't put one group's secrets in it.
+- **Shared base instructions** — every container, in every group, mounts the same read-only `container/CLAUDE.md` at `/app/CLAUDE.md`, alongside the shared agent-runner source and skills. Anything written there reaches all agents; per-group instructions belong in that group's `CLAUDE.local.md`.
 
 ## Related pages
 
