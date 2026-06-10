@@ -1,257 +1,100 @@
 ---
-title: Container isolation
-description: How containers provide security isolation for agent execution
+title: "Container lifecycle"
+description: "The full container story: how the agent image is built, what gets assembled at every spawn, how wakes are deduplicated, and what kills a container."
 tag: "UPDATED"
+keywords: ["container", "lifecycle", "docker", "spawn", "wake", "mounts", "image", "tini", "orphan cleanup", "install slug", "egress lockdown", "kill"]
 ---
 
-NanoClaw runs all agents inside containers (lightweight Linux VMs) to provide true OS-level isolation. This is the primary security boundary that makes Bash access and code execution safe.
+{/* verified-against: src/container-runner.ts, src/container-runtime.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/install-slug.ts, setup/container.ts, container/Dockerfile @ dc34ceb (v2.1.4) */}
 
-## Why containers?
+Every active session gets exactly one Docker container, spawned on demand and killed when it goes quiet. The container is deliberately disposable: all state lives in mounted host directories, so a kill loses nothing but an in-flight provider call — and the [host sweep](/concepts/architecture#what-runs-when) retries that.
 
-Containers provide:
+Docker is the only supported runtime. All runtime-specific logic lives in a single file (`src/container-runtime.ts`, with the binary hardcoded to `docker`), so a future runtime swap means changing one file — but today there is no Apple Container, no micro-VM, no alternative backend.
 
-- **Process isolation** — agent processes can't affect the host system
-- **Filesystem isolation** — agents only see explicitly mounted directories
-- **Resource limits** — CPU/memory can be constrained (future)
-- **Non-root execution** — agents run as unprivileged user
-- **Signal forwarding** — `tini` as PID 1 ensures clean shutdown
+## The image
 
-<Info>
-NanoClaw uses Docker by default for cross-platform compatibility. On macOS, you can use Apple Container instead (via `/convert-to-apple-container` skill).
-</Info>
+Setup builds one base image per install from `container/Dockerfile` (see [Installation](/installation)). It's tagged `nanoclaw-agent-v2-<slug>:latest`, where the slug is the first 8 hex characters of `sha1(projectRoot)` — two NanoClaw checkouts on one host get distinct images and never clobber each other. What's inside:
 
-## Container architecture
+- **`node:22-slim`** base with **Bun** as the agent-runner's runtime — TypeScript runs directly, no compile step
+- **`tini` as PID 1** — reaps zombies and forwards signals so `outbound.db` writes finalize cleanly on `docker stop`
+- **Chromium** plus its library stack for browser automation (`agent-browser` drives it; CJK fonts are an opt-in `INSTALL_CJK_FONTS=true` build arg)
+- **Pinned global CLIs** via pnpm: `@anthropic-ai/claude-code` and `vercel` at fixed versions, `agent-browser` tracking latest
 
-### Base image
+The agent-runner source is **never baked in** — the host bind-mounts it read-only at `/app/src` on every spawn, so source changes never require a rebuild. Rebuilds are only for the Dockerfile itself or CLI version bumps.
 
-The container is built from `container/Dockerfile`:
+When a group installs apt or npm packages, the host generates a Dockerfile `FROM` the base image, builds it as `nanoclaw-agent-v2-<slug>:<agent-group-id>`, and stores the tag in the group's config — that group spawns from its custom image from then on. Mechanics in [Container configuration](/reference/container-config#per-group-images-and-packages).
 
-**Key components:**
+## The lifecycle
 
-- **Base**: `node:22-slim` (Debian-based, minimal)
-- **Runtime**: Bun (runs agent-runner TypeScript directly — no compilation step)
-- **Browser**: Chromium with all dependencies
-- **Tools**: `agent-browser` for browser automation, `vercel` CLI, `curl`, `git`
-- **SDK**: `@anthropic-ai/claude-code` installed globally via pnpm
-- **PID 1**: `tini` for proper signal forwarding so `outbound.db` writes finalize on SIGTERM
-- **User**: `node` (uid 1000, non-root)
-- **Working directory**: `/workspace/group`
-
-<Note>
-Source code is NOT baked into the image. `/app/src` is a read-only bind mount from the host. Source-only changes never require an image rebuild.
-</Note>
-
-### Entrypoint flow
-
-The entrypoint uses `tini` for signal forwarding:
-
-1. **tini** starts as PID 1 (forwards signals cleanly)
-2. **entrypoint.sh** runs setup scripts
-3. **Bun executes agent-runner**: `exec bun run /app/src/index.ts`
-4. Agent-runner polls `inbound.db` for messages and writes responses to `outbound.db`
-5. Container exits when stopped by the host
-
-### Two-database IO model
-
-In v2, all communication between host and container uses two SQLite databases per session. There is no stdin/stdout piping, no IPC files, and no output markers.
-
-- **inbound.db** — host writes, container reads (messages, routing, destinations)
-- **outbound.db** — container writes, host reads (responses, acknowledgments, state)
-
-This eliminates cross-mount SQLite write contention by ensuring each database has exactly one writer.
-
-<Warning>
-The two-DB model requires `journal_mode=DELETE` (not WAL). WAL mode's memory-mapped shared memory file doesn't refresh across Docker bind mounts, which would cause the container to miss messages.
-</Warning>
-
-## Volume mounts
-
-Containers only see what's explicitly mounted. The v2 mount structure is different from v1:
-
-### Per-session mounts
-
-| Mount | Container path | Mode | Purpose |
-|-------|---------------|------|---------|
-| Session folder | `/workspace` | Read-write | `inbound.db`, `outbound.db`, `outbox/`, `.claude/` |
-| Agent group folder | `/workspace/agent` | Read-write | Working files, `CLAUDE.local.md` |
-| Container config | `/workspace/agent/container.json` | Read-only | Nested RO mount (agent can't modify config) |
-| Composed CLAUDE.md | `/workspace/agent/CLAUDE.md` | Read-only | Regenerated each spawn |
-| CLAUDE.md fragments | `/workspace/agent/.claude-fragments` | Read-only | Fragment files for composition |
-| Global memory | `/workspace/global` | Read-only | `groups/global/` directory |
-| Shared CLAUDE.md | `/app/CLAUDE.md` | Read-only | Base CLAUDE.md |
-| Agent-runner source | `/app/src` | Read-only | Shared source (bind mount from host) |
-| Container skills | `/app/skills` | Read-only | Shared skill definitions |
-| Claude SDK state | `/home/node/.claude` | Read-write | SDK state + skill symlinks |
-| Additional mounts | `/workspace/extra/{name}` | Per-config | From `container.json` (validated against allowlist) |
-
-<Warning>
-The `container.json` file is mounted read-only as a nested mount inside the read-write agent group folder. This prevents the agent from modifying its own container configuration.
-</Warning>
-
-### Mount security
-
-All additional mounts are validated against the allowlist at `~/.config/nanoclaw/mount-allowlist.json`:
-
-```json
-{
-  "allowedRoots": [
-    {
-      "path": "~/projects",
-      "allowReadWrite": true,
-      "description": "Development projects"
-    }
-  ],
-  "blockedPatterns": ["password", "secret", "token"]
-}
+```mermaid
+stateDiagram-v2
+    [*] --> Idle: setup builds base image
+    Idle --> Spawning: wakeContainer — inbound message,<br/>due task, or restart
+    Spawning --> Idle: vault unreachable — abort,<br/>message stays pending
+    Spawning --> Running: docker run --rm
+    Running --> Exited: agent-runner exits /<br/>docker stop
+    Running --> Killed: sweep kill — ceiling<br/>or claim-stuck
+    Killed --> Idle: processing rows reset<br/>with backoff
+    Exited --> Idle
 ```
 
-**Validation rules:**
+### Wake — deduplicated, never throws
 
-1. If no allowlist file exists, all additional mounts are blocked
-2. Blocked patterns are merged with hardcoded defaults (`.ssh`, `.gnupg`, `.aws`, `.kube`, `.docker`, `credentials`, `.env`, `.netrc`, `.npmrc`, `id_rsa`, `id_ed25519`, `private_key`, `.secret`, etc.)
-3. Paths are resolved through symlinks before validation
-4. A path must be under an `allowedRoot` and not match any blocked pattern
-5. Read-write access requires both the mount and the allowed root to permit it; otherwise forced read-only
-6. Container paths must be relative, non-empty, no `..`, no `:` (prevents Docker option injection)
+`wakeContainer(session)` fires when the router writes an inbound message, when the host sweep finds due work (scheduled tasks, retries) with no container running, or on an explicit `ncl groups restart`. Two layers prevent duplicates against the same session directory:
 
-<Note>
-Missing-file state is NOT cached — you can create the allowlist without restarting. However, parse errors are permanently cached for the process lifetime.
-</Note>
+1. An **`activeContainers` map** keyed by session ID — if a container is already running, wake is a no-op.
+2. An **in-flight promise map** — a second wake arriving while the first spawn is still mid-setup (vault wiring, mount assembly) joins the existing promise instead of spawning a racy double.
 
-## Container lifecycle
+Wake never throws. A transient spawn failure — most commonly the OneCLI vault being unreachable — returns `false`, the inbound row stays pending, and the next sweep tick retries.
 
-### Wake and spawn
+### Spawn — the world rebuilt every time
 
-Container spawning is deduplicated — concurrent wake calls for the same session share a single in-flight promise:
+Before `docker run`, the runner reassembles everything the agent sees: it refreshes the session's destination map and reply routing, materializes `container.json` from the database, syncs skill symlinks to match the config, composes the group's `CLAUDE.md` from base + fragments (details in [Architecture](/concepts/architecture#composed-at-spawn)), and deletes any stale heartbeat file from a previous container so the sweep gives the new one fresh grace.
 
-1. `wakeContainer(session)` checks for existing running container or in-flight spawn
-2. `spawnContainer(session)` reads agent group config, resolves provider contributions, builds mounts
-3. Skill symlinks are synced before every spawn
-4. Docker container is spawned with `tini` as PID 1
+The exact mounts, from `buildMounts` in `src/container-runner.ts`:
 
-### Execution
+| Host path | Container path | Mode |
+|---|---|---|
+| `data/v2-sessions/<group>/<session>/` | `/workspace` | RW — `inbound.db`, `outbound.db`, `outbox/`, `.heartbeat` |
+| `groups/<folder>/` | `/workspace/agent` | RW — working files, `CLAUDE.local.md` |
+| `groups/<folder>/container.json` | `/workspace/agent/container.json` | RO, nested over the RW group dir |
+| `groups/<folder>/CLAUDE.md` (composed) | `/workspace/agent/CLAUDE.md` | RO, nested — regenerated each spawn |
+| `groups/<folder>/.claude-fragments/` | `/workspace/agent/.claude-fragments` | RO, nested |
+| `groups/global/` | `/workspace/global` | RO — global memory, all groups |
+| `container/CLAUDE.md` | `/app/CLAUDE.md` | RO — shared base instructions |
+| `data/v2-sessions/<group>/.claude-shared/` | `/home/node/.claude` | RW — Claude state, settings, skill symlinks |
+| `container/agent-runner/src/` | `/app/src` | RO — agent-runner source |
+| `container/skills/` | `/app/skills` | RO — shared skills |
+| `additional_mounts` entries | `/workspace/extra/<name>` | Per config, allowlist-validated |
 
-1. **Agent-runner starts**: `bun run /app/src/index.ts`
-2. **Polls inbound.db**: discovers new messages via the poll loop
-3. **Processes messages**: runs through the configured provider (Claude by default)
-4. **Writes outbound.db**: responses, acknowledgments, task operations
-5. **Heartbeat**: `.heartbeat` file mtime updated periodically
+Providers can contribute extra mounts and env vars (for example OpenCode's XDG directories); these are appended last. The nested read-only mounts matter: the group dir is read-write, but `container.json`, the composed `CLAUDE.md`, and the fragments are re-mounted read-only on top, so the agent can read its config and instructions but not rewrite them. `CLAUDE.local.md` stays the one writable memory file.
 
-### Shutdown
+The `docker run` invocation itself: `--rm` (self-removing), a name of `nanoclaw-v2-<folder>-<timestamp>`, the install label `nanoclaw-install=<slug>`, and `TZ` as the only NanoClaw-set env var — everything else the runner needs comes from `container.json`. The OneCLI Agent Vault then injects `HTTPS_PROXY` and certificates so the agent's API calls get credentials in transit; if the vault can't be wired, the spawn aborts rather than running credential-less. When the host user isn't uid 0 or 1000, the container runs `--user <hostUid>:<hostGid>` so mounted files keep sane ownership. The entrypoint is overridden to `exec bun run /app/src/index.ts`, and the image is the group's `image_tag` if set, otherwise the base.
 
-- **Host-initiated**: `docker stop` sends SIGTERM; `tini` forwards to Bun process
-- **Stale detection**: host sweep detects containers with old heartbeats or stuck processing_ack
-- **Fallback**: SIGKILL if graceful stop fails
+When egress lockdown is enabled (`NANOCLAW_EGRESS_LOCKDOWN=true`), the container joins a Docker `--internal` network with the vault gateway as the only reachable hop — no internet route exists, and the agent runs non-root without `NET_ADMIN`, so it can't undo it. If lockdown is on but can't be established, the spawn fails rather than running with open egress. Setup in [Hardening](/operate/hardening#lock-down-network-egress).
 
-<Info>
-Even if the container crashes, all data in session databases and mounted directories persists. Only the container process itself is ephemeral.
-</Info>
+### Running
 
-## Per-agent-group images
+`tini` is PID 1; Bun runs the agent-runner, which polls `inbound.db` and touches `/workspace/.heartbeat` on every provider event — the host's only liveness signal. Container stderr is streamed into the host log at debug level; stdout is unused, since all IO is database rows. There is deliberately **no wall-clock idle timeout** on the host side.
 
-Agent groups can specify custom packages in `container.json`. The host builds a derived Docker image with additional apt and npm packages:
+### Death
 
-- Image tag: derived from the checkout-scoped base image and agent group
-- Built on top of the base `nanoclaw-agent-v2-<slug>:latest` image
-- Cached — only rebuilt when package lists change
+The host sweep kills a running container under exactly two conditions — both heartbeat-driven and documented with the rest of the sweep in [Architecture](/concepts/architecture#what-runs-when):
 
-## Timeouts
+- **Absolute ceiling** — no heartbeat for longer than max(30 minutes, the container's declared Bash timeout).
+- **Claim-stuck** — a message was claimed and the container showed no heartbeat for over max(60 seconds, declared Bash timeout) since the claim.
 
-### Container timeout
+A kill is `docker stop -t 1` (SIGTERM, forwarded by tini so DB writes finalize), with SIGKILL as fallback. On any exit — clean or killed — the close handler removes the session from the active map, marks the container stopped, and logs `Container exited` with the exit code. Orphaned `processing` rows are reset to pending with exponential backoff; after 5 tries a message is marked failed.
 
-- **Default**: 30 minutes (`CONTAINER_TIMEOUT`)
-- **Configurable**: per-agent-group via container config
-- **Enforcement**: `docker stop` (SIGTERM), falls back to SIGKILL
+At host startup, `cleanupOrphans` stops any containers left over from a previous run — filtered by the `nanoclaw-install=<slug>` label, so a second NanoClaw install on the same machine can never reap this install's containers, nor vice versa.
 
-### Stale detection
+## What the boundary holds
 
-The host sweep detects stuck containers by checking:
+The container sees only the mount table above — no host home directory, no `.ssh`, and **no raw credentials**: API keys live in the OneCLI Agent Vault on the host and are injected into HTTPS requests in transit, so a fully compromised agent has nothing to exfiltrate but its own workspace. Additional mounts must pass the allowlist at `~/.config/nanoclaw/mount-allowlist.json` (no allowlist means none are permitted), and egress lockdown closes the remaining hole — by default the agent has open internet access through the proxy. See [Hardening](/operate/hardening) for locking both down and [Credentials](/operate/credentials) for how vault injection works.
 
-- `.heartbeat` file modification time
-- Age of unacknowledged `processing_ack` entries
-- Container state tracking in the session table
+## Related pages
 
-## Skills and MCP servers
-
-Skills are synced to each container via symlinks:
-
-1. **Symlink sync**: before every spawn, skill symlinks at `/home/node/.claude/skills/` are updated to point to `/app/skills/{name}`
-2. **Container-valid paths**: symlinks are dangling on the host but valid inside the container
-3. **Available to agent**: Claude Agent SDK loads from `.claude/skills/`
-
-### Built-in MCP server
-
-The `nanoclaw` MCP server provides tools for container-to-host communication via the database:
-
-- `send_message` — write outbound messages
-- `schedule_task`, `cancel_task`, `pause_task`, `resume_task`, `update_task` — task management
-- `list_tasks` — view scheduled tasks
-
-Additional MCP servers can be configured in `container.json`.
-
-### Global memory injection
-
-For non-main groups, if `/workspace/global/CLAUDE.md` exists, its contents are appended to the system prompt. This provides shared instructions across all agent groups.
-
-### Additional directory auto-discovery
-
-Directories mounted at `/workspace/extra/*` are automatically passed to the SDK as `additionalDirectories`, so any `CLAUDE.md` files in those directories are loaded automatically.
-
-## Browser automation
-
-Chromium runs inside the container:
-
-- **Executable**: `/usr/bin/chromium`
-- **CLI**: `agent-browser` (installed globally)
-- **Headless**: always (no display in container)
-- **User data**: stored in group folder (persists across runs)
-- **Network**: full access (same as host, no restrictions)
-- **Optional CJK fonts**: install via `INSTALL_CJK_FONTS=true` build arg (~200 MB)
-
-## Security implications
-
-### What containers protect against
-
-- **Filesystem access** — agents can't read `~/.ssh` or other sensitive paths
-- **Process interference** — agents can't kill host processes or inject code
-- **Persistence** — containers are ephemeral, no state survives unless mounted
-- **Privilege escalation** — non-root execution limits kernel attack surface
-
-### What containers DON'T protect against
-
-- **Network access** — agents have full network access (can exfiltrate data)
-- **Mounted directory tampering** — agents can modify anything in mounted read-write directories
-- **Vault-based API access** — containers can make authenticated API requests through the OneCLI vault (though they cannot extract real credentials)
-- **Resource exhaustion** — no CPU/memory limits enforced (can DoS host)
-
-<Warning>
-Containers provide filesystem isolation, not network isolation. Agents can make arbitrary HTTP requests and exfiltrate data over the network.
-</Warning>
-
-## Troubleshooting
-
-### Container won't start
-
-1. Check Docker is running: `docker ps`
-2. Check image exists: `docker images | grep nanoclaw-agent`
-3. Rebuild image: `./container/build.sh`
-
-### Container timeout
-
-1. Check timeout setting: `CONTAINER_TIMEOUT` in `.env`
-2. Check if task is legitimately slow (increase timeout)
-3. Review host sweep logs for stale detection
-
-### Permission errors
-
-1. Check mount paths are readable by host user
-2. Check uid/gid mapping
-3. Verify allowlist includes path (for additional mounts)
-4. Check symlink resolution didn't change path
-
-## Related topics
-
-- [Security model and mount validation](/concepts/security)
-- [Group isolation and privileges](/concepts/entity-model)
-- [Scheduled task execution](/guides/scheduled-tasks)
-- [System architecture](/concepts/architecture)
+- [Architecture](/concepts/architecture) — the host sweep, CLAUDE.md composition, and the two-database transport
+- [Container configuration](/reference/container-config) — every config field consumed at spawn
+- [Isolation levels](/concepts/isolation-levels) — what session and group boundaries do and don't separate
+- [Security model](/concepts/security) — the threat model behind these boundaries
