@@ -10,7 +10,7 @@ keywords: ["skills", "extend", "SKILL.md", "registry branches", "channels branch
 A NanoClaw skill is a **SKILL.md instruction workflow** in `.claude/skills/` that Claude Code executes in your checkout. When you run `/add-telegram` or `/manage-mounts`, Claude reads the skill's instructions and performs them — copying files, appending an import, installing a dependency, running a test. There is no plugin engine, no manifest.yaml, and no skill state file. The skill *is* the markdown.
 
 <Note>
-This URL previously documented a different model: skills as `skill/*` git branches that you merged into your fork and removed with `git revert`. That model was designed for v1 and **never shipped in v2** — no `skill/*` branches exist on the repo, and no skill performs a `git merge`. If a skill's instructions say `git merge`, it isn't built for v2. This page describes how skills actually work as of v2.1.4.
+This URL previously documented a different model: skills as `skill/*` git branches that you merged into your fork and removed with `git revert`. That model was designed for v1 and **never shipped in v2** — skills are not distributed as `skill/*` branches you merge, and no skill installs by merging a branch. If a skill's install instructions say `git merge`, it isn't built for v2. This page describes how skills actually work as of v2.1.4.
 </Note>
 
 This is how the trunk stays small: it ships channel and provider *infrastructure* but no specific adapters. Your fork only ever contains the code for the features you installed — the rest stays out of your context window and your upgrade path.
@@ -26,11 +26,11 @@ Channel and provider adapters live on two long-lived **registry branches** (`cha
   <Step title="Copy the files in">
     `git show origin/channels:src/channels/telegram.ts > src/channels/telegram.ts` — repeated for the adapter's helpers, its tests, and its setup step. The tests travel with the code on the branch.
   </Step>
-  <Step title="Wire the barrel">
-    Append `import './telegram.js';` to `src/channels/index.ts` so the adapter self-registers at startup. This one-line append is the only edit to existing code.
+  <Step title="Wire the barrel and the setup step">
+    Append `import './telegram.js';` to `src/channels/index.ts` so the adapter self-registers at startup, and add the `pair-telegram` entry to the `STEPS` map in `setup/index.ts`. These one-line appends are the only edits to existing code.
   </Step>
-  <Step title="Install the pinned dependency">
-    `pnpm install @chat-adapter/telegram@4.27.0`
+  <Step title="Install the dependency">
+    `pnpm install @chat-adapter/telegram` — the skill installs the pinned adapter version.
   </Step>
   <Step title="Build and run the registration test">
     `pnpm run build`, then the copied registration test — it imports the real channel barrel and asserts the registry contains `telegram`. If the import line is deleted, the barrel fails to evaluate, or the dependency is missing, this test goes red.
