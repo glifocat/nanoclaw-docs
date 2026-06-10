@@ -38,8 +38,7 @@ Per-group container config can request `additional_mounts` — extra host direct
     { "path": "~/projects", "allowReadWrite": true, "description": "Development projects" },
     { "path": "~/Documents/work", "allowReadWrite": false, "description": "Work documents (read-only)" }
   ],
-  "blockedPatterns": ["password", "secret", "token"],
-  "nonMainReadOnly": true
+  "blockedPatterns": ["password", "secret", "token"]
 }
 ```
 
@@ -54,8 +53,12 @@ Validation rules, in order:
 Rejected mounts are logged with the reason and skipped; the container still starts with its valid mounts. Use the `/manage-mounts` skill to view, add, or remove entries conversationally, or write the config through the setup step:
 
 ```bash
-pnpm exec tsx setup/index.ts --step mounts --force -- --json '{"allowedRoots":[{"path":"/path/to/dir","readOnly":false}],"blockedPatterns":[],"nonMainReadOnly":true}'
+pnpm exec tsx setup/index.ts --step mounts --force -- --json '{"allowedRoots":[{"path":"/path/to/dir","allowReadWrite":true}],"blockedPatterns":[]}'
 ```
+
+<Note>
+The key the validator reads is `allowReadWrite`. A `readOnly` key (shown in some upstream examples) is silently ignored, leaving the mount read-only. Likewise, a top-level `nonMainReadOnly` field may appear in configs written by setup, but the mount validator doesn't read it.
+</Note>
 
 The allowlist is cached in memory, so restart the service after changes.
 
@@ -65,8 +68,8 @@ Each messaging group carries an `unknown_sender_policy` that decides what happen
 
 | Policy | Behavior |
 |---|---|
-| `strict` | Message dropped silently and recorded in `dropped_messages`. |
-| `request_approval` | Message dropped, and an Approve / Deny card is DM'd to an owner or admin. On approve, the sender becomes a group member and the original message is re-routed. Duplicate requests from the same sender are deduplicated while a card is pending. |
+| `strict` | Message dropped silently and recorded in the dropped-messages log (`ncl dropped-messages list`). |
+| `request_approval` | Message dropped, and an Allow / Deny card is DM'd to an owner or admin. On approve, the sender becomes a group member and the original message is re-routed. Duplicate requests from the same sender are deduplicated while a card is pending. |
 | `public` | Anyone can talk to the agent — the access check is skipped entirely. |
 
 Channels auto-created by the router (someone @mentions or DMs the bot in an unwired chat) get `request_approval`. To harden a chat to silent-drop:
@@ -75,7 +78,7 @@ Channels auto-created by the router (someone @mentions or DMs the bot in an unwi
 ncl messaging-groups update --id <mg-id> --unknown-sender-policy strict
 ```
 
-Check `ncl approvals list --status pending` for in-flight cards and `ncl dropped-messages list` to audit who got dropped and why. Note that the approval flow needs an owner or admin with a reachable DM channel — on a fresh install with no owner configured, approval requests are skipped and logged. Wirings can additionally set `sender_scope known`, which requires explicit membership even on a `public` messaging group — see [ncl CLI](/operate/ncl-cli).
+Sender approvals are handled entirely through the DM card — there's no `ncl` resource for them (`ncl approvals` covers a different approval queue). Use `ncl dropped-messages list` to audit who got dropped and why. Note that the approval flow needs an owner or admin with a reachable DM channel — on a fresh install with no owner configured, approval requests are skipped and logged. Wirings can additionally set `sender_scope known`, which requires explicit membership even on a `public` messaging group — see [ncl CLI](/operate/ncl-cli).
 
 ## The command gate
 
