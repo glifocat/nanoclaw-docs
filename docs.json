@@ -136,7 +136,7 @@
           {
             "group": "Operate",
             "icon": "gauge",
-            "pages": ["operate/ncl-cli", "operate/hardening", "operate/troubleshooting"]
+            "pages": ["operate/configuration", "operate/ncl-cli", "operate/credentials", "operate/hardening", "operate/upgrading", "operate/troubleshooting"]
           },
           {
             "group": "Build with agents",

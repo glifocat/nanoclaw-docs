@@ -1,625 +1,142 @@
 ---
-title: Troubleshooting
-description: Troubleshooting guide for common NanoClaw issues including container errors, channel failures, and service problems
-keywords: ["troubleshooting", "debugging", "common issues"]
+title: "Troubleshooting"
+description: "Diagnose NanoClaw v2 failures: host startup stops, container spawn errors, dropped messages, silent agents, and stuck sessions."
+keywords: ["troubleshooting", "debugging", "dropped messages", "container spawn", "upgrade tripwire", "host sweep", "LOG_LEVEL"]
 tag: "UPDATED"
 ---
 
-This guide covers common issues you may encounter when running NanoClaw and how to resolve them.
+{/* verified-against: .claude/skills/debug/SKILL.md, src/container-runtime.ts, src/container-runner.ts, src/host-sweep.ts, src/upgrade-state.ts, src/log.ts, src/cli/resources/dropped-messages.ts, src/cli/resources/sessions.ts, src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/webhook-server.ts, src/circuit-breaker.ts, setup/service.ts @ dc34ceb */}
 
-## Quick status check
+## Start here
 
-Run these commands to get a quick overview of system health:
+The fastest path is the built-in debug skill: open Claude Code in your NanoClaw folder and run `/debug`. It knows the two-DB session architecture, the log locations, and how to query the session databases directly.
+
+If you're diagnosing by hand, check the logs first. The service writes stdout to `logs/nanoclaw.log` and stderr (warnings and errors) to `logs/nanoclaw.error.log`:
 
 ```bash
-# 1. Is the service running?
-launchctl list | grep nanoclaw
-# Expected: PID  0  com.nanoclaw (PID = running, "-" = not running, non-zero exit = crashed)
-
-# 2. Any running containers?
-docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
-
-# 3. Any stopped/orphaned containers?
-docker ps -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
-
-# 4. Recent errors in service log?
-grep -E 'ERROR|WARN' logs/nanoclaw.log | tail -20
-
-# 5. Are channels connected? (look for last connection event)
-grep -E 'Connected|Connection closed|connection.*close' logs/nanoclaw.log | tail -5
-
-# 6. Are groups loaded?
-grep 'groupCount' logs/nanoclaw.log | tail -3
+tail -f logs/nanoclaw.log          # full routing chain: inbound, spawn/exit, delivery
+tail -n 50 logs/nanoclaw.error.log # delivery failures, crash-loop backoff, warnings
 ```
 
-## Agent not responding
+Set `LOG_LEVEL=debug` (see [Configuration](/operate/configuration#applying-changes)) to also see resolved mount configurations and streamed container stderr tagged with `container=<group folder>`. Containers run with `--rm`, so the host log is the only place container output survives.
 
-### Symptoms
-Messages sent to the agent receive no response.
+Then get the system state from the [ncl CLI](/operate/ncl-cli):
 
-### Diagnosis
+```bash
+ncl sessions list           # container_status: running | stopped
+ncl dropped-messages list   # messages the router or access gate refused
+ncl wirings list            # which chats route to which agents, and how they engage
+```
+
+## Host won't start
+
+**"NanoClaw stopped: update did not go through the supported path"** — the upgrade tripwire fired. The code version doesn't match the marker in `data/upgrade-state.json`, which usually means you ran a raw `git pull` instead of `/update-nanoclaw`. See [Upgrading](/operate/upgrading) for the recovery path.
+
+**"Circuit breaker: delaying startup due to repeated crashes"** in the log — the host crashed repeatedly and is backing off (up to 15 minutes after six consecutive crashes). It will retry on its own; find the original crash in `logs/nanoclaw.error.log` (look for `FATAL Uncaught exception`) and fix that instead of restarting in a loop.
+
+## "FATAL: Container runtime failed to start"
+
+On startup the host runs `docker info`. If it fails, NanoClaw prints this banner and exits:
+
+```text
+╔════════════════════════════════════════════════════════════════╗
+║  FATAL: Container runtime failed to start                      ║
+║                                                                ║
+║  Agents cannot run without a container runtime. To fix:        ║
+║  1. Ensure Docker is installed and running                     ║
+║  2. Run: docker info                                           ║
+║  3. Restart NanoClaw                                           ║
+╚════════════════════════════════════════════════════════════════╝
+```
+
+Do exactly what it says: start Docker (Docker Desktop on macOS, `sudo systemctl start docker` on Linux), confirm `docker info` succeeds, then restart NanoClaw.
+
+## Agent never replies
+
+Trace the message through the pipeline, in order:
 
 <Steps>
-  <Step title="Check if messages are being received">
+  <Step title="Did the router accept it?">
     ```bash
-    grep 'New messages' logs/nanoclaw.log | tail -10
+    ncl dropped-messages list
     ```
-    
-    If no messages appear, the issue is with channel connectivity.
+    Each row aggregates drops per chat, with a `reason`:
+
+    | Reason | Meaning | Fix |
+    |---|---|---|
+    | `no_agent_wired` | No wiring exists for that chat | Create one: `ncl wirings create --messaging-group-id <id> --agent-group-id <id>` |
+    | `no_agent_engaged` | A wiring exists but its engage rules didn't fire | Check `engage_mode`: `mention` needs an @mention (or a DM); `pattern` matches `engage_pattern` against each message |
+    | `unknown_sender_strict` | Sender not recognized, strict policy | Add the sender, or relax the policy — see [Hardening](/operate/hardening#restrict-who-can-talk-to-your-agents) |
+    | `unknown_sender_request_approval` | Sender not recognized; an Allow/Deny card was sent to an approver's DM | The approver answers the card in their DM; `ncl dropped-messages list` shows the recorded drop either way |
   </Step>
-  
-  <Step title="Check if containers are being spawned">
+  <Step title="Did a container spawn?">
     ```bash
-    grep -E 'Processing messages|Spawning container' logs/nanoclaw.log | tail -10
+    ncl sessions list                      # container_status should be "running"
+    grep 'Spawning container' logs/nanoclaw.log | tail -5
+    docker ps --format '{{.Names}} {{.Status}}' | grep nanoclaw
     ```
-    
-    If messages are received but no containers spawn, check trigger patterns.
+    `stopped` is normal between messages — the sweep restarts the container when due messages arrive. If nothing spawns at all, see [Container won't spawn](#container-wont-spawn) below.
   </Step>
-  
-  <Step title="Check for active containers">
-    ```bash
-    docker ps --filter name=nanoclaw-
-    ```
-    
-    If containers are stuck running, they may have hit an infinite loop.
-  </Step>
-  
-  <Step title="Check container logs">
-    ```bash
-    docker logs nanoclaw-{group}-{timestamp}
-    ```
-    
-    Look for errors in the agent execution.
+  <Step title="Did the agent produce a reply?">
+    Inspect the session DBs (`inbound.db` / `outbound.db` under `data/v2-sessions/<group>/<session>/`). The `/debug` skill walks you through the exact queries. A `Container exited` line with a non-zero `code` in the host log, plus the streamed stderr above it, is where the failure usually shows.
   </Step>
 </Steps>
 
-### Solutions
+## Container won't spawn
 
-<Accordion title="Trigger word not matching">
-  Verify the trigger word in your message matches the configured trigger:
-  
-  ```bash
-  sqlite3 store/messages.db "SELECT name, trigger_pattern FROM registered_groups;"
-  ```
-  
-  The trigger is case-insensitive and must appear at the start of the message.
-</Accordion>
+The first two of these abort the spawn; a rejected mount only degrades it (the container starts without that mount). All three appear in `logs/nanoclaw.error.log`:
 
-<Accordion title="Container runtime not available">
-  Ensure Docker is running:
-  
-  ```bash
-  docker info
-  ```
-  
-  If Docker is not running, start it:
-  - macOS: Open Docker Desktop
-  - Linux: `sudo systemctl start docker`
-</Accordion>
+- **`OneCLI gateway not applied — refusing to spawn container without credentials`** — the host can't wire the credential vault, so it refuses to launch the agent. The message stays pending and the sweep retries every minute; fix the gateway (is OneCLI running on `127.0.0.1:10254`?) and the spawn recovers on its own. See [Credentials](/operate/credentials).
+- **Egress lockdown errors** — with lockdown enabled, the spawn fails fast rather than run with open egress: `the "<network>" internal network could not be created` or `the OneCLI gateway "<container>" could not be attached to "<network>"`. Check `docker network inspect` for the egress network and see [Hardening](/operate/hardening#lock-down-network-egress).
+- **`Additional mount REJECTED`** — a mount from your group's container config failed allowlist validation. The log line includes the `requestedPath` and `reason`. Fix the allowlist — see [Hardening](/operate/hardening#gate-additional-mounts).
 
-<Accordion title="Queue at concurrency limit">
-  Check if the queue is blocked:
-  
-  ```bash
-  grep 'concurrency limit' logs/nanoclaw.log | tail -5
-  ```
-  
-  Stop stuck containers:
-  
-  ```bash
-  docker stop -t 1 $(docker ps -q --filter name=nanoclaw-)
-  ```
-</Accordion>
+## Replies are slow
 
-## Container timeout
+- **Cold start**: the first reply after a container spawn takes 30–60 seconds while the sandbox warms up. Setup tells you this during its ping test; it's normal.
+- **Scheduled or retried messages wait for the sweep**: the host sweep runs every 60 seconds, so a due message for a stopped container can sit up to a minute before the wake fires (`Waking container for due messages` in the log).
+- **Retries back off**: a message reset after a crash retries with exponential backoff (5s, 10s, 20s, ...). After five tries you'll see `Message marked as failed after max retries` — that message is dead; resend it.
 
-### Symptoms
-- Logs show `Container timeout` or `timed out`
-- Exit code 137 (SIGKILL) in container logs
-- Messages are lost after timeout
+## Container killed mid-task
 
-### Diagnosis
+The host sweep kills containers it considers stuck, then resets their in-flight messages to pending:
+
+- **`Killing container past absolute ceiling`** — the container's heartbeat file went silent for over 30 minutes. The ceiling stretches automatically when the agent declares a longer Bash timeout, so long-running commands aren't killed as long as they declare their timeout.
+- **`Killing container — message claimed then silent`** — the container claimed a message and showed no sign of life for over 60 seconds since the claim (also extended by a declared Bash timeout).
+
+Both paths are self-healing: `Reset stale message with backoff` follows in the log and the work retries in a fresh container. If the same message keeps killing containers, look at the streamed container stderr (`LOG_LEVEL=debug`) to see what the agent was doing when it died.
+
+## Webhook channel is silent
+
+Webhook-based adapters (Slack, Teams, and similar) register routes on a shared local HTTP server. Confirm it's up and routed:
 
 ```bash
-# Check for recent timeouts
-grep -E 'Container timeout|timed out' logs/nanoclaw.log | tail -10
-
-# Check container log files
-ls -lt groups/*/logs/container-*.log | head -10
-
-# Read the most recent container log
-cat groups/{group}/logs/container-{timestamp}.log
+grep 'Webhook server started' logs/nanoclaw.log   # shows port + registered adapters
+curl -i http://localhost:3000/webhook/slack       # 404 "Unknown adapter" = not registered
 ```
 
-### Solutions
+The server listens on `WEBHOOK_PORT` (default `3000`). If another process already holds that port, the listen fails and the host crashes with `FATAL Uncaught exception` — change `WEBHOOK_PORT` in `.env`. Channel-specific failures (tokens, tunnel/public URL, platform-side config) are covered on each channel page: [Slack](/channels/slack), [Teams](/channels/teams), [Channels overview](/channels/overview).
 
-<Accordion title="Increase timeout for specific group">
-  Modify the group's `containerConfig` in the database:
-  
-  ```bash
-  sqlite3 store/messages.db
-  ```
-  
-  ```sql
-  UPDATE registered_groups 
-  SET container_config = json_set(
-    COALESCE(container_config, '{}'),
-    '$.timeout',
-    3600000  -- 1 hour in milliseconds
-  )
-  WHERE name = 'Family Chat';
-  ```
-</Accordion>
+## Credential request stuck
 
-<Accordion title="Check for infinite loops">
-  Review the container log to see if the agent is stuck:
-  
-  ```bash
-  cat groups/{group}/logs/container-{timestamp}.log
-  ```
-  
-  Look for repeated patterns or lack of progress. If the agent is stuck, consider:
-  - Simplifying the prompt
-  - Adding constraints to the task
-  - Reviewing recent changes to `CLAUDE.md`
-</Accordion>
-
-<Accordion title="Adjust idle timeout">
-  The idle timeout (for graceful shutdown between messages) is currently equal to the hard timeout. This is a known issue. To fix:
-  
-  Edit `src/config.ts` and set:
-  ```typescript
-  export const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-  export const CONTAINER_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-  ```
-  
-  Then rebuild:
-  ```bash
-  npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-  ```
-</Accordion>
-
-## Service stops after SSH logout (Linux)
-
-### Symptoms
-- NanoClaw works while SSH is connected but stops silently after disconnecting
-- `systemctl --user status nanoclaw` shows inactive after reconnecting
-- No error logs or crash — the service simply disappears
-- `systemctl --user enable nanoclaw` appears to succeed but the service still stops
-
-### Cause
-
-By default, systemd sets `Linger=no` for users. When your last SSH session closes, systemd terminates all user-level processes — including the NanoClaw service. This is especially common on cloud VMs (EC2, GCP, Oracle Cloud).
-
-### Solution
-
-The setup script automatically enables linger for non-root users. If you're still experiencing this issue (e.g., you set up NanoClaw before this fix), run:
+If an agent's API call hangs and then fails, a credential approval card may be waiting. The gateway holds the request open until an admin taps Approve or Reject; with no eligible approver it auto-denies, and unanswered cards expire. Check what's pending:
 
 ```bash
-loginctl enable-linger
+ncl approvals list --status pending
 ```
 
-Verify it's enabled:
+The full approval flow — who gets the card, expiry, what happens after a host restart — is in [Credentials](/operate/credentials#approving-credential-use).
+
+## Resetting a session
+
+To wipe a misbehaving session's conversation state, remove its folder — the host re-provisions both session DBs on the next message:
 
 ```bash
-loginctl show-user $USER | grep Linger
-# Expected: Linger=yes
-```
-
-<Note>
-  If `loginctl enable-linger` fails with a permission error, your system may require polkit authorization. Contact your system administrator or run the command with `sudo`.
-</Note>
-
-## Known issues
-
-### Cursor rollback on error
-
-The message cursor (`lastAgentTimestamp`) is now rolled back on container errors, provided no output was already sent to the user. If the agent fails after sending partial output, the cursor is not rolled back to prevent duplicate messages.
-
-If you need to manually reset the cursor, update it in `router_state`:
-
-```sql
--- The cursor is stored as a JSON object mapping JIDs to timestamps
-SELECT value FROM router_state WHERE key = 'last_agent_timestamp';
-```
-
-### IDLE_TIMEOUT and CONTAINER_TIMEOUT
-
-The hard timeout is calculated as `Math.max(configTimeout, IDLE_TIMEOUT + 30_000)`, ensuring a 30-second gap for graceful `_close` sentinel shutdown before the hard kill fires. With default settings (both 30 minutes), the hard timeout is 30 minutes 30 seconds.
-
-If containers are consistently hitting the hard timeout, consider lowering `IDLE_TIMEOUT` in `src/config.ts` to a shorter value (e.g., 5 minutes) so idle containers exit more promptly.
-
-### Kubernetes image garbage collection deletes nanoclaw-agent image
-
-**Symptoms:** `Container exited with code 125: pull access denied for nanoclaw-agent` — the container image disappears after a few hours, even though you just built it.
-
-**Cause:** If your container runtime has Kubernetes enabled (Rancher Desktop enables it by default), the kubelet runs image garbage collection when disk usage exceeds 85%. NanoClaw containers are ephemeral (run and exit), so `nanoclaw-agent:latest` is never protected by a running container. The kubelet sees it as unused and deletes it — often overnight when no messages are being processed.
-
-**Fix:** Disable Kubernetes if you don't need it:
-
-```bash
-# Rancher Desktop
-rdctl set --kubernetes-enabled=false
-
-# Then rebuild the container image
-./container/build.sh
-```
-
-**Diagnosis:**
-
-```bash
-# Check k3s log for image GC activity (Rancher Desktop)
-grep -i "nanoclaw" ~/Library/Logs/rancher-desktop/k3s.log
-# Look for: "Removing image to free bytes" with the nanoclaw-agent image ID
-
-# Check NanoClaw logs for image status
-grep -E "image found|image NOT found|image missing" logs/nanoclaw.log
-```
-
-If you need Kubernetes enabled, set `CONTAINER_IMAGE` to an image stored in a registry that the kubelet won't garbage-collect, or raise the kubelet's GC thresholds.
-
-### Resume branches from stale tree position
-
-**Issue:** When agent teams spawns subagent CLI processes, they write to the same session JSONL. On subsequent `query()` resumes, the CLI reads the JSONL but may pick a stale branch tip, causing responses to land on a branch the host never receives.
-
-**Fix:** Already fixed. The agent runner now passes `resumeSessionAt` with the last assistant message UUID to explicitly anchor each resume.
-
-## Container 401 errors
-
-### Symptoms
-- Container logs show `401 Unauthorized` or `authentication_error` on API calls
-- Agent starts but fails immediately when trying to respond
-- Errors recur every few hours even after restarting
-
-### Cause
-
-Short-lived OAuth tokens copied from the system keychain or `~/.claude/.credentials.json` expire within hours. These tokens share the same `sk-ant-oat01-` prefix as long-lived tokens, so the mistake isn't obvious. When they expire, every container launch fails with a 401.
-
-### Solution
-
-<Tabs>
-  <Tab title="OneCLI Agent Vault (v1.2.35+)">
-    Update the secret registered with OneCLI:
-
-    ```bash
-    # Replace with a long-lived OAuth token or API key
-    onecli secrets create --name Anthropic --type anthropic --value YOUR_KEY --host-pattern api.anthropic.com
-    ```
-
-    You can also use a long-lived OAuth token from `claude setup-token`:
-    ```bash
-    onecli secrets create --name Claude --type oauth --value YOUR_TOKEN --host-pattern api.anthropic.com
-    ```
-  </Tab>
-
-  <Tab title="Credential Proxy (legacy)">
-    Use one of these credential types in `.env`:
-
-    - **Long-lived OAuth token**: Run `claude setup-token` and add the resulting `CLAUDE_CODE_OAUTH_TOKEN` to `.env`
-    - **API key**: Get a key from [console.anthropic.com](https://console.anthropic.com) and add `ANTHROPIC_API_KEY` to `.env`
-  </Tab>
-</Tabs>
-
-After updating credentials, restart the service:
-
-<CodeGroup>
-```bash macOS
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-```
-
-```bash Linux
-systemctl --user restart nanoclaw
-```
-</CodeGroup>
-
-<Warning>
-Never copy tokens from `~/.claude/.credentials.json` into `.env`. These are short-lived keychain tokens that expire within hours. Use `claude setup-token` to generate a long-lived token instead.
-</Warning>
-
-## WhatsApp authentication issues
-
-### Symptoms
-- Logs show "QR" or "authentication required"
-- No messages are being received
-- Connection repeatedly drops
-
-### Diagnosis
-
-```bash
-# Check for QR code requests
-grep 'QR\|authentication required\|qr' logs/nanoclaw.log | tail -5
-
-# Check auth files exist
-ls -la store/auth/
-```
-
-### Solution
-
-Re-authenticate with WhatsApp:
-
-```bash
-claude
-/add-whatsapp
-```
-
-Scan the QR code with your phone, then restart the service:
-
-<CodeGroup>
-```bash macOS
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-```
-
-```bash Linux
-systemctl --user restart nanoclaw
-```
-</CodeGroup>
-
-## Container mount issues
-
-### Symptoms
-- Agent cannot access expected files or directories
-- Logs show "Mount validated" or "Mount REJECTED"
-- Permission errors in container logs
-
-### Diagnosis
-
-```bash
-# Check mount validation logs
-grep -E 'Mount validated|Mount.*REJECTED|mount' logs/nanoclaw.log | tail -10
-
-# Verify the mount allowlist is readable
-cat ~/.config/nanoclaw/mount-allowlist.json
-
-# Check group's container_config in DB
-sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;"
-```
-
-### Solutions
-
-<Accordion title="Add path to mount allowlist">
-  Edit `~/.config/nanoclaw/mount-allowlist.json`:
-  
-  ```json
-  {
-    "allowedRoots": [
-      {
-        "path": "/Users/you/Documents/project",
-        "allowReadWrite": true,
-        "description": "Project files"
-      }
-    ],
-    "blockedPatterns": [".ssh", ".gnupg", ".aws", ".env", "credentials"],
-    "nonMainReadOnly": true
-  }
-  ```
-  
-  Then restart the service. If the mount allowlist file did not exist at startup, NanoClaw will detect it once created without requiring a restart.
-</Accordion>
-
-<Accordion title="Reset mount allowlist to defaults">
-  If you need to regenerate the default mount allowlist (for example, after a misconfiguration), re-run setup with the `--force` flag:
-
-  ```bash
-  claude /setup --force
-  ```
-
-  Without `--force`, setup skips the mount allowlist if it already exists to preserve your customizations.
-</Accordion>
-
-<Accordion title="Check for symlinks">
-  The mount security system resolves symlinks before validation. If you're mounting a symlink, ensure the resolved path is in the allowlist:
-  
-  ```bash
-  readlink -f /path/to/symlink
-  ```
-</Accordion>
-
-<Accordion title="Verify file permissions">
-  Containers run as the host user (or uid 1000 on some systems). Ensure the host user can read the mounted directories:
-  
-  ```bash
-  ls -la /path/to/mount
-  ```
-</Accordion>
-
-<Accordion title="Test mount manually">
-  Run a test container to verify mounts:
-  
-  ```bash
-  docker run -i --rm \
-    -v /path/to/host:/workspace/test:ro \
-    nanoclaw-agent:latest \
-    ls -la /workspace/test
-  ```
-</Accordion>
-
-## IPC issues
-
-### Symptoms
-- Messages sent via IPC don't appear in the chat
-- Tasks don't get scheduled
-- IPC files accumulate in `data/ipc/{group}/`
-
-### Diagnosis
-
-```bash
-# Check for failed IPC operations
-ls -la data/ipc/errors/
-cat data/ipc/errors/main-message-*.json
-
-# Monitor IPC activity
-grep 'IPC' logs/nanoclaw.log | tail -20
-
-# Verify IPC directory permissions
-ls -la data/ipc/main/
-ls -la data/ipc/family-chat/
-```
-
-### Solutions
-
-<Accordion title="Check IPC authorization">
-  Non-main groups can only send messages to their own chat. Verify the `chatJid` in the IPC file matches the group's registered JID:
-  
-  ```bash
-  sqlite3 store/messages.db "SELECT jid, name, folder FROM registered_groups;"
-  ```
-</Accordion>
-
-<Accordion title="Verify JSON format">
-  IPC files must be valid JSON. Check for syntax errors:
-  
-  ```bash
-  cat data/ipc/errors/{group}-message-*.json | jq .
-  ```
-</Accordion>
-
-<Accordion title="Test IPC manually">
-  Write a test message:
-  
-  ```bash
-  echo '{"type":"message","chatJid":"me","text":"test"}' > \
-    data/ipc/main/messages/test.json
-  
-  # Watch logs for processing
-  tail -f logs/nanoclaw.log | grep IPC
-  ```
-</Accordion>
-
-## Session artifact auto-pruning
-
-NanoClaw automatically cleans up stale session artifacts on startup and then every 24 hours. This prevents disk usage from growing unbounded as sessions accumulate.
-
-**Retention policy:**
-
-| Artifact | Retention | Notes |
-|----------|-----------|-------|
-| Session JSONLs and tool results | 7 days | Active sessions (from DB) are never deleted |
-| Debug logs | 3 days | Active sessions skipped |
-| Todo files | 3 days | Active sessions skipped |
-| Telemetry | 7 days | Active sessions skipped |
-| Group logs | 7 days | — |
-
-The cleanup script reads active session IDs from SQLite and never deletes files belonging to active sessions. It runs 30 seconds after startup to avoid competing with initialization, then repeats on a 24-hour interval.
-
-You can run the cleanup manually with `--dry-run` to preview what would be deleted:
-
-```bash
-bash scripts/cleanup-sessions.sh --dry-run
-```
-
-## Stale session auto-recovery
-
-NanoClaw automatically detects and recovers from stale or corrupt sessions. When a container fails because the session transcript file (`.jsonl`) is missing — due to a crash mid-write, manual deletion, or disk-full condition — NanoClaw clears the broken session ID and lets the existing backoff mechanism in the group queue retry with a fresh session.
-
-Stale sessions are detected by matching the error output against known patterns (`no conversation found`, `ENOENT` on `.jsonl` files, or `session not found`). Only these specific signals trigger session clearing — transient errors (network, API) fall through to the normal retry path.
-
-You can identify stale session recovery in logs by looking for:
-
-```
-Stale session detected — clearing for next retry
-```
-
-No manual intervention is required.
-
-### Manual recovery
-
-If auto-recovery doesn't trigger (e.g., the error message doesn't match the expected patterns), you can manually clear a stale session:
-
-```bash
-sqlite3 store/messages.db "DELETE FROM sessions WHERE group_folder = '{group-folder}';"
-```
-
-Then restart the service or wait for the next retry.
-
-## Session branching issues
-
-### Symptoms
-- Agent responses don't appear in the conversation
-- Session transcript shows multiple branches
-- Concurrent CLI processes in session debug logs
-
-### Diagnosis
-
-```bash
-# Check for concurrent CLI processes
-ls -la data/sessions/{group}/.claude/debug/
-
-# Count unique SDK processes (each .txt file = one CLI subprocess)
-# Multiple files = concurrent queries
-
-# Check parentUuid branching in transcript
-python3 -c "
-import json, sys
-lines = open('data/sessions/{group}/.claude/projects/-workspace-group/{session}.jsonl').read().strip().split('\n')
-for i, line in enumerate(lines):
-  try:
-    d = json.loads(line)
-    if d.get('type') == 'user' and d.get('message'):
-      parent = d.get('parentUuid', 'ROOT')[:8]
-      content = str(d['message'].get('content', ''))[:60]
-      print(f'L{i+1} parent={parent} {content}')
-  except: pass
-"
-```
-
-### Solution
-
-This issue was fixed by passing `resumeSessionAt` with the last assistant message UUID. If you're still experiencing it, ensure you're running the latest version of the agent runner.
-
-## Service management
-
-### Restart the service
-
-```bash
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
-```
-
-### View live logs
-
-```bash
-tail -f logs/nanoclaw.log
-```
-
-### Stop the service
-
-<Warning>
-Stopping the service does NOT kill running containers. They will continue running as orphaned processes.
-</Warning>
-
-```bash
-launchctl bootout gui/$(id -u)/com.nanoclaw
-```
-
-### Start the service
-
-```bash
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw.plist
-```
-
-### Rebuild after code changes
-
-```bash
-npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+ncl sessions list                              # find the session and its agent group
+rm -rf data/v2-sessions/<group>/<session>/
 ```
 
 ## Getting help
 
-If you're still experiencing issues:
-
-1. **Ask Claude Code directly:** Run `claude` and describe the problem. Claude can read logs, check database state, and diagnose issues.
-
-2. **Run the debug skill:** `claude` → `/debug` for guided troubleshooting.
-
-3. **Check the Discord:** [Join the community](https://discord.gg/VDdww8qS42) for help from other users.
-
-4. **Review recent changes:** If the issue started after a customization, review what changed:
-   ```bash
-   git diff
-   git log --oneline -10
-   ```
-
-## Related pages
-
-- [Security model](/concepts/security) - Authorization and isolation
-- [IPC system](/concepts/architecture) - Inter-process communication
-- [Container runtime](/concepts/container-lifecycle) - Container execution details
+- Run `/debug` in Claude Code — it can read the logs and query the session DBs for you.
+- [Join the Discord](https://discord.gg/VDdww8qS42) for help from other users.
+- [Open an issue](https://github.com/nanocoai/nanoclaw/issues) if you've found a bug.
