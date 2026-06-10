@@ -83,7 +83,7 @@ If nothing comes back after the cold start, check what the router did with the m
 ncl dropped-messages list
 ```
 
-A `no_agent_engaged` row means your pattern didn't match the text you sent.
+A `no_agent_engaged` drop row only appears when no wiring on the chat matched at all — in this tutorial's setup a catch-all (or complementary) pattern always engages one agent, so if the table is empty, check whether the *other* agent answered instead: your message probably didn't start with "scout".
 
 </Step>
 <Step title="Inspect what was created">
@@ -92,10 +92,10 @@ That first message materialized everything that was lazy in step 1. The group fo
 
 ```bash
 ls groups/scout/
-# CLAUDE.local.md
+# CLAUDE.md  CLAUDE.local.md
 ```
 
-`CLAUDE.local.md` is the agent's persistent memory, auto-loaded on every spawn. Groups created via `ncl` start with it **empty** — edit it to give Scout a personality and standing instructions (see [customize an agent](/guides/customize-an-agent)).
+`CLAUDE.md` is the composed instructions file the host regenerates on every spawn — don't edit it. `CLAUDE.local.md` is the agent's editable persistent memory, auto-loaded on every spawn. Groups created via `ncl` start with it **empty** — edit it to give Scout a personality and standing instructions (see [customize an agent](/guides/customize-an-agent)).
 
 The session — the runtime unit mapping this (agent, chat) pair to a container — is visible too:
 
