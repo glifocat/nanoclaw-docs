@@ -37,6 +37,7 @@ The site was fully rewritten for v2 (PRs #296–#303), verified against `nanocoa
 - **Upstream:** https://github.com/nanocoai/nanoclaw (org moved from `qwibitai`; old URLs redirect).
 - **Code is the ONLY source of truth.** Upstream `docs/`, README.md, CLAUDE.md, and even SKILL.md prose all drift from reality. Verify every claim against `src/`, `container/`, `setup/`, `.claude/skills/` (treat SKILL.md as the executable spec for a skill's BEHAVIOR, but never as a source of facts about core code), and the shell scripts. Every docs page carries a `{/* verified-against: <files> @ <sha> */}` comment — update it whenever you re-verify a page.
 - **Confirmed upstream-doc traps** (claims that are false in code): Apple Container support (doesn't exist; Docker is hardcoded), tini as PID 1 (image default is overridden at spawn; bun is PID 1), `groups/global/` persistence (deleted on every startup), skills-as-git-branches (never shipped in v2; upstream `docs/skills-as-branches.md` is stale), `MAX_CONCURRENT_CONTAINERS` (parsed in `src/config.ts`, never enforced), adapter SKILL.md version pins (drift from the `setup/*.sh` installer pins — prefer the `.sh`), the customize skill's persona-file claim (stale).
+- **Recurring rewrite error classes**: session-mode/engage-mode enum mixups, SKILL.md version pins vs `setup/*.sh` installer pins, dead-config claims (vars parsed but unenforced), absolute claims ("no X exists") that fail edge checks, and quotes that silently elide or paraphrase source — verify each against code before writing.
 - **Channels:** trunk ships infrastructure plus a CLI channel only — NO messaging channel lives on `main`. 17 adapters live on the `channels` registry branch (WhatsApp, WhatsApp Cloud, Telegram, Discord, Slack, Signal, iMessage, Teams, Google Chat, Matrix, Delta Chat, Emacs, GitHub, Linear, Resend, Webex, WeChat), installed by `/add-<channel>` skills that fetch-and-copy files — never `git merge`. 7 channels have `setup/add-*.sh` wizards (whatsapp, telegram, discord, slack, signal, imessage, teams).
 - **Skills:** SKILL.md workflows in `.claude/skills/` (channel/provider/tool installers plus operational skills) and container skills in `container/skills/` mounted into every agent container. Skills are NOT git branches.
 - **No HTTP API:** inbound webhook server (`/webhook/{adapterName}`) plus Unix sockets — the `ncl` admin CLI on `data/ncl.sock`, the CLI channel on `data/cli.sock`.
@@ -65,6 +66,8 @@ Compare the output against the paths cited in each page's `verified-against` com
 - For auto-closing issues, put each `Closes #N` on its own line in the PR body
 - For multi-concern changes, split into stacked PRs (base each on the previous branch). After merging, retarget the next PR to `main` and rebase.
 - **Post-merge verification**: Use the `nanoclaw-docs` MCP (`search_nano_claw`) to verify changes are live and indexed correctly after merging to `main`.
+- **Live-site checks**: the docs edge returns 404 to `curl` even for valid pages — verify live URLs with a real browser (Playwright MCP), never curl alone.
+- `gh pr create`/`merge` occasionally fail transiently with an auth-refresh message — retry once before debugging credentials.
 
 ## Architecture
 
@@ -118,6 +121,8 @@ keywords: ["relevant", "search", "terms"]
 
 **Navigation:** When adding or moving pages, update the `navigation` array in `docs.json`. The site has two tabs — "Documentation" (7 groups: Get started, Channels, Operate, Build with agents, Extend, Understand, Changelog) and "Reference" (2 groups: Operating, Internals) — plus a global Changelog anchor. New pages not added to `docs.json` won't appear in the sidebar.
 
+**docs.json hrefs:** `mint validate`/`broken-links` don't check `href` values in anchors/navbar, and `mint dev` routing is laxer than prod (prod collapses `index` pages: `/changelog/index` 404s live). Use relative hrefs in navigation and verify anchors on the deployed site.
+
 **File naming:** Use kebab-case (e.g., `agent-swarms.mdx`). Match existing patterns in the directory.
 
 **Internal links:** Use root-relative paths without file extensions: `/getting-started/quickstart` (not `../page` or `/page.mdx`).
@@ -150,6 +155,7 @@ Mintlify workflows generate automated PRs (`mintlify/*` branches) on upstream ch
 - **Code snippets must match source**: Automated PRs sometimes rename terms in code snippets to match marketing (e.g., "gateway" → "Agent Vault" in logger.warn). Always compare code blocks against actual upstream files — docs prose uses product names but code must match `src/`.
 - **Cascading merge conflicts**: Merging one PR invalidates others touching the same files. When triaging a batch, merge isolated-file PRs first, then tackle overlapping clusters. Close conflicting PRs and consolidate verified changes into a single new PR.
 - **Bulk branch cleanup**: `gh api -X DELETE repos/OWNER/REPO/git/refs/heads/BRANCH` — use after closing automated PRs to prevent clutter
+- **`gh pr list` caps at 30 results by default** — use `--limit 100` when triaging backlogs, and re-run until empty.
 - **Verify upstream PRs exist**: `gh pr view NUMBER --repo nanocoai/nanoclaw --json title,state` — automated PRs cite upstream PRs that may not exist
 - **Watch for destructive automated PRs**: PRs that remove legacy/deprecated content may conflict with intentional version-tabbed documentation. Verify the removal is actually desired before merging.
 - **"Superseded" PRs may have unique changes**: Always diff line-by-line before closing — never rely solely on PR descriptions
