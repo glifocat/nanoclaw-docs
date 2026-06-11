@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Mintlify-powered documentation site for **NanoClaw** — a lightweight, secure AI assistant that runs Claude agents in isolated Docker containers with multi-messenger support. The main NanoClaw repo is at https://github.com/nanocoai/nanoclaw; this repo is the docs site deployed to https://nanoclaw.dev.
+Mintlify-powered documentation site for **NanoClaw** — a lightweight, secure AI assistant that runs Claude agents in isolated Docker containers with multi-messenger support. The main NanoClaw repo is at https://github.com/nanocoai/nanoclaw; this repo is the docs site deployed to https://docs.nanoclaw.dev (the root https://nanoclaw.dev is the separate marketing site — absolute links to it from docs navigation will 404; use relative hrefs).
 
 **GitHub:** `glifocat/nanoclaw-docs` (not `nanocoai` — that's the upstream NanoClaw source repo)
 
