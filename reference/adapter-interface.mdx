@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["channel adapter", "ChannelAdapter", "adapter interface", "custom channel", "chat sdk bridge", "registerChannelAdapter", "initChannelAdapters", "supportsThreads", "deliver", "InboundMessage"]
 ---
 
-{/* verified-against: src/channels/adapter.ts, src/channels/channel-registry.ts, src/channels/chat-sdk-bridge.ts, src/channels/index.ts, src/webhook-server.ts, channels branch src/channels/telegram.ts @ dc34ceb (v2.1.4) */}
+{/* verified-against: src/channels/adapter.ts, src/channels/channel-registry.ts, src/channels/chat-sdk-bridge.ts, src/channels/index.ts, src/webhook-server.ts, channels branch src/channels/telegram.ts @ 435233a (v2.1.15) */}
 
 A channel adapter bridges NanoClaw with a messaging platform. There are two ways to build one:
 
@@ -23,6 +23,15 @@ The full interface, from `src/channels/adapter.ts`:
 export interface ChannelAdapter {
   name: string;
   channelType: string;
+
+  /**
+   * Adapter-instance name — distinguishes N adapters of one platform
+   * (e.g. three Slack apps in one workspace). Defaults to channelType.
+   * channelType stays the SEMANTIC platform key (user ids, formatting,
+   * container config); instance is a host-side routing key only.
+   * Must be unique across active adapters and URL-safe (no '/', '?', ':').
+   */
+  instance?: string;
 
   /**
    * Whether this adapter models conversations as threads.
@@ -83,7 +92,8 @@ How the host calls each member:
 
 | Member | Required | How the host uses it |
 |---|---|---|
-| `name` / `channelType` | Yes | `name` labels logs; `channelType` keys the adapter in the active-adapter map and in `messaging_groups.channel_type`. The bridge sets both to the Chat SDK adapter's name. |
+| `name` / `channelType` | Yes | `name` labels logs; `channelType` is the semantic platform key — user ids, formatting, and `messaging_groups.channel_type`. The bridge sets both to the Chat SDK adapter's name. |
+| `instance?` | No | Names this adapter instance so N adapters of one platform (e.g. three Slack apps in one workspace) can coexist. The host keys the active-adapter map by `instance ?? channelType`, stamps it on inbound events and `messaging_groups.instance`, and routes replies and typing back through the instance a message arrived on. Omit it and the instance defaults to `channelType` — single-instance installs are byte-for-byte unchanged. Must be unique across active adapters and URL-safe (`[A-Za-z0-9._-]`). |
 | `supportsThreads` | Yes | `true`: one thread = one session, replies go to the originating thread. `false`: the router strips thread ids and the channel itself is the conversation. This shapes [session identity](/concepts/entity-model). |
 | `setup(config)` | Yes | Called once at startup by `initChannelAdapters()`. Connect to the platform here and hold on to `config` — its callbacks are how you hand messages to the host. |
 | `teardown()` | Yes | Called on shutdown by `teardownChannelAdapters()`. Close connections; errors are logged, not fatal. |
@@ -164,7 +174,7 @@ export interface ChannelRegistration {
 `createChatSdkBridge(config)` from `src/channels/chat-sdk-bridge.ts` wraps a Chat SDK `Adapter` into a complete `ChannelAdapter`. What it handles for you:
 
 - **Inbound dispatch** — wires all four SDK paths (subscribed threads, new mentions, DMs, plain messages) into `onInbound`, with the platform-confirmed `isMention` flag set correctly for each.
-- **Webhook or gateway registration** — gateway-capable adapters (Discord) get a supervised gateway listener with exponential backoff; everything else is registered on the shared webhook server at `/webhook/{adapterName}` (port `WEBHOOK_PORT`, default 3000).
+- **Webhook or gateway registration** — gateway-capable adapters (Discord) get a supervised gateway listener with exponential backoff; everything else is registered on the shared webhook server at `/webhook/{routingPath}` (port `WEBHOOK_PORT`, default 3000). The routing path defaults to the adapter name, so single-instance routes are unchanged; a second instance of the same platform passes an `instance` and registers on `/webhook/{instance}` with its own signing secret and Chat SDK state namespace. Modules can also claim a raw `/webhook/{path}` for non–Chat SDK webhooks via `registerWebhookHandler()` — raw routes take priority over adapter routes.
 - **Chunking** — set `maxTextLength` and outbound text longer than the platform limit is split on paragraph → line → word (space) → hard-character boundaries into multiple messages. Files ride on the first chunk, and the first chunk's id is returned so edits and reactions still target the head of the reply. Without it, platforms like Discord (2000) and Telegram (4096) truncate silently.
 - **Reply context** — pass `extractReplyContext` to pull quoted-reply text and sender out of the platform's raw message.
 - **Attachments** — inbound attachments are downloaded and base64-embedded before serialization; outbound `message.files` are posted as uploads.

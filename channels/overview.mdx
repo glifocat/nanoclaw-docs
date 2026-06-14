@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["channels", "adapters", "channel registry", "chat sdk", "webhook", "add-telegram", "add-discord", "add-slack", "manage-channels"]
 ---
 
-{/* verified-against: src/channels/{adapter,channel-registry,index,chat-sdk-bridge,cli}.ts, src/webhook-server.ts, .claude/skills/{manage-channels,add-telegram}/SKILL.md, upstream/channels:src/channels/ @ dc34ceb (v2.1.4) */}
+{/* verified-against: src/channels/{adapter,channel-registry,index,chat-sdk-bridge,cli}.ts, src/webhook-server.ts, .claude/skills/{manage-channels,add-telegram}/SKILL.md, upstream/channels:src/channels/ @ 435233a (v2.1.15) */}
 
 NanoClaw trunk ships channel **infrastructure** — the adapter interface, the registry, the Chat SDK bridge, the webhook server — plus one built-in channel: `cli`, an always-on local-terminal channel that needs no credentials. Every platform adapter (Telegram, Discord, Slack, WhatsApp, …) lives on the `channels` branch of the repo and is installed on demand with an `/add-<channel>` skill. Your fork only contains the channels you actually use.
 
@@ -24,7 +24,7 @@ flowchart LR
     REG[Channel registry] -.->|"instantiates at startup,<br/>resolves adapter for delivery"| A
 ```
 
-The adapter normalizes platform events into inbound messages; the router matches them to a wiring (which agent group handles which chat) and writes them into the right session; the agent's reply drains through the delivery module, which looks up the adapter by channel type in the registry and calls `deliver()`.
+The adapter normalizes platform events into inbound messages; the router matches them to a wiring (which agent group handles which chat) and writes them into the right session; the agent's reply drains through the delivery module, which looks up the owning adapter in the registry — by the messaging group's `instance` (which defaults to the channel type) — and calls `deliver()`, so a reply always leaves through the same adapter the message arrived on.
 
 Adapters come in two flavors:
 
@@ -75,8 +75,11 @@ The built-in `cli` channel isn't in this table because it ships on trunk — see
 Chat SDK channels that receive platform events over HTTP (Slack, Teams, GitHub, and others) share one webhook server. It starts lazily when the first such adapter registers and routes by path:
 
 ```text
-/webhook/{adapterName}   →   that adapter's Chat SDK webhook handler
+/webhook/{routingPath}   →   that adapter's Chat SDK webhook handler
+/webhook/{path}          →   a raw handler from registerWebhookHandler()
 ```
+
+The routing path defaults to the adapter name, so single-instance routes are unchanged; a second adapter of the same platform passes an `instance` and listens on `/webhook/{instance}` with its own signing secret. Modules that need a non–Chat SDK endpoint (a custom GitHub webhook, a payment provider, a health check) register a raw handler on the same server with `registerWebhookHandler(path, handler)` instead of opening a second port — raw routes take priority over adapter routes.
 
 The port comes from the `WEBHOOK_PORT` environment variable, default `3000`. Point the platform's event subscription URL at `https://<your-public-host>/webhook/<channel>` (e.g. `/webhook/slack`) — you'll need a public URL or a tunnel for these channels. Discord is the exception: it uses a persistent Gateway listener instead of inbound webhooks, so no public URL is required. Telegram (long polling), WhatsApp, Signal, and WeChat hold their own outbound connections, so they don't need one either.
 
