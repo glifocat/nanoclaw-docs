@@ -1,0 +1,98 @@
+---
+title: "Uninstall NanoClaw"
+description: "Remove a NanoClaw install — service, containers, data, and credential agents — with a scan, confirm, and execute flow scoped to this checkout."
+icon: "trash"
+tag: "NEW"
+keywords: ["uninstall", "remove", "delete", "cleanup", "nanoclaw.sh --uninstall", "dry run", "install slug"]
+---
+
+{/* verified-against: setup/uninstall/{flow,scan,plan,remove,onecli-agents}.ts, setup/lib/setup-config.ts, setup/auto.ts, uninstall.sh, nanoclaw.sh, src/install-slug.ts @ 435233a (v2.1.15) */}
+
+NanoClaw ships an interactive uninstaller that removes a single install — its service, containers, image, data, and the credential agents it registered. Everything NanoClaw creates is tagged with a per-checkout **install slug** (the first 8 hex characters of `sha1(projectRoot)`), so the uninstaller only ever touches the copy you run it from. Two NanoClaw checkouts on one host never remove each other's artifacts.
+
+## Run it
+
+From the project root:
+
+```bash
+bash nanoclaw.sh --uninstall
+```
+
+The uninstaller short-circuits before any setup work, so it never installs dependencies just to remove them. There's also a wrapper that accepts the legacy short flags (`-n` → `--dry-run`, `-y` → `--yes`):
+
+```bash
+./uninstall.sh
+```
+
+And if you run setup on a folder that already has an install, the wizard offers **Uninstall NanoClaw & exit** as an alternative to upgrading.
+
+<Tip>
+Start with `bash nanoclaw.sh --uninstall --dry-run` to see exactly what would be removed without changing anything.
+</Tip>
+
+## What gets removed
+
+The uninstaller groups everything it finds into four confirmation groups. Each group is shown as a what/where table and asks a separate, default-**No** question — you opt into each one.
+
+| Group | Contains |
+|---|---|
+| **1) App & background service** | The background service (launchd/systemd), any running NanoClaw process, this install's Docker containers and image (matched by the install slug), and the `ncl` command symlink. |
+| **2) App data, logs & secrets** | The central database (`data/v2.db`, with message history), logs, build files (`dist/`, `node_modules/`), and your `.env` (API keys and tokens). Removing this erases stored conversations and saved credentials. |
+| **3) Agents' memory & files** | Notes and memory your agents created (`groups/`) and any migrated data (`store/`). Content you made — unrecoverable after deletion. |
+| **4) OneCLI credential agents** | The per-agent entries this copy registered in the OneCLI vault. |
+
+Your `.env` is never deleted outright — it's copied to `.env.bak` first (a timestamped name if a backup already exists), so saved credentials survive the removal.
+
+## What's left alone
+
+The uninstaller is deliberately narrow. It does **not** touch:
+
+- **The OneCLI app, your credentials, and the gateway** — the vault is a shared, out-of-band component, so removing one NanoClaw copy never tears it down.
+- **Other NanoClaw copies on the machine** — the install slug scopes every action to the current checkout.
+- **Anything it can't confidently attribute to this copy** — for example OneCLI agents from another checkout (it labels these "orphans"). These are listed as "left in place" rather than removed.
+
+A final summary prints what was left alone and any step that couldn't complete, with a manual command to finish the job.
+
+## How it works
+
+<Steps>
+<Step title="Scan">
+Inventories the artifacts tagged with this checkout's install slug. If nothing is found, it reports the copy is already clean and exits.
+</Step>
+<Step title="Confirm (or preview)">
+Each non-empty group is shown with its contents and a default-No prompt. Nothing is deleted until every decision is made, so pressing `Ctrl-C` anywhere in this phase leaves the install completely untouched. With `--dry-run`, this phase just prints what would be removed and exits.
+</Step>
+<Step title="Execute">
+Applies your choices in a safe order — service and containers first (so nothing can respawn), then credential agents, data, and your content. The runtime tail (`dist/`, then `node_modules/`) goes last, because the uninstaller itself is running out of `node_modules/`.
+</Step>
+</Steps>
+
+## Flags
+
+| Flag | Effect |
+|---|---|
+| `--uninstall` | Run the uninstaller. |
+| `--dry-run` | Preview what would be removed without changing anything. |
+| `--yes` | Delete everything found without prompting. Orphan vault agents (from other copies) are still kept. |
+
+`--yes` needs no terminal, which makes it the way to uninstall non-interactively; without it (and without `--dry-run`), the uninstaller requires an interactive terminal and stops otherwise.
+
+## If dependencies are missing
+
+The uninstaller runs on the TypeScript toolchain in `node_modules/`. If those are already gone, `bash nanoclaw.sh --uninstall` can't run the full flow — it prints manual cleanup commands instead, including how to remove this install's containers and image by slug:
+
+```bash
+docker ps -aq --filter label=nanoclaw-install=<slug> | xargs -r docker rm -f
+docker rmi nanoclaw-agent-v2-<slug>:latest
+```
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Upgrading" icon="arrow-up" href="/operate/upgrading">
+    Update NanoClaw and its skills the supported way.
+  </Card>
+  <Card title="Credentials" icon="key" href="/operate/credentials">
+    The OneCLI vault the uninstaller deliberately leaves running.
+  </Card>
+</CardGroup>
