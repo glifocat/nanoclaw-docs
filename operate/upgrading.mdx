@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["upgrade", "update", "update-nanoclaw", "update-skills", "migrate-nanoclaw", "upstream", "merge", "rollback"]
 ---
 
-{/* verified-against: .claude/skills/update-nanoclaw/SKILL.md, .claude/skills/update-skills/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md, scripts/upgrade-state.ts, src/upgrade-state.ts @ dc34ceb */}
+{/* verified-against: .claude/skills/update-nanoclaw/SKILL.md, .claude/skills/update-skills/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md, scripts/upgrade-state.ts, src/upgrade-state.ts @ 435233a (v2.1.15) */}
 
 Don't update with a raw `git pull`. NanoClaw records each sanctioned upgrade in `data/upgrade-state.json`, and a startup tripwire refuses to boot if the running code's version doesn't match that marker. The supported path is the `/update-nanoclaw` skill, which handles the merge, validation, and the marker stamp for you.
 
@@ -20,7 +20,7 @@ Run `/update-nanoclaw` in a Claude Code session at your project root. The skill 
 5. **Conflict preview.** Dry-runs the merge (`git merge --no-commit --no-ff`, then abort) so you see which files would conflict before committing to anything.
 6. **Merge and resolve.** Applies your chosen path. On conflicts it opens only the conflicted files, resolves the markers, and keeps your local customizations intact.
 7. **Validation.** Runs `pnpm run build` and `pnpm test`. If `container/` files changed, it also rebuilds the container image with `./container/build.sh`.
-8. **Breaking changes.** Scans the new `CHANGELOG.md` entries for `[BREAKING]` lines and offers to run each referenced migration skill.
+8. **Breaking changes.** Scans the new `CHANGELOG.md` entries for `[BREAKING]` lines and diffs `versions.json` for moved component pins (e.g. `onecli-gateway`, `onecli-cli`). Each carries a migration path — a skill to run or a `docs/` page to follow verbatim — and the skill offers to run each one. A moved `onecli-gateway` pin, for example, routes you to [`docs/onecli-upgrades.md`](https://github.com/nanocoai/nanoclaw/blob/main/docs/onecli-upgrades.md); the gateway is an external component, so it's never upgraded for you.
 9. **Marker stamp.** On success, stamps the upgrade marker (`pnpm exec tsx scripts/upgrade-state.ts set "" update-nanoclaw`) so the tripwire passes on next start.
 10. **Summary.** Prints the backup tag, conflicts resolved, and the restart command for your platform.
 
