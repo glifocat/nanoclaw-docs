@@ -18,7 +18,7 @@ Setup builds one base image per install from `container/Dockerfile` (see [Instal
 - **`node:22-slim`** base with **Bun** as the agent-runner's runtime — TypeScript runs directly, no compile step
 - **`tini`** as the image's default entrypoint — though production spawns override the entrypoint entirely, so Bun runs as PID 1 (see the spawn section below)
 - **Chromium** plus its library stack for browser automation (`agent-browser` drives it; CJK fonts are an opt-in `INSTALL_CJK_FONTS=true` build arg)
-- **Pinned global CLIs** via pnpm: `@anthropic-ai/claude-code` and `vercel` at fixed versions, `agent-browser` tracking latest
+- **Pinned global CLIs** via pnpm — `@anthropic-ai/claude-code`, `agent-browser`, and `vercel`, each pinned to an exact version. The versions live in `container/cli-tools.json`; `install-cli-tools.sh` reads that manifest and runs `pnpm install -g` for each entry, so a skill adds a CLI by appending to the manifest instead of editing the Dockerfile
 
 The agent-runner source is **never baked in** — the host bind-mounts it read-only at `/app/src` on every spawn, so source changes never require a rebuild. Rebuilds are only for the Dockerfile itself, CLI version bumps, or agent-runner dependency changes — `package.json` and `bun.lock` are copied in and `bun install`ed at build time.
 
