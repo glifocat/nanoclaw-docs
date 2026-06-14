@@ -5,6 +5,13 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Drift sweep against v2.1.15: token count and container CLIs" description="2026-06-14" tags={["Updated"]}>
+  First slice of re-verification against upstream `nanocoai/nanoclaw@435233a` (v2.1.15, up from v2.1.4). Two code-confirmed factual corrections shipped; larger concerns (multi-instance adapters, provider memory scaffold, OneCLI `/v1` upgrade, the new uninstall flow) follow in separate PRs.
+
+  - **`introduction.mdx`**: codebase token count ~185k → ~194k (verified against `repo-tokens/badge.svg`)
+  - **`installation.mdx`** and **`concepts/container-lifecycle.mdx`**: the container's pinned global CLIs now come from a `container/cli-tools.json` manifest installed by `install-cli-tools.sh` — `agent-browser` is pinned to an exact version rather than tracking `latest`
+</Update>
+
 <Update label="Full portal refactor: job-based navigation, v2-only, code-verified" description="2026-06-10" tags={["New", "Updated"]}>
   The whole site was restructured and rewritten across nine PRs (#296–#304), replacing the feature-centric tree (`integrations/`, `features/`, `advanced/`, `api/`) with a job-based journey: **Get started → Channels → Operate → Build with agents → Extend → Understand**, plus a **Reference** tab derived entirely from source code.
 
