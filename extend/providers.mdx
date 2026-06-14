@@ -5,12 +5,12 @@ tag: "UPDATED"
 keywords: ["providers", "agent provider", "claude", "opencode", "codex", "ollama", "local models", "agent_provider", "model", "effort"]
 ---
 
-{/* verified-against: container/agent-runner/src/providers/{types,factory,claude,provider-registry}.ts, container/agent-runner/src/{config,index}.ts, src/container-runner.ts, src/container-config.ts, src/providers/{claude,provider-container-registry}.ts, src/cli/resources/{groups,sessions}.ts, .claude/skills/{add-opencode,add-codex,add-ollama-provider}/SKILL.md, docs/ollama.md @ trunk dc34ceb (v2.1.4); opencode.ts, codex.ts, codex-app-server.ts @ providers branch 5e76b9d */}
+{/* verified-against: container/agent-runner/src/providers/{types,factory,claude,provider-registry}.ts, container/agent-runner/src/{config,index,memory-scaffold,poll-loop}.ts, container/agent-runner/src/memory-templates/, src/container-runner.ts, src/container-config.ts, src/providers/{claude,provider-container-registry}.ts, src/cli/resources/{groups,sessions}.ts, .claude/skills/{add-opencode,add-codex,add-ollama-provider}/SKILL.md, docs/ollama.md @ trunk 435233a (v2.1.15); opencode.ts, codex.ts, codex-app-server.ts @ providers branch 5e76b9d */}
 
 A **provider** is the agent CLI that runs inside a group's container — the thing that actually plans, calls tools, and writes replies. By default that's Claude Code via the Claude Agent SDK. The provider is pluggable: the agent runner selects an implementation from an open registry at startup, and the trunk ships only `claude` (plus a `mock` provider for tests).
 
 <Note>
-Don't confuse providers with [tools](/extend/tools). A tool skill like `/add-ollama-tool` keeps Claude as the agent's brain and gives it a local model to call; a provider skill **replaces** the brain for an entire group.
+Don't confuse providers with [tools](/extend/tools). A tool skill like `/add-ollama-tool` keeps your existing provider as the agent's brain and gives it a local model to call; a provider skill **replaces** the brain for an entire group.
 </Note>
 
 ## How the provider is resolved
@@ -27,7 +27,7 @@ Every code path that creates a session on trunk writes `agent_provider = null`, 
 
 ## Claude (default)
 
-The Claude provider wraps the Claude Agent SDK. Its `model` accepts an alias (`sonnet`, `opus`, `haiku`) or a full model ID, and `effort` is one of `low`, `medium`, `high`, `xhigh`, `max` — both optional, both falling back to the SDK default. It's also the most capable provider: native slash-command handling, and transcript rotation that archives oversized session histories before a cold resume can wedge the container.
+The Claude provider wraps the Claude Agent SDK. Its `model` accepts an alias (`sonnet`, `opus`, `haiku`) or a full model ID, and `effort` is one of `low`, `medium`, `high`, `xhigh`, `max` — both optional, both falling back to the SDK default. It's also the most fully integrated provider in-tree: native slash-command handling, mid-turn input streaming, native memory (`CLAUDE.local.md`), and transcript rotation that archives oversized session histories before a cold resume can wedge the container.
 
 To point it at any Anthropic-compatible endpoint, set `ANTHROPIC_BASE_URL` in `.env` — the real token stays in the vault and is injected on the wire. See [Credentials](/operate/credentials#anthropic-credentials).
 
@@ -77,6 +77,16 @@ Verified against the provider sources on the `providers` branch:
 - **CLAUDE.md imports are emulated.** Codex's app-server doesn't expand `@-import` directives or auto-load `CLAUDE.local.md`, so the provider resolves both itself to reconstruct the composed system prompt.
 - **No transcript rotation.** Only the Claude provider implements `maybeRotateContinuation` — the guard against unresumable, oversized session transcripts.
 
+## Provider capability hooks
+
+A provider implementation declares a handful of optional capabilities. The runner and host read them by name and apply them generically — never branching on a hardcoded provider name — so each is opt-in and default-off: a provider that declares none behaves exactly as before the hooks existed. The three that shape the agent's environment:
+
+- **Persistent memory scaffold** (`usesMemoryScaffold`). A provider with no native memory of its own opts in, and the runner builds an idempotent `memory/` tree in the agent's host-backed workspace (`/workspace/agent`) at boot: `memory/index.md`, `memory/system/definition.md`, plus `memory/memories/` (durable facts, people, projects, decisions) and `memory/data/` (structured reference data). It persists across container restarts and only writes what's missing, so the agent's own edits are never clobbered. Claude omits the flag because it already has native memory (`CLAUDE.local.md`), so its memory is left untouched.
+
+- **Exchange archiving** (`onExchangeComplete`). The poll loop calls this after every completed exchange — a result, a wrapping retry, or an error — handing the provider a `ProviderExchange` (the prompt, the result, the continuation id, and a `completed` / `undelivered` / `error` status). A provider whose harness already keeps an on-disk transcript (the Claude Agent SDK writes `.jsonl`) omits it; one that keeps no transcript implements it to archive each round-trip itself, e.g. as markdown under the agent's `conversations/` dir. It's best-effort — the loop catches and logs anything it throws.
+
+- **Owning the agent surfaces** (`providesAgentSurfaces`). By default the host composes the project doc, skill-discovery links, and provider state dir, then mounts them into the container — the composed `CLAUDE.md`, the skill fragments, and `CLAUDE.local.md` seeding. A provider can declare at registration time that it owns these surfaces; the host then skips all of that, and the provider's own config fn composes and mounts its equivalents (it receives the group dir and the resolved skill list to do so).
+
 ## Switching a group
 
 Set the provider (and optionally model/effort) on the group's container config, then restart:
@@ -101,6 +111,6 @@ Config changes are saved immediately but only take effect on the next container 
     How provider API keys stay out of containers
   </Card>
   <Card title="Give agents tools" icon="screwdriver-wrench" href="/extend/tools">
-    Keep Claude as the brain and add capabilities instead
+    Keep the same brain and add capabilities instead
   </Card>
 </CardGroup>
