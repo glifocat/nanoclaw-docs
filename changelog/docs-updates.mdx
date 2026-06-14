@@ -5,6 +5,15 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Provider capability hooks" description="2026-06-14" tags={["Updated"]}>
+  v2.1.15 added provider-agnostic capability hooks so a non-Claude provider can plug into NanoClaw without special-casing. Documented on **`extend/providers.mdx`**, verified against `nanocoai/nanoclaw@435233a`.
+
+  - **`usesMemoryScaffold`**: a provider without native memory opts in, and the runner builds an idempotent `memory/` tree (`index.md`, `system/definition.md`, `memories/`, `data/`) in the agent's host-backed workspace at boot. Claude omits it — it already has native memory (`CLAUDE.local.md`).
+  - **`onExchangeComplete`**: the poll loop hands each prompt/result round-trip to providers whose harness keeps no on-disk transcript, so they can archive exchanges themselves.
+  - **`providesAgentSurfaces`**: a provider can declare it owns the composed project doc, skill links, and state dir; the host then skips the default surfaces and the provider composes its own.
+  - Same pass nudged the page's voice provider-neutral (Claude framed as the default, not the only brain).
+</Update>
+
 <Update label="Multi-instance adapters: the instance dimension" description="2026-06-14" tags={["Updated"]}>
   v2.1.15 lets you run several adapters of one platform at once (e.g. three Slack apps in one workspace). A new `instance` dimension threads through the stack, and the docs now describe it where it lands. Verified against `nanocoai/nanoclaw@435233a`.
 
