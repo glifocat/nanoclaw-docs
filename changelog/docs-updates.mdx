@@ -5,6 +5,15 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.1.15 sweep: product changelog and SHA re-verification" description="2026-06-14" tags={["Updated"]}>
+  Closed out the v2.1.4 → v2.1.15 drift sweep.
+
+  - **`changelog/index.mdx`**: reconstructed the v2.1.5–v2.1.15 product releases from upstream commits (the upstream `CHANGELOG.md` still parks everything under `[Unreleased]`). v2.1.5 was the big one — multi-instance adapters and the interactive uninstaller
+  - Re-verified and bumped `verified-against` SHAs to `435233a` on pages whose cited files changed without any claim drifting: `concepts/architecture`, `reference/container-config`, `guides/scheduled-tasks`, `concepts/isolation-levels`, `guides/multi-agent-swarm`
+  - `channels/teams`: corrected the webhook-path note to `/webhook/{routingPath}` to match the raw-route change
+  - Known gap: the product changelog still jumps v2.0.0 → v2.1.5; the v2.0.1–v2.1.4 patch releases predate the docs site and remain unreconstructed
+</Update>
+
 <Update label="New page: Uninstall NanoClaw" description="2026-06-14" tags={["New"]}>
   v2.1.15 added an interactive uninstaller (`bash nanoclaw.sh --uninstall`). New **`operate/uninstall.mdx`** documents it, verified against `nanocoai/nanoclaw@435233a`.
 
