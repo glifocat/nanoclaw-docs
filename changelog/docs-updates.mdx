@@ -5,6 +5,15 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="New page: Uninstall NanoClaw" description="2026-06-14" tags={["New"]}>
+  v2.1.15 added an interactive uninstaller (`bash nanoclaw.sh --uninstall`). New **`operate/uninstall.mdx`** documents it, verified against `nanocoai/nanoclaw@435233a`.
+
+  - The scan → confirm → execute flow, the four removal groups, and what's deliberately left alone (the OneCLI vault, other NanoClaw copies — everything is scoped to the per-checkout install slug)
+  - The `--dry-run` and `--yes` flags, the `.env` backup, the Ctrl-C-safe confirm phase, and the manual fallback when `node_modules/` is already gone
+  - Resolved a flag-spelling discrepancy against source: the flags are `--dry-run`/`--yes` (kebab-case), and they're CLI-only — there are no `NANOCLAW_*` env vars for them
+  - `reference/environment-variables.mdx` re-verified (no env var drift in v2.1.15) and its SHA bumped
+</Update>
+
 <Update label="OneCLI gateway: /v1 requirement and version pins" description="2026-06-14" tags={["Updated"]}>
   v2.1.15 moved `@onecli-sh/sdk` to 2.x, which talks to the OneCLI gateway's `/v1` API, and introduced `versions.json` as the machine-checkable source for sanctioned component pins. Verified against `nanocoai/nanoclaw@435233a`.
 

@@ -144,7 +144,7 @@
           {
             "group": "Operate",
             "icon": "gauge",
-            "pages": ["operate/configuration", "operate/ncl-cli", "operate/credentials", "operate/hardening", "operate/upgrading", "operate/troubleshooting"]
+            "pages": ["operate/configuration", "operate/ncl-cli", "operate/credentials", "operate/hardening", "operate/upgrading", "operate/uninstall", "operate/troubleshooting"]
           },
           {
             "group": "Build with agents",
