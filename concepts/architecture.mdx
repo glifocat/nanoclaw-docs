@@ -71,7 +71,7 @@ On the outbound side, `src/delivery.ts` drains `messages_out`: an in-flight set 
 Modules (permissions, scheduling, approvals, agent-to-agent, typing, and so on) self-register through barrel imports before `main()` runs — they hook into the router and delivery pipeline rather than being called by name from core.
 
 <Note>
-There is no HTTP API. The webhook server (`src/webhook-server.ts`) starts lazily when the first Chat SDK adapter registers, listens on `WEBHOOK_PORT` (default 3000), and only accepts inbound platform webhooks at `/webhook/{adapter}`. The admin surface is the `ncl` CLI over the Unix socket, not HTTP.
+There is no HTTP API. The webhook server (`src/webhook-server.ts`) starts lazily when the first Chat SDK adapter registers and listens on `WEBHOOK_PORT` (default 3000). It routes by path: `/webhook/{routingPath}` reaches a Chat SDK adapter (the routing path defaults to the adapter name; a second instance of one platform gets its own path), and `/webhook/{path}` reaches a raw handler that a module registered with `registerWebhookHandler()` for non–Chat SDK webhooks — raw routes take priority. The admin surface is the `ncl` CLI over the Unix socket, not HTTP.
 </Note>
 
 ## Inside the container

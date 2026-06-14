@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["database", "schema", "sqlite", "v2.db", "inbound.db", "outbound.db", "messages_in", "messages_out", "sessions", "container_configs", "pending_sender_approvals", "migrations"]
 ---
 
-{/* verified-against: src/db/schema.ts, src/db/connection.ts, src/db/session-db.ts, src/session-manager.ts, src/db/migrations/{001-initial,002-chat-sdk-state,module-approvals-pending-approvals,module-agent-to-agent-destinations,module-approvals-title-options,008-dropped-messages,009-drop-pending-credentials,010-engage-modes,011-pending-sender-approvals,012-channel-registration,013-approval-render-metadata,014-container-configs,015-cli-scope,index}.ts, container/agent-runner/src/db/messages-out.ts, src/modules/scheduling/db.ts @ dc34ceb (v2.1.4) */}
+{/* verified-against: src/db/schema.ts, src/db/connection.ts, src/db/session-db.ts, src/session-manager.ts, src/db/migrations/{001-initial,002-chat-sdk-state,module-approvals-pending-approvals,module-agent-to-agent-destinations,module-approvals-title-options,008-dropped-messages,009-drop-pending-credentials,010-engage-modes,011-pending-sender-approvals,012-channel-registration,013-approval-render-metadata,014-container-configs,015-cli-scope,016-messaging-group-instance,index}.ts, container/agent-runner/src/db/messages-out.ts, src/modules/scheduling/db.ts @ 435233a (v2.1.15) */}
 
 NanoClaw stores everything in SQLite, split across two layers:
 
@@ -36,13 +36,14 @@ Agent workspaces: folder, skills, CLAUDE.md. All workspaces are equal — privil
 
 ### messaging_groups
 
-Platform chats and channels, one row per `(channel_type, platform_id)` pair (UNIQUE).
+Platform chats and channels, one row per `(channel_type, platform_id, instance)` triple (UNIQUE).
 
 | Column | Type | Default | Meaning |
 |---|---|---|---|
 | `id` | TEXT | — | Primary key |
 | `channel_type` | TEXT | — | `whatsapp`, `discord`, `slack`, … |
 | `platform_id` | TEXT | — | The platform's chat/channel ID |
+| `instance` | TEXT | — | Adapter instance that owns the chat — distinguishes N adapters of one platform (e.g. three Slack apps). `NOT NULL`; migration 016 backfills `instance = channel_type`, so the default instance is the channel type itself |
 | `name` | TEXT | `NULL` | Display name |
 | `is_group` | INTEGER | `0` | `1` for group chats, `0` for DMs |
 | `unknown_sender_policy` | TEXT | `'strict'` | `'strict'` \| `'request_approval'` \| `'public'` — what happens when a never-seen sender posts |
@@ -50,6 +51,8 @@ Platform chats and channels, one row per `(channel_type, platform_id)` pair (UNI
 | `created_at` | TEXT | — | ISO timestamp |
 
 The `'strict'` column default is mostly vestigial: every creation callsite passes the policy explicitly, and the router's auto-create path hardcodes `'request_approval'`.
+
+Migration 016 added `instance` and relaxed the UNIQUE constraint from `(channel_type, platform_id)` to `(channel_type, platform_id, instance)` via a full table rebuild (SQLite can't relax a table-level UNIQUE in place). Existing rows backfill to `instance = channel_type`, so single-instance installs see no behavioral change.
 
 ### messaging_group_agents
 
@@ -253,7 +256,7 @@ Audit log of dropped messages from senders that didn't pass policy (migration 00
 
 ### chat_sdk_* tables
 
-Four small tables backing the Chat SDK bridge state (migration 002): `chat_sdk_kv` (key/value with optional `expires_at`), `chat_sdk_subscriptions` (`thread_id`, `subscribed_at`), `chat_sdk_locks` (`thread_id`, `token`, `expires_at`), and `chat_sdk_lists` (`key`, `idx`, `value`, optional `expires_at`).
+Four small tables backing the Chat SDK bridge state (migration 002): `chat_sdk_kv` (key/value with optional `expires_at`), `chat_sdk_subscriptions` (`thread_id`, `subscribed_at`), `chat_sdk_locks` (`thread_id`, `token`, `expires_at`), and `chat_sdk_lists` (`key`, `idx`, `value`, optional `expires_at`). A named non-default adapter instance prefixes its keys with `<instance>:` so sibling instances of one platform never collide; the default instance uses unprefixed keys (the legacy keyspace), so the table layout is unchanged.
 
 ### schema_version
 
