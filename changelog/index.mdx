@@ -6,6 +6,53 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.1.15" description="2026-06-14" tags={["Feature"]}>
+  - Container global CLIs (`@anthropic-ai/claude-code`, `agent-browser`, `vercel`) are now data-driven from `container/cli-tools.json`, each pinned to an exact version — a skill adds a CLI by appending to the manifest instead of editing the Dockerfile
+</Update>
+
+<Update label="v2.1.14" description="2026-06-13" tags={["Breaking"]}>
+  - **[BREAKING]** `@onecli-sh/sdk` 0.5.0 → 2.2.1 — now requires a OneCLI gateway with the `/v1` API; gateways that predate it answer `404` to every vault call. Sanctioned component versions are pinned in `versions.json` and the `onecli` setup step enforces them. Migration: [`docs/onecli-upgrades.md`](https://github.com/nanocoai/nanoclaw/blob/main/docs/onecli-upgrades.md)
+  - Slash commands now interrupt an in-flight turn instead of waiting it out
+  - New `onExchangeComplete` provider hook — providers whose harness keeps no on-disk transcript can archive each exchange themselves
+</Update>
+
+<Update label="v2.1.13" description="2026-06-13" tags={["Feature"]}>
+  - Agent-surfaces capability seam (`providesAgentSurfaces`) — a provider can declare it owns the composed project doc, skill links, and state dir, and the host skips its default surfaces
+</Update>
+
+<Update label="v2.1.12" description="2026-06-13" tags={["Feature"]}>
+  - Opt-in persistent memory scaffold (`usesMemoryScaffold`) — providers without native memory get an idempotent `memory/` tree in the agent's host-backed workspace at boot
+</Update>
+
+<Update label="v2.1.11" description="2026-06-11" tags={["Feature"]}>
+  - Webhook raw-route registry — modules register non–Chat SDK webhooks (GitHub, payment providers, health checks) with `registerWebhookHandler()` on the shared server instead of opening a second port
+</Update>
+
+<Update label="v2.1.10" description="2026-06-11" tags={["Fix"]}>
+  - Open `outbound.db` read-write in `writeOutboundDirect` so direct outbound writes aren't blocked
+</Update>
+
+<Update label="v2.1.9" description="2026-06-11" tags={["Feature"]}>
+  - Approval-resolved callback registry — modules can observe when an approval is resolved (e.g. to clear an "awaiting approval" indicator)
+</Update>
+
+<Update label="v2.1.8" description="2026-06-11" tags={["Fix"]}>
+  - Grace period for freshly-woken containers with stale processing claims — skips SLA enforcement on the tick that wakes a container, preventing a spawn-kill loop
+</Update>
+
+<Update label="v2.1.7" description="2026-06-11" tags={["Fix"]}>
+  - Record the acting user on resolved approval cards
+</Update>
+
+<Update label="v2.1.6" description="2026-06-11" tags={["Fix"]}>
+  - Add a read side (`getDeliveryAction`) to the delivery action registry so module registrations can be behavior-tested
+</Update>
+
+<Update label="v2.1.5" description="2026-06-11" tags={["Feature"]}>
+  - **Multi-instance adapters** — run several adapters of one platform at once (e.g. three Slack apps in one workspace). A new `messaging_groups.instance` dimension (migration 016) keys the adapter registry, per-instance Chat SDK state namespaces and webhook routes, and threads the instance through the router, delivery, and typing indicators. Single-instance installs are unchanged (instance defaults to the channel type)
+  - **Interactive uninstaller** — `bash nanoclaw.sh --uninstall` removes one NanoClaw copy (service, containers, data, OneCLI agents) with a scan → confirm → execute flow, `--dry-run` and `--yes` flags, and per-checkout install-slug scoping. See [Uninstall NanoClaw](/operate/uninstall)
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention
