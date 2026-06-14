@@ -5,6 +5,13 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="OneCLI gateway: /v1 requirement and version pins" description="2026-06-14" tags={["Updated"]}>
+  v2.1.15 moved `@onecli-sh/sdk` to 2.x, which talks to the OneCLI gateway's `/v1` API, and introduced `versions.json` as the machine-checkable source for sanctioned component pins. Verified against `nanocoai/nanoclaw@435233a`.
+
+  - **`operate/credentials.mdx`**: setup installs the gateway and `onecli` CLI at the `versions.json` pins (`onecli-gateway`, `onecli-cli`), never `latest`; it probes `/v1/health` and warns (never auto-upgrades) when the gateway predates the `/v1` API, pointing to the `docs/onecli-upgrades.md` runbook
+  - **`operate/upgrading.mdx`**: the `/update-nanoclaw` breaking-changes step now also diffs `versions.json` for moved component pins and routes each to its migration path — a skill or a `docs/` page
+</Update>
+
 <Update label="Provider capability hooks" description="2026-06-14" tags={["Updated"]}>
   v2.1.15 added provider-agnostic capability hooks so a non-Claude provider can plug into NanoClaw without special-casing. Documented on **`extend/providers.mdx`**, verified against `nanocoai/nanoclaw@435233a`.
 
