@@ -6,7 +6,7 @@ tag: "UPDATED"
 keywords: ["setup", "install", "getting started", "nanoclaw.sh", "setup wizard", "first agent"]
 ---
 
-{/* verified-against: nanoclaw.sh, setup.sh, setup/auto.ts, setup/probe.sh, setup/install-node.sh, setup/channels/*.ts, scripts/init-first-agent.ts, .claude/skills/setup/SKILL.md, package.json @ dc34ceb */}
+{/* verified-against: nanoclaw.sh, setup.sh, setup/auto.ts, setup/probe.sh, setup/install-node.sh, setup/channels/*.ts, scripts/init-first-agent.ts, .claude/skills/setup/SKILL.md, package.json @ 435233a (v2.1.15) */}
 
 From a fresh machine to an agent you can message — one command and a handful of prompts.
 
@@ -68,8 +68,14 @@ Everything else — Homebrew on macOS, Node 22, pnpm, Docker, the OneCLI vault �
 
 You now have a host service (launchd or systemd) running NanoClaw from this checkout. It routes messages between your channels and agents, where each agent runs in its own Docker container sandbox that wakes on incoming messages and sleeps when idle. Your Anthropic credential lives in the OneCLI vault — never inside the container. Agent workspaces live under `groups/`, runtime state under `data/`, and logs under `logs/`. See [Architecture](/concepts/architecture) for the full picture.
 
+Claude is the default agent provider that the wizard connects you to. You can switch a group to Codex, OpenCode, or a local Ollama model afterward — see [Agent providers](/extend/providers).
+
 <Note>
 Coming from NanoClaw v1? Run `bash migrate-v2.sh` before setup — see the [migration guide](/migrate-from-v1).
+</Note>
+
+<Note>
+Re-running `bash nanoclaw.sh` on a folder that already has an install lets you keep it and continue, or uninstall this copy and exit — see [Uninstall NanoClaw](/operate/uninstall).
 </Note>
 
 ## Next steps
