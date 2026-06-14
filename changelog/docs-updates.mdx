@@ -5,6 +5,14 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Multi-instance adapters: the instance dimension" description="2026-06-14" tags={["Updated"]}>
+  v2.1.15 lets you run several adapters of one platform at once (e.g. three Slack apps in one workspace). A new `instance` dimension threads through the stack, and the docs now describe it where it lands. Verified against `nanocoai/nanoclaw@435233a`.
+
+  - **`reference/adapter-interface.mdx`**: new optional `instance` field on the `ChannelAdapter` contract (defaults to `channelType`; URL-safe routing key); `channelType` clarified as the semantic platform key; webhook registration now uses a `routingPath` and the shared server also accepts raw `registerWebhookHandler()` routes
+  - **`reference/db-schema.mdx`** + **`concepts/entity-model.mdx`**: `messaging_groups` is now keyed `(channel_type, platform_id, instance)`; documented the new `instance` column, migration 016's backfill (`instance = channel_type`), and the per-instance `chat_sdk_kv` key prefix
+  - **`channels/overview.mdx`** + **`concepts/architecture.mdx`**: webhook server routes by `routingPath` with raw handlers taking priority; delivery resolves the owning adapter by `instance` so a reply leaves through the adapter the message arrived on
+</Update>
+
 <Update label="Drift sweep against v2.1.15: token count and container CLIs" description="2026-06-14" tags={["Updated"]}>
   First slice of re-verification against upstream `nanocoai/nanoclaw@435233a` (v2.1.15, up from v2.1.4). Two code-confirmed factual corrections shipped; larger concerns (multi-instance adapters, provider memory scaffold, OneCLI `/v1` upgrade, the new uninstall flow) follow in separate PRs.
 
