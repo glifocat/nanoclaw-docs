@@ -34,7 +34,7 @@
     "eyebrows": "breadcrumbs"
   },
   "banner": {
-    "content": "**Docs are catching up to v2.** [Join the Discord community](https://discord.gg/VDdww8qS42) — get help, share what you're building, or just say hi.",
+    "content": "[Join the Discord community](https://discord.gg/VDdww8qS42) — get help, share what you're building, or just say hi.",
     "dismissible": true
   },
   "navbar": {
