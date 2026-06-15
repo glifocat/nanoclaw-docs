@@ -184,7 +184,7 @@ To PR changes to `nanocoai/nanoclaw` from Ethan's fork (`glifocat/nanoclaw-glifo
 
 ## Token Count
 
-Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated) — the ONLY valid source. Never cite a number from prose, memory, or an automated PR; read the badge first. Last seen: 185k (~92% of Claude's context window) at dc34ceb (v2.1.4). Update pages that cite the count (e.g., `introduction.mdx`) if the badge value changes significantly.
+Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated) — the ONLY valid source. Never cite a number from prose, memory, or an automated PR; read the badge first. Last seen: 195k (~98% of the context window) at e3986eb (v2.1.16). Update pages that cite the count (e.g., `introduction.mdx`) if the badge value changes significantly.
 
 ## Writing Standards
 
