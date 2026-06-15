@@ -58,7 +58,7 @@ Full parameter schemas are in the [MCP tools reference](/reference/mcp-tools#sch
 </Step>
 <Step title="Gate frequent tasks with a script">
 
-Every firing that reaches the agent is a Claude API call. For tasks that run more than a few times a day, `schedule_task` accepts an optional `script` — a bash script that runs *before* the agent is invoked:
+Every firing that reaches the agent is a full model API call. For tasks that run more than a few times a day, `schedule_task` accepts an optional `script` — a bash script that runs *before* the agent is invoked:
 
 ```text
 Scout, every hour check for open PRs needing my review. Use a script that
@@ -112,7 +112,7 @@ A healthy recurring series shows one `pending` row (the next run) plus one `comp
 
 ## What you built
 
-A recurring task that is nothing but data: a `messages_in` row the 60-second host sweep wakes a container for, a clone-on-completion loop keyed by `series_id`, and an optional script gate between "the task fired" and "Claude got called". No daemon, no crontab — delete the row series (via `cancel_task`) and it's gone.
+A recurring task that is nothing but data: a `messages_in` row the 60-second host sweep wakes a container for, a clone-on-completion loop keyed by `series_id`, and an optional script gate between "the task fired" and "the agent got called". No daemon, no crontab — delete the row series (via `cancel_task`) and it's gone.
 
 ## Next steps
 

@@ -5,6 +5,15 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Provider-neutral voice pass" description="2026-06-15" tags={["Updated"]}>
+  Neutralized prose where "Claude" stood in for "the agent" generically — claims that read as false on a non-Claude (Codex/OpenCode/Ollama) group. Claude-specific facts and literals (the Claude Code CLI, the Claude Agent SDK, `CLAUDE.local.md`, Claude credentials) are kept verbatim.
+
+  - **`extend/tools.mdx`**: the local-model tool skills keep *the agent* as the orchestrator (not "Claude")
+  - **`guides/scheduled-tasks.mdx`**: a firing is "a full model API call" / "the agent got called"
+  - **`reference/mcp-tools.mdx`**: "the tools the agent can call" (dropped the `(Claude)` parenthetical)
+  - **`installation.mdx`**: the wizard does "provider auth"; **`quickstart.mdx`**: "AI-assisted recovery" (failure assist can be provider-owned since v2.1.16)
+</Update>
+
 <Update label="v2.1.16 sweep: provider selection + full re-verification" description="2026-06-15" tags={["Updated"]}>
   Brought the whole site current with `nanocoai/nanoclaw@e3986eb` (v2.1.16) — every content page is now anchored at v2.1.16.
 
