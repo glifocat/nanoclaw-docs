@@ -2,10 +2,10 @@
 title: "Agent providers"
 description: "Swap the agent brain per group — Claude Code by default, OpenCode or Codex via provider skills, or a local Ollama model with no provider code at all."
 tag: "UPDATED"
-keywords: ["providers", "agent provider", "claude", "opencode", "codex", "ollama", "local models", "agent_provider", "model", "effort"]
+keywords: ["providers", "agent provider", "claude", "opencode", "codex", "ollama", "local models", "agent_provider", "model", "effort", "provider selection", "switch provider", "migrate-memory"]
 ---
 
-{/* verified-against: container/agent-runner/src/providers/{types,factory,claude,provider-registry}.ts, container/agent-runner/src/{config,index,memory-scaffold,poll-loop}.ts, container/agent-runner/src/memory-templates/, src/container-runner.ts, src/container-config.ts, src/providers/{claude,provider-container-registry}.ts, src/cli/resources/{groups,sessions}.ts, .claude/skills/{add-opencode,add-codex,add-ollama-provider}/SKILL.md, docs/ollama.md @ trunk 435233a (v2.1.15); opencode.ts, codex.ts, codex-app-server.ts @ providers branch 5e76b9d */}
+{/* verified-against: container/agent-runner/src/providers/{types,factory,claude,provider-registry}.ts, container/agent-runner/src/{config,index,memory-scaffold,poll-loop}.ts, container/agent-runner/src/memory-templates/, src/container-runner.ts, src/container-config.ts, src/providers/{claude,provider-container-registry}.ts, src/cli/resources/{groups,sessions}.ts, .claude/skills/{add-opencode,add-codex,add-ollama-provider,migrate-memory}/SKILL.md, src/group-init.ts, setup/auto.ts, setup/providers/registry.ts, setup/provider-auth.ts, docs/ollama.md, docs/provider-migration.md @ trunk e3986eb (v2.1.16); opencode.ts, codex.ts, codex-app-server.ts @ providers branch 5e76b9d */}
 
 A **provider** is the agent CLI that runs inside a group's container — the thing that actually plans, calls tools, and writes replies. By default that's Claude Code via the Claude Agent SDK. The provider is pluggable: the agent runner selects an implementation from an open registry at startup, and the trunk ships only `claude` (plus a `mock` provider for tests).
 
@@ -87,6 +87,12 @@ A provider implementation declares a handful of optional capabilities. The runne
 
 - **Owning the agent surfaces** (`providesAgentSurfaces`). By default the host composes the project doc, skill-discovery links, and provider state dir, then mounts them into the container — the composed `CLAUDE.md`, the skill fragments, and `CLAUDE.local.md` seeding. A provider can declare at registration time that it owns these surfaces; the host then skips all of that, and the provider's own config fn composes and mounts its equivalents (it receives the group dir and the resolved skill list to do so).
 
+## Choosing a provider during setup
+
+[Setup](/quickstart) asks which agent runtime should power your assistant. Claude is the default — press Enter and the standard Claude auth runs. **Codex** is offered as an inline install: pick it and setup runs its installer, rebuilds the image, and walks its vault-only auth (a ChatGPT subscription or an OpenAI API key). OpenCode and Ollama aren't in the picker; add them after setup with their `/add-*` skills.
+
+The pick is **not** an install-wide default — it sets the provider on the first agent group as a per-group database property. Every group's provider is independent, and a spawned subagent inherits its creator's provider so a single-provider install never spawns a child on a runtime it can't reach.
+
 ## Switching a group
 
 Set the provider (and optionally model/effort) on the group's container config, then restart:
@@ -97,6 +103,17 @@ ncl groups restart --id <group-id>
 ```
 
 Config changes are saved immediately but only take effect on the next container spawn — the restart forces it. Switching back is `--provider claude` (or clearing the field; the fallback is `claude` either way). To back the code out entirely, OpenCode and Codex each ship a `REMOVE.md`; Ollama needs no removal — its SKILL.md's "Reverting to Claude" steps are just deleting the `env` and `blockedHosts` keys from the container config and the `model` setting from the shared settings file.
+
+### What carries across a switch
+
+Provider-neutral state stays put: group identity, wiring, members, roles, destinations, container config, skills, MCP servers, mounts, workspace files (`groups/<folder>/`), and conversation archives (`conversations/`). Agent surfaces are composed fresh at every spawn, so nothing migrates there.
+
+Two things are provider-specific and **do not** carry across:
+
+- **Agent memory.** Each provider keeps its own store — Claude's is `CLAUDE.local.md`, scaffold providers like Codex keep a `memory/` tree. A switch never touches the old store; the new provider starts with its own. To carry memory across, run **`/migrate-memory`** — the coding agent reads the source store, distills it into the target store (copy, never move), and restarts the group. Both directions work.
+- **In-flight conversation context.** Continuations are per-provider, so the new provider starts a fresh thread; the old slot is kept, so switching back resumes where you left off. Recent context is recoverable from the `conversations/` archives.
+
+Switching to a provider that isn't installed (or a typo'd name) fails the container at boot — the host logs `Container exited non-zero` with a `stderrTail` like `Unknown provider: codexx. Registered: claude, codex`.
 
 ## Next steps
 
