@@ -10,7 +10,7 @@ rss: true
 
   - **`extend/tools.mdx`**: the local-model tool skills keep *the agent* as the orchestrator (not "Claude")
   - **`guides/scheduled-tasks.mdx`**: a firing is "a full model API call" / "the agent got called"
-  - **`reference/mcp-tools.mdx`**: "the tools the agent can call" (dropped the `(Claude)` parenthetical)
+  - **`reference/mcp-tools.mdx`**: "the tools the agent can call" (dropped the `(Claude)` parenthetical); `create_agent` seeds the provider's own memory surface (`CLAUDE.local.md` for Claude, the `memory/` scaffold otherwise), matching the `multi-agent-swarm` fix
   - **`installation.mdx`**: the wizard does "provider auth"; **`quickstart.mdx`**: "AI-assisted recovery" (failure assist can be provider-owned since v2.1.16)
 </Update>
 
