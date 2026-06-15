@@ -6,7 +6,7 @@ tag: "UPDATED"
 keywords: ["setup", "install", "getting started", "nanoclaw.sh", "setup wizard", "first agent"]
 ---
 
-{/* verified-against: nanoclaw.sh, setup.sh, setup/auto.ts, setup/probe.sh, setup/install-node.sh, setup/channels/*.ts, scripts/init-first-agent.ts, .claude/skills/setup/SKILL.md, package.json @ 435233a (v2.1.15) */}
+{/* verified-against: nanoclaw.sh, setup.sh, setup/auto.ts, setup/probe.sh, setup/install-node.sh, setup/channels/*.ts, setup/providers/registry.ts, scripts/init-first-agent.ts, .claude/skills/setup/SKILL.md, package.json @ e3986eb (v2.1.16) */}
 
 From a fresh machine to an agent you can message — one command and a handful of prompts.
 
@@ -37,7 +37,7 @@ Everything else — Homebrew on macOS, Node 22, pnpm, Docker, the OneCLI vault �
     1. **System check** — verifies your environment
     2. **Sandbox build** — builds the agent container image. First build pulls a base image and takes 3–10 minutes on a fresh machine.
     3. **OneCLI vault** — installs the credential vault, or offers to reuse an existing OneCLI instance. Your agent never sees your API keys; the vault injects them into approved requests as they leave the sandbox.
-    4. **Connect to Claude** — sign in with your Claude subscription (opens a browser), paste an OAuth token (`sk-ant-oat…`), or paste an API key (`sk-ant-api…`)
+    4. **Choose your agent runtime and connect** — Claude is the default: press Enter, then sign in with your Claude subscription (opens a browser), paste an OAuth token (`sk-ant-oat…`), or paste an API key (`sk-ant-api…`). Or pick **Codex** to install it inline and authenticate with a ChatGPT subscription or OpenAI API key — either way the credential lands in the vault, never the container
     5. **Access rules** — writes the assistant's filesystem access rules (empty to start — the sandbox only sees what you explicitly share later)
     6. **Background service** — starts NanoClaw under launchd (macOS) or a systemd user service (Linux)
     7. **Your name** — what the assistant should call you

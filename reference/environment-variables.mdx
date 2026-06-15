@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["environment variables", ".env", "configuration", "ASSISTANT_NAME", "CONTAINER_TIMEOUT", "LOG_LEVEL", "NANOCLAW_SKIP", "NANOCLAW_EGRESS_LOCKDOWN", "setup", "reference"]
 ---
 
-{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/container-runner.ts, src/providers/claude.ts, setup/auto.ts, setup/onecli.ts, setup/lib/setup-config.ts, setup/lib/claude-assist.ts, setup/lib/diagnostics.ts, setup/signal-auth.ts, setup/container.ts, setup/migrate-v2/select-channels.ts, migrate-v2.sh, container/agent-runner/src/{timezone.ts,providers/claude.ts} @ 435233a (v2.1.15) */}
+{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/container-runner.ts, src/providers/claude.ts, setup/auto.ts, setup/onecli.ts, setup/lib/setup-config.ts, setup/lib/claude-assist.ts, setup/lib/diagnostics.ts, setup/signal-auth.ts, setup/container.ts, setup/migrate-v2/select-channels.ts, migrate-v2.sh, container/agent-runner/src/{timezone.ts,providers/claude.ts} @ e3986eb (v2.1.16) */}
 
 Exhaustive list of every environment variable the NanoClaw host, setup wizard, and agent runner read. For how to actually set these — `.env` editing, service definitions, restart commands — see [Configuration](/operate/configuration).
 
@@ -49,16 +49,16 @@ Consumed by the setup wizard (`pnpm run setup:auto`) and migration scripts, not 
 
 | Variable | Default | Read in | Effect |
 |---|---|---|---|
-| `NANOCLAW_SKIP` | — | `setup/auto.ts:118` | Comma-separated step names to skip: `environment`, `container`, `onecli`, `auth`, `mounts`, `service`, `cli-agent`, `timezone`, `channel`, `verify`, `first-chat`. |
-| `NANOCLAW_DISPLAY_NAME` | `$USER` | `setup/auto.ts:320` | How agents address the operator — skips the prompt. |
+| `NANOCLAW_SKIP` | — | `setup/auto.ts:135` | Comma-separated step names to skip: `environment`, `container`, `onecli`, `auth`, `mounts`, `service`, `cli-agent`, `timezone`, `channel`, `verify`, `first-chat`. |
+| `NANOCLAW_DISPLAY_NAME` | `$USER` | `setup/auto.ts:414` | How agents address the operator — skips the prompt. |
 | `NANOCLAW_AGENT_NAME` | — | `setup/channels/*.ts` | Pre-fills the agent name prompt in each channel setup flow. The CLI scratch agent is always "Terminal Agent". |
 | `NANOCLAW_CHANNELS` | — | `setup/migrate-v2/select-channels.ts:43` | Comma-separated channel names (e.g. `telegram,discord`) — skips the channel picker in the v2 migration flow. |
 | `NANOCLAW_V1_PATH` | sibling-directory scan | `migrate-v2.sh:196` | Explicit override for v1 install discovery in the migration flow. Validated against `$NANOCLAW_V1_PATH/store/messages.db` — the script fails with a message telling you to set it when auto-discovery misses. |
 | `INSTALL_CJK_FONTS` | `false` | `setup/container.ts:181` | Set `true` to bake CJK fonts (~200 MB) into the agent image. Read from `.env` by regex during the container build step and passed as a Docker `--build-arg` — the only build-arg passed through today. Set it in `.env`, not the service environment. |
-| `NANOCLAW_ONECLI_API_HOST` | `https://api.onecli.sh` | `setup/auto.ts:188` | Use a remote OneCLI vault instead of installing one locally. |
+| `NANOCLAW_ONECLI_API_HOST` | `https://api.onecli.sh` | `setup/auto.ts:236` | Use a remote OneCLI vault instead of installing one locally. |
 | `NANOCLAW_ONECLI_API_TOKEN` | — | `setup/onecli.ts:324` | Bearer token (`oc_…`) for the remote vault. Required when the host is set. |
-| `NANOCLAW_ANTHROPIC_BASE_URL` | — | `setup/auto.ts:717` | Custom Anthropic-compatible endpoint. Setup writes `ANTHROPIC_BASE_URL` to `.env` and stores the token in the vault. |
-| `NANOCLAW_ANTHROPIC_AUTH_TOKEN` | — | `setup/auto.ts:718` | Bearer token for the custom endpoint. Both URL and token must be set together. |
+| `NANOCLAW_ANTHROPIC_BASE_URL` | — | `setup/auto.ts:844` | Custom Anthropic-compatible endpoint. Setup writes `ANTHROPIC_BASE_URL` to `.env` and stores the token in the vault. |
+| `NANOCLAW_ANTHROPIC_AUTH_TOKEN` | — | `setup/auto.ts:845` | Bearer token for the custom endpoint. Both URL and token must be set together. |
 | `NANOCLAW_SETUP_ASSIST_MODE` | `false` | `setup/lib/setup-config.ts:128` | Use non-interactive Claude assist on step failure instead of interactive handoff. |
 | `NANOCLAW_SKIP_CLAUDE_ASSIST` | — | `setup/lib/claude-assist.ts:96` | Set `1` to disable Claude-assisted failure recovery entirely (CI/scripted runs). |
 | `NANOCLAW_NO_DIAGNOSTICS` | — | `setup/lib/diagnostics.ts:45` | Set `1` to disable setup diagnostics reporting. |
@@ -70,7 +70,7 @@ Consumed by the setup wizard (`pnpm run setup:auto`) and migration scripts, not 
 
 ## Container-side variables (agent runner)
 
-Read inside the agent container by the agent runner. The host injects only `TZ` (plus provider-contributed and OneCLI proxy variables) at spawn — `src/container-runner.ts:413`. The rest are not passed through from the host environment; overriding them means baking them into a custom image or a provider container config.
+Read inside the agent container by the agent runner. The host injects only `TZ` (plus provider-contributed and OneCLI proxy variables) at spawn — `src/container-runner.ts:439`. The rest are not passed through from the host environment; overriding them means baking them into a custom image or a provider container config.
 
 | Variable | Default | Read in | Effect |
 |---|---|---|---|
