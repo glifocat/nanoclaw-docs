@@ -5,6 +5,15 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.1.16 sweep: provider selection + full re-verification" description="2026-06-15" tags={["Updated"]}>
+  Brought the whole site current with `nanocoai/nanoclaw@e3986eb` (v2.1.16) — every content page is now anchored at v2.1.16.
+
+  - **Product changelog + token count**: added the v2.1.16 release (operator-driven provider selection, per-group provider switching via `ncl groups config update --provider`, and `/migrate-memory`) and bumped the codebase token count to 195k.
+  - **Provider selection (16 v2.1.15 pages)**: documented the setup-time runtime picker (`quickstart`), the memory-across-a-switch story and `/migrate-memory` (`extend/providers`), and fixed `multi-agent-swarm` (a spawned agent inherits its creator's provider; the seed lands in the provider's own memory surface) and `upgrading` (the `/update-nanoclaw` breaking-change check is skill-only now — it no longer diffs `versions.json` pins). Corrected six drifted `file:line` citations on `reference/environment-variables`.
+  - **Re-verified the 19 v2.1.4 main pages**: 14 were no-drift; 5 fixed — `installation` (new `provider-auth` setup step), `concepts/contributing` (185k → 195k, vitest globs), `reference/skills-catalog` (added `/migrate-memory`; 45 → 46 skills), `operate/troubleshooting` (boot failures now log `Container exited non-zero` with a `stderrTail`), `extend/overview` (provider installs span three barrels now — host, container, and setup).
+  - **Re-verified the 8 channel pages**: the `channels` registry branch is frozen at `8137440` (adapters unchanged since before v2.1.4), so no content drift — pinned that SHA on each page for precise future adapter-drift detection.
+</Update>
+
 <Update label="v2.1.15 sweep: product changelog and SHA re-verification" description="2026-06-14" tags={["Updated"]}>
   Closed out the v2.1.4 → v2.1.15 drift sweep.
 
