@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["skills", "extend", "SKILL.md", "registry branches", "channels branch", "providers branch", "REMOVE.md", "container skills", "additive fetch"]
 ---
 
-{/* verified-against: CONTRIBUTING.md, docs/skills-model.md, .claude/skills/{add-telegram,add-codex,add-gmail-tool,manage-mounts}/SKILL.md, .claude/skills/{add-telegram,add-gmail-tool}/REMOVE.md, container/skills/, src/container-runner.ts @ dc34ceb (v2.1.4) */}
+{/* verified-against: CONTRIBUTING.md, docs/skills-model.md, .claude/skills/{add-telegram,add-codex,add-gmail-tool,manage-mounts}/SKILL.md, .claude/skills/{add-telegram,add-gmail-tool}/REMOVE.md, container/skills/, src/container-runner.ts, setup/providers/index.ts @ e3986eb (v2.1.16) */}
 
 A NanoClaw skill is a **SKILL.md instruction workflow** in `.claude/skills/` that Claude Code executes in your checkout. When you run `/add-telegram` or `/manage-mounts`, Claude reads the skill's instructions and performs them — copying files, appending an import, installing a dependency, running a test. There is no plugin engine, no manifest.yaml, and no skill state file. The skill *is* the markdown.
 
@@ -50,7 +50,7 @@ These are the skills you invoke as slash commands in Claude Code from your NanoC
 | Category | Example | What installing looks like |
 | --- | --- | --- |
 | **Channel installs** | `/add-telegram` | The flow above: copy the adapter from the `channels` branch, append the barrel import, pin the dependency, run the registration test. See [Channels overview](/channels/overview). |
-| **Provider installs** | `/add-codex` | Same pattern against the `providers` branch, but multi-point: a provider spans the host tree *and* the container's agent-runner tree, so the skill copies into both and runs a registration test per tree. See [Providers](/extend/providers). |
+| **Provider installs** | `/add-codex` | Same pattern against the `providers` branch, but multi-point: a provider spans three trees — the host, the container's agent-runner, and setup — so the skill appends an import to each of the three provider barrels and runs a registration guard per tree. See [Providers](/extend/providers). |
 | **Tool installs** | `/add-gmail-tool` | Wires an MCP server into selected agent groups with vault-managed credentials: the container only ever sees `onecli-managed` placeholder stubs, and the OneCLI gateway injects real OAuth tokens in flight. See [Tools](/extend/tools). |
 | **Operational skills** | `/manage-mounts` | Pure instruction workflows — no code copied, nothing fetched. The SKILL.md walks Claude through a task, like editing the mount allowlist through the setup CLI and restarting the service. |
 

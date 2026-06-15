@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["mcp tools", "send_message", "send_file", "schedule_task", "ask_user_question", "create_agent", "install_packages", "add_mcp_server", "nanoclaw mcp server", "agent tools"]
 ---
 
-{/* verified-against: container/agent-runner/src/mcp-tools/{index,server,types,core,scheduling,interactive,agents,self-mod}.ts, container/agent-runner/src/mcp-tools/{core,scheduling,interactive,agents,self-mod,cli}.instructions.md, src/modules/agent-to-agent/create-agent.ts, src/group-init.ts @ dc34ceb (v2.1.4) */}
+{/* verified-against: container/agent-runner/src/mcp-tools/{index,server,types,core,scheduling,interactive,agents,self-mod}.ts, container/agent-runner/src/mcp-tools/{core,scheduling,interactive,agents,self-mod,cli}.instructions.md, src/modules/agent-to-agent/create-agent.ts, src/group-init.ts @ e3986eb (v2.1.16) */}
 
 These are the tools the agent (Claude) can call from inside its container. They're exposed by the built-in `nanoclaw` MCP server (`container/agent-runner/src/mcp-tools/`), so the agent sees them with the `mcp__nanoclaw__` prefix — e.g. `mcp__nanoclaw__send_message`. As an operator you never call them directly; you see their effects: messages arriving in chats, schedule changes, and approval cards.
 
