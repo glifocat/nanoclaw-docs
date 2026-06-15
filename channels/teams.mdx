@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["teams", "microsoft teams", "add-teams", "azure bot", "app registration", "client secret", "sideload", "manifest", "webhook", "chat sdk", "threads"]
 ---
 
-{/* verified-against: src/channels/teams.ts (channels branch), src/channels/chat-sdk-bridge.ts, src/webhook-server.ts, setup/channels/teams.ts, setup/add-teams.sh, .claude/skills/add-teams/SKILL.md @ dc34ceb */}
+{/* verified-against: src/channels/teams.ts (channels branch), src/channels/chat-sdk-bridge.ts, src/webhook-server.ts, setup/channels/teams.ts, setup/add-teams.sh, .claude/skills/add-teams/SKILL.md @ e3986eb (v2.1.16); channels @ 8137440 */}
 
 The Teams adapter connects NanoClaw to a bot you register in Azure. It's built on the Chat SDK bridge (`@chat-adapter/teams` 4.26.0, pinned — the `/add-teams` skill may pin a slightly newer adapter version) and receives messages over **webhooks**: Azure Bot Service POSTs to NanoClaw's shared webhook server, so Teams needs a **public HTTPS URL** that reaches your machine.
 

@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["slack", "bot token", "signing secret", "add-slack", "webhook", "event subscriptions", "interactivity", "mrkdwn", "chat sdk", "threads"]
 ---
 
-{/* verified-against: src/channels/slack.ts (channels branch), src/channels/chat-sdk-bridge.ts, src/webhook-server.ts, src/router.ts, setup/channels/slack.ts, setup/add-slack.sh, .claude/skills/add-slack/SKILL.md, container/skills/slack-formatting/SKILL.md @ dc34ceb */}
+{/* verified-against: src/channels/slack.ts (channels branch), src/channels/chat-sdk-bridge.ts, src/webhook-server.ts, src/router.ts, setup/channels/slack.ts, setup/add-slack.sh, .claude/skills/add-slack/SKILL.md, container/skills/slack-formatting/SKILL.md @ e3986eb (v2.1.16); channels @ 8137440 */}
 
 The Slack adapter connects NanoClaw to a Slack app you create in your workspace. It's built on the Chat SDK bridge (`@chat-adapter/slack` 4.26.0, pinned) and receives events over **webhooks**: Slack POSTs to `/webhook/slack` on NanoClaw's shared webhook server. Unlike Discord or Telegram, that means Slack needs a **public URL** that reaches your machine.
 
