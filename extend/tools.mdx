@@ -40,7 +40,7 @@ The skill installs the MCP server into the container image, registers it per gro
 
 ## Local models as tools
 
-Two skills let Claude offload work to local models. In both cases **Claude stays the orchestrator** — it decides when to delegate, calls the local model as a tool, and uses the result.
+Two skills let the agent offload work to local models. In both cases **the agent stays the orchestrator** — it decides when to delegate, calls the local model as a tool, and uses the result.
 
 | Skill | What it adds |
 | --- | --- |
@@ -48,7 +48,7 @@ Two skills let Claude offload work to local models. In both cases **Claude stays
 | `/add-atomic-chat-tool` | `atomic_chat_list_models` and `atomic_chat_generate` against the [Atomic Chat](https://github.com/AtomicBot-ai/Atomic-Chat) desktop app's OpenAI-compatible API on port 1337. |
 
 <Note>
-Don't confuse `/add-ollama-tool` with `/add-ollama-provider`. The tool skill keeps Claude as the agent's brain and gives it a local model to call; the provider skill **replaces** the agent's brain with a local Ollama model for an entire group. See [Providers](/extend/providers).
+Don't confuse `/add-ollama-tool` with `/add-ollama-provider`. The tool skill keeps your existing provider as the agent's brain and gives it a local model to call; the provider skill **replaces** the agent's brain with a local Ollama model for an entire group. See [Providers](/extend/providers).
 </Note>
 
 ## Web access
