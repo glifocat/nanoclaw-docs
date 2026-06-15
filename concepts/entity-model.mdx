@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["entity model", "agent groups", "messaging groups", "wirings", "messaging_group_agents", "engage_mode", "session_mode", "sender_scope", "roles", "owner", "admin", "sessions"]
 ---
 
-{/* verified-against: src/db/schema.ts, src/db/migrations/{010-engage-modes,011-pending-sender-approvals,012-channel-registration,016-messaging-group-instance}.ts, src/types.ts, src/router.ts, src/session-manager.ts, src/modules/permissions/{index.ts,access.ts}, src/command-gate.ts @ 435233a (v2.1.15) */}
+{/* verified-against: src/db/schema.ts, src/db/migrations/{010-engage-modes,011-pending-sender-approvals,012-channel-registration,016-messaging-group-instance}.ts, src/types.ts, src/router.ts, src/session-manager.ts, src/modules/permissions/{index.ts,access.ts}, src/command-gate.ts @ e3986eb (v2.1.16) */}
 
 Everything NanoClaw does reduces to five entities in `data/v2.db`: **agent groups** (where agents run), **messaging groups** (where people talk), **wirings** (the edge connecting them, which holds all the behavior), **users** (who is allowed to do what), and **sessions** (the conversation state in between). This page is the mental model; for column-level detail see the [database schema](/reference/db-schema).
 

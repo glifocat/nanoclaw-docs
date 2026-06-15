@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["channels", "adapters", "channel registry", "chat sdk", "webhook", "add-telegram", "add-discord", "add-slack", "manage-channels"]
 ---
 
-{/* verified-against: src/channels/{adapter,channel-registry,index,chat-sdk-bridge,cli}.ts, src/webhook-server.ts, .claude/skills/{manage-channels,add-telegram}/SKILL.md, upstream/channels:src/channels/ @ 435233a (v2.1.15) */}
+{/* verified-against: src/channels/{adapter,channel-registry,index,chat-sdk-bridge,cli}.ts, src/webhook-server.ts, .claude/skills/{manage-channels,add-telegram}/SKILL.md, upstream/channels:src/channels/ @ e3986eb (v2.1.16) */}
 
 NanoClaw trunk ships channel **infrastructure** — the adapter interface, the registry, the Chat SDK bridge, the webhook server — plus one built-in channel: `cli`, an always-on local-terminal channel that needs no credentials. Every platform adapter (Telegram, Discord, Slack, WhatsApp, …) lives on the `channels` branch of the repo and is installed on demand with an `/add-<channel>` skill. Your fork only contains the channels you actually use.
 
