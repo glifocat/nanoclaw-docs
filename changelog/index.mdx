@@ -6,6 +6,13 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.1.16" description="2026-06-14" tags={["Feature"]}>
+  - **Operator-driven provider selection in setup** — the installer can select, install, and authenticate a non-default agent provider, then set it on the first agent before its first spawn. A provider registry feeds the picker and a vault-only auth walkthrough; default (Claude) installs are unaffected
+  - **Per-group provider choice** — the provider is a per-group database property, not an install-wide default: `ncl groups config update --id <group-id> --provider <name>` then restart. Group creation stays provider-agnostic
+  - **Memory migrates via `/migrate-memory`, never at runtime** — each provider keeps its own store, so a fresh group on a different provider never inherits stale `CLAUDE.*` files
+  - Container boot failures now log the last stderr lines at `warn` on a non-zero exit instead of looping silently
+</Update>
+
 <Update label="v2.1.15" description="2026-06-14" tags={["Feature"]}>
   - Container global CLIs (`@anthropic-ai/claude-code`, `agent-browser`, `vercel`) are now data-driven from `container/cli-tools.json`, each pinned to an exact version — a skill adds a CLI by appending to the manifest instead of editing the Dockerfile
 </Update>
