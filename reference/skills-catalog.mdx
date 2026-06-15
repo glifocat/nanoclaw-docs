@@ -5,11 +5,11 @@ tag: "NEW"
 keywords: ["skills", "catalog", "reference", "add-channel", "providers", "tools", "container skills", "workspace skills", "slash commands"]
 ---
 
-{/* verified-against: .claude/skills/ and container/skills/ listings + each skill's SKILL.md frontmatter @ dc34ceb (v2.1.4) */}
+{/* verified-against: .claude/skills/ and container/skills/ listings + each skill's SKILL.md frontmatter @ e3986eb (v2.1.16) */}
 
 NanoClaw ships two kinds of skills:
 
-- **Host-side workspace skills** (`.claude/skills/`) — invoked as slash commands in Claude Code from your NanoClaw checkout. They install channels, providers, and tools, or operate and maintain your install. 45 skills total: 17 channel installs, 3 provider installs, 10 tool installs, and 15 operational skills.
+- **Host-side workspace skills** (`.claude/skills/`) — invoked as slash commands in Claude Code from your NanoClaw checkout. They install channels, providers, and tools, or operate and maintain your install. 46 skills total: 17 channel installs, 3 provider installs, 10 tool installs, and 16 operational skills.
 - **Container skills** (`container/skills/`) — 8 skills mounted into every agent container at `/app/skills`. The agent loads them at runtime; you don't invoke them yourself.
 
 For how skills work and how to write your own, see [Extending NanoClaw](/extend/overview).
@@ -80,6 +80,7 @@ Setup, maintenance, migration, and day-to-day administration of your install.
 | `/manage-mounts` | Configures which host directories agent containers can access — view, add, or remove mount allowlist entries |
 | `/migrate-from-openclaw` | Migrates from OpenClaw to NanoClaw v2 — detects an existing install, extracts identity, credentials, and tasks, then guides interactive migration |
 | `/migrate-from-v1` | Finishes migrating a NanoClaw v1 install into v2 after `migrate-v2.sh` — seeds the owner, reconciles container configs, helps port custom v1 code |
+| `/migrate-memory` | Carries an agent group's memory across a provider switch (e.g. Claude ↔ Codex) — run after `ncl groups config update --provider`; reads the source provider's memory store, distills it into the target's, and restarts the group |
 | `/migrate-nanoclaw` | Extracts your customizations from a fork, generates a replayable migration guide, and upgrades to upstream by reapplying them on a clean base |
 | `/qodo-pr-resolver` | Reviews and resolves PR issues with Qodo — AI-powered code review fixes for GitHub, GitLab, Bitbucket, and Azure DevOps |
 | `/setup` | Runs initial NanoClaw setup — install, configure, first-time setup |

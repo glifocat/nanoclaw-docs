@@ -5,7 +5,7 @@ keywords: ["troubleshooting", "debugging", "dropped messages", "container spawn"
 tag: "UPDATED"
 ---
 
-{/* verified-against: .claude/skills/debug/SKILL.md, src/container-runtime.ts, src/container-runner.ts, src/host-sweep.ts, src/upgrade-state.ts, src/log.ts, src/cli/resources/dropped-messages.ts, src/cli/resources/sessions.ts, src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/webhook-server.ts, src/circuit-breaker.ts, setup/service.ts @ dc34ceb */}
+{/* verified-against: .claude/skills/debug/SKILL.md, src/container-runtime.ts, src/container-runner.ts, src/host-sweep.ts, src/upgrade-state.ts, src/log.ts, src/cli/resources/dropped-messages.ts, src/cli/resources/sessions.ts, src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/webhook-server.ts, src/circuit-breaker.ts, setup/service.ts @ e3986eb (v2.1.16) */}
 
 ## Start here
 
@@ -78,7 +78,7 @@ Trace the message through the pipeline, in order:
     `stopped` is normal between messages — the sweep restarts the container when due messages arrive. If nothing spawns at all, see [Container won't spawn](#container-wont-spawn) below.
   </Step>
   <Step title="Did the agent produce a reply?">
-    Inspect the session DBs (`inbound.db` / `outbound.db` under `data/v2-sessions/<group>/<session>/`). The `/debug` skill walks you through the exact queries. A `Container exited` line with a non-zero `code` in the host log, plus the streamed stderr above it, is where the failure usually shows.
+    Inspect the session DBs (`inbound.db` / `outbound.db` under `data/v2-sessions/<group>/<session>/`). The `/debug` skill walks you through the exact queries. A `Container exited non-zero` warning in the host log carries the exit `code` and a `stderrTail` — the last ~10 lines of container stderr — which is where a boot failure usually shows. A clean or signal-killed exit logs `Container exited` at info level instead.
   </Step>
 </Steps>
 
