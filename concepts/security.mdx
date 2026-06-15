@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["security", "threat model", "prompt injection", "container isolation", "egress lockdown", "mount allowlist", "approvals", "credentials", "defense in depth"]
 ---
 
-{/* verified-against: src/container-runner.ts, src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/command-gate.ts, src/modules/permissions/{index.ts,access.ts,channel-approval.ts,sender-approval.ts}, src/modules/approvals/{index.ts,primitive.ts,onecli-approvals.ts}, src/modules/self-mod/index.ts, container/Dockerfile, pnpm-workspace.yaml, docs/SECURITY.md @ dc34ceb (v2.1.4) */}
+{/* verified-against: src/container-runner.ts, src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/command-gate.ts, src/modules/permissions/{index.ts,access.ts,channel-approval.ts,sender-approval.ts}, src/modules/approvals/{index.ts,primitive.ts,onecli-approvals.ts}, src/modules/self-mod/index.ts, container/Dockerfile, pnpm-workspace.yaml, docs/SECURITY.md @ e3986eb (v2.1.16) */}
 
 NanoClaw connects an AI agent with real tools — a shell, a filesystem, network access — to chat platforms where anyone can type. Every inbound message is untrusted input fed straight into the model's context, and no model reliably distinguishes "instructions from my operator" from "instructions an attacker pasted into the group chat." So the design assumption is blunt: **prompt injection eventually succeeds, and the agent acts as if the attacker wrote its instructions.**
 
