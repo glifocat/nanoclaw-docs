@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["container", "lifecycle", "docker", "spawn", "wake", "mounts", "image", "tini", "orphan cleanup", "install slug", "egress lockdown", "kill"]
 ---
 
-{/* verified-against: src/container-runner.ts, src/container-runtime.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/install-slug.ts, setup/container.ts, container/Dockerfile @ dc34ceb (v2.1.4) */}
+{/* verified-against: src/container-runner.ts, src/container-runtime.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/install-slug.ts, setup/container.ts, container/Dockerfile @ e3986eb (v2.1.16) */}
 
 Every active session gets exactly one Docker container, spawned on demand and killed when it goes quiet. The container is deliberately disposable: all state lives in mounted host directories, so a kill loses nothing but an in-flight provider call — and the [host sweep](/concepts/architecture#what-runs-when) retries that.
 
