@@ -60,6 +60,53 @@ tag: "UPDATED"
   - **Interactive uninstaller** — `bash nanoclaw.sh --uninstall` removes one NanoClaw copy (service, containers, data, OneCLI agents) with a scan → confirm → execute flow, `--dry-run` and `--yes` flags, and per-checkout install-slug scoping. See [Uninstall NanoClaw](/operate/uninstall)
 </Update>
 
+<Update label="v2.1.1 – v2.1.4" description="2026-06-09" tags={["Feature"]}>
+  - **Egress lockdown (opt-in)** — an agent group's outbound network is forced through the OneCLI gateway, so a compromised agent can't reach arbitrary hosts (v2.1.1). See [Hardening](/operate/hardening#lock-down-network-egress)
+  - v2.1.2–v2.1.4 were rapid patch follow-ups with no user-facing changes
+</Update>
+
+<Update label="v2.1.0" description="2026-06-07" tags={["Breaking"]}>
+  - **[BREAKING] Startup now requires an upgrade marker.** The host refuses to boot unless `data/upgrade-state.json` records that the install reached its version through a sanctioned path (`/setup`, `/update-nanoclaw`, `/migrate-nanoclaw`). Stamp it with `pnpm exec tsx scripts/upgrade-state.ts set` — the same command clears a tripped marker. See [Upgrading](/operate/upgrading)
+  - Skills retrofit — channel, provider, and tool skills made v2-conformant (minimal integration surface, a test per integration point); four skills broken on v2 were dropped
+</Update>
+
+<Update label="v2.0.65 – v2.0.76" description="2026-06-05" tags={["Feature"]}>
+  - **`/upload-trace`** — upload a session trace to Hugging Face for sharing or debugging
+  - Session-transcript rotation before resume — oversized or aged transcripts are rotated so a cold resume can't wedge the container
+  - **`/add-rtk`** token-efficient CLI-proxy skill, and a `whatsapp-formatting` container skill
+  - Fixes: signal-cli 0.13+ `listAccounts`, the Photon remote-iMessage URL, channel-approval target scoping, and per-group `CLAUDE.local.md` loading
+</Update>
+
+<Update label="v2.0.64" description="2026-05-18" tags={["Fix"]}>
+  - `ncl destinations add`/`remove` through the approval flow now reach the receiver immediately — an approved destination no longer fails `send_message` with `unknown destination` until the next container restart
+</Update>
+
+<Update label="v2.0.55 – v2.0.63" description="2026-05-15" tags={["Breaking"]}>
+  Rollup release covering v2.0.55–v2.0.63; per-bump GitHub Releases begin here.
+  - **[BREAKING] Service names are now per-install** — the launchd label and systemd unit are slugged to your project root (`com.nanoclaw.<sha1(projectRoot)[:8]>`, `nanoclaw-<slug>.service`). The old `com.nanoclaw` / `nanoclaw.service` names no longer match; find yours with `source setup/lib/install-slug.sh && launchd_label` (macOS) or `systemd_unit` (Linux)
+  - Stronger `<message>`-wrapping enforcement; MCP servers added via `add_mcp_server` inherit OneCLI gateway routing; CLI-scope hardening (`scopeField` fails closed, `sessions get` guarded against cross-group access); `/add-gmail-tool` and `/add-gcal-tool` aligned with the v2 container-config model; `qwibitai/nanoclaw` → `nanocoai/nanoclaw` swept across code and docs
+</Update>
+
+<Update label="v2.0.54" description="2026-05-10" tags={["Feature"]}>
+  - **Per-group model and effort overrides** — `ncl groups config update --model <model> --effort <level>`, falling back to the host-configured model when unset
+  - Container `claude-code` bumped to 2.1.128
+</Update>
+
+<Update label="v2.0.48 – v2.0.53" description="2026-05-09" tags={["Feature"]}>
+  - **Container config moved to the database** — per-group runtime config (provider, model, packages, MCP servers, mounts, skills) lives in the `container_configs` table instead of `groups/<folder>/container.json`; filesystem configs are backfilled on startup
+  - **`ncl groups restart`** with `--rebuild` / `--message` — config edits no longer auto-kill containers; on-wake messages are picked up only by a fresh container's first poll
+  - **Per-group `cli_scope`** (`disabled` / `group` / `global`, default `group`) — controls what the agent can reach via `ncl` from inside its container, with cross-group result filtering
+</Update>
+
+<Update label="v2.0.45 – v2.0.47" description="2026-05-08" tags={["Feature"]}>
+  - **The `ncl` admin CLI** — query and modify the central DB (agent groups, messaging groups, wirings, users, roles, members, destinations, sessions, approvals, dropped messages). Host transport over a Unix socket; container-side writes go through the approval flow
+  - **v1 → v2 migration** — `bash migrate-v2.sh` finds your v1 install, merges `.env`, seeds the v2 DB, copies group folders (`CLAUDE.md` → `CLAUDE.local.md`) and session data, ports tasks and channels, then hands off to `/migrate-from-v1`. See [Migrate from v1](/migrate-from-v1)
+</Update>
+
+<Update label="v2.0.1 – v2.0.44" description="2026-05-07" tags={["Maintenance"]}>
+  - Post-rewrite stabilization — roughly 44 rapid patch releases over two weeks, before the per-release changelog discipline began at v2.0.63. Not individually documented upstream; see the [GitHub releases](https://github.com/nanocoai/nanoclaw/releases) for raw notes
+</Update>
+
 <Update label="v2.0.0" description="2026-04-22" tags={["Breaking"]}>
   - Ground-up architectural rewrite with new entity model (users, roles, messaging groups, agent groups, wirings)
   - Two-database session model — `inbound.db` (host writes) and `outbound.db` (container writes) eliminate cross-mount SQLite contention
