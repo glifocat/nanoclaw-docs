@@ -5,6 +5,14 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Filled the v2.0.x → v2.1.4 product-changelog gap" description="2026-06-15" tags={["Updated"]}>
+  `changelog/index.mdx` jumped straight from v2.0.0 to v2.1.5. Reconstructed the ~80 intervening patch releases by mapping upstream version bumps, mirroring upstream's own granularity rather than fabricating per-patch detail.
+
+  - Milestone entries for the versions upstream's `CHANGELOG.md` documents — the `ncl` admin CLI + v1→v2 migration (2.0.45), container-config-in-DB + `cli_scope` (2.0.48), per-group model/effort (2.0.54), the per-install-service-names **breaking** rollup (2.0.55–2.0.63), the destinations-through-approval fix (2.0.64), and the startup upgrade-marker **breaking** change (2.1.0)
+  - **Egress lockdown** reconstructed for v2.1.1 from commits; honest rollups for the rapid-patch ranges (2.0.1–2.0.44 stabilization, 2.0.65–2.0.76) with a pointer to GitHub releases
+  - Every version 2.0.1–2.1.4 is now accounted for in a labeled entry. Closes the last known gap noted in the v2.1.16 sweep
+</Update>
+
 <Update label="Provider-neutral voice pass" description="2026-06-15" tags={["Updated"]}>
   Neutralized prose where "Claude" stood in for "the agent" generically — claims that read as false on a non-Claude (Codex/OpenCode/Ollama) group. Claude-specific facts and literals (the Claude Code CLI, the Claude Agent SDK, `CLAUDE.local.md`, Claude credentials) are kept verbatim.
 
