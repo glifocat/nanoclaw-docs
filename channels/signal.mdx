@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["signal", "signal-cli", "add-signal", "linked devices", "qr code", "json-rpc", "daemon", "secondary device"]
 ---
 
-{/* verified-against: src/channels/signal.ts (channels branch), setup/channels/signal.ts, setup/add-signal.sh, setup/install-signal-cli.sh, setup/signal-auth.ts, .claude/skills/add-signal/SKILL.md @ e3986eb (v2.1.16); channels @ 8137440 */}
+{/* verified-against: src/channels/signal.ts (channels branch), setup/channels/signal.ts, setup/add-signal.sh, setup/install-signal-cli.sh, setup/signal-auth.ts, .claude/skills/add-signal/SKILL.md @ 2afbd182 (v2.1.21); channels @ fdbfb6a */}
 
 The Signal adapter is **native** — no Chat SDK bridge, only Node.js builtins. Signal has no bot API, so NanoClaw talks to [signal-cli](https://github.com/AsamK/signal-cli), which it spawns as a local daemon and drives over a newline-delimited **JSON-RPC TCP socket** (`127.0.0.1:7583` by default). Setup links NanoClaw to your existing Signal account as a **secondary device** — no new phone number needed; your assistant sends and receives as the number on your phone. All connections are outbound, so no public URL, webhook, or open port; works behind NAT and on a laptop.
 

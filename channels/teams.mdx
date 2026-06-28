@@ -5,9 +5,9 @@ tag: "NEW"
 keywords: ["teams", "microsoft teams", "add-teams", "azure bot", "app registration", "client secret", "sideload", "manifest", "webhook", "chat sdk", "threads"]
 ---
 
-{/* verified-against: src/channels/teams.ts (channels branch), src/channels/chat-sdk-bridge.ts, src/webhook-server.ts, setup/channels/teams.ts, setup/add-teams.sh, .claude/skills/add-teams/SKILL.md @ e3986eb (v2.1.16); channels @ 8137440 */}
+{/* verified-against: src/channels/teams.ts (channels branch), src/channels/chat-sdk-bridge.ts, src/webhook-server.ts, setup/channels/teams.ts, setup/add-teams.sh, .claude/skills/add-teams/SKILL.md @ 2afbd182 (v2.1.21); channels @ fdbfb6a */}
 
-The Teams adapter connects NanoClaw to a bot you register in Azure. It's built on the Chat SDK bridge (`@chat-adapter/teams` 4.26.0, pinned — the `/add-teams` skill may pin a slightly newer adapter version) and receives messages over **webhooks**: Azure Bot Service POSTs to NanoClaw's shared webhook server, so Teams needs a **public HTTPS URL** that reaches your machine.
+The Teams adapter connects NanoClaw to a bot you register in Azure. It's built on the Chat SDK bridge (`@chat-adapter/teams` 4.29.0, pinned — the `/add-teams` skill may pin a slightly newer adapter version) and receives messages over **webhooks**: Azure Bot Service POSTs to NanoClaw's shared webhook server, so Teams needs a **public HTTPS URL** that reaches your machine.
 
 Teams is the most involved channel NanoClaw supports — there's no "paste a token" shortcut. Setup walks ~7 steps across the Azure portal and Teams admin: app registration, client secret, Azure Bot resource, messaging endpoint, Teams channel enable, app manifest, and sideload. The wizard guides each step in the terminal, and at any prompt you can type `?` (or pick **Stuck** at a step gate) to hand off to interactive Claude with your progress so far. Every step gate also offers **← Back to channel selection**, so you can bail out to the channel picker at any point.
 

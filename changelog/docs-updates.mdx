@@ -5,6 +5,17 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.1.21 sweep: new features + full re-verification" description="2026-06-29" tags={["Updated"]}>
+  Brought the whole site current with `nanocoai/nanoclaw@2afbd182` (v2.1.21) after a drift check found the docs anchored at v2.1.16.
+
+  - **Agent-to-agent approval policies** (migrations 017/018): documented the per-message gate on connected agents (the new `ncl policies` resource, the `agent_message_policies` table), the strict named approver (`approver_user_id`), and reject-with-reason across `guides/multi-agent-swarm`, `concepts/security`, `reference/{db-schema,ncl-cli}`, `operate/ncl-cli`, and `extend/self-modification`.
+  - **Codex provider v2** (`extend/providers`): install via the `cli-tools.json` manifest, vault-only auth, composed `AGENTS.md` + `.agents/skills` + per-group `~/.codex`. Removed the stale `.env` / `OPENAI_BASE_URL` claims.
+  - **Container resource caps + `/learn`**: `CONTAINER_CPU_LIMIT` / `CONTAINER_MEMORY_LIMIT` added to `reference/environment-variables`, `operate/{configuration,hardening}`, and `concepts/container-lifecycle`; the `/learn` skill added to `reference/skills-catalog` (46 → 47) and `extend/writing-skills`.
+  - **Upgrade flow** (`operate/upgrading`): `/update-nanoclaw` now upgrades the OneCLI gateway when its `versions.json` pin moves (reversing the old "never upgraded for you"), and `/update-skills` rebuilds the container image when re-applied code lives under `container/`.
+  - **Provider-aware install** (`installation`, `quickstart`): the credential prerequisite is now "a credential for the provider you pick," not Claude-only.
+  - **Full SHA re-verification**: re-verified every cited file's diff e3986eb..2afbd182 and bumped the `verified-against` anchor on ~30 pages; bumped the `channels` registry branch to `fdbfb6a` and refreshed the channel-adapter pins to `4.29.0` (Chat SDK lock). Codebase token count 195k → 199k.
+</Update>
+
 <Update label="Filled the v2.0.x → v2.1.4 product-changelog gap" description="2026-06-15" tags={["Updated"]}>
   `changelog/index.mdx` jumped straight from v2.0.0 to v2.1.5. Reconstructed the ~80 intervening patch releases by mapping upstream version bumps, mirroring upstream's own granularity rather than fabricating per-patch detail.
 

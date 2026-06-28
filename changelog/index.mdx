@@ -6,6 +6,35 @@ rss: true
 tag: "UPDATED"
 ---
 
+<Update label="v2.1.21" description="2026-06-25" tags={["Feature"]}>
+  - **Reject with reason** — declining a self-mod or agent-to-agent approval can now relay a one-line note back to the requesting agent (`Your <action> request was rejected by admin: "<reason>"`). A plain Reject is unchanged; an unanswered reason prompt finalizes as a plain reject after ~5 minutes
+  - **`/learn` skill** — distill or refine a reusable skill from a directory, a URL, pasted notes, or the work just done, authored to the project's skill guidelines
+  - Clearer agent-to-agent gate approval prompt
+</Update>
+
+<Update label="v2.1.20" description="2026-06-25" tags={["Breaking"]}>
+  - **[BREAKING] Chat SDK pinned to `4.29.0`** (was `^4.24.0`) — `chat` and the `@chat-adapter/*` channel adapters are version-locked, so a mismatched pair fails to typecheck. Core installs with no channel (only `cli`) are unaffected. **Migration:** re-run each installed channel's `/add-<channel>` skill to pull the matching `4.29.0` adapter
+  - **Per-container resource caps** — `CONTAINER_CPU_LIMIT` and `CONTAINER_MEMORY_LIMIT` pass through to `docker run` as `--cpus` / `--memory`. Both empty by default (unbounded, byte-identical spawn args to before); `--memory` is a hard cap on a swapless host
+  - `/update-skills` now rebuilds the agent image when a re-applied skill changed files under `container/`
+  - Fixes: reap dead peer service registrations whose binary is gone; allow an env-selected agent provider in setup
+</Update>
+
+<Update label="v2.1.19" description="2026-06-18" tags={["Feature"]}>
+  - **Per-message approval policies on agent-to-agent connections** — an operator can gate one agent→agent edge so every message waits for human approval, without un-wiring it: `ncl policies set --from <id> --to <id> --approver <user-id>`. Directed and per-pair; operator-only. Backed by the new `agent_message_policies` table (migration 017)
+  - **Named approver** — a policy pins a single required approver; only that user (or an owner) can clear a held message, recorded as `approver_user_id` on `pending_approvals` (migration 018)
+  - `.claude` is now mirrored into `.agents` via symlinks
+</Update>
+
+<Update label="v2.1.18" description="2026-06-18" tags={["Fix"]}>
+  - Setup parses the Claude OAuth token correctly from a wrapped PTY capture
+</Update>
+
+<Update label="v2.1.17" description="2026-06-16" tags={["Feature"]}>
+  - **Codex CLI installs via the `container/cli-tools.json` manifest** instead of a hard-coded Dockerfile layer
+  - **`/update-nanoclaw` upgrades the OneCLI gateway when its pinned version moves** (`versions.json`), walking you through [`docs/onecli-upgrades.md`](https://github.com/nanocoai/nanoclaw/blob/main/docs/onecli-upgrades.md) before the restart
+  - Budget/billing-exhausted LLM turns (e.g. an Anthropic `403 billing_error`) now reach the user instead of being silently dropped and retried
+</Update>
+
 <Update label="v2.1.16" description="2026-06-14" tags={["Feature"]}>
   - **Operator-driven provider selection in setup** — the installer can select, install, and authenticate a non-default agent provider, then set it on the first agent before its first spawn. A provider registry feeds the picker and a vault-only auth walkthrough; default (Claude) installs are unaffected
   - **Per-group provider choice** — the provider is a per-group database property, not an install-wide default: `ncl groups config update --id <group-id> --provider <name>` then restart. Group creation stays provider-agnostic

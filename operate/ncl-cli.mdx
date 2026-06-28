@@ -5,13 +5,13 @@ tag: "UPDATED"
 keywords: ["ncl", "cli", "admin", "unix socket", "cli_scope", "groups", "wirings", "sessions", "approvals"]
 ---
 
-{/* verified-against: src/cli/client.ts, src/cli/dispatch.ts, src/cli/socket-server.ts, src/cli/crud.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,roles,sessions,user-dms,users,wirings}.ts, src/db/container-configs.ts, bin/ncl, setup/service.ts @ e3986eb (v2.1.16) */}
+{/* verified-against: src/cli/client.ts, src/cli/dispatch.ts, src/cli/socket-server.ts, src/cli/crud.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,roles,sessions,user-dms,users,wirings}.ts, src/db/container-configs.ts, bin/ncl, setup/service.ts @ 2afbd182 (v2.1.21) */}
 
 `ncl` is the admin CLI for a running NanoClaw host. It sends one request frame over a Unix socket at `data/ncl.sock` and prints the response — every command reads or mutates the host's central database live, no restart needed. The socket is `chmod 0600`, so only the user that started the host can connect.
 
 Don't confuse it with the [CLI channel](/channels/cli), which is a chat adapter for talking *to an agent* from the terminal — `ncl` is for operating the host itself.
 
-This page is the working tour. The [ncl CLI reference](/reference/ncl-cli) has every operation, flag, and enum for all eleven resources.
+This page is the working tour. The [ncl CLI reference](/reference/ncl-cli) has every operation, flag, and enum for all twelve resources — including the operator-only [`policies`](/reference/ncl-cli#policies) gate for agent-to-agent messages.
 
 ## Invoking ncl
 
