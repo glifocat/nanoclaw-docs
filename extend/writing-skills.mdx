@@ -9,6 +9,10 @@ keywords: ["writing skills", "SKILL.md", "REMOVE.md", "skill authoring", "idempo
 
 A skill is a markdown file that Claude Code executes — there's no engine to integrate with, so writing one is mostly writing good instructions. The bar upstream holds skills to is [docs/skill-guidelines.md](https://github.com/nanocoai/nanoclaw/blob/main/docs/skill-guidelines.md), and it boils down to two principles: **minimal integration surface** (mostly add files; keep reach-ins into existing code to a line or two that calls your own code) and **a test for every functional integration point** (one that goes red if the wiring is deleted or drifts). This page covers the conventions; [the overview](/extend/overview) explains the model.
 
+<Tip>
+Don't start from a blank file. The [`/learn`](/reference/skills-catalog#operational-skills) skill distills a `SKILL.md` from a source — a directory, a URL, pasted notes, or the work you just did in a conversation — authored to these same guidelines, and refines an existing skill the same way. Generate the first draft, then tighten it by hand against the conventions below.
+</Tip>
+
 ## Anatomy of a SKILL.md
 
 Every skill is a directory under `.claude/skills/<name>/` with a `SKILL.md` in the [Claude Code skills format](https://code.claude.com/docs/en/skills):
