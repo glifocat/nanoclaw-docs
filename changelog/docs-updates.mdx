@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Slack Socket Mode" description="2026-06-29" tags={["Updated"]}>
+  Documented Slack's **Socket Mode** (now the setup default) across `channels/slack` and `channels/overview`. Setting `SLACK_APP_TOKEN` (`xapp-…`) opens an outbound WebSocket, so the host needs **no public URL** — alongside the existing webhook mode. Reverses the page's old "v2 doesn't use Socket Mode" note and the webhook-only framing.
+</Update>
+
 <Update label="v2.1.21 sweep: new features + full re-verification" description="2026-06-29" tags={["Updated"]}>
   Brought the whole site current with `nanocoai/nanoclaw@2afbd182` (v2.1.21) after a drift check found the docs anchored at v2.1.16.
 
