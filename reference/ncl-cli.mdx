@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["ncl", "cli", "reference", "commands", "flags", "groups", "wirings", "sessions", "roles", "members", "destinations", "approvals", "cli_scope"]
 ---
 
-{/* verified-against: src/cli/dispatch.ts, src/cli/crud.ts, src/cli/client.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/registry.ts, src/cli/frame.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,roles,sessions,user-dms,users,wirings}.ts, bin/ncl @ e3986eb (v2.1.16) */}
+{/* verified-against: src/cli/dispatch.ts, src/cli/crud.ts, src/cli/client.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/registry.ts, src/cli/frame.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,policies,roles,sessions,user-dms,users,wirings}.ts, bin/ncl @ 2afbd182 (v2.1.21) */}
 
 Exhaustive reference for the `ncl` admin CLI. For a task-oriented walkthrough, see [The ncl admin CLI](/operate/ncl-cli).
 
@@ -51,7 +51,7 @@ In-flight approval cards waiting for an admin response. Read-only; rows are dele
 | list | `ncl approvals list [--<column> <value>] [--limit N]` | open |
 | get | `ncl approvals get --id <approval-id>` | open |
 
-Columns (all usable as list filters): `approval_id`, `session_id`, `request_id`, `action` (e.g. `install_packages`, `add_mcp_server`, `onecli_credential`), `payload` (JSON), `created_at`, `agent_group_id`, `channel_type`, `platform_id`, `platform_message_id`, `expires_at`, `status` (`pending` | `approved` | `rejected` | `expired`), `title`, `options_json`.
+Columns (all usable as list filters): `approval_id`, `session_id`, `request_id`, `action` (e.g. `install_packages`, `add_mcp_server`, `onecli_credential`), `payload` (JSON), `created_at`, `agent_group_id`, `channel_type`, `platform_id`, `platform_message_id`, `expires_at`, `status` (`pending` | `approved` | `rejected` | `expired` | `awaiting_reason`), `approver_user_id`, `title`, `options_json`.
 
 ## destinations
 
@@ -123,6 +123,18 @@ One chat or channel on one platform. Identity is the unique `(channel_type, plat
 | `--is-group` | number | Updatable, default `0`. `1` = multi-user group chat, `0` = DM. Affects session scoping. |
 | `--unknown-sender-policy` | enum | Updatable, default `strict`. `strict` drops silently; `request_approval` sends an approval card to an admin; `public` allows anyone. |
 | `--denied-at` | string | Updatable. Set when the owner denies registering the channel; router drops all messages silently while set. Cleared by any explicit wiring mutation. |
+
+## policies
+
+Per-message approval gate on an agent-to-agent connection. A row forces every message from one agent to another to be approved by a human before delivery — without un-wiring the [destination](#destinations). **No row = free flow.** Directed and per-pair: gate both directions with two policies. Operator-only — agents can't manage their own gates, and self-messages (`--from` equal to `--to`) are never gated.
+
+| Operation | Invocation | Access |
+| --- | --- | --- |
+| list | `ncl policies list [--<column> <value>]` | open |
+| set | `ncl policies set --from <agent-group-id> --to <agent-group-id> --approver <user-id>` | approval |
+| remove | `ncl policies remove --from <agent-group-id> --to <agent-group-id>` | approval |
+
+`set` upserts — re-running with a different `--approver` replaces it. Only the named `--approver` (or an owner) can approve a held message. Removing a policy returns the edge to free flow. Columns: `from_agent_group_id`, `to_agent_group_id`, `approver`, `created_at`.
 
 ## roles
 
