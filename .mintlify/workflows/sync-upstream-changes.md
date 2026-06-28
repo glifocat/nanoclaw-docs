@@ -65,7 +65,7 @@ When changes don't map cleanly through verified-against comments (e.g., brand-ne
 
 - If a change doesn't affect documentation, skip it.
 - Keep documentation concise. Match the existing style of each page.
-- For every page where you make a **content change** (corrected facts, new sections, changed behavior), add or keep `tag: "UPDATED"` in the frontmatter. Do NOT add the tag for cosmetic-only changes (formatting, component swaps, whitespace, or a SHA-only bump of the verified-against comment). If the page already has a different tag (e.g., `NEW`), replace it with `UPDATED`. Example:
+- For every page where you make a **content change** (corrected facts, new sections, changed behavior), add or keep `tag: "UPDATED"` in the frontmatter. Do NOT add the tag for cosmetic-only changes (formatting, component swaps, whitespace, or a SHA-only bump of the verified-against comment). If the page already has a different tag (e.g., `NEW`), replace it with `UPDATED`. If your only change to a page is a SHA-only `verified-against` bump, leave its existing tag exactly as-is — do not add, refresh, or remove it; the weekly audit ages tags out by content date and enforces the badge cap. Example:
   ```yaml
   ---
   title: "Container lifecycle"
