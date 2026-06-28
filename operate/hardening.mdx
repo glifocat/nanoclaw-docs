@@ -92,14 +92,16 @@ If the permissions module isn't installed (no `user_roles` table), admin command
 
 ## Cap container resources
 
-Four limits bound what a runaway agent can consume. All are read from `process.env` only — set them in the service definition, not `.env` (see [Configuration](/operate/configuration#process-environment-only)):
+These limits bound what a runaway agent can consume. All are read from `process.env` only — set them in the service definition, not `.env` (see [Configuration](/operate/configuration#process-environment-only)):
 
 | Variable | Default | Limits |
 |---|---|---|
 | `CONTAINER_TIMEOUT` | 30 min | Max runtime for an agent container. |
 | `IDLE_TIMEOUT` | 30 min | How long an idle container survives after its last result. |
-| `MAX_CONCURRENT_CONTAINERS` | `5` | Simultaneously running agent containers. |
+| `CONTAINER_CPU_LIMIT` | _unset_ | CPU cap per container, passed to `docker run --cpus` (e.g. `2`). Opt-in; unset leaves containers unbounded. |
+| `CONTAINER_MEMORY_LIMIT` | _unset_ | Memory cap per container, passed to `docker run --memory` (e.g. `8g`). A hard cap only on a swapless host — there a runaway is OOM-killed; with swap it can spill past the limit. |
 | `CONTAINER_MAX_OUTPUT_SIZE` | 10 MB | Output captured from a container. |
+| `MAX_CONCURRENT_CONTAINERS` | `5` | Intended cap on simultaneous containers — [parsed but not enforced](/reference/environment-variables), so setting it currently has no effect. |
 
 ## Credentials
 

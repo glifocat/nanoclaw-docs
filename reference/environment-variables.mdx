@@ -32,6 +32,8 @@ Read from `process.env` at host startup. Putting these in `.env` has no effect �
 |---|---|---|---|
 | `CONTAINER_TIMEOUT` | `1800000` (30 min) | `src/config.ts:34` | Max runtime for an agent container, in milliseconds. |
 | `CONTAINER_MAX_OUTPUT_SIZE` | `10485760` (10 MB) | `src/config.ts:35` | Max output captured from a container, in bytes. |
+| `CONTAINER_CPU_LIMIT` | _unset_ (unbounded) | `src/config.ts:44` | Opt-in CPU cap per agent container, passed through to `docker run --cpus` (e.g. `2`). Empty leaves containers unbounded — the current default. |
+| `CONTAINER_MEMORY_LIMIT` | _unset_ (unbounded) | `src/config.ts:45` | Opt-in memory cap per agent container, passed through to `docker run --memory` (e.g. `8g`). A hard cap only on a swapless host — there the runaway is OOM-killed; with swap present the container can spill past it. NanoClaw doesn't manage swap. |
 | `MAX_MESSAGES_PER_PROMPT` | `10` | `src/config.ts:38` | How many queued messages are batched into one agent prompt. Per-group override exists in container config. |
 | `IDLE_TIMEOUT` | `1800000` (30 min) | `src/config.ts:39` | How long a container stays alive after its last result, waiting for follow-ups. |
 | `MAX_CONCURRENT_CONTAINERS` | `5` | `src/config.ts:40` | Intended cap on simultaneous agent containers. Parsed but not enforced anywhere as of v2.1.4 — setting it has no effect. |

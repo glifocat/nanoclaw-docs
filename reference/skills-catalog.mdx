@@ -5,11 +5,11 @@ tag: "NEW"
 keywords: ["skills", "catalog", "reference", "add-channel", "providers", "tools", "container skills", "workspace skills", "slash commands"]
 ---
 
-{/* verified-against: .claude/skills/ and container/skills/ listings + each skill's SKILL.md frontmatter @ e3986eb (v2.1.16) */}
+{/* verified-against: .claude/skills/ and container/skills/ listings + each skill's SKILL.md frontmatter @ 2afbd182 (v2.1.21) */}
 
 NanoClaw ships two kinds of skills:
 
-- **Host-side workspace skills** (`.claude/skills/`) — invoked as slash commands in Claude Code from your NanoClaw checkout. They install channels, providers, and tools, or operate and maintain your install. 46 skills total: 17 channel installs, 3 provider installs, 10 tool installs, and 16 operational skills.
+- **Host-side workspace skills** (`.claude/skills/`) — invoked as slash commands in Claude Code from your NanoClaw checkout. They install channels, providers, and tools, or operate and maintain your install. 47 skills total: 17 channel installs, 3 provider installs, 10 tool installs, and 17 operational skills.
 - **Container skills** (`container/skills/`) — 8 skills mounted into every agent container at `/app/skills`. The agent loads them at runtime; you don't invoke them yourself.
 
 For how skills work and how to write your own, see [Extending NanoClaw](/extend/overview).
@@ -76,6 +76,7 @@ Setup, maintenance, migration, and day-to-day administration of your install.
 | `/get-qodo-rules` | Loads org- and repo-level coding rules from Qodo before code tasks begin, so generation follows team standards |
 | `/init-first-agent` | Walks you through creating the first agent for a DM channel — resolves your channel identity, wires the DM group, and triggers a welcome DM |
 | `/init-onecli` | Installs and initializes OneCLI Agent Vault, migrating existing `.env` credentials to the vault |
+| `/learn` | Distills a reusable skill from a source — a directory, URL, pasted notes, or the work just done in the conversation — or refines an existing one, writing a `.claude/skills/<name>/SKILL.md` to the project's skill guidelines. Creates or refines skills; it doesn't install them from a registry |
 | `/manage-channels` | Wires channels to agent groups, manages isolation levels, and adds new channel groups |
 | `/manage-mounts` | Configures which host directories agent containers can access — view, add, or remove mount allowlist entries |
 | `/migrate-from-openclaw` | Migrates from OpenClaw to NanoClaw v2 — detects an existing install, extracts identity, credentials, and tasks, then guides interactive migration |
