@@ -5,9 +5,12 @@ tag: "UPDATED"
 keywords: ["slack", "bot token", "signing secret", "add-slack", "webhook", "event subscriptions", "interactivity", "mrkdwn", "chat sdk", "threads"]
 ---
 
-{/* verified-against: src/channels/slack.ts (channels branch), src/channels/chat-sdk-bridge.ts, src/webhook-server.ts, src/router.ts, setup/channels/slack.ts, setup/add-slack.sh, .claude/skills/add-slack/SKILL.md, container/skills/slack-formatting/SKILL.md @ e3986eb (v2.1.16); channels @ 8137440 */}
+{/* verified-against: src/channels/slack.ts (channels branch), src/channels/chat-sdk-bridge.ts, src/webhook-server.ts, src/router.ts, setup/channels/slack.ts, setup/add-slack.sh, .claude/skills/add-slack/SKILL.md, container/skills/slack-formatting/SKILL.md @ 2afbd182 (v2.1.21); channels @ fdbfb6a */}
 
-The Slack adapter connects NanoClaw to a Slack app you create in your workspace. It's built on the Chat SDK bridge (`@chat-adapter/slack` 4.26.0, pinned) and receives events over **webhooks**: Slack POSTs to `/webhook/slack` on NanoClaw's shared webhook server. Unlike Discord or Telegram, that means Slack needs a **public URL** that reaches your machine.
+The Slack adapter connects NanoClaw to a Slack app you create in your workspace. It's built on the Chat SDK bridge (`@chat-adapter/slack` 4.29.0, pinned) and supports two delivery modes:
+
+- **Socket Mode** (the setup default) — the bot opens an outbound WebSocket to Slack, so events arrive over that connection and NanoClaw needs **no public URL**. Ideal for local dev or a host behind NAT. Setting `SLACK_APP_TOKEN` (`xapp-…`) is what flips the adapter into this mode.
+- **Webhook mode** — Slack POSTs to `/webhook/slack` on NanoClaw's shared webhook server, which needs a **public HTTPS URL** that reaches your machine. The adapter uses this mode whenever `SLACK_APP_TOKEN` is unset.
 
 The bot works in public channels, private channels, DMs, and threads.
 
@@ -17,8 +20,8 @@ The bot works in public channels, private channels, DMs, and threads.
 - A working NanoClaw install ([quickstart](/quickstart))
 - A Slack app created **From scratch** at [api.slack.com/apps](https://api.slack.com/apps) with these **Bot Token Scopes** (under **OAuth & Permissions**): `chat:write`, `im:write`, `im:history`, `channels:read`, `channels:history`, `groups:read`, `groups:history`, `users:read`, `reactions:write`, `files:read`, `files:write`
 - **App Home** → enable the **Messages Tab** and check "Allow users to send slash commands and messages from the messages tab" — without this you can't DM the bot
-- Two credentials to paste: the **Bot User OAuth Token** (`xoxb-…`, shown after **Install to Workspace**) and the **Signing Secret** (under **Basic Information**). No app-level token — v2 doesn't use Socket Mode.
-- A way to expose port 3000 publicly — ngrok, Cloudflare Tunnel, or a reverse proxy on a VPS
+- The **Bot User OAuth Token** (`xoxb-…`, shown after **Install to Workspace**), plus the credential for your chosen mode: an **App-Level Token** (`xapp-…` with the `connections:write` scope, under **Basic Information** → **App-Level Tokens**) for Socket Mode, or the **Signing Secret** (under **Basic Information**) for webhook mode. In Socket Mode the signing secret is optional — Slack signs socket frames separately.
+- **Webhook mode only:** a way to expose port 3000 publicly — ngrok, Cloudflare Tunnel, or a reverse proxy on a VPS. Socket Mode needs none of this.
 
 ## Install
 
@@ -28,11 +31,11 @@ Slack is offered in the first-run setup wizard, or add it later by running `/add
   <Step title="Create the Slack app">
     The wizard opens [api.slack.com/apps](https://api.slack.com/apps) and walks you through the app creation checklist above: scopes, Messages Tab, signing secret, and workspace install.
   </Step>
-  <Step title="Paste the bot token and signing secret">
-    Both are password prompts. The wizard format-validates them (`xoxb-` prefix, hex secret), then calls `auth.test` to confirm Slack accepts the token and resolve your workspace and bot identity. If `SLACK_BOT_TOKEN` or `SLACK_SIGNING_SECRET` already exist in `.env`, it offers to reuse them.
+  <Step title="Choose a delivery mode and paste credentials">
+    The wizard first asks **how Slack should deliver events** — **Socket Mode** (default; no public URL) or **Public webhook**. Then it collects the **Bot User OAuth Token** plus the mode credential: an **App-Level Token** (`xapp-…`) for Socket Mode, or the **Signing Secret** for webhook mode. All are password prompts, format-validated (`xoxb-`/`xapp-` prefixes, hex secret); the wizard then calls `auth.test` to confirm Slack accepts the token and resolve your workspace and bot identity. Existing values in `.env` are offered for reuse.
   </Step>
   <Step title="Adapter install">
-    `setup/add-slack.sh` copies the adapter from the `channels` branch, installs the pinned package, builds, writes `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET` to `.env` (synced to `data/env/env`), and restarts the service.
+    `setup/add-slack.sh` copies the adapter from the `channels` branch, installs the pinned package, builds, writes `SLACK_BOT_TOKEN` plus either `SLACK_APP_TOKEN` (Socket Mode) or `SLACK_SIGNING_SECRET` (webhook) to `.env` (synced to `data/env/env`), and restarts the service.
   </Step>
   <Step title="Identify yourself">
     The wizard asks for your Slack member ID (`U…` — in Slack, click your profile picture → **Profile** → **⋮** → **Copy member ID**), then calls `conversations.open` to get a DM channel with you.
@@ -40,11 +43,15 @@ Slack is offered in the first-run setup wizard, or add it later by running `/add
   <Step title="Name the agent and get the welcome DM">
     The wizard asks for your operator role and an agent name (default `Nano`), wires the DM to your first agent group, and sends a welcome message. The DM is delivered outbound via `chat.postMessage`, so it arrives even before webhooks are configured — but the bot can't hear your replies yet.
   </Step>
-  <Step title="Expose the webhook server and finish in Slack">
-    Make port 3000 publicly reachable (ngrok, Cloudflare Tunnel, or a reverse proxy), then in your Slack app:
-    - **Event Subscriptions** → enable, set the Request URL to `https://<your-public-host>/webhook/slack` (Slack sends a verification challenge that must pass), and subscribe to the bot events `message.channels`, `message.groups`, `message.im`, and `app_mention`
+  <Step title="Finish in Slack">
+    **Socket Mode:** in your Slack app, go to **Socket Mode** → toggle **Enable Socket Mode** on. Keep **Event Subscriptions** enabled with the bot events below — under Socket Mode no Request URL is required. That's it; just DM the bot.
+
+    **Webhook mode:** make port 3000 publicly reachable (ngrok, Cloudflare Tunnel, or a reverse proxy), then:
+    - **Event Subscriptions** → enable, set the Request URL to `https://<your-public-host>/webhook/slack` (Slack sends a verification challenge that must pass)
     - **Interactivity & Shortcuts** → enable, same Request URL
     - Reinstall the app when Slack prompts you to apply the new settings
+
+    Either mode subscribes to the same bot events: `message.channels`, `message.groups`, `message.im`, and `app_mention`.
   </Step>
 </Steps>
 
@@ -52,10 +59,10 @@ To wire workspace channels or more DMs later, run `/manage-channels`. Channels a
 
 ## Platform notes
 
-- **Webhook delivery** — the bridge registers Slack on the shared webhook server (port 3000, configurable via `WEBHOOK_PORT`), which routes `/webhook/slack` to the adapter. Requests are authenticated with your signing secret. The public URL must stay reachable — if your tunnel dies, the bot silently stops hearing messages.
+- **Event delivery** — in **Socket Mode** the bot holds an outbound WebSocket to Slack, so nothing inbound needs to be reachable. In **webhook mode** the bridge registers Slack on the shared webhook server (port 3000, configurable via `WEBHOOK_PORT`), routes `/webhook/slack` to the adapter, and authenticates requests with your signing secret — the public URL must stay reachable, or the bot silently stops hearing messages if your tunnel dies.
 - **Threads** — the adapter sets `supportsThreads: true`, so in group channels the router forces `per-thread` sessions: each Slack thread gets its own agent session (unless the wiring uses `agent-shared`, which keeps one session across all of an agent's messaging groups). DMs collapse sub-threads into one session. See the [entity model](/concepts/entity-model).
 - **Mentions and engagement** — @mentioning the bot in an unwired channel reaches the router as a platform-confirmed mention (the `app_mention` event); in mention-sticky wirings the bot then sticks to that thread (plain mention wirings respond per mention without subscribing). DMs are always treated as addressed to the bot.
-- **Interactive questions** — when an agent asks a multiple-choice question, it renders as a card with buttons. Clicks arrive through the Interactivity request URL (same `/webhook/slack` route) and the card updates in place to show the selection. If buttons do nothing, Interactivity isn't configured.
+- **Interactive questions** — when an agent asks a multiple-choice question, it renders as a card with buttons. Clicks arrive over the same channel as events — the socket in Socket Mode, the `/webhook/slack` route (via **Interactivity & Shortcuts**) in webhook mode — and the card updates in place to show the selection. If buttons do nothing in webhook mode, Interactivity isn't configured.
 - **Attachments and reactions** — file uploads are downloaded and passed to the agent as data (`files:read`), and the agent can react to messages (`reactions:write`).
 - **Formatting** — Slack uses [mrkdwn](https://api.slack.com/reference/surfaces/formatting), not standard Markdown (`*bold*` not `**bold**`, `<url|text>` links, no headings). The `slack-formatting` container skill is mounted into agent containers with a full mrkdwn reference.
 - **No outbound chunking** — the adapter doesn't set the bridge's `maxTextLength`, so long replies are posted as a single message. Slack's message limit is high enough that this rarely matters.
@@ -63,7 +70,7 @@ To wire workspace channels or more DMs later, run `/manage-channels`. Channels a
 ## Troubleshooting
 
 - **"Slack didn't accept that token"** — `auth.test` rejected it (`invalid_auth` or `token_revoked`). Copy the token again from **OAuth & Permissions** and retry setup. "Couldn't reach Slack" instead means a network problem.
-- **Welcome DM arrived but the bot never replies** — outbound works without webhooks; inbound doesn't. Check that your public URL is up, Event Subscriptions is enabled with a verified Request URL, and the bot events are subscribed. Slack's URL verification fails if the signing secret in `.env` doesn't match the app.
+- **Welcome DM arrived but the bot never replies** — outbound works regardless; inbound depends on your mode. In **Socket Mode**, confirm `SLACK_APP_TOKEN` is set and **Enable Socket Mode** is toggled on in the app. In **webhook mode**, check that your public URL is up, Event Subscriptions is enabled with a verified Request URL, and the bot events are subscribed (URL verification fails if the signing secret in `.env` doesn't match the app).
 - **`missing_scope` when opening the DM** — your app lacks `im:write`. Add it under **OAuth & Permissions**, reinstall the app to the workspace, then retry setup.
 - **Webhook returns 404 `Unknown adapter: slack`** — the adapter never registered, usually because `SLACK_BOT_TOKEN` is missing from the environment the service reads (the factory returns `null` without it). Verify `.env` and `data/env/env`, then restart the service.
 

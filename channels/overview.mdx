@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["channels", "adapters", "channel registry", "chat sdk", "webhook", "add-telegram", "add-discord", "add-slack", "manage-channels"]
 ---
 
-{/* verified-against: src/channels/{adapter,channel-registry,index,chat-sdk-bridge,cli}.ts, src/webhook-server.ts, .claude/skills/{manage-channels,add-telegram}/SKILL.md, upstream/channels:src/channels/ @ e3986eb (v2.1.16) */}
+{/* verified-against: src/channels/{adapter,channel-registry,index,chat-sdk-bridge,cli}.ts, src/webhook-server.ts, .claude/skills/{manage-channels,add-telegram}/SKILL.md, upstream/channels:src/channels/ @ 2afbd182 (v2.1.21); channels @ fdbfb6a */}
 
 NanoClaw trunk ships channel **infrastructure** — the adapter interface, the registry, the Chat SDK bridge, the webhook server — plus one built-in channel: `cli`, an always-on local-terminal channel that needs no credentials. Every platform adapter (Telegram, Discord, Slack, WhatsApp, …) lives on the `channels` branch of the repo and is installed on demand with an `/add-<channel>` skill. Your fork only contains the channels you actually use.
 
@@ -54,7 +54,7 @@ Everything on the `channels` branch right now. "Setup wizard" means the channel 
 | WhatsApp Cloud | — | `/add-whatsapp-cloud` | Chat SDK; Meta's official Cloud API |
 | Telegram | Yes | `/add-telegram` | Chat SDK; BotFather token, pair-code chat registration |
 | Discord | Yes | `/add-discord` | Chat SDK; Gateway listener — no public URL needed; thread-based |
-| Slack | Yes | `/add-slack` | Chat SDK; events delivered to the webhook server; thread-based |
+| Slack | Yes | `/add-slack` | Chat SDK; Socket Mode (default, no public URL) or webhook delivery; thread-based |
 | Signal | Yes | `/add-signal` | Native; requires signal-cli with a linked account |
 | iMessage | Yes | `/add-imessage` | Chat SDK; local mode (macOS Full Disk Access) or remote mode (Photon API) |
 | Microsoft Teams | Yes | `/add-teams` | Chat SDK; webhook-based; thread-based |
@@ -81,7 +81,7 @@ Chat SDK channels that receive platform events over HTTP (Slack, Teams, GitHub, 
 
 The routing path defaults to the adapter name, so single-instance routes are unchanged; a second adapter of the same platform passes an `instance` and listens on `/webhook/{instance}` with its own signing secret. Modules that need a non–Chat SDK endpoint (a custom GitHub webhook, a payment provider, a health check) register a raw handler on the same server with `registerWebhookHandler(path, handler)` instead of opening a second port — raw routes take priority over adapter routes.
 
-The port comes from the `WEBHOOK_PORT` environment variable, default `3000`. Point the platform's event subscription URL at `https://<your-public-host>/webhook/<channel>` (e.g. `/webhook/slack`) — you'll need a public URL or a tunnel for these channels. Discord is the exception: it uses a persistent Gateway listener instead of inbound webhooks, so no public URL is required. Telegram (long polling), WhatsApp, Signal, and WeChat hold their own outbound connections, so they don't need one either.
+The port comes from the `WEBHOOK_PORT` environment variable, default `3000`. Point the platform's event subscription URL at `https://<your-public-host>/webhook/<channel>` (e.g. `/webhook/slack`) — you'll need a public URL or a tunnel for these channels. Discord is the exception: it uses a persistent Gateway listener instead of inbound webhooks, so no public URL is required. Telegram (long polling), WhatsApp, Signal, and WeChat hold their own outbound connections, so they don't need one either. Slack needs a public URL only in webhook mode — in Socket Mode (the setup default) it holds an outbound WebSocket like Discord, so no public URL is required.
 
 ## Wiring channels to agents
 
