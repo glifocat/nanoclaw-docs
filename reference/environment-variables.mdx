@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["environment variables", ".env", "configuration", "ASSISTANT_NAME", "CONTAINER_TIMEOUT", "LOG_LEVEL", "NANOCLAW_SKIP", "NANOCLAW_EGRESS_LOCKDOWN", "setup", "reference"]
 ---
 
-{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/container-runner.ts, src/providers/claude.ts, setup/auto.ts, setup/onecli.ts, setup/lib/setup-config.ts, setup/lib/claude-assist.ts, setup/lib/diagnostics.ts, setup/signal-auth.ts, setup/container.ts, setup/migrate-v2/select-channels.ts, migrate-v2.sh, container/agent-runner/src/{timezone.ts,providers/claude.ts} @ e3986eb (v2.1.16) */}
+{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/container-runner.ts, src/providers/claude.ts, setup/auto.ts, setup/onecli.ts, setup/lib/setup-config.ts, setup/lib/claude-assist.ts, setup/lib/diagnostics.ts, setup/signal-auth.ts, setup/container.ts, setup/migrate-v2/select-channels.ts, migrate-v2.sh, container/agent-runner/src/{timezone.ts,providers/claude.ts} @ 2afbd182 (v2.1.21) */}
 
 Exhaustive list of every environment variable the NanoClaw host, setup wizard, and agent runner read. For how to actually set these — `.env` editing, service definitions, restart commands — see [Configuration](/operate/configuration).
 
@@ -53,6 +53,7 @@ Consumed by the setup wizard (`pnpm run setup:auto`) and migration scripts, not 
 |---|---|---|---|
 | `NANOCLAW_SKIP` | — | `setup/auto.ts:135` | Comma-separated step names to skip: `environment`, `container`, `onecli`, `auth`, `mounts`, `service`, `cli-agent`, `timezone`, `channel`, `verify`, `first-chat`. |
 | `NANOCLAW_DISPLAY_NAME` | `$USER` | `setup/auto.ts:414` | How agents address the operator — skips the prompt. |
+| `NANOCLAW_AGENT_PROVIDER` | — | `setup/auto.ts:821` | Preselects the agent provider and skips the setup picker (e.g. `claude`, `codex`). Setup fails if the value isn't a provider available in this install. |
 | `NANOCLAW_AGENT_NAME` | — | `setup/channels/*.ts` | Pre-fills the agent name prompt in each channel setup flow. The CLI scratch agent is always "Terminal Agent". |
 | `NANOCLAW_CHANNELS` | — | `setup/migrate-v2/select-channels.ts:43` | Comma-separated channel names (e.g. `telegram,discord`) — skips the channel picker in the v2 migration flow. |
 | `NANOCLAW_V1_PATH` | sibling-directory scan | `migrate-v2.sh:196` | Explicit override for v1 install discovery in the migration flow. Validated against `$NANOCLAW_V1_PATH/store/messages.db` — the script fails with a message telling you to set it when auto-discovery misses. |
@@ -72,7 +73,7 @@ Consumed by the setup wizard (`pnpm run setup:auto`) and migration scripts, not 
 
 ## Container-side variables (agent runner)
 
-Read inside the agent container by the agent runner. The host injects only `TZ` (plus provider-contributed and OneCLI proxy variables) at spawn — `src/container-runner.ts:439`. The rest are not passed through from the host environment; overriding them means baking them into a custom image or a provider container config.
+Read inside the agent container by the agent runner. The host injects only `TZ` (plus provider-contributed and OneCLI proxy variables) at spawn — `src/container-runner.ts:448`. The rest are not passed through from the host environment; overriding them means baking them into a custom image or a provider container config.
 
 | Variable | Default | Read in | Effect |
 |---|---|---|---|
