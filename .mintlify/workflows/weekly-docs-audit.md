@@ -49,10 +49,14 @@ Verify all `.mdx` files have:
 
 ### 6. Clean up stale sidebar tags
 
-Check all `.mdx` files for `tag` frontmatter fields. Remove tags that are no longer relevant:
-- Remove `tag: "NEW"` from pages that were created more than 2 weeks ago (check git log for the file's first commit date)
-- Remove `tag: "UPDATED"` from pages that were last modified more than 2 weeks ago (check git log for the file's last commit date)
-- Leave other tags (e.g., `BETA`, `DEPRECATED`) untouched — these are intentional and long-lived
+Sidebar `tag` badges are a contrast signal — they only help when they mark the *few* pages worth a second look. Keep them scarce: a badge on most of the nav reads as noise, not news.
+
+Check all `.mdx` files for `tag` frontmatter fields and apply these rules in order:
+
+- **`NEW`** — remove from any page whose *first* commit is more than 2 weeks old (`git log --diff-filter=A --follow --format=%cI -- <file> | tail -1`). `NEW` is only for genuinely new pages; a page that merely gained content should carry `UPDATED`, not `NEW`.
+- **`UPDATED`** — date this off the page's last **content** change, NOT its last commit. A commit whose only change to the file is the `{/* verified-against … */}` comment line or the `tag:` frontmatter field is bookkeeping, not content — it must not keep a page badged. Inspect each candidate commit's diff (`git log -p --follow -- <file>`) and use the most recent commit that touches any *other* line as the freshness date; remove `UPDATED` if that date is more than 2 weeks old. (This is the key fix: SHA-only `verified-against` bumps and tag edits no longer reset the clock.)
+- **Saturation cap** — after the above, if more than **10 pages** still carry `UPDATED` (~20% of the nav), keep the tag only on the 10 with the most recent content change and strip it from the rest, oldest first. This bounds the badge count no matter how many pages an upstream sync touched at once.
+- Leave other tags (e.g., `BETA`, `DEPRECATED`) untouched — these are intentional and long-lived.
 
 ### 7. Report and fix
 
