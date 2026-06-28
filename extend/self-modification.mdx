@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["self-modification", "install_packages", "add_mcp_server", "CLAUDE.local.md", "approval", "self-customize", "rebuild", "agent memory"]
 ---
 
-{/* verified-against: src/modules/self-mod/{index,request,apply}.ts, src/modules/approvals/primitive.ts, container/agent-runner/src/mcp-tools/self-mod.ts, container/agent-runner/src/mcp-tools/self-mod.instructions.md, container/skills/self-customize/SKILL.md, src/container-runner.ts, src/claude-md-compose.ts @ e3986eb (v2.1.16) */}
+{/* verified-against: src/modules/self-mod/{index,request,apply}.ts, src/modules/approvals/primitive.ts, container/agent-runner/src/mcp-tools/self-mod.ts, container/agent-runner/src/mcp-tools/self-mod.instructions.md, container/skills/self-customize/SKILL.md, src/container-runner.ts, src/claude-md-compose.ts @ 2afbd182 (v2.1.21) */}
 
 Agents can change their own environment — but every change that touches the container goes through you. The self-mod module exposes exactly two operations, `install_packages` and `add_mcp_server`, and **both are always approval-gated**: the agent submits a request, an admin gets a card, and nothing changes until someone taps Approve. The one thing an agent can change freely is its own memory file.
 
@@ -48,11 +48,11 @@ Two things this path can't do: it doesn't accept the `instructions` field that [
 
 ## The approval flow, from your seat
 
-Both operations use the same approvals plumbing as [credential requests](/operate/credentials#approving-credential-use). You get a DM card — "Install Packages Request" or "Add MCP Request" — naming the agent, the package list or server command, and the agent's stated reason, with Approve / Reject buttons.
+Both operations use the same approvals plumbing as [credential requests](/operate/credentials#approving-credential-use). You get a DM card — "Install Packages Request" or "Add MCP Request" — naming the agent, the package list or server command, and the agent's stated reason, with **Approve**, **Reject**, and **Reject with reason…** buttons.
 
 - **Who gets it:** admins of the requesting agent group first, then global admins, then owners — the first one with a reachable DM, preferring approvers on the same channel type as the originating session, then falling back to list order on any channel. No eligible approver means the request fails immediately and the agent is told why.
 - **On approve:** the host executes the full change (config update, rebuild if needed, restart) and the agent gets a system message prompting it to verify and report.
-- **On reject:** the agent sees "Your `install_packages` request was rejected by admin."
+- **On reject:** a plain Reject tells the agent "Your `install_packages` request was rejected by admin." **Reject with reason…** instead prompts you for a one-line note in your DM and relays it — `Your install_packages request was rejected by admin: "<reason>"` — so the agent learns *why*. Don't answer within ~5 minutes and it finalizes as a plain reject.
 
 Pending requests are visible with `ncl approvals list --status pending`; decisions happen on the card, not in the CLI.
 

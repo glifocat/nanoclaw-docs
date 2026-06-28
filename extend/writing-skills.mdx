@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["writing skills", "SKILL.md", "REMOVE.md", "skill authoring", "idempotency", "registration test", "skill-guidelines", "vitest", "integration points"]
 ---
 
-{/* verified-against: docs/skill-guidelines.md, CONTRIBUTING.md, vitest.skills.config.ts, .claude/skills/{add-telegram,manage-mounts,update-skills,add-ollama-tool}/SKILL.md, .claude/skills/add-telegram/REMOVE.md @ e3986eb (v2.1.16) */}
+{/* verified-against: docs/skill-guidelines.md, CONTRIBUTING.md, vitest.skills.config.ts, .claude/skills/{add-telegram,manage-mounts,update-skills,add-ollama-tool}/SKILL.md, .claude/skills/add-telegram/REMOVE.md @ 2afbd182 (v2.1.21) */}
 
 A skill is a markdown file that Claude Code executes — there's no engine to integrate with, so writing one is mostly writing good instructions. The bar upstream holds skills to is [docs/skill-guidelines.md](https://github.com/nanocoai/nanoclaw/blob/main/docs/skill-guidelines.md), and it boils down to two principles: **minimal integration surface** (mostly add files; keep reach-ins into existing code to a line or two that calls your own code) and **a test for every functional integration point** (one that goes red if the wiring is deleted or drifts). This page covers the conventions; [the overview](/extend/overview) explains the model.
 

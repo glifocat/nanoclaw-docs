@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["cli", "terminal", "pnpm run chat", "unix socket", "cli.sock", "local channel", "init-cli-agent"]
 ---
 
-{/* verified-against: src/channels/cli.ts, src/channels/index.ts, scripts/chat.ts, scripts/init-cli-agent.ts, setup/auto.ts, src/cli/socket-server.ts, package.json @ e3986eb (v2.1.16) */}
+{/* verified-against: src/channels/cli.ts, src/channels/index.ts, scripts/chat.ts, scripts/init-cli-agent.ts, setup/auto.ts, src/cli/socket-server.ts, package.json @ 2afbd182 (v2.1.21) */}
 
 The CLI channel is the one channel built into NanoClaw trunk — `src/channels/index.ts` registers only `cli`. It needs no credentials, no platform account, and no install skill: the daemon listens on a Unix socket at `data/cli.sock`, and `pnpm run chat` connects to it from the same machine. It exists so you can talk to an agent before (or without) wiring any messaging platform — the setup wizard uses it for its first-contact ping/pong check, and CLI-only installs are a fully supported way to run NanoClaw.
 

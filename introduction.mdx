@@ -7,7 +7,7 @@ tag: "UPDATED"
 keywords: ["nanoclaw", "multi-agent", "claude", "container isolation", "inbox outbox", "sqlite", "channels", "skills", "v2"]
 ---
 
-{/* verified-against: src/index.ts, src/router.ts, src/channels/index.ts, src/container-runtime.ts, src/container-runner.ts, src/db/schema.ts, src/modules/, container/agent-runner/src/mcp-tools/agents.ts, agents.instructions.md, core.ts, .claude/skills/, .claude/skills/add-telegram/SKILL.md, repo-tokens/badge.svg, package.json @ e3986eb (v2.1.16) */}
+{/* verified-against: src/index.ts, src/router.ts, src/channels/index.ts, src/container-runtime.ts, src/container-runner.ts, src/db/schema.ts, src/modules/, container/agent-runner/src/mcp-tools/agents.ts, agents.instructions.md, core.ts, .claude/skills/, .claude/skills/add-telegram/SKILL.md, repo-tokens/badge.svg, package.json @ 2afbd182 (v2.1.21) */}
 
 NanoClaw runs AI agents that talk to you over your messaging apps — and to each other. Claude is the default provider, with Codex, OpenCode, and Ollama available as alternatives. One Node host process handles routing and delivery. Every active session gets its own Docker container, so agents can run Bash and edit files without touching your host or each other.
 
@@ -48,7 +48,7 @@ The router resolves who sent the message, which agent group should handle it, an
 
 **Container isolation.** Agents run in Docker containers and see only what you explicitly mount. Bash and file edits execute inside the container, never on your host. Each session gets its own container, so parallel conversations can't interfere with each other.
 
-**Small enough to hold in context.** The codebase is ~195k tokens — compact enough for a long-context agent to hold in context. That's also how you customize it: edit the code, not a config sprawl.
+**Small enough to hold in context.** The codebase is ~199k tokens — compact enough for a long-context agent to hold in context. That's also how you customize it: edit the code, not a config sprawl.
 
 **Channels are skills, not bundled features.** Main ships exactly one channel — the local CLI. Everything else lives on the `channels` branch and gets copied into your fork by a skill: `/add-telegram`, `/add-discord`, `/add-whatsapp`, `/add-slack`, `/add-signal`, `/add-imessage`, and several more. Your install contains the adapters you asked for and nothing else. The same mechanism covers alternative agent providers (`/add-codex`, `/add-opencode`, `/add-ollama-provider`).
 
