@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Beginner-friendlier Get started" description="2026-06-29" tags={["Updated"]}>
+  Reworked the on-ramp to lead with outcome before architecture. `introduction` now opens with what NanoClaw does for you (text it like a coworker; it runs code in a sandbox) and a "Key terms" callout defining agent / channel / sandbox / provider; the SQLite-queue framing moved into "How a message flows" rather than the lede. `quickstart` gained a time/effort/prerequisite expectation-setter. No facts changed — resequenced and scaffolded.
+</Update>
+
 <Update label="Slack Socket Mode" description="2026-06-29" tags={["Updated"]}>
   Documented Slack's **Socket Mode** (now the setup default) across `channels/slack` and `channels/overview`. Setting `SLACK_APP_TOKEN` (`xapp-…`) opens an outbound WebSocket, so the host needs **no public URL** — alongside the existing webhook mode. Reverses the page's old "v2 doesn't use Socket Mode" note and the webhook-only framing.
 </Update>

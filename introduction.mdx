@@ -9,9 +9,17 @@ keywords: ["nanoclaw", "multi-agent", "claude", "container isolation", "inbox ou
 
 {/* verified-against: src/index.ts, src/router.ts, src/channels/index.ts, src/container-runtime.ts, src/container-runner.ts, src/db/schema.ts, src/modules/, container/agent-runner/src/mcp-tools/agents.ts, agents.instructions.md, core.ts, .claude/skills/, .claude/skills/add-telegram/SKILL.md, repo-tokens/badge.svg, package.json @ 2afbd182 (v2.1.21) */}
 
-NanoClaw runs AI agents that talk to you over your messaging apps — and to each other. Claude is the default provider, with Codex, OpenCode, and Ollama available as alternatives. One Node host process handles routing and delivery. Every active session gets its own Docker container, so agents can run Bash and edit files without touching your host or each other.
+NanoClaw is a personal AI assistant you run on your own machine and reach from the messaging apps you already use — Telegram, WhatsApp, Discord, Slack, or just your terminal. Text it like you'd text a coworker: it can search the web, run code, edit files, and follow up on a schedule. Each agent works inside its own locked-down sandbox, so it does real work without touching the rest of your computer.
 
-A single pattern drives the whole system: every message is a row in a SQLite queue. A user chat, an inbound webhook, a scheduled job, an agent delegating to another agent — all of them land in an inbox table (`messages_in`), and every response leaves through an outbox (`messages_out`). A scheduled task is just a message with a `process_after` timestamp. There is no separate scheduler, RPC layer, or job system to learn.
+It's self-hosted and yours — clone the repo, run one setup command, connect a chat app. Claude powers agents by default, with Codex, OpenCode, and Ollama as alternatives.
+
+<Info>
+  **New here? Four words that show up everywhere:**
+  - **Agent** — one AI identity with its own memory, workspace, and personality.
+  - **Channel** — a messaging app you reach an agent through (Telegram, WhatsApp, … or the terminal).
+  - **Sandbox** — the isolated Docker container an agent runs in; it only sees what you explicitly share.
+  - **Provider** — the AI model behind an agent (Claude by default; Codex, OpenCode, or Ollama optional).
+</Info>
 
 <CardGroup cols={2}>
   <Card title="Run it" icon="rocket" href="/quickstart">
@@ -29,6 +37,8 @@ A single pattern drives the whole system: every message is a row in a SQLite que
 </CardGroup>
 
 ## How a message flows
+
+One idea drives the whole system: every message is a row in a SQLite queue. A user chat, an inbound webhook, a scheduled job, an agent delegating to another agent — all of them land in an inbox table (`messages_in`), and every response leaves through an outbox (`messages_out`). A scheduled task is just a message with a `process_after` timestamp. There's no separate scheduler, RPC layer, or job system to learn.
 
 Every channel — Telegram, Discord, a webhook, the built-in CLI — feeds the same pipeline:
 
