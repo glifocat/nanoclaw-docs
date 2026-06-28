@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["security", "threat model", "prompt injection", "container isolation", "egress lockdown", "mount allowlist", "approvals", "credentials", "defense in depth"]
 ---
 
-{/* verified-against: src/container-runner.ts, src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/command-gate.ts, src/modules/permissions/{index.ts,access.ts,channel-approval.ts,sender-approval.ts}, src/modules/approvals/{index.ts,primitive.ts,onecli-approvals.ts}, src/modules/self-mod/index.ts, container/Dockerfile, pnpm-workspace.yaml, docs/SECURITY.md @ e3986eb (v2.1.16) */}
+{/* verified-against: src/container-runner.ts, src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/command-gate.ts, src/modules/permissions/{index.ts,access.ts,channel-approval.ts,sender-approval.ts}, src/modules/approvals/{index.ts,primitive.ts,onecli-approvals.ts,reason-capture.ts,finalize.ts,response-handler.ts}, src/modules/agent-to-agent/{message-gate.ts,db/agent-message-policies.ts}, src/modules/self-mod/index.ts, container/Dockerfile, pnpm-workspace.yaml, docs/SECURITY.md @ 2afbd182 (v2.1.21) */}
 
 NanoClaw connects an AI agent with real tools — a shell, a filesystem, network access — to chat platforms where anyone can type. Every inbound message is untrusted input fed straight into the model's context, and no model reliably distinguishes "instructions from my operator" from "instructions an attacker pasted into the group chat." So the design assumption is blunt: **prompt injection eventually succeeds, and the agent acts as if the attacker wrote its instructions.**
 
@@ -62,6 +62,12 @@ Some actions are too consequential to leave to a model that might be acting on i
 - **Credential use** — vault secrets can require per-request approval; the gateway holds the HTTPS request open while the card shows an admin the method, host, path, and body preview.
 - **Self-modification** — an agent asking to install packages or add an MCP server into its own container is asking to expand its own capabilities, which is exactly what an attacker would ask for. Both actions queue an approval card.
 - **Channel registration** — new chats reaching agents, as above.
+- **Agent-to-agent messages** — an operator can gate a connection between two agents so every message from one to the other is held until a human approves it, without un-wiring the connection. Set it with [`ncl policies set`](/guides/multi-agent-swarm#gate-a-connection); no policy means messages flow freely.
+
+Two refinements control who decides and what the agent learns:
+
+- **Named approver** — most cards fall to the first reachable admin, but an agent-to-agent message policy pins a specific approver. Only that exact user (or an owner) can resolve the card, recorded as `approver_user_id` on the request — so a held message can't be cleared by just anyone with admin rights.
+- **Reject with reason** — alongside Approve and Reject, an admin can decline with a one-line note. NanoClaw parks the request, prompts the admin in their DM, and relays their reply back to the requesting agent (`Your <action> request was rejected by admin: "<reason>"`). If the admin doesn't reply within ~5 minutes — or the host restarts mid-prompt — the host sweep finalizes a plain reject, so the agent is never left waiting on a decision that never comes.
 
 The credential flow in detail, including card expiry and `ncl approvals`, is in [Credentials](/operate/credentials#approving-credential-use).
 
