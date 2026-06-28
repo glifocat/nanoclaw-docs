@@ -5,7 +5,7 @@ tag: "NEW"
 keywords: ["database", "schema", "sqlite", "v2.db", "inbound.db", "outbound.db", "messages_in", "messages_out", "sessions", "container_configs", "pending_sender_approvals", "migrations"]
 ---
 
-{/* verified-against: src/db/schema.ts, src/db/connection.ts, src/db/session-db.ts, src/session-manager.ts, src/db/migrations/{001-initial,002-chat-sdk-state,module-approvals-pending-approvals,module-agent-to-agent-destinations,module-approvals-title-options,008-dropped-messages,009-drop-pending-credentials,010-engage-modes,011-pending-sender-approvals,012-channel-registration,013-approval-render-metadata,014-container-configs,015-cli-scope,016-messaging-group-instance,index}.ts, container/agent-runner/src/db/messages-out.ts, src/modules/scheduling/db.ts @ e3986eb (v2.1.16) */}
+{/* verified-against: src/db/schema.ts, src/db/connection.ts, src/db/session-db.ts, src/session-manager.ts, src/db/migrations/{001-initial,002-chat-sdk-state,module-approvals-pending-approvals,module-agent-to-agent-destinations,module-approvals-title-options,008-dropped-messages,009-drop-pending-credentials,010-engage-modes,011-pending-sender-approvals,012-channel-registration,013-approval-render-metadata,014-container-configs,015-cli-scope,016-messaging-group-instance,017-agent-message-policies,018-approvals-approver-user-id,index}.ts, src/modules/agent-to-agent/db/agent-message-policies.ts, container/agent-runner/src/db/messages-out.ts, src/modules/scheduling/db.ts @ 2afbd182 (v2.1.21) */}
 
 NanoClaw stores everything in SQLite, split across two layers:
 
@@ -172,9 +172,10 @@ Host-side records for any approval-requiring request: `install_packages` / `add_
 | `agent_group_id` | TEXT | `NULL` | FK → `agent_groups(id)` |
 | `channel_type` / `platform_id` / `platform_message_id` | TEXT | `NULL` | Where the admin card lives, for later edits |
 | `expires_at` | TEXT | `NULL` | Expiry for credential approvals |
-| `status` | TEXT | `'pending'` | Approval status |
+| `status` | TEXT | `'pending'` | `pending` \| `approved` \| `rejected` \| `expired` \| `awaiting_reason` (a reject-with-reason hold, see [security](/concepts/security#human-in-the-loop-approvals)) |
 | `title` | TEXT | `''` | Card title (render metadata) |
 | `options_json` | TEXT | `'[]'` | Card options (render metadata) |
+| `approver_user_id` | TEXT | `NULL` | When set — the named approver of an agent-to-agent [message policy](#agent_message_policies) — only that exact user may resolve the card; `NULL` keeps the group/owner authorization path (migration 018) |
 | `created_at` | TEXT | — | ISO timestamp |
 
 ### pending_sender_approvals
@@ -219,6 +220,19 @@ Per-agent named map of allowed message targets — both the routing map and the 
 | `created_at` | TEXT | — | ISO timestamp |
 
 Primary key: `(agent_group_id, local_name)`. Indexed on `(target_type, target_id)`.
+
+### agent_message_policies
+
+Per-message approval gate on an agent-to-agent connection (migration 017). A row means every message from the source agent to the target is held for human approval before delivery — the [destination](#agent_destinations) stays wired, but each message pauses. **No row = free flow.** The gate is directed and per-pair: gate both directions with two rows. Operator-managed only (agents can't gate their own edges), and a row is deleted in both directions when either agent group is removed, so no policy outlives its connection.
+
+| Column | Type | Default | Meaning |
+|---|---|---|---|
+| `from_agent_group_id` | TEXT | — | Source agent (FK → `agent_groups(id)`) |
+| `to_agent_group_id` | TEXT | — | Target agent (FK → `agent_groups(id)`) |
+| `approver` | TEXT | — | User-id who must approve each gated message; only this user (or an owner) can approve. Persisted onto the held card's `pending_approvals.approver_user_id` |
+| `created_at` | TEXT | — | ISO timestamp |
+
+Primary key: `(from_agent_group_id, to_agent_group_id)`.
 
 ### container_configs
 
