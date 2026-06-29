@@ -30,9 +30,11 @@ Deployment is automatic after merge to `main` (via Mintlify GitHub app).
 
 **macOS gotcha**: `grep -oP` (Perl regex) is not available on macOS. Use `grep -oE` with POSIX extended regex instead (e.g., `grep -oE '[0-9.]+k'`).
 
+**Shell is zsh**: unquoted `$var` does NOT word-split (`set -- $r` leaves later positionals empty — use `${=var}` or list args explicitly), and `git log`/`git diff` flags must come *before* the `<rev>..<rev>` range or git misreads it as a path.
+
 ## NanoClaw Architecture Context
 
-The site was fully rewritten for v2 (PRs #296–#303), verified against `nanocoai/nanoclaw@dc34ceb` (v2.1.4). Keep these facts current when editing:
+The site was fully rewritten for v2 (PRs #296–#303) and fully re-verified to `nanocoai/nanoclaw@2afbd182` (v2.1.21); channel pages at `channels@fdbfb6a`. Keep these facts current when editing:
 
 - **Upstream:** https://github.com/nanocoai/nanoclaw (org moved from `qwibitai`; old URLs redirect).
 - **Code is the ONLY source of truth.** Upstream `docs/`, README.md, CLAUDE.md, and even SKILL.md prose all drift from reality. Verify every claim against `src/`, `container/`, `setup/`, `.claude/skills/` (treat SKILL.md as the executable spec for a skill's BEHAVIOR, but never as a source of facts about core code), and the shell scripts. Every docs page carries a `{/* verified-against: <files> @ <sha> */}` comment — update it whenever you re-verify a page.
@@ -55,6 +57,10 @@ git -C <upstream-checkout> diff <page-sha>..HEAD --name-only
 ```
 
 Compare the output against the paths cited in each page's `verified-against` comment; re-verify and bump the SHA only on pages whose cited files actually changed.
+
+- Registry branches (`channels`, `providers`) can be force-pushed — diff with three dots (`git diff <anchor>...upstream/<branch>`) and fetch into an explicit ref (`git fetch upstream <branch>:refs/remotes/upstream/<branch>`), since a plain fetch may not move the tracking ref.
+- Bump a page's SHA only when you actually re-verified its cited files at that SHA. A narrow prose fix can leave the old SHA for the next full sweep — bumping it falsely claims re-verification.
+- For a multi-version sweep, fan out read-only subagents (one per page-area) that diff each page's cited files and return keep/fix verdicts. A naive regex intersection mis-parses brace-comma citations (`{a,b,c}`) and silently under-reports drift.
 
 ## PR Workflow
 
@@ -137,10 +143,10 @@ keywords: ["relevant", "search", "terms"]
 
 ## Sidebar Tags
 
-Mintlify workflows in `.mintlify/workflows/` auto-manage `tag` frontmatter:
+Mintlify workflows in `.mintlify/workflows/` auto-manage `tag` frontmatter (`.mintlify/` is gitignored but these files are tracked — new ones need `git add -f`):
 - `tag: "UPDATED"` — applied by sync workflow for content changes (not cosmetic)
 - `tag: "NEW"` — applied by skill-docs workflow for new pages
-- Tags are cleaned up after 2 weeks by the weekly audit workflow
+- The weekly audit expires `UPDATED` off the last *content* commit (SHA-only `verified-against` bumps and tag edits don't count) and caps it at ~10 pages; `NEW` only for pages under 2 weeks old. Don't let a large sweep leave dozens of badges.
 - Do NOT add tags for cosmetic-only changes (formatting, component swaps)
 
 ## Automated PR Triage
@@ -184,7 +190,7 @@ To PR changes to `nanocoai/nanoclaw` from Ethan's fork (`glifocat/nanoclaw-glifo
 
 ## Token Count
 
-Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated) — the ONLY valid source. Never cite a number from prose, memory, or an automated PR; read the badge first. Last seen: 195k (~98% of the context window) at e3986eb (v2.1.16). Update pages that cite the count (e.g., `introduction.mdx`) if the badge value changes significantly.
+Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated) — the ONLY valid source. Never cite a number from prose, memory, or an automated PR; read the badge first. Last seen: 199k at 2afbd182 (v2.1.21). Update pages that cite the count (e.g., `introduction.mdx`) if the badge value changes significantly.
 
 ## Writing Standards
 
