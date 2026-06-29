@@ -63,6 +63,8 @@ When changes don't map cleanly through verified-against comments (e.g., brand-ne
 
 ### 5. Housekeeping
 
+- **Scale guard.** This workflow handles the per-push trickle. If the push reveals a large gap — the affected pages' cited SHAs are several releases behind, or many pages drifted at once — don't attempt a single-pass rewrite of everything; update what's clearly in this push, then flag in the PR that a full re-verification is due via the `/drift-sweep` skill.
+- When diffing a registry branch (`channels`, `providers`) that may have been force-pushed, use a three-dot diff (`git diff <anchor>...upstream/<branch>`) so dropped commits aren't missed.
 - If a change doesn't affect documentation, skip it.
 - Keep documentation concise. Match the existing style of each page.
 - For every page where you make a **content change** (corrected facts, new sections, changed behavior), add or keep `tag: "UPDATED"` in the frontmatter. Do NOT add the tag for cosmetic-only changes (formatting, component swaps, whitespace, or a SHA-only bump of the verified-against comment). If the page already has a different tag (e.g., `NEW`), replace it with `UPDATED`. If your only change to a page is a SHA-only `verified-against` bump, leave its existing tag exactly as-is — do not add, refresh, or remove it; the weekly audit ages tags out by content date and enforces the badge cap. Example:

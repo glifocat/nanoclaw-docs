@@ -27,6 +27,8 @@ Every page carries `{/* verified-against: <files> @ <sha> */}` after the frontma
 
 Pages whose cited files did not change are fine even if their SHA is old.
 
+If many pages are stale at once, or the docs anchor is several releases behind upstream `package.json` (compare the dominant `verified-against` SHA's version against `nanocoai/nanoclaw` HEAD), don't try to reconcile everything in this audit — flag in the report that a full re-verification is due and recommend an operator run the **`/drift-sweep`** skill, which classifies every page and ships the fixes as stacked PRs.
+
 ### 3. Check for stale code references
 
 Compare code snippets and function references in the docs against the actual upstream source code in the `nanocoai/nanoclaw` context repo. Flag any that no longer match, specifically:
