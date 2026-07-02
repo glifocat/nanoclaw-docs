@@ -1,15 +1,17 @@
 ---
-name: Document new skills and channel adapters
+name: Document new skills, channel adapters, and providers
 on:
   push:
     - repo: nanocoai/nanoclaw
       branch: channels
+    - repo: nanocoai/nanoclaw
+      branch: providers
 context:
   - repo: nanocoai/nanoclaw
 automerge: false
 ---
 
-A push was made to the `channels` registry branch on the upstream NanoClaw repository. New or updated channel adapters land there; new skills land in `.claude/skills/` on `main` (those are caught by the sync workflow, which routes here for documentation rules). Review what changed and create or update the documentation.
+A push was made to a registry branch (`channels` or `providers`) on the upstream NanoClaw repository. New or updated channel adapters land on `channels`; provider adapters (Codex, OpenCode, Ollama, …) land on `providers`; new skills land in `.claude/skills/` on `main` (those are caught by the sync workflow, which routes here for documentation rules). Review what changed and create or update the documentation.
 
 Read this repo's `CLAUDE.md` (NanoClaw Architecture Context section) first — it is the source of truth for the v2 model and lists confirmed upstream-doc traps. Key points: skills are SKILL.md workflows, NOT git branches; channel adapters are installed by `/add-<channel>` skills that fetch-and-copy files from the `channels` registry branch, never `git merge`; treat a skill's SKILL.md as the executable spec for its BEHAVIOR, but never as a source of facts about core code — verify claims against `src/`, `setup/*.sh`, and `container/`.
 
@@ -18,6 +20,7 @@ Read this repo's `CLAUDE.md` (NanoClaw Architecture Context section) first — i
 ### 1. Identify what changed
 
 - New or modified adapter directories on the `channels` registry branch (e.g., `src/channels/<adapter>/`)
+- New or modified provider files on the `providers` registry branch (e.g., `container/agent-runner/src/providers/<provider>.ts`, `setup/providers/<provider>.ts`)
 - New or modified `.claude/skills/<name>/SKILL.md` workflows (channel installers, tool installers, provider installers, operational skills)
 - New `setup/add-*.sh` wizards
 - Container skills in `container/skills/`
