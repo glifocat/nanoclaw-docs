@@ -3,11 +3,10 @@ title: "What is NanoClaw?"
 description: "A multi-agent AI assistant. One host process, one Docker container per session, and a SQLite queue that carries every message in the system."
 icon: "house"
 sidebarTitle: "Introduction"
-tag: "UPDATED"
 keywords: ["nanoclaw", "multi-agent", "claude", "container isolation", "inbox outbox", "sqlite", "channels", "skills", "v2"]
 ---
 
-{/* verified-against: src/index.ts, src/router.ts, src/channels/index.ts, src/container-runtime.ts, src/container-runner.ts, src/db/schema.ts, src/modules/, container/agent-runner/src/mcp-tools/agents.ts, agents.instructions.md, core.ts, .claude/skills/, .claude/skills/add-telegram/SKILL.md, repo-tokens/badge.svg, package.json @ 2afbd182 (v2.1.21) */}
+{/* verified-against: src/index.ts, src/router.ts, src/channels/index.ts, src/container-runtime.ts, src/container-runner.ts, src/db/schema.ts, src/modules/, container/agent-runner/src/mcp-tools/agents.ts, agents.instructions.md, core.ts, .claude/skills/, .claude/skills/add-telegram/SKILL.md, repo-tokens/badge.svg, package.json @ cb6e3d1 (v2.1.23) */}
 
 NanoClaw is a personal AI assistant you run on your own machine and reach from the messaging apps you already use — Telegram, WhatsApp, Discord, Slack, or just your terminal. Text it like you'd text a coworker: it can search the web, run code, edit files, and follow up on a schedule. Each agent works inside its own locked-down sandbox, so it does real work without touching the rest of your computer.
 
@@ -58,7 +57,7 @@ The router resolves who sent the message, which agent group should handle it, an
 
 **Container isolation.** Agents run in Docker containers and see only what you explicitly mount. Bash and file edits execute inside the container, never on your host. Each session gets its own container, so parallel conversations can't interfere with each other.
 
-**Small enough to hold in context.** The codebase is ~199k tokens — compact enough for a long-context agent to hold in context. That's also how you customize it: edit the code, not a config sprawl.
+**Small enough to hold in context.** The codebase is ~204k tokens — compact enough for a long-context agent to hold in context. That's also how you customize it: edit the code, not a config sprawl.
 
 **Channels are skills, not bundled features.** Main ships exactly one channel — the local CLI. Everything else lives on the `channels` branch and gets copied into your fork by a skill: `/add-telegram`, `/add-discord`, `/add-whatsapp`, `/add-slack`, `/add-signal`, `/add-imessage`, and several more. Your install contains the adapters you asked for and nothing else. The same mechanism covers alternative agent providers (`/add-codex`, `/add-opencode`, `/add-ollama-provider`).
 

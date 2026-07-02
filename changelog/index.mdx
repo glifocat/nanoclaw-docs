@@ -5,6 +5,15 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v2.1.23" description="2026-06-30" tags={["Fix"]}>
+  - Container tooling bumps: `@anthropic-ai/claude-code` 2.1.170 → 2.1.197 (via the `cli-tools.json` manifest), Claude agent SDK `^0.3.170` → `^0.3.197`, Anthropic SDK `^0.100.0` → `^0.108.0`
+</Update>
+
+<Update label="v2.1.22" description="2026-06-30" tags={["Fix"]}>
+  - **Inbox symlink containment** — channel-inbound attachments and agent-to-agent forwarded files are written into a session's `inbox/` through a shared host-side guard (`src/inbox-safety.ts`): a symlinked inbox root or per-message directory is rejected, final paths are containment-checked against the session folder, and writes use exclusive-create flags so a pre-placed symlinked file can't be followed (security, #2828)
+  - `ncl messaging-groups create` gained an `instance` column for running multiple adapters of one channel type; when `--instance` is omitted it defaults to the `channel_type` value
+</Update>
+
 <Update label="v2.1.21" description="2026-06-25" tags={["Feature"]}>
   - **Reject with reason** — declining a self-mod or agent-to-agent approval can now relay a one-line note back to the requesting agent (`Your <action> request was rejected by admin: "<reason>"`). A plain Reject is unchanged; an unanswered reason prompt finalizes as a plain reject after ~5 minutes
   - **`/learn` skill** — distill or refine a reusable skill from a directory, a URL, pasted notes, or the work just done, authored to the project's skill guidelines
