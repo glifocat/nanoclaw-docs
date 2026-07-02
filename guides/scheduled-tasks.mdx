@@ -4,7 +4,7 @@ description: "Hands-on tutorial: have your agent schedule a recurring task in ch
 keywords: ["scheduled tasks", "schedule_task", "cron", "recurrence", "process_after", "series_id", "host sweep", "wakeAgent", "task script", "timezone"]
 ---
 
-{/* verified-against: container/agent-runner/src/mcp-tools/scheduling.ts, container/agent-runner/src/mcp-tools/scheduling.instructions.md, container/agent-runner/src/scheduling/task-script.ts, container/agent-runner/src/poll-loop.ts, container/agent-runner/src/timezone.ts, src/host-sweep.ts, src/modules/scheduling/{actions,db,recurrence}.ts, src/config.ts, src/container-runner.ts, src/cli/resources/ @ 2afbd182 (v2.1.21) */}
+{/* verified-against: container/agent-runner/src/mcp-tools/scheduling.ts, container/agent-runner/src/mcp-tools/scheduling.instructions.md, container/agent-runner/src/scheduling/task-script.ts, container/agent-runner/src/poll-loop.ts, container/agent-runner/src/timezone.ts, src/host-sweep.ts, src/modules/scheduling/{actions,db,recurrence}.ts, src/config.ts, src/container-runner.ts, src/cli/resources/ @ cb6e3d1 (v2.1.23) */}
 
 v2 has no scheduler service. A scheduled task is a row in the session's `messages_in` table with `kind='task'` and a `process_after` timestamp — same inbox, same flow as any chat message. The agent is the entire scheduling interface: you create, change, and cancel tasks by asking it in chat. This tutorial assumes a working install with a wired agent (see [your first agent](/guides/first-agent)).
 

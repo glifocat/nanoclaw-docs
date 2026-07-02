@@ -4,7 +4,7 @@ description: "Administer a running NanoClaw host from the terminal — inspect a
 keywords: ["ncl", "cli", "admin", "unix socket", "cli_scope", "groups", "wirings", "sessions", "approvals"]
 ---
 
-{/* verified-against: src/cli/client.ts, src/cli/dispatch.ts, src/cli/socket-server.ts, src/cli/crud.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,roles,sessions,user-dms,users,wirings}.ts, src/db/container-configs.ts, bin/ncl, setup/service.ts @ 2afbd182 (v2.1.21) */}
+{/* verified-against: src/cli/client.ts, src/cli/dispatch.ts, src/cli/socket-server.ts, src/cli/crud.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,roles,sessions,user-dms,users,wirings}.ts, src/db/container-configs.ts, bin/ncl, setup/service.ts @ cb6e3d1 (v2.1.23) */}
 
 `ncl` is the admin CLI for a running NanoClaw host. It sends one request frame over a Unix socket at `data/ncl.sock` and prints the response — every command reads or mutates the host's central database live, no restart needed. The socket is `chmod 0600`, so only the user that started the host can connect.
 
