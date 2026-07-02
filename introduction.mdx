@@ -1,16 +1,23 @@
 ---
 title: "What is NanoClaw?"
-description: "A multi-agent AI assistant. One host process, one Docker container per session, and a SQLite queue that carries every message in the system."
+description: "A personal AI assistant you run on your own machine and text from Telegram, WhatsApp, Discord, Slack, or the terminal — every agent working inside its own sandbox."
 icon: "house"
 sidebarTitle: "Introduction"
-keywords: ["nanoclaw", "multi-agent", "claude", "container isolation", "inbox outbox", "sqlite", "channels", "skills", "v2"]
+tag: "UPDATED"
+keywords: ["nanoclaw", "personal ai assistant", "self-hosted", "multi-agent", "claude", "container isolation", "channels", "skills", "v2"]
 ---
 
-{/* verified-against: src/index.ts, src/router.ts, src/channels/index.ts, src/container-runtime.ts, src/container-runner.ts, src/db/schema.ts, src/modules/, container/agent-runner/src/mcp-tools/agents.ts, agents.instructions.md, core.ts, .claude/skills/, .claude/skills/add-telegram/SKILL.md, repo-tokens/badge.svg, package.json @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/index.ts, src/router.ts, src/channels/index.ts, src/container-runtime.ts, src/container-runner.ts, src/session-manager.ts, src/claude-md-compose.ts, src/modules/, container/agent-runner/src/providers/claude.ts, container/agent-runner/src/mcp-tools/{agents,scheduling}.ts, agents.instructions.md, .claude/skills/, .claude/skills/add-telegram/SKILL.md, repo-tokens/badge.svg, package.json @ cb6e3d1 (v2.1.23) */}
 
 NanoClaw is a personal AI assistant you run on your own machine and reach from the messaging apps you already use — Telegram, WhatsApp, Discord, Slack, or just your terminal. Text it like you'd text a coworker: it can search the web, run code, edit files, and follow up on a schedule. Each agent works inside its own locked-down sandbox, so it does real work without touching the rest of your computer.
 
 It's self-hosted and yours — clone the repo, run one setup command, connect a chat app. Claude powers agents by default, with Codex, OpenCode, and Ollama as alternatives.
+
+{/* TODO(ethan): hero screenshot — a phone chat (Telegram or WhatsApp) showing a short real exchange:
+   you ask the agent for something concrete (e.g. "remind me every Friday to send the invoice"), it confirms.
+   Capture from your live install, save to images/hero-chat.png, then embed here:
+   <img src="/images/hero-chat.png" alt="A Telegram chat where the user asks their NanoClaw agent to schedule a weekly reminder and the agent confirms it" />
+*/}
 
 <Info>
   **New here? Four words that show up everywhere:**
@@ -19,6 +26,19 @@ It's self-hosted and yours — clone the repo, run one setup command, connect a 
   - **Sandbox** — the isolated Docker container an agent runs in; it only sees what you explicitly share.
   - **Provider** — the AI model behind an agent (Claude by default; Codex, OpenCode, or Ollama optional).
 </Info>
+
+## What can it do?
+
+Everything below works on a fresh install, from a plain chat message — no configuration first:
+
+- **Research** — agents can search the web and fetch pages out of the box. *"What changed in the new EU battery regulation?"*
+- **Reminders and recurring work** — *"remind me in 20 minutes"* or *"every weekday at 9, summarize my repo's new issues"*. Scheduled tasks fire back into the same chat and survive restarts.
+- **Real code and files** — the agent writes and runs code inside its sandbox, and its working files persist between conversations.
+- **Read what you send** — share a file or photo over a chat app and ask about it; attachments land in the sandbox for the agent to open.
+- **Remember you** — ask it to remember your name, your preferences, your projects. Each agent keeps its own persistent memory.
+- **Grow into a team** — your agent can spawn companion agents, each with its own sandbox and memory, and delegate work to them. See the [multi-agent swarm guide](/guides/multi-agent-swarm).
+
+The [quickstart](/quickstart#things-to-try-first) ends with copy-paste messages that exercise each of these.
 
 <CardGroup cols={2}>
   <Card title="Run it" icon="rocket" href="/quickstart">
@@ -35,35 +55,11 @@ It's self-hosted and yours — clone the repo, run one setup command, connect a 
   </Card>
 </CardGroup>
 
-## How a message flows
+## Under the hood, briefly
 
-One idea drives the whole system: every message is a row in a SQLite queue. A user chat, an inbound webhook, a scheduled job, an agent delegating to another agent — all of them land in an inbox table (`messages_in`), and every response leaves through an outbox (`messages_out`). A scheduled task is just a message with a `process_after` timestamp. There's no separate scheduler, RPC layer, or job system to learn.
+One idea drives the whole system: every message — a chat, a webhook, a scheduled job, one agent delegating to another — is a row in a SQLite queue, and every reply leaves through another one. There's no separate scheduler, RPC layer, or job system to learn. Agents run in Docker containers that see only what you explicitly mount; Bash and file edits execute inside the container, never on your host. Channels aren't bundled features — a skill like `/add-telegram` copies exactly the adapter you asked for into your install. And the whole codebase is ~204k tokens, small enough for a long-context coding agent to hold in context — which is also how you customize it: edit the code, not a config sprawl.
 
-Every channel — Telegram, Discord, a webhook, the built-in CLI — feeds the same pipeline:
-
-```mermaid
-flowchart LR
-    A[Channel adapter] --> B[Router]
-    B --> C[("Inbox<br/>messages_in")]
-    C --> D[Agent container]
-    D --> E[("Outbox<br/>messages_out")]
-    E --> F[Delivery poll]
-    F --> A
-```
-
-The router resolves who sent the message, which agent group should handle it, and which session it belongs to, then writes the row and wakes the container. The container processes its inbox and writes replies to its outbox; the host's delivery polls pick them up and hand them back to the channel adapter. Agent-to-agent messages follow the exact same path — an agent's `send_message` is a row addressed to another agent's inbox.
-
-## Why it's built this way
-
-**Container isolation.** Agents run in Docker containers and see only what you explicitly mount. Bash and file edits execute inside the container, never on your host. Each session gets its own container, so parallel conversations can't interfere with each other.
-
-**Small enough to hold in context.** The codebase is ~204k tokens — compact enough for a long-context agent to hold in context. That's also how you customize it: edit the code, not a config sprawl.
-
-**Channels are skills, not bundled features.** Main ships exactly one channel — the local CLI. Everything else lives on the `channels` branch and gets copied into your fork by a skill: `/add-telegram`, `/add-discord`, `/add-whatsapp`, `/add-slack`, `/add-signal`, `/add-imessage`, and several more. Your install contains the adapters you asked for and nothing else. The same mechanism covers alternative agent providers (`/add-codex`, `/add-opencode`, `/add-ollama-provider`).
-
-## Agents that work together
-
-An agent can spawn long-lived companion agents with `create_agent` — each with its own container, workspace, and persistent memory — and delegate to them over the same message queue. That's enough to build real teams: a worker per task, a manager that tracks what's in flight, a supervisor that pings you for approval. See the [multi-agent swarm guide](/guides/multi-agent-swarm).
+The full picture — routing, sessions, the container lifecycle — lives in [Architecture](/concepts/architecture); the threat model in [Security](/concepts/security).
 
 ## Who this is for
 

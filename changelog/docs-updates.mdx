@@ -5,6 +5,14 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Get started, second pass" description="2026-07-02" tags={["Updated"]}>
+  Follow-up to the 2026-06-29 rework, aimed at the remaining beginner friction:
+
+  - `introduction` — plain-language page description (was architecture jargon); new **"What can it do?"** section with six concrete, code-verified capabilities; the message-flow diagram and design rationale compressed into a short "Under the hood, briefly" paragraph linking to `concepts/architecture` (which covers it in depth) — the intro no longer duplicates it
+  - `quickstart` — new **"Things to try first"** section: six copy-paste messages exercising web research, reminders, sandboxed code, inbound attachments, persistent memory, and companion agents, each verified against source (web tools are on the Claude provider's allowlist; `schedule_task` routes back to the originating chat; attachments land in the session inbox; `CLAUDE.local.md` persists per group; the wizard's first agent has `global` CLI scope so `create_agent` needs no approval card). Includes the CLI-channel gotcha: reminders that fire while the terminal is disconnected are saved, not pushed live
+  - Placeholder (comment) for a hero chat screenshot on `introduction`, pending a capture from a live install
+</Update>
+
 <Update label="v2.1.23 drift sweep" description="2026-07-02" tags={["Updated"]}>
   Brought the site current with `nanocoai/nanoclaw@cb6e3d1` (v2.1.23) and `channels@90dd87d` — a 14-commit trunk delta plus two channels-branch merges since the v2.1.21 sweep.
 
