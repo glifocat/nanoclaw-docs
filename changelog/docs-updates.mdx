@@ -5,6 +5,16 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.1.23 drift sweep" description="2026-07-02" tags={["Updated"]}>
+  Brought the site current with `nanocoai/nanoclaw@cb6e3d1` (v2.1.23) and `channels@90dd87d` — a 14-commit trunk delta plus two channels-branch merges since the v2.1.21 sweep.
+
+  - **Inbox symlink-containment guard** (`concepts/security`): documented the new shared host-write guard `src/inbox-safety.ts` under Container isolation — the one place files flow *into* the sandbox
+  - **`ncl messaging-groups --instance`** (`reference/ncl-cli`): new flag row — string, updatable, defaults to the `--channel-type` value
+  - **WhatsApp media recovery** (`channels/whatsapp`): failed inbound media downloads retry via WhatsApp's re-upload path; still-failing media leaves a visible `[<type> could not be downloaded]` note instead of a silent drop
+  - **Slack Socket Mode in guided setup**: upstream's setup wizard caught up with what `channels/slack` already documented — the page verified accurate as-is, no content change
+  - **Full SHA re-verification**: classified every page's cited files against the trunk and channels diffs, re-verified the dirty set, and bumped `verified-against` anchors site-wide to `cb6e3d1` / `90dd87d`; fixed a transposed-digit providers-branch anchor (`c576766` → `c570766`) on `extend/providers`. Codebase token count 199k → 204k
+</Update>
+
 <Update label="Beginner-friendlier Get started" description="2026-06-29" tags={["Updated"]}>
   Reworked the on-ramp to lead with outcome before architecture. `introduction` now opens with what NanoClaw does for you (text it like a coworker; it runs code in a sandbox) and a "Key terms" callout defining agent / channel / sandbox / provider; the SQLite-queue framing moved into "How a message flows" rather than the lede. `quickstart` gained a time/effort/prerequisite expectation-setter. No facts changed — resequenced and scaffolded.
 </Update>

@@ -5,7 +5,7 @@ icon: "trash"
 keywords: ["uninstall", "remove", "delete", "cleanup", "nanoclaw.sh --uninstall", "dry run", "install slug"]
 ---
 
-{/* verified-against: setup/uninstall/{flow,scan,plan,remove,onecli-agents}.ts, setup/lib/setup-config.ts, setup/auto.ts, uninstall.sh, nanoclaw.sh, src/install-slug.ts @ 2afbd182 (v2.1.21) */}
+{/* verified-against: setup/uninstall/{flow,scan,plan,remove,onecli-agents}.ts, setup/lib/setup-config.ts, setup/auto.ts, uninstall.sh, nanoclaw.sh, src/install-slug.ts @ cb6e3d1 (v2.1.23) */}
 
 NanoClaw ships an interactive uninstaller that removes a single install — its service, containers, image, data, and the credential agents it registered. Everything NanoClaw creates is tagged with a per-checkout **install slug** (the first 8 hex characters of `sha1(projectRoot)`), so the uninstaller only ever touches the copy you run it from. Two NanoClaw checkouts on one host never remove each other's artifacts.
 

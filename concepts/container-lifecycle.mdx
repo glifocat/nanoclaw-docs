@@ -1,11 +1,10 @@
 ---
 title: "Container lifecycle"
 description: "The full container story: how the agent image is built, what gets assembled at every spawn, how wakes are deduplicated, and what kills a container."
-tag: "UPDATED"
 keywords: ["container", "lifecycle", "docker", "spawn", "wake", "mounts", "image", "tini", "orphan cleanup", "install slug", "egress lockdown", "kill"]
 ---
 
-{/* verified-against: src/container-runner.ts, src/container-runtime.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/install-slug.ts, setup/container.ts, container/Dockerfile @ 2afbd182 (v2.1.21) */}
+{/* verified-against: src/container-runner.ts, src/container-runtime.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/install-slug.ts, setup/container.ts, container/Dockerfile @ cb6e3d1 (v2.1.23) */}
 
 Every active session gets exactly one Docker container, spawned on demand and killed when it goes quiet. The container is deliberately disposable: all state lives in mounted host directories, so a kill loses nothing but an in-flight provider call — and the [host sweep](/concepts/architecture#what-runs-when) retries that.
 

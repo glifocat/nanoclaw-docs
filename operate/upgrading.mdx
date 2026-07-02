@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["upgrade", "update", "update-nanoclaw", "update-skills", "migrate-nanoclaw", "upstream", "merge", "rollback"]
 ---
 
-{/* verified-against: .claude/skills/update-nanoclaw/SKILL.md, .claude/skills/update-skills/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md, versions.json, scripts/upgrade-state.ts, src/upgrade-state.ts @ 2afbd182 (v2.1.21) */}
+{/* verified-against: .claude/skills/update-nanoclaw/SKILL.md, .claude/skills/update-skills/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md, versions.json, scripts/upgrade-state.ts, src/upgrade-state.ts @ cb6e3d1 (v2.1.23) */}
 
 Don't update with a raw `git pull`. NanoClaw records each sanctioned upgrade in `data/upgrade-state.json`, and a startup tripwire refuses to boot if the running code's version doesn't match that marker. The supported path is the `/update-nanoclaw` skill, which handles the merge, validation, and the marker stamp for you.
 

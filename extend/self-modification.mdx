@@ -1,11 +1,10 @@
 ---
 title: "Agent self-modification"
 description: "What agents can change about themselves — editing their own memory freely, and requesting packages or MCP servers through admin approval."
-tag: "UPDATED"
 keywords: ["self-modification", "install_packages", "add_mcp_server", "CLAUDE.local.md", "approval", "self-customize", "rebuild", "agent memory"]
 ---
 
-{/* verified-against: src/modules/self-mod/{index,request,apply}.ts, src/modules/approvals/primitive.ts, container/agent-runner/src/mcp-tools/self-mod.ts, container/agent-runner/src/mcp-tools/self-mod.instructions.md, container/skills/self-customize/SKILL.md, src/container-runner.ts, src/claude-md-compose.ts @ 2afbd182 (v2.1.21) */}
+{/* verified-against: src/modules/self-mod/{index,request,apply}.ts, src/modules/approvals/primitive.ts, container/agent-runner/src/mcp-tools/self-mod.ts, container/agent-runner/src/mcp-tools/self-mod.instructions.md, container/skills/self-customize/SKILL.md, src/container-runner.ts, src/claude-md-compose.ts @ cb6e3d1 (v2.1.23) */}
 
 Agents can change their own environment — but every change that touches the container goes through you. The self-mod module exposes exactly two operations, `install_packages` and `add_mcp_server`, and **both are always approval-gated**: the agent submits a request, an admin gets a card, and nothing changes until someone taps Approve. The one thing an agent can change freely is its own memory file.
 
