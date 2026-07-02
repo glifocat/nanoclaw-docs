@@ -41,7 +41,7 @@ Compare code snippets and function references in the docs against the actual ups
 
 ### 4. Check for missing documentation
 
-Review recent upstream changes (last 7 days of commits on `nanocoai/nanoclaw` `main`, plus the `channels` registry branch for new adapters) and identify any new features, configuration options, skills, or behavioral changes that aren't documented yet. Route new-skill docs per the table in the new-skill-docs workflow (channel skills → `channels/` + `reference/skills-catalog.mdx`; tool skills → `extend/tools.mdx` + catalog; provider skills → `extend/providers.mdx` + catalog; operational skills → catalog + relevant `operate/` page).
+Review recent upstream changes (last 7 days of commits on `nanocoai/nanoclaw` `main`, plus the `channels` registry branch for new adapters and the `providers` registry branch for new or updated provider adapters) and identify any new features, configuration options, skills, or behavioral changes that aren't documented yet. Route new-skill docs per the table in the new-skill-docs workflow (channel skills → `channels/` + `reference/skills-catalog.mdx`; tool skills → `extend/tools.mdx` + catalog; provider skills → `extend/providers.mdx` + catalog; operational skills → catalog + relevant `operate/` page).
 
 ### 5. Check frontmatter quality
 
