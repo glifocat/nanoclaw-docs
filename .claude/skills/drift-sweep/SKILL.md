@@ -61,7 +61,7 @@ Do NOT trust a quick regex intersection: citations use brace globs with internal
 Fan out one read-only subagent per page-area (channels / concepts / operate / guides+extend / get-started+reference). Each agent, for its pages:
 
 1. Extracts cited files (expanding brace globs; noting which branch each is on).
-2. Diffs each cited file across the correct branch's `<anchor>..<head>` (trunk: `e3986eb..upstream/main`; channels: `8137440..upstream/channels`; providers: 3-dot).
+2. Diffs each cited file across the correct branch's `<anchor>..<head>` (trunk: `<trunk-anchor>..upstream/main`; channels: `<channels-anchor>..upstream/channels` if fast-forward, 3-dot otherwise; providers: 3-dot). The anchors come from the Phase 1 census of the pages' own `verified-against` comments — never reuse a SHA from a previous sweep, an example, or memory; a hardcoded anchor goes stale the moment a sweep merges.
 3. Reads the diff of every changed cited file and judges whether the page's specific claims still hold.
 4. Returns a per-page verdict: **CLEAN** (no cited file changed) | **BUMP-OK** (changed but claims accurate) | **NEEDS-EDIT** (a claim is now wrong/stale, OR a notable new behavior is missing where the page would mention it) — with the exact stale quote, the correct fact, and source evidence.
 
@@ -103,6 +103,7 @@ Finish the sweep with: product + docs-updates changelogs, the token badge if it 
 - Citing a token count from memory or a PR instead of `repo-tokens/badge.svg`.
 - `curl`-checking a live page (always 404) instead of a browser; checking before the deploy propagates.
 - Cramming unrelated fixes into one PR, or letting a sweep leave dozens of sidebar badges.
+- Diffing from an anchor that didn't come from the Phase 1 census — a SHA remembered from a previous sweep (or copied from an old example) silently under-scopes the whole classification.
 
 ## Output format
 
