@@ -1,10 +1,11 @@
 ---
 title: "WhatsApp"
 description: "Connect NanoClaw to your personal WhatsApp with the native Baileys adapter — QR or pairing-code login, shared or dedicated number."
+tag: "UPDATED"
 keywords: ["whatsapp", "baileys", "qr code", "pairing code", "add-whatsapp", "ASSISTANT_HAS_OWN_NUMBER", "linked devices"]
 ---
 
-{/* verified-against: src/channels/whatsapp.ts (channels branch), setup/channels/whatsapp.ts, .claude/skills/add-whatsapp/SKILL.md @ 2afbd182 (v2.1.21); channels @ fdbfb6a */}
+{/* verified-against: src/channels/whatsapp.ts (channels branch), setup/channels/whatsapp.ts, .claude/skills/add-whatsapp/SKILL.md @ cb6e3d1 (v2.1.23); channels @ 90dd87d */}
 
 The WhatsApp adapter connects NanoClaw to a personal WhatsApp account as a linked device — no Meta business account, no API key. It's a native adapter built directly on `@whiskeysockets/baileys` 7.0.0-rc.9 (pinned; the WhatsApp Web protocol), not the Chat SDK bridge. For Meta's official Cloud API instead, use `/add-whatsapp-cloud` — see the [channels overview](/channels/overview).
 
@@ -50,7 +51,7 @@ To wire more chats or groups later, run `/manage-channels`.
 - **Reconnection** — on disconnect the adapter reconnects immediately (with one retry after 5s if that attempt throws) unless it was logged out. Messages sent while disconnected are queued in memory and flushed when the connection reopens.
 - **No threads** — the adapter sets `supportsThreads: false`; every inbound message has a null thread ID. Wirings with `per-thread` session mode behave like `shared` here — see the [entity model](/concepts/entity-model).
 - **DMs vs groups** — DMs always count as addressed to the agent. In groups (`…@g.us` JIDs) the agent is by default only triggered by an explicit @-mention of the bot's number, which the adapter also normalizes to `@<agent name>` for trigger matching. Group names sync from WhatsApp every 24 hours.
-- **Media** — inbound images, video, audio, and documents are downloaded to `data/attachments/` and passed to the agent (unsafe attacker-controlled filenames are replaced). Outbound files are sent as native WhatsApp media by extension, with the reply text as the first file's caption.
+- **Media** — inbound images, video, audio, and documents are downloaded to `data/attachments/` and passed to the agent (unsafe attacker-controlled filenames are replaced). If the direct download fails — typically an expired media URL around a reconnect — the adapter asks WhatsApp to re-upload the media and retries; if it still can't be fetched, the message reaches the agent with a visible `[<type> could not be downloaded]` note instead of silently dropping the attachment. Outbound files are sent as native WhatsApp media by extension, with the reply text as the first file's caption.
 - **Formatting** — the agent's markdown is converted to WhatsApp formatting (`**bold**` → `*bold*`, headings → bold, links → `text (url)`); code blocks pass through untouched. `@<phone>` in replies becomes a real tappable mention.
 - **Interactive questions** — `ask_user_question` renders as text with slash-command answers (`/approve`, `/reject`); the adapter matches your reply to the pending question. Editing and deleting sent messages isn't supported (linked-device limitation).
 - **Self-chat** — in shared mode you can message the agent in your own "You" chat. The adapter tells your typed messages apart from its own echoes via a sent-message cache.
