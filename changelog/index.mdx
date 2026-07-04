@@ -5,6 +5,72 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v2.1.38" description="2026-07-04" tags={["Fix"]}>
+  - **Agent images build asynchronously** — `buildAgentGroupImage` swaps its blocking `execSync docker build` for an awaited promisified `exec`, so the single-threaded host stays responsive during the up-to-15-minute rebuild a package-install approval or `ncl groups restart --rebuild` can trigger. Timeout, buffered stdio, and non-zero-exit propagation are preserved (#2931)
+</Update>
+
+<Update label="v2.1.37" description="2026-07-04" tags={["Maintenance"]}>
+  - Security docs rewritten to match the v2 perimeter — `docs/SECURITY.md` reworked, and the stale `docs/docker-sandboxes.md` and `docs/APPLE-CONTAINER-NETWORKING.md` removed (#2945)
+  - Dead `data/env/env` secrets mirror removed from the setup and migrate paths — channel/setup scripts no longer write a second copy of credentials to disk (#2946)
+  - Stale architecture, scheduling, provider-config, and overlay docs corrected (#2948)
+</Update>
+
+<Update label="v2.1.36" description="2026-07-04" tags={["Fix"]}>
+  - **Mount allowlist honors the `readOnly` key** — the per-root `readOnly` flag (and the top-level `nonMainReadOnly` key) that `/manage-mounts` and setup actually write is now respected, so read-write grants are no longer silently forced read-only. The allowlist is also read and validated per call with an mtime-keyed cache instead of being parsed once for the whole process lifetime, so a parse error is no longer cached forever (#2943)
+</Update>
+
+<Update label="v2.1.35" description="2026-07-04" tags={["Fix"]}>
+  - **Agent-to-agent reply stamping fixed** — the active batch's `in_reply_to` value lived in module-level state, but the nanoclaw MCP server runs as a separate subprocess from the poll loop, so the reply stamp was always read as `null` and a2a replies fell back to host peer-affinity routing. The stamp now publishes through `session_state` in `outbound.db` (both processes already open it), with an `updated_at` staleness guard so a stamp left by a killed container isn't reused (#2942)
+  - Removed one-DB-era `@deprecated` shims and dead exports left over from the two-database session split (#2940)
+</Update>
+
+<Update label="v2.1.34" description="2026-07-04" tags={["Fix"]}>
+  - Re-provision a missing session folder on resolve so the documented session-reset flow works instead of erroring on the recreated session (#2937)
+</Update>
+
+<Update label="v2.1.33" description="2026-07-04" tags={["Maintenance"]}>
+  - Dead `ncl` CLI protocol vocabulary cleaned out of the command registry and framing (#2936)
+  - Removed dead v1 config knobs and a broken pnpm auth script (#2935)
+</Update>
+
+<Update label="v2.1.32" description="2026-07-04" tags={["Fix"]}>
+  - **Security-perimeter env vars are reachable under the packaged service** — egress lockdown and the per-container CPU/memory caps were read from `process.env` only, but the shipped launchd/systemd service sets just `PATH`+`HOME` and never loads `.env` into `process.env`, so these knobs couldn't be turned on the supported way. They now route through the same `readEnvFile` path as the other config keys, keeping `process.env` precedence so dev-mode/nohup installs are unaffected (#2934)
+</Update>
+
+<Update label="v2.1.31" description="2026-07-04" tags={["Feature", "Skill"]}>
+  - **Colored approval buttons** — approval cards render Approve/Reject as styled buttons (Slack `primary`/`danger`) across the OneCLI, primitive, channel-approval, and sender-approval flows (#2933)
+  - **`/add-clidash` skill** — a zero-dependency, read-only web dashboard that derives its tabs and tables at runtime from any CLI emitting JSON, pre-wired for `ncl` (agent groups, sessions, channels, users, roles) with message-activity charts, a log tail, and a read-only file viewer (#2795)
+</Update>
+
+<Update label="v2.1.30" description="2026-07-04" tags={["Fix"]}>
+  - `ncl` positional-ID resolution fixed for generated (dashed) identifiers — the longest-registered-prefix lookup no longer mis-splits a dashed ID into command + args (#2932)
+</Update>
+
+<Update label="v2.1.29" description="2026-07-04" tags={["Fix"]}>
+  - Command-gate hardening — `/start` is back in the host `FILTERED` set (a Telegram fix silently undone when host gating landed) so it's dropped instead of reaching the agent as a normal message, and the inline admin check now calls `hasAdminPrivilege` instead of a `hasTable('user_roles')` guard that only ever masked a missing check (fail-open removed) (#2930)
+</Update>
+
+<Update label="v2.1.28" description="2026-07-04" tags={["Feature"]}>
+  - **OneCLI approval cards show what the agent is doing** — when the hosted OneCLI gateway sends a structured `summary` on an approval request, the card renders `Action:` plus labeled fields (e.g. the To / Subject / Body of an email send) instead of the raw `METHOD host/path` + body-preview HTTP trace. Rendering is defensive — values are coerced and length-capped, with a running budget that keeps the card under Slack's section-block limit and reports any omitted fields; without a summary the old body-preview fallback remains (#2929)
+</Update>
+
+<Update label="v2.1.27" description="2026-07-04" tags={["Maintenance"]}>
+  - Removed the dead `/workspace/global` container mount and untracked leftover v1 group seed files (`groups/global`, `groups/main` CLAUDE.md) (#2928)
+</Update>
+
+<Update label="v2.1.26" description="2026-07-04" tags={["Maintenance"]}>
+  - Unregistered the mock agent provider from the production container barrel so it can't be selected at runtime (#2927)
+</Update>
+
+<Update label="v2.1.25" description="2026-07-04" tags={["Security"]}>
+  - **Approved CLI commands no longer run with escalated host privilege** — a `ncl` command held for approval was re-dispatched as `{ caller: 'host' }` when it executed, so an approved group-scoped command ran with unrestricted host scope. The approval now records the original caller context and replays the command under it, so it executes with exactly the requesting agent's scope (#2611)
+</Update>
+
+<Update label="v2.1.24" description="2026-07-02" tags={["Feature"]}>
+  - **Agent templates** — folder-only templates under `templates/` (`context/instructions.md` plus optional context extras, `.mcp.json`, and a `skills/` overlay) stamp a new group with `ncl groups create --template <name>`: the provider-neutral instructions are inlined at the top of `CLAUDE.md`/`AGENTS.md` every spawn, context extras are copied preserving their layout, MCP servers are written to container config, and the per-group skills overlay is installed. See [`docs/templates.md`](https://github.com/nanocoai/nanoclaw/blob/main/docs/templates.md) (#2890)
+  - Guided setup now offers Slack **Socket Mode** as a first-class option in the Slack setup flow (#2885)
+</Update>
+
 <Update label="v2.1.23" description="2026-06-30" tags={["Fix"]}>
   - Container tooling bumps: `@anthropic-ai/claude-code` 2.1.170 → 2.1.197 (via the `cli-tools.json` manifest), Claude agent SDK `^0.3.170` → `^0.3.197`, Anthropic SDK `^0.100.0` → `^0.108.0`
 </Update>
