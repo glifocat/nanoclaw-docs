@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["multi-agent", "create_agent", "agent-to-agent", "agent destinations", "send_message", "sub-agents", "approval", "ncl destinations"]
 ---
 
-{/* verified-against: src/modules/agent-to-agent/{create-agent,agent-route,write-destinations,index,message-gate}.ts, src/modules/agent-to-agent/db/{agent-destinations,agent-message-policies}.ts, src/modules/approvals/primitive.ts, container/agent-runner/src/mcp-tools/agents.ts + agents.instructions.md, container/agent-runner/src/destinations.ts, src/cli/resources/{destinations,groups,policies,wirings}.ts, src/group-init.ts, src/db/messaging-groups.ts @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/modules/agent-to-agent/{create-agent,agent-route,write-destinations,index,message-gate}.ts, src/modules/agent-to-agent/db/{agent-destinations,agent-message-policies}.ts, src/modules/approvals/primitive.ts, container/agent-runner/src/mcp-tools/agents.ts + agents.instructions.md, container/agent-runner/src/destinations.ts, src/cli/resources/{destinations,groups,policies,wirings}.ts, src/group-init.ts, src/db/messaging-groups.ts @ 08a1ac9 (v2.1.38) */}
 
 The [introduction](/introduction) promises real teams: a worker per task, a manager that tracks what's in flight, a supervisor that pings you. This tutorial builds the smallest working version — one agent spawning and delegating to another — then scales the same three primitives into that trio. It continues from [your first agent](/guides/first-agent); you'll reuse Scout to see the approval gate.
 
@@ -151,7 +151,7 @@ Return to free flow with `ncl policies remove --from <source-agent-id> --to <tar
 
 - **No loop protection.** There is no throttle, hop limit, or cycle detection on agent-to-agent messages — two agents told to "always reply" will ping-pong indefinitely, burning API calls. Give every agent's instructions an explicit stop condition ("report back once, then wait"). A [message policy](#gate-a-connection) on the edge also breaks a runaway loop, since every hop then waits for a human tap.
 - **No broadcast.** Each message targets one destination. Fan-out means one `<message>` block (or `send_message` call) per recipient — the parent orchestrates, the queue doesn't.
-- **No concurrency cap.** `MAX_CONCURRENT_CONTAINERS` (default 5) is parsed at startup but [not enforced anywhere as of v2.1.4](/reference/environment-variables) — a wide team really does run one container per active agent, so size the host accordingly.
+- **No concurrency cap.** There's no environment variable that limits simultaneous agent containers — the old `MAX_CONCURRENT_CONTAINERS` was removed from the code entirely, not just left unenforced. A wide team really does run one container per active agent, so size the host accordingly.
 - **Edits to destinations outside `ncl` don't propagate live.** A running container serves a projection of its destinations, refreshed on every wake and by `ncl destinations add`/`remove` — but direct DB writes leave it stale until the next wake.
 
 ## Cleanup

@@ -4,7 +4,7 @@ description: "Lock down a NanoClaw install — egress lockdown, the mount allowl
 keywords: ["hardening", "security", "egress lockdown", "NANOCLAW_EGRESS_LOCKDOWN", "mount allowlist", "unknown_sender_policy", "command gate", "container limits"]
 ---
 
-{/* verified-against: src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/modules/permissions/{index.ts,access.ts,sender-approval.ts}, src/command-gate.ts, src/router.ts, src/db/schema.ts, src/config.ts, config-examples/mount-allowlist.json, .claude/skills/manage-mounts/SKILL.md, setup/mounts.ts @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/modules/permissions/{index.ts,access.ts,sender-approval.ts}, src/command-gate.ts, src/router.ts, src/db/schema.ts, src/config.ts, src/host-sweep.ts, config-examples/mount-allowlist.json, .claude/skills/manage-mounts/SKILL.md, setup/mounts.ts @ 08a1ac9 (v2.1.38) */}
 
 NanoClaw's isolation boundary is the Docker container: each agent runs in its own container with a scoped workspace mount (see [Container lifecycle](/concepts/container-lifecycle)). There is no micro-VM or alternative sandbox runtime — hardening means tightening what those containers can reach. This page walks the defense-in-depth controls from network to filesystem to people.
 
@@ -18,7 +18,7 @@ By default, agent containers have normal outbound internet access. Set `NANOCLAW
 
 The setup is idempotent and self-healing — NanoClaw creates the network and re-attaches the gateway on every spawn if needed. It also **fails fast**: if lockdown is enabled but the network can't be created or the gateway container can't be attached, NanoClaw throws an `EgressLockdownError` and refuses to spawn the agent rather than silently running it with open egress. If you see that error, start the gateway container (or set `NANOCLAW_EGRESS_LOCKDOWN=false` to opt out).
 
-All three variables are read from `process.env` only — putting them in `.env` has no effect. Set them in the service definition (launchd plist or systemd unit) as described in [Configuration](/operate/configuration#applying-changes):
+All three variables can be set in `.env` or the process environment (`src/config.ts:56-65`) — `.env` is the simpler path for a plain "edit and restart" flow; the service definition (launchd plist or systemd unit) still works too, as described in [Configuration](/operate/configuration#applying-changes):
 
 ```bash
 # Linux (systemd unit)
@@ -56,7 +56,7 @@ pnpm exec tsx setup/index.ts --step mounts --force -- --json '{"allowedRoots":[{
 ```
 
 <Note>
-The key the validator reads is `allowReadWrite`. A `readOnly` key (shown in some upstream examples) is silently ignored, leaving the mount read-only. Likewise, a top-level `nonMainReadOnly` field may appear in configs written by setup, but the mount validator doesn't read it.
+The validator accepts either key: `allowReadWrite` (native) or `readOnly` (written by the `/manage-mounts` skill and setup). If both are absent it defaults to read-only. `readOnly: true` means read-only, `readOnly: false` means read-write — the validator translates it to `allowReadWrite = !readOnly` and logs a warning when it does (`src/modules/mount-security/index.ts`, `normalizeRoot`). Likewise, a top-level `nonMainReadOnly` field may appear in configs written by setup, but the mount validator doesn't read it.
 </Note>
 
 The allowlist is cached in memory, so restart the service after changes.
@@ -91,16 +91,16 @@ If the permissions module isn't installed (no `user_roles` table), admin command
 
 ## Cap container resources
 
-These limits bound what a runaway agent can consume. All are read from `process.env` only — set them in the service definition, not `.env` (see [Configuration](/operate/configuration#process-environment-only)):
+These limits bound what a runaway agent can consume. Both can be set in `.env` or the process environment (see [Configuration](/operate/configuration#read-from-env)):
 
 | Variable | Default | Limits |
 |---|---|---|
-| `CONTAINER_TIMEOUT` | 30 min | Max runtime for an agent container. |
-| `IDLE_TIMEOUT` | 30 min | How long an idle container survives after its last result. |
 | `CONTAINER_CPU_LIMIT` | _unset_ | CPU cap per container, passed to `docker run --cpus` (e.g. `2`). Opt-in; unset leaves containers unbounded. |
 | `CONTAINER_MEMORY_LIMIT` | _unset_ | Memory cap per container, passed to `docker run --memory` (e.g. `8g`). A hard cap only on a swapless host — there a runaway is OOM-killed; with swap it can spill past the limit. |
-| `CONTAINER_MAX_OUTPUT_SIZE` | 10 MB | Output captured from a container. |
-| `MAX_CONCURRENT_CONTAINERS` | `5` | Intended cap on simultaneous containers — [parsed but not enforced](/reference/environment-variables), so setting it currently has no effect. |
+
+<Note>
+There is no env var for a container-count or output-size cap, and no concurrency-cap env var — `CONTAINER_TIMEOUT`, `IDLE_TIMEOUT`, `CONTAINER_MAX_OUTPUT_SIZE`, and `MAX_CONCURRENT_CONTAINERS` were removed from the code. Idle/stuck containers are now caught by the periodic host-sweep loop (`src/host-sweep.ts`) — see [Container killed mid-task](/operate/troubleshooting#container-killed-mid-task).
+</Note>
 
 ## Credentials
 

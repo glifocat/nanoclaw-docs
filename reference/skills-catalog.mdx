@@ -4,11 +4,11 @@ description: "Every skill that ships with NanoClaw — host-side workspace skill
 keywords: ["skills", "catalog", "reference", "add-channel", "providers", "tools", "container skills", "workspace skills", "slash commands"]
 ---
 
-{/* verified-against: .claude/skills/ and container/skills/ listings + each skill's SKILL.md frontmatter @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: .claude/skills/ and container/skills/ listings + each skill's SKILL.md frontmatter @ 08a1ac9 (v2.1.38) */}
 
 NanoClaw ships two kinds of skills:
 
-- **Host-side workspace skills** (`.claude/skills/`) — invoked as slash commands in Claude Code from your NanoClaw checkout. They install channels, providers, and tools, or operate and maintain your install. 47 skills total: 17 channel installs, 3 provider installs, 10 tool installs, and 17 operational skills.
+- **Host-side workspace skills** (`.claude/skills/`) — invoked as slash commands in Claude Code from your NanoClaw checkout. They install channels, providers, and tools, or operate and maintain your install. 48 skills total: 17 channel installs, 3 provider installs, 11 tool installs, and 17 operational skills.
 - **Container skills** (`container/skills/`) — 8 skills mounted into every agent container at `/app/skills`. The agent loads them at runtime; you don't invoke them yourself.
 
 For how skills work and how to write your own, see [Extending NanoClaw](/extend/overview).
@@ -54,6 +54,7 @@ Each skill adds a capability or MCP tool to your agents. See [Tools](/extend/too
 | Skill | What it does |
 | --- | --- |
 | `/add-atomic-chat-tool` | Adds the Atomic Chat MCP server so agents can call local models served by the Atomic Chat desktop app via its OpenAI-compatible API |
+| `/add-clidash` | Adds clidash — a zero-dependency, read-only web dashboard that derives its tabs and tables at runtime from any CLI that lists resources as JSON, pre-wired for NanoClaw's `ncl` CLI |
 | `/add-dashboard` | Adds a monitoring dashboard — installs `@nanoco/nanoclaw-dashboard` and a pusher that sends periodic JSON snapshots |
 | `/add-gcal-tool` | Adds Google Calendar as an MCP tool (list calendars, list/search/create events, free/busy) using OneCLI-managed OAuth — no raw credentials reach the container |
 | `/add-gmail-tool` | Adds Gmail as an MCP tool (read, search, send, label, draft) using OneCLI-managed OAuth — tokens injected at request time |

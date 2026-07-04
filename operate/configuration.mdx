@@ -1,10 +1,10 @@
 ---
 title: "Configuration"
 description: "Configure a NanoClaw install — environment variables in .env and the service environment, plus per-group container config in the database."
-keywords: ["configuration", "environment variables", ".env", "container config", "ASSISTANT_NAME", "CONTAINER_TIMEOUT", "LOG_LEVEL", "container_configs"]
+keywords: ["configuration", "environment variables", ".env", "container config", "ASSISTANT_NAME", "LOG_LEVEL", "container_configs"]
 ---
 
-{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/providers/claude.ts, src/container-config.ts, src/db/container-configs.ts, setup/set-env.ts, setup/service.ts @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/providers/claude.ts, src/container-config.ts, src/db/container-configs.ts, setup/set-env.ts, setup/service.ts @ 08a1ac9 (v2.1.38) */}
 
 NanoClaw has two configuration layers:
 
@@ -27,6 +27,11 @@ Variables come from two sources, and the distinction matters:
 | `ONECLI_URL` | — | URL of the OneCLI Agent Vault. |
 | `ONECLI_API_KEY` | — | API key for the vault. See [Credentials](/operate/credentials). |
 | `TZ` | system timezone, else `UTC` | IANA timezone for scheduled tasks and message timestamps. Invalid values are skipped, not errored. |
+| `CONTAINER_CPU_LIMIT` | _unset_ (unbounded) | Opt-in CPU cap per container, passed to `docker run --cpus` (e.g. `2`). Can be set in `.env` or the process environment. |
+| `CONTAINER_MEMORY_LIMIT` | _unset_ (unbounded) | Opt-in memory cap per container, passed to `docker run --memory` (e.g. `8g`). Hard cap only on a swapless host. Can be set in `.env` or the process environment. |
+| `NANOCLAW_EGRESS_LOCKDOWN` | `false` | Set `true` to force all agent traffic through the OneCLI gateway on an internal Docker network. Fails fast if the gateway isn't running. Can be set in `.env` or the process environment. See [Hardening](/operate/hardening). |
+| `NANOCLAW_EGRESS_NETWORK` | `nanoclaw-egress` | Name of the locked-down Docker network. Can be set in `.env` or the process environment. |
+| `ONECLI_GATEWAY_CONTAINER` | `onecli` | Name of the gateway container attached as the only egress hop. Can be set in `.env` or the process environment. |
 | `ANTHROPIC_BASE_URL` | — | Custom Anthropic-compatible endpoint for the Claude provider. Only active when setup has configured a custom endpoint; the real auth token stays on the host and is injected by the OneCLI proxy. |
 
 Some channels run in containers and can't see the host's `.env`. For those, setup mirrors `.env` to `data/env/env`, which is mounted into the channel container. Keep the two in sync — the `set-env` setup step handles both:
@@ -45,15 +50,12 @@ These are read from `process.env` at startup. Set them in the service definition
 
 | Variable | Default | What it does |
 |---|---|---|
-| `CONTAINER_TIMEOUT` | `1800000` (30 min) | Max runtime for an agent container, in milliseconds. |
-| `IDLE_TIMEOUT` | `1800000` (30 min) | How long a container stays alive after its last result, waiting for follow-ups. |
-| `MAX_CONCURRENT_CONTAINERS` | `5` | Intended cap on simultaneously running agent containers. Parsed at startup but not enforced anywhere as of v2.1.4 — setting it has no effect. |
-| `CONTAINER_MAX_OUTPUT_SIZE` | `10485760` (10 MB) | Max output captured from a container. |
-| `CONTAINER_CPU_LIMIT` | _unset_ (unbounded) | Opt-in CPU cap per container, passed to `docker run --cpus` (e.g. `2`). |
-| `CONTAINER_MEMORY_LIMIT` | _unset_ (unbounded) | Opt-in memory cap per container, passed to `docker run --memory` (e.g. `8g`). Hard cap only on a swapless host. |
-| `MAX_MESSAGES_PER_PROMPT` | `10` | How many queued messages are batched into a single agent prompt. |
 | `CONTAINER_IMAGE` | per-install tag | Full agent image override (name and tag). |
 | `CONTAINER_IMAGE_BASE` | per-install name | Base image name override. The default includes an install slug so two checkouts on one host don't clobber each other's `nanoclaw-agent` image. |
+
+<Note>
+`CONTAINER_TIMEOUT`, `IDLE_TIMEOUT`, `MAX_CONCURRENT_CONTAINERS`, `CONTAINER_MAX_OUTPUT_SIZE`, and `MAX_MESSAGES_PER_PROMPT` were removed from the code and are no longer read — setting any of them has no effect. Container idle/stuck detection is now handled by the periodic host-sweep loop (`src/host-sweep.ts`), not a per-container timeout env var.
+</Note>
 
 **Network and logging**
 
@@ -61,14 +63,6 @@ These are read from `process.env` at startup. Set them in the service definition
 |---|---|---|
 | `WEBHOOK_PORT` | `3000` | Port for the local webhook server. |
 | `LOG_LEVEL` | `info` | One of `debug`, `info`, `warn`, `error`, `fatal`. |
-
-**Security**
-
-| Variable | Default | What it does |
-|---|---|---|
-| `NANOCLAW_EGRESS_LOCKDOWN` | `false` | Set `true` to force all agent traffic through the OneCLI gateway on an internal Docker network. Fails fast if the gateway isn't running. |
-| `NANOCLAW_EGRESS_NETWORK` | `nanoclaw-egress` | Name of the locked-down Docker network. |
-| `ONECLI_GATEWAY_CONTAINER` | `onecli` | Name of the gateway container attached as the only egress hop. |
 
 See [Hardening](/operate/hardening) for the full egress lockdown and sandboxing story.
 
