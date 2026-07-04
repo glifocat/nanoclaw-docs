@@ -4,7 +4,7 @@ description: "Diagnose NanoClaw v2 failures: host startup stops, container spawn
 keywords: ["troubleshooting", "debugging", "dropped messages", "container spawn", "upgrade tripwire", "host sweep", "LOG_LEVEL"]
 ---
 
-{/* verified-against: .claude/skills/debug/SKILL.md, src/container-runtime.ts, src/container-runner.ts, src/host-sweep.ts, src/upgrade-state.ts, src/log.ts, src/cli/resources/dropped-messages.ts, src/cli/resources/sessions.ts, src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/webhook-server.ts, src/circuit-breaker.ts, setup/service.ts @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: .claude/skills/debug/SKILL.md, src/container-runtime.ts, src/container-runner.ts, src/host-sweep.ts, src/upgrade-state.ts, src/log.ts, src/cli/resources/dropped-messages.ts, src/cli/resources/sessions.ts, src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/webhook-server.ts, src/circuit-breaker.ts, setup/service.ts @ 08a1ac9 (v2.1.38) */}
 
 ## Start here
 
@@ -113,7 +113,7 @@ grep 'Webhook server started' logs/nanoclaw.log   # shows port + registered adap
 curl -i http://localhost:3000/webhook/slack       # 404 "Unknown adapter" = not registered
 ```
 
-The server listens on `WEBHOOK_PORT` (default `3000`). If another process already holds that port, the listen fails and the host crashes with `FATAL Uncaught exception` — change `WEBHOOK_PORT` in `.env`. Channel-specific failures (tokens, tunnel/public URL, platform-side config) are covered on each channel page: [Slack](/channels/slack), [Teams](/channels/teams), [Channels overview](/channels/overview).
+The server listens on `WEBHOOK_PORT` (default `3000`). If another process already holds that port, the listen fails and the host crashes with `FATAL Uncaught exception` — `WEBHOOK_PORT` is read from the process environment only (`src/webhook-server.ts:113`), so set it in the service definition or your shell, not `.env`, then restart. Channel-specific failures (tokens, tunnel/public URL, platform-side config) are covered on each channel page: [Slack](/channels/slack), [Teams](/channels/teams), [Channels overview](/channels/overview).
 
 ## Credential request stuck
 
