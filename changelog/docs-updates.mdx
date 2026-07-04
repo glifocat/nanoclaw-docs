@@ -5,6 +5,16 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.1.38 drift sweep" description="2026-07-04" tags={["Updated", "Fixed"]}>
+  Brought the site current with `nanocoai/nanoclaw@08a1ac9` (v2.1.38) — a ~15-release delta since the v2.1.23 sweep. A code-grounded pass over the whole site found six pages drifted, traced to two upstream root causes plus two standalone fixes:
+
+  - **`.env` support arrived** for vars the docs called process.env-only: `config.ts` now falls back to `.env` for `CONTAINER_CPU_LIMIT`, `CONTAINER_MEMORY_LIMIT`, and the three egress vars — corrected on `reference/environment-variables`, `operate/configuration`, `operate/hardening`, and `operate/troubleshooting`. `WEBHOOK_PORT` is the exception and stays documented as process.env-only.
+  - **Five env vars removed upstream** (the host-sweep loop replaced the old timeout/concurrency machinery): `CONTAINER_TIMEOUT`, `IDLE_TIMEOUT`, `MAX_CONCURRENT_CONTAINERS`, `CONTAINER_MAX_OUTPUT_SIZE`, `MAX_MESSAGES_PER_PROMPT` — dropped from `reference/environment-variables`, `operate/configuration`, `operate/hardening`, and `guides/multi-agent-swarm`.
+  - **Security correction** (`operate/hardening`): the `readOnly` key on additional mounts is no longer silently ignored — `mount-security` honors it, so `{readOnly: false}` grants read-write. The page said the opposite, understating permissiveness.
+  - **`reference/skills-catalog`**: 47 → 48 skills (`/add-clidash`)
+  - `verified-against` anchors bumped to `08a1ac9` on the touched pages
+</Update>
+
 <Update label="Get started, second pass" description="2026-07-02" tags={["Updated"]}>
   Follow-up to the 2026-06-29 rework, aimed at the remaining beginner friction:
 
