@@ -29,7 +29,7 @@ Two things are already there before you add anything: the built-in `nanoclaw` MC
 | Labels | `list_email_labels`, `create_label`, `update_label`, `delete_label`, `get_or_create_label` |
 | Filters | `list_filters`, `get_filter`, `create_filter`, `create_filter_from_template`, `delete_filter` |
 
-OAuth follows v2's credential invariant — containers never hold raw tokens. You connect Gmail once in the OneCLI web UI; the skill writes **stub files** (`~/.gmail-mcp/`) whose values are the `"onecli-managed"` placeholder. The MCP server starts happily against the stubs, and the vault's gateway rewrites `Authorization: Bearer onecli-managed` to the real OAuth token in flight to `gmail.googleapis.com`. Full mechanics in [Credentials](/operate/credentials#credential-stubs).
+OAuth follows v2's credential invariant — containers never hold raw tokens. You connect Gmail once in the [OneCLI web UI](/operate/credentials#accessing-the-onecli-dashboard); the skill writes **stub files** (`~/.gmail-mcp/`) whose values are the `"onecli-managed"` placeholder. The MCP server starts happily against the stubs, and the vault's gateway rewrites `Authorization: Bearer onecli-managed` to the real OAuth token in flight to `gmail.googleapis.com`. Full mechanics in [Credentials](/operate/credentials#credential-stubs).
 
 The skill installs the MCP server into the container image, registers it per group with `ncl groups config add-mcp-server`, and mounts the stub directory. To test: ask the agent to *"list my gmail labels"* — the first call takes a moment while the server starts and the vault does the token exchange.
 

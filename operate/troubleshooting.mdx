@@ -85,7 +85,7 @@ Trace the message through the pipeline, in order:
 
 The first two of these abort the spawn; a rejected mount only degrades it (the container starts without that mount). All three appear in `logs/nanoclaw.error.log`:
 
-- **`OneCLI gateway not applied — refusing to spawn container without credentials`** — the host can't wire the credential vault, so it refuses to launch the agent. The message stays pending and the sweep retries every minute; fix the gateway (is OneCLI running on `127.0.0.1:10254`?) and the spawn recovers on its own. See [Credentials](/operate/credentials).
+- **`OneCLI gateway not applied — refusing to spawn container without credentials`** — the host can't wire the credential vault, so it refuses to launch the agent. The message stays pending and the sweep retries every minute; fix the vault connection (is OneCLI reachable at the URL in `ONECLI_URL` in `.env`? on installs where containers reach the gateway it binds the Docker-bridge IP, not `127.0.0.1`) and the spawn recovers on its own. See [Credentials](/operate/credentials).
 - **Egress lockdown errors** — with lockdown enabled, the spawn fails fast rather than run with open egress: `the "<network>" internal network could not be created` or `the OneCLI gateway "<container>" could not be attached to "<network>"`. Check `docker network inspect` for the egress network and see [Hardening](/operate/hardening#lock-down-network-egress).
 - **`Additional mount REJECTED`** — a mount from your group's container config failed allowlist validation. The log line includes the `requestedPath` and `reason`. Fix the allowlist — see [Hardening](/operate/hardening#gate-additional-mounts).
 
