@@ -4,7 +4,7 @@ description: "Every per-group container config field — storage, defaults, spaw
 keywords: ["container config", "container_configs", "container.json", "provider", "model", "effort", "image_tag", "mcp_servers", "additional_mounts", "cli_scope", "skills", "packages"]
 ---
 
-{/* verified-against: src/db/container-configs.ts, src/container-config.ts, src/container-runner.ts, src/cli/resources/groups.ts, src/cli/dispatch.ts, src/claude-md-compose.ts, src/modules/mount-security/index.ts, src/db/migrations/{014-container-configs,015-cli-scope}.ts, container/agent-runner/src/{config.ts,index.ts,db/messages-in.ts,providers/types.ts} @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/db/container-configs.ts, src/container-config.ts, src/container-runner.ts, src/cli/resources/groups.ts, src/cli/dispatch.ts, src/claude-md-compose.ts, src/modules/mount-security/index.ts, src/db/migrations/{014-container-configs,015-cli-scope}.ts, container/agent-runner/src/{config.ts,index.ts,db/messages-in.ts,providers/types.ts} @ 08a1ac9 (v2.1.38) */}
 
 Each agent group has one row in the `container_configs` table in the central SQLite database — the source of truth for how that group's containers spawn. You change it with the [`ncl groups config` subcommands](/reference/ncl-cli#groups); the row is created automatically with defaults when the group is created.
 
@@ -72,7 +72,7 @@ This is the only field **not** written to `container.json` — the host checks t
 
 ### skills
 
-Either the string `"all"` or an array of skill names. Before mounting, the host syncs symlinks in the group's `.claude-shared/skills/` directory to match: `"all"` re-reads `container/skills/` on every spawn (newly added skills appear automatically), an array pins the exact set. Each symlink targets `/app/skills/<name>` — valid inside the container, dangling on the host. There is no `ncl groups config` subcommand for this field as of v2.1.4; update the JSON column directly in the database.
+Either the string `"all"` or an array of skill names. Before mounting, the host syncs symlinks in the group's `.claude-shared/skills/` directory to match: `"all"` re-reads `container/skills/` on every spawn (newly added skills appear automatically), an array pins the exact set. Each symlink targets `/app/skills/<name>` — valid inside the container, dangling on the host. There is no `ncl groups config` subcommand for this field as of v2.1.38; update the JSON column directly in the database.
 
 ### mcp_servers
 
@@ -89,7 +89,7 @@ External MCP servers merged with the built-in `nanoclaw` server at runner startu
 }
 ```
 
-`args` and `env` are optional. `instructions`, if present, is composed into the group's CLAUDE.md as an inline fragment at spawn — but neither `ncl groups config add-mcp-server` nor the agent's `add_mcp_server` tool accepts it as of v2.1.4; to set it, update the JSON column directly in the database. Manage the rest with `ncl groups config add-mcp-server` / `remove-mcp-server`.
+`args` and `env` are optional. `instructions`, if present, is composed into the group's CLAUDE.md as an inline fragment at spawn — but neither `ncl groups config add-mcp-server` nor the agent's `add_mcp_server` tool accepts it as of v2.1.38; to set it, update the JSON column directly in the database. Manage the rest with `ncl groups config add-mcp-server` / `remove-mcp-server`.
 
 ### packages_apt and packages_npm
 
