@@ -35,7 +35,7 @@ NanoClaw uses **pnpm** for the host and **Bun** for the agent-runner inside the 
 ```bash
 # Host (Node + pnpm, repo root)
 pnpm install
-pnpm run dev          # run the host with hot reload (tsx)
+pnpm run dev          # run the host from TypeScript (tsx — no watch; restart to pick up changes)
 pnpm run build        # compile TypeScript (tsc)
 pnpm test             # host tests (vitest run)
 pnpm run test:watch   # vitest in watch mode

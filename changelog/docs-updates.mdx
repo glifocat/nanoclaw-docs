@@ -11,6 +11,7 @@ rss: true
   - **`extend/providers`** — the codex provider's `AGENTS.md` compose now opens with the group's template persona (`instructions.prepend.md`, exempt from the 32 KB-cap eviction), template skills are mirrored into `.agents/skills` as real directories (they're stamped on the Claude plane, which Codex never reads), and the `.agents` dir is mounted at both `/workspace/agent/.agents` and `/home/node/.agents` — Codex only scans workspace-level `.agents/skills` inside a git repo, so the `$HOME` mount is what makes skills discoverable. Providers-branch anchor bumped to `d2dd91b`
   - **`reference/environment-variables`** — all 37 source citations re-checked at `b6cb53e`: every variable and default still accurate; 10 drifted line numbers corrected and the "line numbers reference v2.1.4" disclaimer updated to v2.1.38
   - **`reference/container-config`** — the two "as of v2.1.4" absence claims (no `ncl groups config` subcommand for `skills`; `add-mcp-server` / `add_mcp_server` don't accept `instructions`) re-verified still true at v2.1.38 and restamped; anchor bumped to `08a1ac9`
+  - **`concepts/contributing`** — `pnpm run dev` never had hot reload (`tsx src/index.ts`, no watch, unchanged since the initial commit); corrected the command comment. Surfaced by cross-checking the in-repo docs overhaul (nanoclaw #2961–#2964) against the portal
 </Update>
 
 <Update label="v2.1.38 drift sweep" description="2026-07-04" tags={["Updated", "Fixed"]}>
