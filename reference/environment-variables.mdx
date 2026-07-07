@@ -57,7 +57,7 @@ Consumed by the setup wizard (`pnpm run setup:auto`) and migration scripts, not 
 | `NANOCLAW_CHANNELS` | — | `setup/migrate-v2/select-channels.ts:43` | Comma-separated channel names (e.g. `telegram,discord`) — skips the channel picker in the v2 migration flow. |
 | `NANOCLAW_V1_PATH` | sibling-directory scan | `migrate-v2.sh:196` | Explicit override for v1 install discovery in the migration flow. Validated against `$NANOCLAW_V1_PATH/store/messages.db` — the script fails with a message telling you to set it when auto-discovery misses. |
 | `INSTALL_CJK_FONTS` | `false` | `setup/container.ts:181` | Set `true` to bake CJK fonts (~200 MB) into the agent image. Read from `.env` by regex during the container build step and passed as a Docker `--build-arg` — the only build-arg passed through today. Set it in `.env`, not the service environment. |
-| `NANOCLAW_ONECLI_API_HOST` | `https://api.onecli.sh` | `setup/auto.ts:238` | Use a remote OneCLI vault instead of installing one locally. |
+| `NANOCLAW_ONECLI_API_HOST` | — | `setup/auto.ts:238` | Use a remote OneCLI vault instead of installing one locally. Unset means a local vault is installed; `https://api.onecli.sh` is only the pre-filled placeholder in the advanced-settings form (`setup/lib/setup-config.ts:73`), not a live default. |
 | `NANOCLAW_ONECLI_API_TOKEN` | — | `setup/onecli.ts:325` | Bearer token (`oc_…`) for the remote vault. Required when the host is set. |
 | `NANOCLAW_ANTHROPIC_BASE_URL` | — | `setup/auto.ts:855` | Custom Anthropic-compatible endpoint. Setup writes `ANTHROPIC_BASE_URL` to `.env` and stores the token in the vault. |
 | `NANOCLAW_ANTHROPIC_AUTH_TOKEN` | — | `setup/auto.ts:856` | Bearer token for the custom endpoint. Both URL and token must be set together. |
