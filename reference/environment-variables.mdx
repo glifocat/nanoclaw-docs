@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["environment variables", ".env", "configuration", "ASSISTANT_NAME", "LOG_LEVEL", "NANOCLAW_SKIP", "NANOCLAW_EGRESS_LOCKDOWN", "setup", "reference"]
 ---
 
-{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/container-runner.ts, src/providers/claude.ts, setup/auto.ts, setup/onecli.ts, setup/lib/setup-config.ts, setup/lib/claude-assist.ts, setup/lib/diagnostics.ts, setup/signal-auth.ts, setup/container.ts, setup/migrate-v2/select-channels.ts, migrate-v2.sh, container/agent-runner/src/{timezone.ts,providers/claude.ts} @ b6cb53e (v2.1.38) */}
+{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/container-runner.ts, src/providers/claude.ts, setup/auto.ts, setup/onecli.ts, setup/lib/setup-config.ts, setup/lib/claude-assist.ts, setup/lib/diagnostics.ts, setup/signal-auth.ts, setup/container.ts, setup/migrate-v2/select-channels.ts, migrate-v2.sh, container/agent-runner/src/{timezone.ts,providers/claude.ts} @ e926e30e (v2.1.53) */}
 
 Exhaustive list of every environment variable the NanoClaw host, setup wizard, and agent runner read. For how to actually set these — `.env` editing, service definitions, restart commands — see [Configuration](/operate/configuration).
 
@@ -13,7 +13,7 @@ Channel adapters (Telegram bot tokens, Slack app credentials, and so on) have th
 
 ## Read from .env
 
-NanoClaw's own parser ([`src/env.ts`](https://github.com/nanocoai/nanoclaw/blob/main/src/env.ts)) reads exactly these keys from `.env` at the project root. Values are never loaded into `process.env`, so they don't leak to child processes. For the first ten, a value already in the process environment takes precedence over `.env`; `ANTHROPIC_BASE_URL` is read from `.env` only.
+NanoClaw's own parser ([`src/env.ts`](https://github.com/nanocoai/nanoclaw/blob/main/src/env.ts)) reads exactly these keys from `.env` at the project root. Values are never loaded into `process.env`, so they don't leak to child processes. For the first eleven, a value already in the process environment takes precedence over `.env`; `ANTHROPIC_BASE_URL` is read from `.env` only.
 
 | Variable | Default | Read in | Effect |
 |---|---|---|---|
@@ -27,6 +27,7 @@ NanoClaw's own parser ([`src/env.ts`](https://github.com/nanocoai/nanoclaw/blob/
 | `NANOCLAW_EGRESS_LOCKDOWN` | `false` | `src/config.ts:61` | Set `true` to force all agent traffic through the OneCLI gateway on an internal Docker network. Spawns fail fast if the gateway isn't running. Can be set in `.env` or the process environment. See [Hardening](/operate/hardening). |
 | `NANOCLAW_EGRESS_NETWORK` | `nanoclaw-egress` | `src/config.ts:62` | Name of the locked-down Docker network. Can be set in `.env` or the process environment. |
 | `ONECLI_GATEWAY_CONTAINER` | `onecli` | `src/config.ts:64` | Name of the gateway container attached as the only egress hop. Can be set in `.env` or the process environment. |
+| `DEFAULT_AGENT_PROVIDER` | `claude` | `src/config.ts:35` | Instance-wide default agent provider stamped onto newly created agent groups. Existing groups are never retroactively changed, and per-group `ncl groups config update --provider` overrides it. Can be set in `.env` or the process environment. |
 | `ANTHROPIC_BASE_URL` | — | `src/providers/claude.ts:21` | Custom Anthropic-compatible endpoint, passed into agent containers with a placeholder auth token. Only active when setup has registered the custom-endpoint provider config; the real token stays in the vault. |
 
 ## Host process environment only
