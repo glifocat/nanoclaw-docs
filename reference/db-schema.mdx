@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["database", "schema", "sqlite", "v2.db", "inbound.db", "outbound.db", "messages_in", "messages_out", "sessions", "container_configs", "pending_sender_approvals", "migrations"]
 ---
 
-{/* verified-against: src/db/schema.ts, src/db/connection.ts, src/db/session-db.ts, src/session-manager.ts, src/db/migrations/{001-initial,002-chat-sdk-state,module-approvals-pending-approvals,module-agent-to-agent-destinations,module-approvals-title-options,008-dropped-messages,009-drop-pending-credentials,010-engage-modes,011-pending-sender-approvals,012-channel-registration,013-approval-render-metadata,014-container-configs,015-cli-scope,016-messaging-group-instance,017-agent-message-policies,018-approvals-approver-user-id,index}.ts, src/modules/agent-to-agent/db/agent-message-policies.ts, container/agent-runner/src/db/messages-out.ts, src/modules/scheduling/db.ts @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/db/schema.ts, src/db/connection.ts, src/db/session-db.ts, src/session-manager.ts, src/db/migrations/{001-initial,002-chat-sdk-state,module-approvals-pending-approvals,module-agent-to-agent-destinations,module-approvals-title-options,008-dropped-messages,009-drop-pending-credentials,010-engage-modes,011-pending-sender-approvals,012-channel-registration,013-approval-render-metadata,014-container-configs,015-cli-scope,016-messaging-group-instance,017-agent-message-policies,018-approvals-approver-user-id,019-wiring-threads,index}.ts, src/modules/agent-to-agent/db/agent-message-policies.ts, container/agent-runner/src/db/messages-out.ts, src/modules/scheduling/db.ts @ e926e30e (v2.1.53) */}
 
 NanoClaw stores everything in SQLite, split across two layers:
 
@@ -68,6 +68,7 @@ Which agent groups handle which messaging groups. Migration 010 replaced v1's op
 | `sender_scope` | TEXT | `'all'` | `'all'` \| `'known'` — who can engage the agent |
 | `ignored_message_policy` | TEXT | `'drop'` | `'drop'` \| `'accumulate'` — what to do with non-engaging messages |
 | `session_mode` | TEXT | `'shared'` | Session sharing strategy |
+| `threads` | INTEGER | `NULL` | Per-wiring thread override (migration 019). `NULL` = inherit the channel adapter's declared thread default for the context (DM vs group); `1`/`0` = explicit override, hard-ANDed with the adapter's raw thread capability at router fanout |
 | `priority` | INTEGER | `0` | Ordering when multiple agents are wired to one chat |
 | `created_at` | TEXT | — | ISO timestamp |
 
@@ -294,7 +295,7 @@ Everything the agent receives — chat messages, system events, and scheduled ta
 | `seq` | INTEGER | — | Even, UNIQUE — globally ordered agent-facing ID |
 | `kind` | TEXT | — | `'chat'` \| `'chat-sdk'` \| `'task'` \| `'webhook'` \| `'system'` (the `MessageInKind` union) — task vs. message is just this column. `'webhook'` is in the union but has no writer on main yet |
 | `timestamp` | TEXT | — | ISO timestamp |
-| `status` | TEXT | `'pending'` | `pending` → `completed` / `failed`; tasks can also be `paused` |
+| `status` | TEXT | `'pending'` | `pending` → `completed` / `failed`; tasks can also be `paused` or `cancelled` |
 | `process_after` | TEXT | `NULL` | Don't deliver before this time — scheduling and retry backoff |
 | `recurrence` | TEXT | `NULL` | Cron expression; the host sweep clones completed recurring rows for the next run |
 | `series_id` | TEXT | `NULL` | Groups a recurring task's clones (initially the original's `id`; indexed) |
@@ -330,7 +331,7 @@ The destination map for this session's agent, derived from `agent_destinations`.
 
 #### session_routing
 
-Default reply routing — single-row table (`CHECK (id = 1)`). The host overwrites it on every container wake from the session's messaging group and thread; the container reads it in `send_message` / `ask_user_question` to default the channel and thread when the agent doesn't name an explicit destination. Columns: `id`, `channel_type`, `platform_id`, `thread_id`.
+Default reply routing — single-row table (`CHECK (id = 1)`). The host overwrites it on every container wake from the session's messaging group and thread. `send_message` requires an explicit `to`; the container reads this row to preserve the session's `thread_id` when that destination is the same channel the session is bound to (so replies land in the originating thread), and `ask_user_question` reads it to route its card. Columns: `id`, `channel_type`, `platform_id`, `thread_id`.
 
 ### outbound.db (container writes, host reads)
 

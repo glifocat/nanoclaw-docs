@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["ncl", "cli", "reference", "commands", "flags", "groups", "wirings", "sessions", "roles", "members", "destinations", "approvals", "cli_scope"]
 ---
 
-{/* verified-against: src/cli/dispatch.ts, src/cli/crud.ts, src/cli/client.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/registry.ts, src/cli/frame.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,policies,roles,sessions,user-dms,users,wirings}.ts, bin/ncl @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/cli/dispatch.ts, src/cli/crud.ts, src/cli/client.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/registry.ts, src/cli/frame.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,policies,roles,sessions,tasks,user-dms,users,wirings}.ts, src/channels/channel-defaults.ts, bin/ncl @ e926e30e (v2.1.53) */}
 
 Exhaustive reference for the `ncl` admin CLI. For a task-oriented walkthrough, see [The ncl admin CLI](/operate/ncl-cli).
 
@@ -93,6 +93,8 @@ Agent groups — logical agent identities with their own workspace folder, histo
 | config remove-mcp-server | `ncl groups config remove-mcp-server --id <id> --name <server>` | approval | Restart required to take effect. |
 | config add-package | `ncl groups config add-package --id <id> --apt <pkg> \| --npm <pkg>` | approval | At least one of `--apt`/`--npm`. Requires `ncl groups restart --rebuild`. |
 | config remove-package | `ncl groups config remove-package --id <id> --apt <pkg> \| --npm <pkg>` | approval | Requires `ncl groups restart --rebuild`. |
+| config add-mount | `ncl groups config add-mount --id <id> --host <host-path> --container <container-path> [--ro]` | approval | **Host-only** — never runnable from inside a container (mounting host paths is a filesystem-access boundary). Adds a bind mount to `additional_mounts`; `--ro` makes it read-only. Restart required to take effect. |
+| config remove-mount | `ncl groups config remove-mount --id <id> --host <host-path> --container <container-path>` | approval | Host-only. Removes the matching mount. Restart required to take effect. |
 
 ## members
 
@@ -158,6 +160,35 @@ The runtime unit — one `(agent_group, messaging_group, thread)` combination ma
 
 Columns: `id`, `agent_group_id`, `messaging_group_id` (null for agent-shared sessions), `thread_id` (per-thread mode only), `agent_provider` (null = inherit from group), `status` (`active` | `closed`), `container_status` (`running` | `idle` | `stopped` — `idle` is reserved and currently unused), `last_active`, `created_at`.
 
+## tasks
+
+Scheduled tasks — the CLI home for what used to be the agent's `schedule_task` MCP tools. Each task is a **series**: the live `pending`/`paused` row is the next run, and completed rows are its run history. Tasks are created from the host or by an agent inside its own task session, and each runs in an isolated per-task session that the host garbage-collects once the series is spent. Ids are `t-<hex>`, or `<slug>-<hex>` when you pass `--name`.
+
+| Operation | Invocation | Access |
+| --- | --- | --- |
+| list | `ncl tasks list [--status <pending\|paused>] [--group <id>] [--all]` | open |
+| get | `ncl tasks get --id <series-id>` | open |
+| create | `ncl tasks create --prompt <text> [--name <name>] [--process-after <when>] [--recurrence <cron>] [--script <bash>] [--group <id>]` | approval |
+| update | `ncl tasks update --id <series-id> [--prompt] [--process-after] [--recurrence] [--script]` | approval |
+| run | `ncl tasks run --id <series-id>` | open |
+| pause / resume | `ncl tasks pause --id <series-id>` / `ncl tasks resume --id <series-id>` | approval |
+| cancel | `ncl tasks cancel (--id <series-id> \| --all)` | approval |
+| delete | `ncl tasks delete --id <series-id>` | approval |
+| append-log | `ncl tasks append-log --msg <text> [--id <series-id>]` | open |
+
+| Flag | Notes |
+| --- | --- |
+| `--prompt` | Required on create. The prompt the agent wakes to. |
+| `--process-after` | First/next run time — ISO 8601, offset, or naive-local in the instance timezone. Required for one-shots; with `--recurrence` the first run is derived from the cron grid. |
+| `--recurrence` | Cron expression, evaluated in the instance timezone. On `update`, `"null"`/`"none"` clears it (back to one-shot). |
+| `--name` | Short label folded into a readable series id (`<slug>-<hex>`). |
+| `--script` | Pre-task gate bash script — runs first; the agent only wakes if the script's last stdout line is JSON with `"wakeAgent": true`. |
+| `--group` | Agent group id (host callers). Auto-filled to the caller's own group inside a container. |
+| `--all` | On `cancel`, the kill switch — cancels every live task in scope. |
+| `--msg` | On `append-log`, the note to add. Inside a task run, `--id` is auto-derived from the caller's session. |
+
+`run` fires a task now without changing its schedule (a safe test that neither consumes a one-shot nor advances a recurring series — unlike `update --process-after now`). `append-log` adds a note to a task's run log (`tasks/<id>.md`); every run already auto-logs its final text, so it's for additive mid-run notes only.
+
 ## user-dms
 
 DM route cache mapping `(user, channel_type)` to the messaging group used for cold DMs (approvals, pairing). Populated lazily; list-only.
@@ -199,8 +230,9 @@ Connects a messaging group to an agent group — which agent handles which chat.
 | --- | --- | --- |
 | `--messaging-group-id` | string | Required on create. References `messaging_groups.id`. Not updatable. |
 | `--agent-group-id` | string | Required on create. References `agent_groups.id`. Not updatable. |
-| `--engage-mode` | enum | Updatable, default `mention`. `mention` — only when @mentioned or in DMs. `mention-sticky` — after one mention in a thread, responds to all subsequent messages there. `pattern` — matches every message against `engage_pattern`. |
+| `--engage-mode` | enum | Updatable. Omitted engage flags default from the target channel adapter's declaration for the chat context (DM vs group), falling back to `mention` when the channel declares none. `mention` — only when @mentioned or in DMs. `mention-sticky` — after one mention in a thread, responds to all subsequent messages there. `pattern` — matches every message against `engage_pattern`. |
 | `--engage-pattern` | string | Updatable. Regex, required when `engage_mode=pattern`; use `.` for always-on. Ignored in mention modes. |
 | `--sender-scope` | enum | Updatable, default `all`. `all` — any sender (subject to `unknown_sender_policy`). `known` — only users with a role or membership in the agent group. |
 | `--ignored-message-policy` | enum | Updatable, default `drop`. `drop` — agent never sees non-engaging messages. `accumulate` — stored as background context so the agent has prior context when triggered. |
-| `--session-mode` | enum | Updatable, default `shared`. `shared` — one session per (agent, messaging group). `per-thread` — one per thread/topic. `agent-shared` — one across all messaging groups wired to the agent. Threaded adapters in group chats force per-thread regardless. |
+| `--session-mode` | enum | Updatable, default `shared`. `shared` — one session per (agent, messaging group). `per-thread` — one per thread/topic. `agent-shared` — one across all messaging groups wired to the agent. Threaded adapters in group chats force per-thread regardless, unless `--threads false` disables threads for the wiring. |
+| `--threads` | boolean | Updatable. Per-wiring thread override: `true`/`false` (or `1`/`0`). Omitted (`NULL`) inherits the channel adapter's declared thread default for the context. Hard-ANDed with the adapter's raw capability at router fanout — it can disable threads on a threaded platform, but never enable them on a non-threaded one. Disabling also lifts the per-thread session-mode forcing above. |

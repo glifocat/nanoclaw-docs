@@ -4,7 +4,7 @@ description: "The ChannelAdapter contract for building your own channel — life
 keywords: ["channel adapter", "ChannelAdapter", "adapter interface", "custom channel", "chat sdk bridge", "registerChannelAdapter", "initChannelAdapters", "supportsThreads", "deliver", "InboundMessage"]
 ---
 
-{/* verified-against: src/channels/adapter.ts, src/channels/channel-registry.ts, src/channels/chat-sdk-bridge.ts, src/channels/index.ts, src/webhook-server.ts, channels branch src/channels/telegram.ts @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/channels/adapter.ts, src/channels/channel-registry.ts, src/channels/chat-sdk-bridge.ts, src/channels/index.ts, src/webhook-server.ts @ e926e30e (v2.1.53); channels branch src/channels/telegram.ts @ 9e14cd0c */}
 
 A channel adapter bridges NanoClaw with a messaging platform. There are two ways to build one:
 
@@ -140,7 +140,7 @@ export interface ChannelSetup {
 | `isGroup?` | `boolean` | `true` for group/channel threads, `false` for DMs. |
 
 <Note>
-The doc comment on `InboundMessage.isMention` in `src/channels/adapter.ts` describes a router fallback that text-matches the agent group name — that comment is stale. At dc34ceb no such fallback exists; `pattern` mode is the disambiguator (see `evaluateEngage` in `src/router.ts`).
+The doc comment on `InboundMessage.isMention` in `src/channels/adapter.ts` describes a router fallback that text-matches the agent group name — that comment is stale. No such fallback exists; `pattern` mode is the disambiguator (see `evaluateEngage` in `src/router.ts`).
 </Note>
 
 `InboundEvent` (used by `onInboundEvent`) adds an explicit `channelType` plus an optional `replyTo: DeliveryAddress` that redirects the agent's reply elsewhere — a router-layer concept for admin transports like the CLI. Regular chat adapters never set it.
@@ -156,6 +156,13 @@ export type ChannelAdapterFactory = () => ChannelAdapter | Promise<ChannelAdapte
 /** Registration entry for a channel adapter. */
 export interface ChannelRegistration {
   factory: ChannelAdapterFactory;
+  /**
+   * Wiring-time defaults for this channel, resolvable WITHOUT instantiating
+   * the adapter — offline creation paths (setup, init-first-agent, ncl on a
+   * host where the factory returned null for missing creds) read them from
+   * the registry. Channel modules pass the same const here and to the adapter.
+   */
+  defaults?: ChannelDefaults;
   containerConfig?: {
     mounts?: Array<{ hostPath: string; containerPath: string; readonly: boolean }>;
     env?: Record<string, string>;
@@ -167,6 +174,27 @@ export interface ChannelRegistration {
 - **Null factory = clean skip** — return `null` when credentials are missing. The host logs `Channel credentials missing, skipping` and moves on, so an installed-but-unconfigured channel never crashes startup.
 - **Setup retries** — if `setup()` throws an error whose `name === 'NetworkError'` (Chat SDK's transient network error), the host retries after 2 s, 5 s, then 10 s before giving up. Any other error fails fast — bad tokens shouldn't loop. A failed adapter is logged and skipped; other channels still start.
 - **`containerConfig`** — optional extra mounts and env vars the container runner injects into agent containers for groups wired to this channel (e.g. mounting a media store).
+
+### Wiring defaults
+
+A channel declares its default engagement and threading behavior through `defaults?: ChannelDefaults` — carried on both the registration entry (above) and the adapter itself. Because the registration copy is resolvable without constructing the adapter, offline creation paths read it when stamping wiring rows. Each declaration has a `dm` and a `group` context:
+
+```ts
+export interface ChannelContextDefaults {
+  engageMode: 'pattern' | 'mention' | 'mention-sticky';
+  engagePattern?: string;   // required iff engageMode === 'pattern'; may contain the literal {name}
+  threads: boolean;         // default thread honoring; must be false when supportsThreads is false
+  unknownSenderPolicy: 'strict' | 'request_approval' | 'public';
+}
+
+export interface ChannelDefaults {
+  dm: ChannelContextDefaults;
+  group: ChannelContextDefaults;
+  mentions: 'platform' | 'dm-only' | 'never';   // which mention signal the adapter emits
+}
+```
+
+These feed the wiring defaults an operator gets when they don't pass explicit `--engage-mode`/`--threads` flags (see [ncl wirings](/reference/ncl-cli#wirings)), and the per-context `threads` value is what a per-wiring `--threads` override is hard-ANDed against. Omitting `defaults` falls back to a core default keyed on `supportsThreads` (`fallbackChannelDefaults` in `channel-registry.ts`), so stale adapter copies keep working.
 
 ## The Chat SDK path
 

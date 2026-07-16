@@ -4,12 +4,12 @@ description: "Every skill that ships with NanoClaw — host-side workspace skill
 keywords: ["skills", "catalog", "reference", "add-channel", "providers", "tools", "container skills", "workspace skills", "slash commands"]
 ---
 
-{/* verified-against: .claude/skills/ and container/skills/ listings + each skill's SKILL.md frontmatter @ 08a1ac9 (v2.1.38) */}
+{/* verified-against: .claude/skills/ and container/skills/ listings + each skill's SKILL.md frontmatter @ e926e30e (v2.1.53) */}
 
 NanoClaw ships two kinds of skills:
 
 - **Host-side workspace skills** (`.claude/skills/`) — invoked as slash commands in Claude Code from your NanoClaw checkout. They install channels, providers, and tools, or operate and maintain your install. 48 skills total: 17 channel installs, 3 provider installs, 11 tool installs, and 17 operational skills.
-- **Container skills** (`container/skills/`) — 8 skills mounted into every agent container at `/app/skills`. The agent loads them at runtime; you don't invoke them yourself.
+- **Container skills** (`container/skills/`) — 6 skills mounted into every agent container at `/app/skills`. The agent loads them at runtime; you don't invoke them yourself.
 
 For how skills work and how to write your own, see [Extending NanoClaw](/extend/overview).
 
@@ -98,11 +98,11 @@ Mounted into every agent container at `/app/skills`. The agent picks them up aut
 | `agent-browser` | Browses the web for any task — research, web apps, forms, screenshots, data extraction, page testing |
 | `frontend-engineer` | Enforces a build-test-verify workflow for web projects — never done until built, tested, responsive, accessible, and visually verified |
 | `onecli-gateway` | Transparent HTTPS proxy that injects stored credentials into outbound calls — the agent makes plain HTTP requests and the gateway handles auth |
-| `self-customize` | Lets the agent customize itself — add capabilities, install packages, add MCP servers, edit code or CLAUDE.md |
-| `slack-formatting` | Formats messages for Slack using mrkdwn syntax when responding to Slack channels |
+| `self-customize` | Lets the agent customize itself — add capabilities, install packages, add MCP servers, edit code or its memory files |
 | `vercel-cli` | Deploys apps to Vercel and manages Vercel projects, domains, and environment variables |
 | `welcome` | Introduces the agent to a newly connected channel — triggered automatically when a channel is first wired |
-| `whatsapp-formatting` | Formats messages for WhatsApp, including mentions that render as real WhatsApp tags |
+
+Channel-specific formatting skills (`slack-formatting`, `whatsapp-formatting`) are not part of the base image — they live on the `channels` branch and install alongside their channel via `/add-slack` and `/add-whatsapp`.
 
 ## Related pages
 
