@@ -4,7 +4,7 @@ description: "A decision guide for how isolated your agents and conversations sh
 keywords: ["isolation", "session_mode", "shared", "per-thread", "agent-shared", "agent groups", "privacy", "workspace", "sessions", "multi-tenant"]
 ---
 
-{/* verified-against: src/session-manager.ts, src/router.ts, src/container-runner.ts, .claude/skills/manage-channels/SKILL.md, src/cli/resources/wirings.ts @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/session-manager.ts, src/router.ts, src/channels/channel-defaults.ts, src/container-runner.ts, .claude/skills/manage-channels/SKILL.md, src/cli/resources/wirings.ts @ e926e30e (v2.1.53) */}
 
 Every time you wire a chat to an agent, you answer one question: should this conversation share anything with the others? NanoClaw gives you four levels, built from two dials in the [entity model](/concepts/entity-model) — which agent group the wiring points at, and the wiring's `session_mode`. This page walks them from most to least isolated.
 
@@ -17,7 +17,7 @@ Every time you wire a chat to an agent, you answer one question: should this con
 
 ## Separate agent groups — nothing shared
 
-Each agent group is its own world: a workspace folder under `groups/<folder>/`, its own per-group memory (`CLAUDE.local.md`), its own composed `CLAUDE.md`, its own container config (packages, mounts, model, skills), and its own Agent Vault credential scope — the OneCLI agent identifier *is* the agent group id, so secrets granted to one group never reach another. Sessions of different groups share only the host and the read-only pieces every container gets: the shared base instructions (`container/CLAUDE.md`, mounted at `/app/CLAUDE.md`) plus the agent-runner source and skills.
+Each agent group is its own world: a workspace folder under `groups/<folder>/`, its own per-group standing instructions (`instructions.prepend.md`) and durable memory (the `memory/` tree), its own composed `CLAUDE.md`, its own container config (packages, mounts, model, skills), and its own Agent Vault credential scope — the OneCLI agent identifier *is* the agent group id, so secrets granted to one group never reach another. Sessions of different groups share only the host and the read-only pieces every container gets: the shared base instructions (`container/CLAUDE.md`, mounted at `/app/CLAUDE.md`) plus the agent-runner source and skills.
 
 Choose this when:
 
@@ -30,12 +30,12 @@ Choose this when:
 `session_mode: 'shared'` gives each wired chat its own session: its own conversation history, its own session folder and databases, its own container while running. The agent in chat A cannot read what was said in chat B. Same brain, separate conversations — right for one assistant serving several chats that shouldn't see each other's context.
 
 <Warning>
-Conversations are isolated; the **filesystem is not**. Every session of an agent group mounts the same group folder read-write at `/workspace/agent` — working files and `CLAUDE.local.md` memory included. A file the agent saves while talking in chat A is readable (and mentionable) while talking in chat B, and a memory note written in one conversation shapes all of them. If the people in one chat must never see artifacts from another, separate sessions are not enough — use separate agent groups.
+Conversations are isolated; the **filesystem is not**. Every session of an agent group mounts the same group folder read-write at `/workspace/agent` — working files, `instructions.prepend.md`, and the `memory/` tree included. A file the agent saves while talking in chat A is readable (and mentionable) while talking in chat B, and a memory note written in one conversation shapes all of them. If the people in one chat must never see artifacts from another, separate sessions are not enough — use separate agent groups.
 </Warning>
 
 ## A session per thread — `per-thread`
 
-The same idea at finer grain: one session per `(chat, thread)`, so each Discord or Slack thread is its own conversation. You rarely set this by hand — on thread-capable adapters the router **forces** per-thread in group chats regardless of a `shared` wiring (only `agent-shared` overrides it), DM sub-threads collapse into one session (for `shared` wirings — an explicit `per-thread` wiring is honored in DMs), and thread-less adapters like WhatsApp or Telegram collapse `per-thread` back to `shared`. The full requested-versus-effective table is in the [entity model](/concepts/entity-model)'s sessions section. The shared-filesystem caveat above applies here identically.
+The same idea at finer grain: one session per `(chat, thread)`, so each Discord or Slack thread is its own conversation. You rarely set this by hand — on thread-capable adapters the router **forces** per-thread in group chats regardless of a `shared` wiring (only `agent-shared` or a per-wiring `threads = 0` overrides it), DM thread behavior follows the channel's declared DM default and any `threads` override, and thread-less adapters like WhatsApp or Telegram collapse `per-thread` back to `shared`. The full requested-versus-effective table is in the [entity model](/concepts/entity-model)'s sessions section. The shared-filesystem caveat above applies here identically.
 
 ## One conversation everywhere — `agent-shared`
 
@@ -79,7 +79,7 @@ Session and agent-group boundaries separate agents from each other, not from the
 
 - **The container boundary** is what stands between an agent and the host — see [container lifecycle](/concepts/container-lifecycle) for what's mounted where and why.
 - **Network egress and additional mounts** are per-group container config and open by default beyond the proxy — lock them down in [hardening](/operate/hardening).
-- **Shared base instructions** — every container, in every group, mounts the same read-only `container/CLAUDE.md` at `/app/CLAUDE.md`, alongside the shared agent-runner source and skills. Anything written there reaches all agents; per-group instructions belong in that group's `CLAUDE.local.md`.
+- **Shared base instructions** — every container, in every group, mounts the same read-only `container/CLAUDE.md` at `/app/CLAUDE.md`, alongside the shared agent-runner source and skills. Anything written there reaches all agents; per-group instructions belong in that group's `instructions.prepend.md`.
 
 ## Related pages
 

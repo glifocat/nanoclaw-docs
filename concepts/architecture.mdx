@@ -4,7 +4,7 @@ description: "How NanoClaw works from the top down: a host process that routes m
 keywords: ["architecture", "host process", "router", "delivery", "host sweep", "inbound.db", "outbound.db", "container", "agent-runner", "poll loop", "IPC"]
 ---
 
-{/* verified-against: src/index.ts, src/router.ts, src/delivery.ts, src/session-manager.ts, src/host-sweep.ts, src/container-runner.ts, src/claude-md-compose.ts, src/webhook-server.ts, container/agent-runner/src/{index,poll-loop,formatter,compact-instructions}.ts @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/index.ts, src/router.ts, src/delivery.ts, src/session-manager.ts, src/host-sweep.ts, src/container-runner.ts, src/claude-md-compose.ts, src/group-persona.ts, src/webhook-server.ts, container/agent-runner/src/{index,poll-loop,formatter,compact-instructions}.ts @ e926e30e (v2.1.53) */}
 
 NanoClaw is one Node.js host process plus one Docker container per active session. The host owns the channels, the routing, and the container lifecycle; the agent runs inside the container and never talks to the network on NanoClaw's behalf. Between them sits the core idea: **every message is a row in SQLite**. There is no internal message bus, no RPC, no shared memory — the host writes rows the container reads, the container writes rows the host reads, and everything else is polling.
 
@@ -59,7 +59,7 @@ On the outbound side, `src/delivery.ts` drains `messages_out`: an in-flight set 
 `src/index.ts` is a thin orchestrator. What it starts, in order:
 
 1. **Circuit breaker** — backs off on rapid restart loops, then an upgrade tripwire refuses to start if the install was updated outside `/update-nanoclaw`.
-2. **Central DB** — opens `data/v2.db`, runs migrations, backfills container configs, and performs the one-time `CLAUDE.local.md` filesystem cutover.
+2. **Central DB** — opens `data/v2.db`, runs migrations, and backfills container configs.
 3. **Container runtime** — verifies Docker is running and removes orphan containers from a previous run.
 4. **Channel adapters** — every adapter registered via the channel barrel is initialized; adapters with missing credentials are skipped with a warning.
 5. **Delivery adapter bridge** — connects the delivery system to the adapter registry for `deliver()` and `setTyping()`.
@@ -86,7 +86,7 @@ The poll loop (`poll-loop.ts`) drives everything:
 - The provider's session ID (continuation) is persisted to `outbound.db` so the next container resumes the conversation, and a `PreCompact` hook injects instructions that preserve routing context through context compaction.
 - On every provider event the runner touches `/workspace/.heartbeat` — the host's only liveness signal.
 
-The agent itself talks to NanoClaw through a built-in MCP server (`send_message`, `schedule_task`, `ask_user_question`, and friends — see [MCP tools](/reference/mcp-tools)). The provider behind `provider.query()` is pluggable: Claude Code is the default, and others self-register the same way channels do (see [Providers](/extend/providers)).
+The agent itself talks to NanoClaw through a built-in MCP server (`send_message`, `ask_user_question`, `create_agent`, and friends — see [MCP tools](/reference/mcp-tools); scheduling is not an MCP tool anymore, it moved to the `ncl tasks` CLI). The provider behind `provider.query()` is pluggable: Claude Code is the default, and others self-register the same way channels do (see [Providers](/extend/providers)).
 
 ## Composed at spawn
 
@@ -94,7 +94,7 @@ The container runner (`src/container-runner.ts`) rebuilds the agent's world on e
 
 1. Refreshes the session's destination map and default reply routing in `inbound.db`.
 2. Materializes `container.json` from the database and syncs skill symlinks to match its selection.
-3. **Composes `groups/<folder>/CLAUDE.md`** (`src/claude-md-compose.ts`) and builds the mount list: a generated entry point that begins with `<!-- Composed at spawn — do not edit. Edit CLAUDE.local.md for per-group content. -->` and contains only imports — the shared base (`container/CLAUDE.md`, mounted read-only at `/app/CLAUDE.md`), one fragment per skill that ships `instructions.md`, one per built-in module's MCP tool instructions, and inline instructions from user-added MCP servers. The only file you (or the agent) should edit is `CLAUDE.local.md`, the per-group memory that Claude Code auto-loads alongside it.
+3. **Composes `groups/<folder>/CLAUDE.md`** (`src/claude-md-compose.ts`) and builds the mount list: a generated entry point that begins with `<!-- Composed at spawn - do not edit. Standing instructions: instructions.prepend.md. Memory: memory/. -->` and contains only imports — the group's `instructions.prepend.md` inlined first as the persona fragment, then the shared base (`container/CLAUDE.md`, mounted read-only at `/app/CLAUDE.md`), one fragment per skill that ships `instructions.md`, one per built-in module's MCP tool instructions, and inline instructions from user-added MCP servers. The files you (or the agent) edit are `instructions.prepend.md` for standing instructions and the `memory/` tree for durable memory; the composed `CLAUDE.md` is regenerated every spawn.
 4. Wires the OneCLI Agent Vault: `HTTPS_PROXY` plus certificates are injected so API calls are credential-injected in transit. If the vault is unreachable, the spawn fails rather than running without credentials, and the message stays pending for the next sweep.
 5. Joins the egress lockdown network when enabled (see [Security model](/concepts/security)) and spawns `docker run`.
 

@@ -4,7 +4,7 @@ description: "The full container story: how the agent image is built, what gets 
 keywords: ["container", "lifecycle", "docker", "spawn", "wake", "mounts", "image", "tini", "orphan cleanup", "install slug", "egress lockdown", "kill"]
 ---
 
-{/* verified-against: src/container-runner.ts, src/container-runtime.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/install-slug.ts, setup/container.ts, container/Dockerfile @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/container-runner.ts, src/container-runtime.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/install-slug.ts, setup/container.ts, container/Dockerfile @ e926e30e (v2.1.53) */}
 
 Every active session gets exactly one Docker container, spawned on demand and killed when it goes quiet. The container is deliberately disposable: all state lives in mounted host directories, so a kill loses nothing but an in-flight provider call — and the [host sweep](/concepts/architecture#what-runs-when) retries that.
 
@@ -55,20 +55,17 @@ The exact mounts, from `buildMounts` in `src/container-runner.ts`:
 | Host path | Container path | Mode |
 |---|---|---|
 | `data/v2-sessions/<group>/<session>/` | `/workspace` | RW — `inbound.db`, `outbound.db`, `outbox/`, `.heartbeat` |
-| `groups/<folder>/` | `/workspace/agent` | RW — working files, `CLAUDE.local.md` |
+| `groups/<folder>/` | `/workspace/agent` | RW — working files, `instructions.prepend.md`, `memory/` |
 | `groups/<folder>/container.json` | `/workspace/agent/container.json` | RO, nested over the RW group dir |
 | `groups/<folder>/CLAUDE.md` (composed) | `/workspace/agent/CLAUDE.md` | RO, nested — regenerated each spawn |
 | `groups/<folder>/.claude-fragments/` | `/workspace/agent/.claude-fragments` | RO, nested |
-| `groups/global/` | `/workspace/global` | RO — dead code as of v2.1.4\* |
 | `container/CLAUDE.md` | `/app/CLAUDE.md` | RO — shared base instructions |
 | `data/v2-sessions/<group>/.claude-shared/` | `/home/node/.claude` | RW — Claude state, settings, skill symlinks |
 | `container/agent-runner/src/` | `/app/src` | RO — agent-runner source |
 | `container/skills/` | `/app/skills` | RO — shared skills |
 | `additional_mounts` entries | `/workspace/extra/<name>` | Per config, allowlist-validated |
 
-\* The `groups/global/` mount is dead code as of v2.1.4: `migrateGroupsToClaudeLocal()` (`src/claude-md-compose.ts`) deletes `groups/global/` at every host startup, so the existence check in `buildMounts` never passes and `/workspace/global` never materializes. The shared base now lives in `container/CLAUDE.md`, mounted at `/app/CLAUDE.md`.
-
-Providers can contribute extra mounts and env vars (for example OpenCode's XDG directories); these are appended last. The nested read-only mounts matter: the group dir is read-write, but `container.json`, the composed `CLAUDE.md`, and the fragments are re-mounted read-only on top, so the agent can read its config and instructions but not rewrite them. `CLAUDE.local.md` stays the one writable memory file.
+Providers can contribute extra mounts and env vars (for example OpenCode's XDG directories); these are appended last. The nested read-only mounts matter: the group dir is read-write, but `container.json`, the composed `CLAUDE.md`, and the fragments are re-mounted read-only on top, so the agent can read its config and instructions but not rewrite them. The writable per-group state is `instructions.prepend.md` and the `memory/` tree.
 
 The `docker run` invocation itself: `--rm` (self-removing), a name of `nanoclaw-v2-<folder>-<timestamp>`, the install label `nanoclaw-install=<slug>`, and `TZ` as the only env var NanoClaw always sets — everything else the runner needs comes from `container.json`. Two optional resource caps ride alongside: if `CONTAINER_CPU_LIMIT` or `CONTAINER_MEMORY_LIMIT` is set, the runner adds `--cpus` / `--memory` (opt-in — unset leaves the container unbounded, today's default; see [Hardening](/operate/hardening#cap-container-resources)). The OneCLI Agent Vault then injects `HTTPS_PROXY` and certificates so the agent's API calls get credentials in transit; if the vault can't be wired, the spawn aborts rather than running credential-less. When the host user isn't uid 0 or 1000, the container runs `--user <hostUid>:<hostGid>` so mounted files keep sane ownership, with `HOME=/home/node` set alongside. The image is the group's `image_tag` if set, otherwise the base — and the image's tini entrypoint is **overridden**: the runner passes `--entrypoint bash` with `-c 'exec bun run /app/src/index.ts'`, so bash `exec`s into Bun and **Bun is PID 1** (there's no `--init` flag either).
 
