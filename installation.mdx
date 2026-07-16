@@ -5,7 +5,7 @@ icon: "download"
 keywords: ["requirements", "docker", "node", "pnpm", "bun", "wsl", "launchd", "systemd", "onecli", "nanoclaw.sh", "manual install"]
 ---
 
-{/* verified-against: nanoclaw.sh, setup.sh, setup/probe.sh, setup/auto.ts, setup/index.ts, setup/install-node.sh, setup/install-docker.sh, setup/container.ts, setup/service.ts, setup/set-env.ts, container/Dockerfile, src/container-runtime.ts, src/container-runner.ts, src/claude-md-compose.ts, src/group-init.ts, src/config.ts, src/install-slug.ts, src/session-manager.ts, src/index.ts, package.json @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: nanoclaw.sh, setup.sh, setup/probe.sh, setup/auto.ts, setup/index.ts, setup/install-node.sh, setup/install-docker.sh, setup/container.ts, setup/service.ts, setup/set-env.ts, container/Dockerfile, src/container-runtime.ts, src/container-runner.ts, src/claude-md-compose.ts, src/group-init.ts, src/config.ts, src/install-slug.ts, src/session-manager.ts, src/index.ts, package.json @ e926e30e (v2.1.53) */}
 
 This page is the depth companion to [Quick start](/quickstart): what the installer actually does, how to install by hand, how the background service works, and where everything lands on disk. If you just want a running assistant, run `bash nanoclaw.sh` and follow the wizard — quick start covers that flow end to end.
 
@@ -181,7 +181,8 @@ Everything stateful lives inside the checkout, with two exceptions: security all
     </Tree.Folder>
     <Tree.Folder name="groups" defaultOpen>
       <Tree.Folder name="main" defaultOpen>
-        <Tree.File name="CLAUDE.local.md" />
+        <Tree.File name="instructions.prepend.md" />
+        <Tree.Folder name="memory" />
         <Tree.File name="CLAUDE.md" />
         <Tree.File name="container.json" />
       </Tree.Folder>
@@ -222,7 +223,8 @@ The highlights:
 
 | Path | Purpose |
 |---|---|
-| `groups/<folder>/CLAUDE.local.md` | Per-group agent instructions — this is the file you edit. |
+| `groups/<folder>/instructions.prepend.md` | The group's standing instructions and persona — this is the file you edit. |
+| `groups/<folder>/memory/` | The agent's durable memory tree, scaffolded at boot and shared by every provider. |
 | `groups/<folder>/CLAUDE.md` | Regenerated at every container spawn from the shared base plus enabled skills. Don't edit it — your changes get overwritten. |
 | `groups/<folder>/container.json` | Per-group container overrides. |
 | `container/CLAUDE.md` | Shared base instructions for all agents, mounted read-only into every container. |

@@ -7,7 +7,7 @@ tag: "UPDATED"
 keywords: ["nanoclaw", "personal ai assistant", "self-hosted", "multi-agent", "claude", "container isolation", "channels", "skills", "v2"]
 ---
 
-{/* verified-against: src/index.ts, src/router.ts, src/channels/index.ts, src/container-runtime.ts, src/container-runner.ts, src/session-manager.ts, src/claude-md-compose.ts, src/modules/, container/agent-runner/src/providers/claude.ts, container/agent-runner/src/mcp-tools/{agents,scheduling}.ts, agents.instructions.md, .claude/skills/, .claude/skills/add-telegram/SKILL.md, repo-tokens/badge.svg, package.json @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/index.ts, src/router.ts, src/channels/index.ts, src/container-runtime.ts, src/container-runner.ts, src/session-manager.ts, src/claude-md-compose.ts, src/modules/, container/agent-runner/src/providers/claude.ts, container/agent-runner/src/mcp-tools/agents.ts, container/agent-runner/src/mcp-tools/agents.instructions.md, .claude/skills/, .claude/skills/add-telegram/SKILL.md, repo-tokens/badge.svg, package.json @ e926e30e (v2.1.53) */}
 
 NanoClaw is a personal AI assistant you run on your own machine and reach from the messaging apps you already use — Telegram, WhatsApp, Discord, Slack, or just your terminal. Text it like you'd text a coworker. Each agent works inside its own locked-down sandbox, so it does real work without touching the rest of your computer.
 
@@ -57,7 +57,7 @@ The [quickstart](/quickstart#things-to-try-first) ends with copy-paste messages 
 
 ## Under the hood, briefly
 
-One idea drives the whole system: every message — a chat, a webhook, a scheduled job, one agent delegating to another — is a row in a SQLite queue, and every reply leaves through another one. There's no separate scheduler, RPC layer, or job system to learn. Channels aren't bundled features — a skill like `/add-telegram` copies exactly the adapter you asked for into your install. And the whole codebase is ~204k tokens, small enough for a long-context coding agent to hold in context — which is also how you customize it: edit the code, not a config sprawl.
+One idea drives the whole system: every message — a chat, a webhook, a scheduled job, one agent delegating to another — is a row in a SQLite queue, and every reply leaves through another one. There's no separate scheduler, RPC layer, or job system to learn. Channels aren't bundled features — a skill like `/add-telegram` copies exactly the adapter you asked for into your install. And the whole codebase is ~226k tokens, small enough for a long-context coding agent to hold in context — which is also how you customize it: edit the code, not a config sprawl.
 
 The full picture — routing, sessions, the container lifecycle — lives in [Architecture](/concepts/architecture); the threat model in [Security](/concepts/security).
 
