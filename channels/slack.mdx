@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["slack", "bot token", "signing secret", "add-slack", "webhook", "event subscriptions", "interactivity", "mrkdwn", "chat sdk", "threads"]
 ---
 
-{/* verified-against: src/channels/slack.ts (channels branch), src/channels/chat-sdk-bridge.ts, src/webhook-server.ts, src/router.ts, setup/channels/slack.ts, setup/add-slack.sh, .claude/skills/add-slack/SKILL.md, container/skills/slack-formatting/SKILL.md @ cb6e3d1 (v2.1.23); channels @ 90dd87d */}
+{/* verified-against: src/channels/chat-sdk-bridge.ts, src/webhook-server.ts, src/router.ts, .claude/skills/add-slack/SKILL.md @ e926e30e (v2.1.53); channels branch src/channels/slack.ts, container/skills/slack-formatting/SKILL.md @ 9e14cd0c */}
 
 The Slack adapter connects NanoClaw to a Slack app you create in your workspace. It's built on the Chat SDK bridge (`@chat-adapter/slack` 4.29.0, pinned) and supports two delivery modes:
 
@@ -35,7 +35,7 @@ Slack is offered in the first-run setup wizard, or add it later by running `/add
     The wizard first asks **how Slack should deliver events** — **Socket Mode** (default; no public URL) or **Public webhook**. Then it collects the **Bot User OAuth Token** plus the mode credential: an **App-Level Token** (`xapp-…`) for Socket Mode, or the **Signing Secret** for webhook mode. All are password prompts, format-validated (`xoxb-`/`xapp-` prefixes, hex secret); the wizard then calls `auth.test` to confirm Slack accepts the token and resolve your workspace and bot identity. Existing values in `.env` are offered for reuse.
   </Step>
   <Step title="Adapter install">
-    `setup/add-slack.sh` copies the adapter from the `channels` branch, installs the pinned package, builds, writes `SLACK_BOT_TOKEN` plus either `SLACK_APP_TOKEN` (Socket Mode) or `SLACK_SIGNING_SECRET` (webhook) to `.env` (synced to `data/env/env`), and restarts the service.
+    The `/add-slack` skill copies the adapter from the `channels` branch, installs the pinned package, builds, writes `SLACK_BOT_TOKEN` plus either `SLACK_APP_TOKEN` (Socket Mode) or `SLACK_SIGNING_SECRET` (webhook) to `.env` (synced to `data/env/env`), and restarts the service.
   </Step>
   <Step title="Identify yourself">
     The wizard asks for your Slack member ID (`U…` — in Slack, click your profile picture → **Profile** → **⋮** → **Copy member ID**), then calls `conversations.open` to get a DM channel with you.

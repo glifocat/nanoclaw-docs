@@ -4,7 +4,7 @@ description: "Connect NanoClaw to iMessage via the Chat SDK adapter — local mo
 keywords: ["imessage", "add-imessage", "photon", "full disk access", "chat.db", "macos", "chat sdk", "apple messages"]
 ---
 
-{/* verified-against: src/channels/imessage.ts (channels branch), setup/channels/imessage.ts, setup/add-imessage.sh, .claude/skills/add-imessage/SKILL.md @ cb6e3d1 (v2.1.23); channels @ 90dd87d */}
+{/* verified-against: setup/channels/imessage-configure.sh, .claude/skills/add-imessage/SKILL.md @ e926e30e (v2.1.53); channels branch src/channels/imessage.ts @ 9e14cd0c */}
 
 The iMessage adapter connects NanoClaw to Apple's Messages network. It's built on the Chat SDK bridge (`chat-adapter-imessage` 0.1.1, pinned — a community adapter) and runs in one of two modes:
 
@@ -36,7 +36,7 @@ iMessage is offered in the first-run setup wizard, or add it later by running `/
     The phone number or email you iMessage from — phone in `+`E.164 format (e.g. `+14155551234`), or any email iMessage recognises. This becomes the platform ID wired to your first agent, and where the welcome message goes.
   </Step>
   <Step title="Adapter install">
-    `setup/add-imessage.sh` copies the adapter from the `channels` branch, installs the pinned package, builds, writes the mode keys to `.env` (synced to `data/env/env`), and restarts the service. Idempotent: safe to re-run.
+    The `/add-imessage` skill copies the adapter from the `channels` branch, installs the pinned package, builds, writes the mode keys to `.env` (synced to `data/env/env`), and restarts the service. Idempotent: safe to re-run.
   </Step>
   <Step title="Name the agent and get the welcome message">
     The wizard asks for your operator role and an agent name (default `Nano`), wires your handle to your first agent group, and sends a welcome iMessage.
@@ -48,7 +48,7 @@ To wire more conversations later, run `/manage-channels`. Contacts are identifie
 ## Platform notes
 
 - **Mode is resolved from `.env`** — `IMESSAGE_LOCAL` set to anything but `false` means local. Local mode additionally requires `IMESSAGE_ENABLED=true`; remote requires `IMESSAGE_SERVER_URL` (plus `IMESSAGE_API_KEY`). If the required keys for the active mode are missing, the adapter factory returns nothing and the channel silently doesn't start.
-- **Switching modes is clean** — re-running setup (or `setup/add-imessage.sh`) writes the new mode's keys and strips the opposite mode's, so stale values can't confuse the adapter.
+- **Switching modes is clean** — re-running setup (or `/add-imessage`) writes the new mode's keys and strips the opposite mode's, so stale values can't confuse the adapter.
 - **Full Disk Access binds to one specific binary** — the grant applies to the `node` file you dragged in, resolved via `which node` at setup time. If you switch Node versions (e.g. with `nvm`), the path changes and the grant no longer covers the binary NanoClaw runs under — re-grant for the new one.
 - **No threads** — the adapter sets `supportsThreads: false`; thread IDs map 1:1 to conversations. Wirings with `per-thread` session mode behave like `shared` here — see the [entity model](/concepts/entity-model).
 

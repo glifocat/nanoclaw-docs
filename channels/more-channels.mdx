@@ -4,7 +4,7 @@ description: "Catalog of the ten NanoClaw channels installed conversationally wi
 keywords: ["channels", "add-gchat", "add-github", "add-linear", "add-matrix", "add-webex", "add-wechat", "add-deltachat", "add-emacs", "add-resend", "add-whatsapp-cloud", "chat sdk", "webhook"]
 ---
 
-{/* verified-against: upstream/channels:src/channels/{whatsapp-cloud,gchat,github,linear,matrix,webex,wechat,deltachat,emacs,resend}.ts and .claude/skills/add-{whatsapp-cloud,gchat,github,linear,matrix,webex,wechat,deltachat,emacs,resend}/SKILL.md @ cb6e3d1 (v2.1.23); channels @ 90dd87d */}
+{/* verified-against: .claude/skills/add-{whatsapp-cloud,gchat,github,linear,matrix,webex,wechat,deltachat,emacs,resend}/SKILL.md, src/webhook-server.ts @ e926e30e (v2.1.53); channels branch src/channels/{whatsapp-cloud,gchat,github,linear,matrix,webex,wechat,deltachat,emacs,resend}.ts @ 9e14cd0c */}
 
 These ten channels don't have a guided flow in the first-run setup wizard. Instead, each one is installed by running its `/add-<channel>` skill in Claude Code — Claude copies the adapter in from the `channels` branch, wires it into the registry, then walks you through credentials conversationally. The install pattern (fetch branch, copy adapter, wire barrel, pin package, build, collect credentials) is the same for every channel — see [Channels overview](/channels/overview) for the full model.
 
@@ -93,7 +93,7 @@ Personal WeChat via Tencent's official iLink Bot API — first-party, free, and 
 
 ## WhatsApp Cloud API
 
-WhatsApp through Meta's official Business Cloud API — the hosted alternative to the [native Baileys adapter](/channels/whatsapp). No linked device or QR pairing; instead you register a Meta business app and point its webhook at NanoClaw.
+WhatsApp through Meta's official Business Cloud API — the hosted alternative to the [native Baileys adapter](/channels/whatsapp). No linked device or QR pairing; instead you register a Meta business app and point its webhook at NanoClaw. The adapter registers as its own channel instance (`whatsapp-cloud`), so it can be installed alongside the native adapter without the two colliding.
 
 - **Transport:** Chat SDK bridge; webhook at `/webhook/whatsapp`, subscribed to the `messages` field
 - **Credentials:** `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`

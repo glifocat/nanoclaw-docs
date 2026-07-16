@@ -4,7 +4,7 @@ description: "Connect NanoClaw to Signal via a native signal-cli adapter — QR-
 keywords: ["signal", "signal-cli", "add-signal", "linked devices", "qr code", "json-rpc", "daemon", "secondary device"]
 ---
 
-{/* verified-against: src/channels/signal.ts (channels branch), setup/channels/signal.ts, setup/add-signal.sh, setup/install-signal-cli.sh, setup/signal-auth.ts, .claude/skills/add-signal/SKILL.md @ cb6e3d1 (v2.1.23); channels @ 90dd87d */}
+{/* verified-against: setup/install-signal-cli.sh, setup/signal-auth.ts, .claude/skills/add-signal/SKILL.md @ e926e30e (v2.1.53); channels branch src/channels/signal.ts @ 9e14cd0c */}
 
 The Signal adapter is **native** — no Chat SDK bridge, only Node.js builtins. Signal has no bot API, so NanoClaw talks to [signal-cli](https://github.com/AsamK/signal-cli), which it spawns as a local daemon and drives over a newline-delimited **JSON-RPC TCP socket** (`127.0.0.1:7583` by default). Setup links NanoClaw to your existing Signal account as a **secondary device** — no new phone number needed; your assistant sends and receives as the number on your phone. All connections are outbound, so no public URL, webhook, or open port; works behind NAT and on a laptop.
 
@@ -18,14 +18,14 @@ If you'd rather give NanoClaw its own dedicated number (a SIM or VoIP number it 
 
 ## Install
 
-Signal is offered in the first-run setup wizard, or add it later by running `/add-signal` in Claude Code. The wizard flow:
+Signal is offered in the first-run setup wizard, or add it later by running `/add-signal` in Claude Code. Both paths run the same `/add-signal` skill:
 
 <Steps>
   <Step title="signal-cli check">
     The wizard probes for `signal-cli` on PATH (or `SIGNAL_CLI_PATH`) and auto-installs it if missing — about 30 seconds, one-time only.
   </Step>
   <Step title="Adapter install">
-    `setup/add-signal.sh` copies the adapter from the `channels` branch, installs `qrcode` (only used to render the linking QR — the adapter itself has no npm dependencies), and builds. Idempotent: safe to re-run without re-linking.
+    The `/add-signal` skill copies the adapter from the `channels` branch, registers it in the channel barrel, installs `qrcode` (only used to render the linking QR — the adapter itself has no npm dependencies), and builds. Idempotent: safe to re-run without re-linking.
   </Step>
   <Step title="Scan the QR code">
     The wizard runs `signal-cli link` and renders the linking URL as a terminal QR. On your phone: **Signal → Settings → Linked Devices → Link New Device**, then scan. The link times out after 3 minutes — re-run setup for a fresh code. If an account is already linked, this step is skipped and the existing account reused.
@@ -49,6 +49,7 @@ To wire group chats or more DMs later, run `/manage-channels`. DMs are identifie
 - **Formatting** — Markdown in replies (`**bold**`, `*italic*`, `~~strike~~`, `` `code` ``, `||spoiler||`) is converted to Signal's native offset-based text styles, nesting included. If the daemon rejects the styles, the adapter retries with the raw markup. Long replies are chunked at 4,000 characters, splitting at line breaks where possible.
 - **Attachments** — inbound images are passed to the agent as file paths it can read (`[Image: <path>]` lines plus a structured attachments array). Outbound files from the agent are delivered via signal-cli, with caption text sent first. Voice notes get transcribed if `WHISPER_BIN` (local whisper.cpp, needs ffmpeg) or `OPENAI_API_KEY` is set; otherwise the agent sees a `[Voice Message]` placeholder.
 - **Replies and mentions** — quoted replies pass the quoted text and sender to the agent as context. Inbound @mentions are resolved from Signal's placeholder protocol to display names, so the agent sees `@Alice` instead of a raw UUID.
+- **Group engagement** — group wirings default to mention engagement: the agent responds only when the linked account is @-tagged in the group. DMs always count as addressed to the agent. Override per wiring with a different [engage mode](/reference/ncl-cli#wirings).
 - **Typing indicator** — shown while the agent works, in DMs only (Signal has no group typing).
 - **Groups** — modern Signal groups (GroupV2) are detected by their group ID; group messages route to a `group:<groupId>` chat, separate from each member's DM.
 - **No auto-reconnect** — if the daemon drops the TCP connection, the adapter marks itself disconnected and logs a warning rather than retrying. Restart the service to re-establish.

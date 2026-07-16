@@ -4,7 +4,7 @@ description: "Connect NanoClaw to a Discord bot via the Chat SDK adapter — Dev
 keywords: ["discord", "bot token", "add-discord", "gateway", "message content intent", "chat sdk", "threads", "developer portal"]
 ---
 
-{/* verified-against: src/channels/discord.ts (channels branch), src/channels/chat-sdk-bridge.ts, setup/channels/discord.ts, .claude/skills/add-discord/SKILL.md @ cb6e3d1 (v2.1.23); channels @ 90dd87d */}
+{/* verified-against: src/channels/chat-sdk-bridge.ts, src/router.ts, src/channels/channel-defaults.ts, setup/channels/run-channel-skill.ts, .claude/skills/add-discord/SKILL.md @ e926e30e (v2.1.53); channels branch src/channels/discord.ts @ 9e14cd0c */}
 
 The Discord adapter connects NanoClaw to a bot you create in the Discord Developer Portal. It's built on the Chat SDK bridge (`@chat-adapter/discord` 4.29.0, pinned — the `/add-discord` skill may pin a slightly newer adapter version) and connects over Discord's **Gateway** — a WebSocket NanoClaw opens outbound, with events forwarded to a local loopback server. No public URL, webhook, or open port needed; works behind NAT and on a laptop.
 
@@ -19,23 +19,20 @@ The bot works in server text channels, threads, and DMs.
 
 ## Install
 
-Discord is offered in the first-run setup wizard, or add it later by running `/add-discord` in Claude Code. The wizard flow:
+Discord is offered in the first-run setup wizard, or add it later by running `/add-discord` in Claude Code. Both paths run the same `/add-discord` skill:
 
 <Steps>
   <Step title="Create the bot (if you don't have one)">
     The wizard opens the Developer Portal: click **New Application**, then in the **Bot** tab click **Reset Token**, copy the token, and enable **Message Content Intent**.
   </Step>
   <Step title="Paste the token">
-    The wizard format-validates it, calls `/users/@me` to confirm Discord accepts it and resolve the bot's username, then calls `/oauth2/applications/@me` to derive the application ID and public key. If a `DISCORD_BOT_TOKEN` already exists in `.env`, it offers to reuse it.
-  </Step>
-  <Step title="Confirm your identity">
-    The wizard reads the app owner from the API and asks "Is @you your Discord account?". If the app is team-owned (or you decline), it falls back to a manual user-ID prompt with Developer Mode instructions.
+    The wizard format-validates it, calls `/users/@me` to confirm Discord accepts it and resolve the bot's username, then calls `/oauth2/applications/@me` to derive the application ID, the public key, and your Discord identity (the app owner). If a `DISCORD_BOT_TOKEN` already exists in `.env`, it offers to reuse it.
   </Step>
   <Step title="Invite the bot to a server">
     The bot can't DM you until you share a server. The wizard generates and opens the OAuth invite URL (scope `bot`, permissions `100416`: Send Messages, Read Message History, Add Reactions, Attach Files) — pick any server, a personal one is fine.
   </Step>
   <Step title="Adapter install">
-    `setup/add-discord.sh` copies the adapter from the `channels` branch, installs the pinned package, builds, writes `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID`, and `DISCORD_PUBLIC_KEY` to `.env` (synced to `data/env/env`), and restarts the service.
+    The skill copies `src/channels/discord.ts` from the `channels` branch, registers it in the channel barrel, installs the pinned `@chat-adapter/discord` package, builds and tests, writes `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID`, and `DISCORD_PUBLIC_KEY` to `.env` (synced to `data/env/env`), and restarts the service.
   </Step>
   <Step title="Name the agent and get the welcome DM">
     The wizard opens a DM channel with you via the API, asks for your operator role and an agent name (default `Nano`), wires the DM to your first agent group, and sends a welcome message.
@@ -47,11 +44,11 @@ To wire server channels or more DMs later, run `/manage-channels`. Server channe
 ## Platform notes
 
 - **Gateway connection with backoff** — the bridge starts a Gateway listener in 24-hour cycles and forwards raw events (including button clicks) to a local HTTP server bound to `127.0.0.1`. If the listener dies, it reconnects with exponential backoff (1s doubling per consecutive failure, capped at 1 hour); a run lasting over 5 minutes counts as healthy and resets the counter. The cap exists because an unrecoverable failure like a bad token would otherwise restart ~10×/sec and get the IP blocked by Discord's Cloudflare layer.
-- **Threads** — the adapter sets `supportsThreads: true`, and on server channels the router gives every thread its own agent session automatically: even wirings set to `shared` behave as `per-thread` here. Only `agent-shared` (one session across all of an agent's messaging groups) overrides this. In DMs the forcing doesn't apply: `shared` wirings get a single session regardless of sub-threads, while an explicit `per-thread` wiring is honored — see the [entity model](/concepts/entity-model).
+- **Threads** — the adapter supports threads and declares `threads: true` as the channel default for server channels, so the router gives every thread its own agent session automatically: even wirings set to `shared` behave as `per-thread` here. Only `agent-shared` (one session across all of an agent's messaging groups) overrides this, and setting the wiring's [`--threads false`](/reference/ncl-cli#wirings) collapses the channel back to one session across threads. DMs declare `threads: false`: sub-threads collapse into the single DM session — even for `per-thread` wirings — unless the wiring sets `--threads true`. See the [entity model](/concepts/entity-model).
 - **Mentions and engagement** — @mentioning the bot in an unwired channel is platform-confirmed and reaches the router as a mention; in mention-sticky wirings the bot then sticks to that thread (plain mention wirings respond per mention without subscribing). DMs are always treated as addressed to the bot.
-- **Replies and attachments** — replying to a message passes the quoted text and sender (display name or username) to the agent as context. Attachments are downloaded and passed to the agent as data, not just described.
+- **Replies, forwards, and attachments** — replying to a message passes the quoted text and sender (display name or username) to the agent as context. Forwarded messages are unwrapped: Discord ships their content in a snapshot rather than the message body, and the adapter restores the text (tagged `[Forwarded message]`) so the agent sees it. Attachments are downloaded and passed to the agent as data, not just described.
 - **Interactive questions** — when an agent asks a multiple-choice question, it renders as an embed with buttons; your click arrives via the Gateway and the card updates in place to show the selection.
-- **2,000-character limit** — Discord caps messages at 2,000 characters. The current adapter doesn't enable the bridge's automatic chunking, so longer replies can be truncated by the platform.
+- **2,000-character limit** — Discord caps messages at 2,000 characters. The adapter sets the bridge's `maxTextLength` to 2,000, so longer agent replies are split into multiple messages instead of failing.
 - **Typing indicator** — the bot shows a typing indicator while the agent works.
 
 ## Troubleshooting

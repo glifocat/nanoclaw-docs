@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["whatsapp", "baileys", "qr code", "pairing code", "add-whatsapp", "ASSISTANT_HAS_OWN_NUMBER", "linked devices"]
 ---
 
-{/* verified-against: src/channels/whatsapp.ts (channels branch), setup/channels/whatsapp.ts, .claude/skills/add-whatsapp/SKILL.md @ cb6e3d1 (v2.1.23); channels @ 90dd87d */}
+{/* verified-against: .claude/skills/add-whatsapp/SKILL.md, setup/channels/run-channel-skill.ts @ e926e30e (v2.1.53); channels branch src/channels/whatsapp.ts @ 9e14cd0c */}
 
 The WhatsApp adapter connects NanoClaw to a personal WhatsApp account as a linked device — no Meta business account, no API key. It's a native adapter built directly on `@whiskeysockets/baileys` 7.0.0-rc.9 (pinned; the WhatsApp Web protocol), not the Chat SDK bridge. For Meta's official Cloud API instead, use `/add-whatsapp-cloud` — see the [channels overview](/channels/overview).
 
@@ -25,17 +25,17 @@ You can run it in two modes:
 WhatsApp is offered in the first-run setup wizard, or add it later by running `/add-whatsapp` in Claude Code. Both flows do the same thing:
 
 <Steps>
+  <Step title="Choose your mode">
+    The skill starts with a number safety check: will the agent live on your personal number (shared mode — messages land in your "You" self-chat) or on a separate SIM it owns (dedicated mode)? Dedicated mode writes `ASSISTANT_HAS_OWN_NUMBER=true` to `.env` (and `data/env/env` for containers).
+  </Step>
+  <Step title="Adapter install">
+    The skill copies `src/channels/whatsapp.ts` and the `whatsapp-formatting` container skill from the `channels` branch, wires the adapter into the channel barrel, and installs the pinned Baileys, `qrcode`, and `pino` packages.
+  </Step>
   <Step title="Pick an auth method">
     QR code (scan with your phone's camera) or pairing code (enter an 8-character code on your phone — no camera needed). The pairing-code flow asks for your phone number first.
   </Step>
-  <Step title="Adapter install">
-    The skill copies `src/channels/whatsapp.ts` from the `channels` branch, wires it into the channel barrel, and installs the pinned Baileys, `qrcode`, and `pino` packages.
-  </Step>
   <Step title="Link your phone">
     A QR code renders (terminal, or a local browser page via the skill) and rotates every ~60 seconds until scanned. Pairing codes also expire in ~60 seconds — enter them immediately under **Linked Devices → Link a Device → Link with phone number instead**. Credentials land in `store/auth/`, and the wizard restarts the service so the adapter picks them up.
-  </Step>
-  <Step title="Choose your mode">
-    The wizard asks which number you'll chat from. Same number as the one you linked = shared mode, and messages land in your "You" self-chat. A different number = dedicated mode — the wizard writes `ASSISTANT_HAS_OWN_NUMBER=true` to `.env` (and `data/env/env` for containers).
   </Step>
   <Step title="Name the agent and get the welcome DM">
     The wizard asks for an agent name (default `Nano`), wires your DM to the first agent group, and sends a welcome message.
@@ -50,7 +50,7 @@ To wire more chats or groups later, run `/manage-channels`.
 - **Activation** — the adapter only starts when `store/auth/creds.json` exists, `WHATSAPP_PHONE_NUMBER` is set (pairing-code mode), or `WHATSAPP_ENABLED=true` (QR mode). Otherwise it's skipped at startup.
 - **Reconnection** — on disconnect the adapter reconnects immediately (with one retry after 5s if that attempt throws) unless it was logged out. Messages sent while disconnected are queued in memory and flushed when the connection reopens.
 - **No threads** — the adapter sets `supportsThreads: false`; every inbound message has a null thread ID. Wirings with `per-thread` session mode behave like `shared` here — see the [entity model](/concepts/entity-model).
-- **DMs vs groups** — DMs always count as addressed to the agent. In groups (`…@g.us` JIDs) the agent is by default only triggered by an explicit @-mention of the bot's number, which the adapter also normalizes to `@<agent name>` for trigger matching. Group names sync from WhatsApp every 24 hours.
+- **DMs vs groups** — DMs always count as addressed to the agent, in both modes. Group behavior (`…@g.us` JIDs) depends on the mode. **Shared number**: an @-tag of the number addresses you, the human — it never engages the agent; instead the agent triggers when its name appears as a whole word in the message, and unknown senders fall under the `strict` policy so strangers DMing you never spawn agent state. **Dedicated number**: groups engage on an explicit @-mention of the bot's number, and unknown senders get the `request_approval` policy. Group names sync from WhatsApp every 24 hours.
 - **Media** — inbound images, video, audio, and documents are downloaded to `data/attachments/` and passed to the agent (unsafe attacker-controlled filenames are replaced). If the direct download fails — typically an expired media URL around a reconnect — the adapter asks WhatsApp to re-upload the media and retries; if it still can't be fetched, the message reaches the agent with a visible `[<type> could not be downloaded]` note instead of silently dropping the attachment. Outbound files are sent as native WhatsApp media by extension, with the reply text as the first file's caption.
 - **Formatting** — the agent's markdown is converted to WhatsApp formatting (`**bold**` → `*bold*`, headings → bold, links → `text (url)`); code blocks pass through untouched. `@<phone>` in replies becomes a real tappable mention.
 - **Interactive questions** — `ask_user_question` renders as text with slash-command answers (`/approve`, `/reject`); the adapter matches your reply to the pending question. Editing and deleting sent messages isn't supported (linked-device limitation).
