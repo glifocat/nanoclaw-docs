@@ -4,7 +4,7 @@ description: "Configure a NanoClaw install — environment variables in .env and
 keywords: ["configuration", "environment variables", ".env", "container config", "ASSISTANT_NAME", "LOG_LEVEL", "container_configs"]
 ---
 
-{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/providers/claude.ts, src/container-config.ts, src/db/container-configs.ts, setup/set-env.ts, setup/service.ts @ 08a1ac9 (v2.1.38) */}
+{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/providers/claude.ts, src/container-config.ts, src/db/container-configs.ts, setup/set-env.ts, setup/service.ts @ e926e30e (v2.1.53) */}
 
 NanoClaw has two configuration layers:
 
@@ -24,6 +24,7 @@ Variables come from two sources, and the distinction matters:
 |---|---|---|
 | `ASSISTANT_NAME` | `Andy` | The assistant's name. Also sets the default trigger, `@<name>`. |
 | `ASSISTANT_HAS_OWN_NUMBER` | `false` | Set `true` when the assistant runs on its own WhatsApp number instead of yours. |
+| `DEFAULT_AGENT_PROVIDER` | `claude` | Provider stamped on **new** agent groups at creation. Existing groups are never touched, and the per-group `provider` config still wins. |
 | `ONECLI_URL` | — | URL of the OneCLI Agent Vault. |
 | `ONECLI_API_KEY` | — | API key for the vault. See [Credentials](/operate/credentials). |
 | `TZ` | system timezone, else `UTC` | IANA timezone for scheduled tasks and message timestamps. Invalid values are skipped, not errored. |
@@ -74,7 +75,7 @@ Fields per group:
 
 | Field | What it controls |
 |---|---|
-| `provider` | Which agent CLI runs in the container (e.g. Claude Code, OpenCode). |
+| `provider` | Which agent CLI runs in the container (e.g. Claude Code, OpenCode). New groups start with the `DEFAULT_AGENT_PROVIDER` value. |
 | `model`, `effort` | Model and reasoning effort passed to the provider. |
 | `assistant_name` | Per-group assistant name override. |
 | `max_messages_per_prompt` | Per-group override of the install-wide batching limit. |
