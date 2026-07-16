@@ -86,7 +86,7 @@ The poll loop (`poll-loop.ts`) drives everything:
 - The provider's session ID (continuation) is persisted to `outbound.db` so the next container resumes the conversation, and a `PreCompact` hook injects instructions that preserve routing context through context compaction.
 - On every provider event the runner touches `/workspace/.heartbeat` — the host's only liveness signal.
 
-The agent itself talks to NanoClaw through a built-in MCP server (`send_message`, `schedule_task`, `ask_user_question`, and friends — see [MCP tools](/reference/mcp-tools)). The provider behind `provider.query()` is pluggable: Claude Code is the default, and others self-register the same way channels do (see [Providers](/extend/providers)).
+The agent itself talks to NanoClaw through a built-in MCP server (`send_message`, `ask_user_question`, `create_agent`, and friends — see [MCP tools](/reference/mcp-tools); scheduling is not an MCP tool anymore, it moved to the `ncl tasks` CLI). The provider behind `provider.query()` is pluggable: Claude Code is the default, and others self-register the same way channels do (see [Providers](/extend/providers)).
 
 ## Composed at spawn
 
