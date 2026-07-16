@@ -46,7 +46,7 @@ The site was fully rewritten for v2 (PRs #296–#303) and fully re-verified to `
 - **Runtime:** Docker only. Host runs Node + pnpm; the agent-runner inside the container runs Bun.
 - **Entity model:** `agent_groups` ↔ `messaging_groups` connected via wirings. `engage_mode`: `pattern` | `mention` | `mention-sticky`. `session_mode`: `shared` | `per-thread` | `agent-shared` (the router forces per-thread on thread-capable group chats). Central DB is `data/v2.db`; each session gets an inbound/outbound SQLite pair — that pair IS the host↔container IPC.
 - **Credentials:** OneCLI Agent Vault invariant — containers never hold raw API keys (stub key + in-flight injection). Docs prose says "Agent Vault"; code snippets must match source (which says "gateway"). `/use-native-credential-proxy` is the opt-in alternative.
-- **Per-group customization:** `CLAUDE.local.md` is the editable per-group file. `groups/<folder>/CLAUDE.md` is composed at every spawn — never teach users to edit it.
+- **Per-group customization:** the editable per-group surfaces are `instructions.prepend.md` (standing instructions/persona) and the `memory/` tree (durable facts, scaffolded at boot, shared by every provider). `CLAUDE.local.md` is retired — it survives only as a migration staging file. `groups/<folder>/CLAUDE.md` is composed at every spawn — never teach users to edit it.
 
 ## Drift Detection
 

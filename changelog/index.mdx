@@ -5,6 +5,68 @@ icon: "tag"
 rss: true
 ---
 
+<Update label="v2.1.53" description="2026-07-13" tags={["Feature", "Skill"]}>
+  - **Setup wizard channel installs are SKILL.md-driven** — the bespoke per-channel setup modules (`setup/channels/<channel>.ts`) are deleted; `/setup` now drives the same `/add-<channel>` skills you run by hand, through a thin generic driver (render + ask + run, no phasing). The skills carry the whole flow in `nc:` directive fences: operator-facing prompts (`nc:operator`), command output captured into variables (`nc:run` capture), `when:` guards for either/or paths, precondition gates (`effect:check`), and a human barrier for manual UI steps. A lone `?` at any prompt hands off to Claude for help (#2958, #2972)
+  - **Host-only mount verbs** — `ncl groups config add-mount` / `remove-mount` edit a group's additional mounts from the host socket; never runnable from inside a container. The gmail/gcal/rtk tool skills now use them instead of raw SQL (#3035)
+  - Troubleshooting sections added to all 11 credentialed channel skills, and per-skill raw logs from every setup command (#2958)
+</Update>
+
+<Update label="v2.1.52" description="2026-07-13" tags={["Fix"]}>
+  - Warn when a real directory entry blocks a shared skill symlink instead of silently skipping it (#3002)
+</Update>
+
+<Update label="v2.1.51" description="2026-07-13" tags={["Fix"]}>
+  - Outbound messages whose channel adapter is missing route into the retry path instead of being dropped (#2996)
+</Update>
+
+<Update label="v2.1.50" description="2026-07-13" tags={["Fix"]}>
+  - The agent runner logs when an errored batch is acked as completed, so silent failures leave a trace (#2966)
+</Update>
+
+<Update label="v2.1.49" description="2026-07-13" tags={["Feature"]}>
+  - **One-door task delivery** — `send_message` is the only path out of a task session. A scheduled task's final text no longer implicitly routes anywhere; the agent explicitly sends what should reach a chat, and everything else stays in the task log (#2988)
+</Update>
+
+<Update label="v2.1.48" description="2026-07-13" tags={["Feature"]}>
+  - Lean harness defaults for new agent groups — freshly created groups start with a smaller default toolset (#3031)
+</Update>
+
+<Update label="v2.1.47" description="2026-07-13" tags={["Fix"]}>
+  - WhatsApp setup warns before configuring shared mode (the assistant on your own number), and the warning title renders cleanly (#3021)
+</Update>
+
+<Update label="v2.1.46" description="2026-07-10" tags={["Fix"]}>
+  - Channel-defaults review fixes, and the WhatsApp service restarts after mode/name env writes so changes take effect (#3010)
+</Update>
+
+<Update label="v2.1.45" description="2026-07-10" tags={["Maintenance"]}>
+  - **`slack-formatting` and `whatsapp-formatting` moved to the `channels` branch** — trunk `container/skills/` drops from 8 to 6 skills; installs that wire Slack or WhatsApp get the formatting skill through the channel install instead (#3009)
+</Update>
+
+<Update label="v2.1.44" description="2026-07-10" tags={["Fix"]}>
+  - All timestamps stored as ISO and displayed in local time (#3003, #3006)
+</Update>
+
+<Update label="v2.1.43" description="2026-07-10" tags={["Fix"]}>
+  - Task rows stamped with ISO timestamps (#3005)
+</Update>
+
+<Update label="v2.1.42" description="2026-07-10" tags={["Fix"]}>
+  - `ncl wirings create` live-refreshes destinations, provisions companion rows (as does `ncl groups create`), and wraps INSERT + postCreate in one transaction (#2416)
+</Update>
+
+<Update label="v2.1.41" description="2026-07-09" tags={["Feature"]}>
+  - **`ncl tasks` control plane** — scheduled tasks move from the agent's MCP tools to a full CLI resource: create, list, get, run, update, pause, resume, cancel, delete. Each task series runs in an isolated per-task session the host garbage-collects when the series is spent, with an optional pre-wake bash script gate. **Breaking:** the six scheduling MCP tools (`schedule_task` and friends) are no longer exposed to agents (#2981, #2978)
+</Update>
+
+<Update label="v2.1.40" description="2026-07-08" tags={["Feature"]}>
+  - `ncl` CLI: verb-level args with per-verb deep help (`ncl <resource> help <verb>`), and a server-rendered human output format (#2980)
+</Update>
+
+<Update label="v2.1.39" description="2026-07-07" tags={["Fix"]}>
+  - The agent runner matches `rate_limit_event` as a top-level SDK message type (#2965)
+</Update>
+
 <Update label="v2.1.38" description="2026-07-04" tags={["Fix"]}>
   - **Agent images build asynchronously** — `buildAgentGroupImage` swaps its blocking `execSync docker build` for an awaited promisified `exec`, so the single-threaded host stays responsive during the up-to-15-minute rebuild a package-install approval or `ncl groups restart --rebuild` can trigger. Timeout, buffered stdio, and non-zero-exit propagation are preserved (#2931)
 </Update>
