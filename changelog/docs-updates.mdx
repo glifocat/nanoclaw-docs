@@ -5,6 +5,17 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="v2.1.53 full drift sweep" description="2026-07-16" tags={["Updated", "Fixed"]}>
+  Brought the whole site current with `nanocoai/nanoclaw@e926e30e` (v2.1.53) — a ~15-release, ~230-commit delta since the v2.1.38 sweep. Every anchored page was re-verified claim-by-claim against source; 43 pages changed across eight PRs (#346–#354). The big upstream themes and what they touched:
+
+  - **The memory rework** — `CLAUDE.local.md` is retired. Per-group memory is now the `memory/` tree (scaffolded at boot, shared by every provider, carried across provider switches) plus `instructions.prepend.md` for standing instructions; `usesMemoryScaffold` is gone from the provider interface. Rewritten across `concepts/*`, `guides/*`, `extend/providers`, `extend/self-modification`, `installation`, and `migrate-from-v1` (which now documents the staged-`CLAUDE.local.md` → `/migrate-memory` flow)
+  - **Scheduled tasks moved to `ncl tasks`** — the six scheduling MCP tools are gone; `guides/scheduled-tasks` got a ground-up rewrite, `reference/mcp-tools` lost its Scheduling section, and `reference/ncl-cli` + `operate/ncl-cli` gained the `tasks` resource (including this sweep's correction: all task verbs are `open`, not approval-gated)
+  - **SKILL.md-driven setup** — the wizard now dispatches `/add-<channel>` skills; install prose corrected on the channels pages, `extend/overview`, and `extend/writing-skills` (which was still quoting a pre-flight block deleted in the `nc:` directive-fence rewrite)
+  - **Per-wiring `threads` axis** (migration 019) on `concepts/entity-model`, `reference/db-schema`, the ncl pages, and `channels/discord`
+  - Token badge ~204k → **~226k** (now frozen — `update-tokens.yml` was deleted); container skills 8 → 6; `DEFAULT_AGENT_PROVIDER`; structured approval cards; host-only `add-mount`/`remove-mount`
+  - Method note: every area's pre-verified "no content change, bump only" verdicts were re-checked adversarially before shipping — that re-check found real drift in all four areas it flagged, so it's now a standing step of the sweep process
+</Update>
+
 <Update label="Providers-branch sweep + v2.1.4 stamp cleanup" description="2026-07-07" tags={["Updated", "Fixed"]}>
   Follow-up sweep after the v2.1.38 pass. Trunk moved only three commits since `08a1ac9` (all in-repo docs — no source changes), and the `channels` branch is unchanged at `90dd87d`, so the site's claims against trunk and channels still hold. The `providers` registry branch did move (`c570766` → `d2dd91b`, codex payload), and two leftover `v2.1.4` stamps from the original reference pages were cleared:
 
