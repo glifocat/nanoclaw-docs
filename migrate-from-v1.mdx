@@ -5,7 +5,7 @@ icon: "route"
 keywords: ["migration", "v1", "v2", "upgrade", "OpenClaw", "migrate-v2.sh", "migrate-from-v1", "migrate-from-openclaw", "handoff"]
 ---
 
-{/* verified-against: migrate-v2.sh, migrate-v2-reset.sh, setup/migrate-v2/*.ts, .claude/skills/migrate-from-v1/SKILL.md, .claude/skills/migrate-from-openclaw/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: migrate-v2.sh, migrate-v2-reset.sh, setup/migrate-v2/*.ts, .claude/skills/migrate-from-v1/SKILL.md, .claude/skills/migrate-from-openclaw/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md, .claude/skills/migrate-memory/SKILL.md @ e926e30e (v2.1.53) */}
 
 NanoClaw v2 is a ground-up rewrite — you don't upgrade in place, you migrate into a fresh v2 checkout. There are two supported paths:
 
@@ -26,7 +26,7 @@ The migration never modifies your v1 install. It reads from it (the v1 checkout 
 |---|---|
 | `.env` keys | Merged into v2's `.env`. Existing v2 keys are never overwritten. |
 | Registered groups | Seeded into the central database (`data/v2.db`) as agent groups, messaging groups, and the wiring between them. |
-| Group folders | Copied into `groups/`. Each v1 `CLAUDE.md` becomes `CLAUDE.local.md` — v2 composes `CLAUDE.md` at container spawn, so your customizations move to the local file. v1 `container_config` becomes `container.json` (or a `.v1-container-config.json` sidecar if it can't be parsed). |
+| Group folders | Copied into `groups/`. Each v1 `CLAUDE.md` is staged as `CLAUDE.local.md` — a temporary legacy file the post-migration skill later distills into v2's real surfaces (`instructions.prepend.md` for standing instructions, the `memory/` tree for durable facts); v2 composes `CLAUDE.md` fresh at container spawn. v1 `container_config` becomes `container.json` (or a `.v1-container-config.json` sidecar if it can't be parsed). |
 | Conversations | Session state and Claude Code transcripts are copied, and the v1 session ID is written as the continuation — your agent resumes the exact same conversation in v2. |
 | Scheduled tasks | Active tasks are ported into v2's task model (task rows in each session's inbound database). |
 | Channel auth | Credentials for the channels you select — both env keys and on-disk auth state like the WhatsApp keystore — are copied, and the channel code is installed. |
@@ -111,7 +111,7 @@ The script is idempotent — re-running it skips what's already done, so a faile
 
 1. **Get v2 routing real messages.** Fixes any failed steps that block message routing, then has you send a test message before going deeper. v1 stays paused, not modified.
 2. **Owner and access.** v2 auto-creates a `users` row for every sender it sees; the skill confirms which one is you and grants the `owner` role. Then it asks how open the bot should be — the script left every group on `public` so the switchover test would work, and the skill offers to tighten it to `strict` (known users only) or `request_approval`, seeding known senders from your v1 message history if you want.
-3. **Clean up `CLAUDE.local.md`.** The migration copied your entire v1 `CLAUDE.md` per group, including v1 boilerplate that v2 now provides through composed fragments. The skill diffs each file against the v1 template, strips the stock sections, keeps your customizations and agent identity, and shows you the result before writing.
+3. **Migrate legacy memory.** The migration staged your entire v1 `CLAUDE.md` per group as `CLAUDE.local.md`. The skill runs `/migrate-memory` for each imported group: it quiesces the group, moves the staged file into the shared `memory/` tree, then distills standing identity into `instructions.prepend.md` and durable facts into memory files before the group runs again.
 4. **Container config.** Verifies that `container.json` mount paths still exist on this machine, and resolves any `.v1-container-config.json` sidecars left by unparseable v1 configs.
 5. **Fork customizations.** If your v1 was a customized fork, the skill walks the commits with you — portable items (container skills, Claude skills, docs) get copied; v1 source changes get stashed to `docs/v1-fork-reference/` since they don't translate.
 
@@ -143,12 +143,12 @@ What maps where:
 |---|---|
 | An agent | An agent group (its own container, workspace, and memory) |
 | A chat or group | A messaging group, wired to an agent group |
-| `IDENTITY.md` / `SOUL.md` | `container/CLAUDE.md` (shared across agents) or a group's `CLAUDE.local.md`, your choice |
-| `USER.md`, `MEMORY.md`, daily memory files | `user-context.md`, `memories.md`, and `daily-memories/` in the group folder |
+| `IDENTITY.md` / `SOUL.md` | Standing behavior woven into the group's `instructions.prepend.md`; backstory and reference material become linked concepts under `memory/` |
+| `USER.md`, `MEMORY.md`, daily memory files | Focused concepts in the group's `memory/` tree (always-relevant facts go to Core Memory); daily files are copied into a memory folder or consolidated, your choice |
 | Skills | Copied into `container/skills/` — the SKILL.md format is shared, so they're portable |
 | Channel tokens (Telegram, Discord, Slack) | `.env` — the host process reads them |
 | Anthropic and other API keys | The OneCLI vault — injected per request, never in container env |
-| Cron jobs | v2 scheduled tasks, created through the agent's `schedule_task` tool |
+| Cron jobs | v2 scheduled tasks, created with the [`ncl tasks` CLI](/reference/ncl-cli#tasks) and run in isolated per-task sessions |
 | MCP servers | Per-agent-group container config |
 | `allowFrom` / `dmPolicy` allowlists | `unknown_sender_policy` per messaging group, plus user roles and group members |
 
