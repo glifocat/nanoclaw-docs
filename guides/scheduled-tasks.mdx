@@ -1,12 +1,12 @@
 ---
 title: "Schedule recurring work"
-description: "Hands-on tutorial: have your agent schedule a recurring task in chat, understand what fires it, manage the series, gate frequent runs with a script, and inspect it all from the host."
-keywords: ["scheduled tasks", "schedule_task", "cron", "recurrence", "process_after", "series_id", "host sweep", "wakeAgent", "task script", "timezone"]
+description: "Hands-on tutorial: have your agent schedule a recurring task in chat, understand what fires it, manage the series with ncl tasks, gate frequent runs with a script, and inspect it all from the host."
+keywords: ["scheduled tasks", "ncl tasks", "cron", "recurrence", "process_after", "series_id", "host sweep", "wakeAgent", "task script", "timezone"]
 ---
 
-{/* verified-against: container/agent-runner/src/mcp-tools/scheduling.ts, container/agent-runner/src/mcp-tools/scheduling.instructions.md, container/agent-runner/src/scheduling/task-script.ts, container/agent-runner/src/poll-loop.ts, container/agent-runner/src/timezone.ts, src/host-sweep.ts, src/modules/scheduling/{actions,db,recurrence}.ts, src/config.ts, src/container-runner.ts, src/cli/resources/ @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/cli/resources/tasks.ts, container/agent-runner/src/mcp-tools/scheduling.instructions.md, src/modules/scheduling/{create,db,recurrence,run-log}.ts, container/agent-runner/src/scheduling/task-script.ts, container/agent-runner/src/poll-loop.ts, container/agent-runner/src/timezone.ts, src/host-sweep.ts, src/session-manager.ts, src/config.ts, src/container-runner.ts @ e926e30e (v2.1.53) */}
 
-v2 has no scheduler service. A scheduled task is a row in the session's `messages_in` table with `kind='task'` and a `process_after` timestamp — same inbox, same flow as any chat message. The agent is the entire scheduling interface: you create, change, and cancel tasks by asking it in chat. This tutorial assumes a working install with a wired agent (see [your first agent](/guides/first-agent)).
+v2 has no scheduler service. A scheduled task is a row in an isolated per-task session's `messages_in` table with `kind='task'` and a `process_after` timestamp — the same inbox machinery, swept by the same host sweep, as any chat message. You drive it through the `ncl tasks` CLI: ask the agent in chat and it runs `ncl tasks` on your behalf, or run the commands yourself from the host. This tutorial assumes a working install with a wired agent (see [your first agent](/guides/first-agent)).
 
 <Steps>
 <Step title="Schedule a task in chat">
@@ -17,24 +17,24 @@ Ask your agent, in whatever chat it's wired to:
 Scout, every weekday at 9am remind me to post my standup update
 ```
 
-Mechanically, the agent calls the `schedule_task` MCP tool with a `prompt`, a `processAfter` timestamp for the first run, and a cron `recurrence` (`0 9 * * 1-5`). The container can't write the host-owned inbound database, so the tool emits a system action through `messages_out`; the host applies it, inserting a `messages_in` row with `kind='task'`, status `pending`, your `process_after`, the cron expression, and `series_id` set to the task's own id. See the [session DB schema](/reference/db-schema#session-databases) for the columns.
+Mechanically, the agent runs `ncl tasks create` with a `--prompt`, a cron `--recurrence` (`0 9 * * 1-5`), and (for one-shots) a `--process-after` timestamp for the first run. NanoClaw provisions an isolated per-task session for the series and inserts a `messages_in` row there with `kind='task'`, status `pending`, your `process_after`, the cron expression, and `series_id` set to the task's own id. See the [session DB schema](/reference/db-schema#session-databases) for the columns.
 
-The agent confirms with the generated id (`task-<timestamp>-<random>`). For a one-shot task — "remind me tomorrow at 2pm to review the budget" — it simply omits `recurrence`.
+The agent confirms with the generated id. Passing `--name "standup"` yields a readable id like `standup-a25c`; without a name, ids are `t-<hex>`. For a one-shot task — "remind me tomorrow at 2pm to review the budget" — it passes `--process-after` and omits `--recurrence`.
 
 </Step>
 <Step title="Know what fires it">
 
-Nothing watches the clock per-task. The [host sweep](/concepts/architecture#what-runs-when) visits every active session **every 60 seconds**, counts pending rows with `process_after <= now`, and wakes the session's container if one isn't already running. The agent's poll loop then picks the task up like any inbound message and executes the prompt.
+Nothing watches the clock per-task. The [host sweep](/concepts/architecture#what-runs-when) visits every active session **every 60 seconds**, counts pending rows with `process_after <= now`, and wakes the task session's container if one isn't already running. The agent's poll loop then picks the task up like any inbound message and executes the prompt.
 
 Two consequences worth internalizing:
 
 - **±60 seconds is the precision floor.** A task due at 09:00:00 fires whenever the next sweep tick lands, plus container cold-start if nothing is warm. Don't schedule anything that needs second-level timing.
-- **Recurring tasks are clones, not loops.** When a recurring occurrence completes, the next sweep tick computes the next run with cron-parser, inserts a fresh `pending` row carrying the same `series_id` forward, and clears `recurrence` on the completed row so it isn't re-cloned. The series id is the stable handle; individual occurrence ids come and go.
+- **Recurring tasks are clones, not loops.** When a recurring occurrence completes, the next sweep tick computes the next run with cron-parser, inserts a fresh `pending` row carrying the same `series_id` forward, and clears `recurrence` on the completed row so it isn't re-cloned. The series id is the stable handle; individual occurrence ids come and go. Once a series has no live occurrence left, the sweep garbage-collects its per-task session.
 
 </Step>
-<Step title="Manage it in chat">
+<Step title="Manage it with ncl tasks">
 
-All management goes through the agent too:
+You can manage tasks by asking the agent in chat:
 
 ```text
 Scout, list my scheduled tasks
@@ -43,21 +43,24 @@ Scout, move the standup reminder to 9:30
 Scout, cancel the standup reminder
 ```
 
-Exact tool behaviors behind those phrases:
+Behind those phrases (and available directly from the host) is the `ncl tasks` resource:
 
-| Tool | Behavior |
+| Command | Behavior |
 |---|---|
-| `list_tasks` | One row per series — the live `pending` or `paused` occurrence, not the pile of completed firings. The id shown is the series id, which every other tool expects. |
-| `update_task` | Edits the live occurrence in place (matches by id *or* series id). Omitted fields are untouched; an **empty string clears** `recurrence` (the task becomes one-shot) or `script`. If nothing matches, the host messages the agent back so it can tell you. |
-| `pause_task` / `resume_task` | Flip status between `pending` and `paused`. Paused rows are never counted as due, so they don't fire or wake anything. |
-| `cancel_task` | Marks all live rows in the series `completed` and nulls `recurrence` — the series ends, history rows stay. |
+| `ncl tasks list` | One row per series — the live `pending` or `paused` occurrence, not the pile of completed firings, each enriched with run count, failures, and next fire. |
+| `ncl tasks get <id>` | Full detail for one series: schedule, run history, failures, and the recent run-log lines. |
+| `ncl tasks update <id>` | Edits the live occurrence (matches by id *or* series id). Omitted fields are untouched; `--recurrence null` clears the schedule (the task becomes one-shot) and `--script null` removes the gate. |
+| `ncl tasks pause <id>` / `resume <id>` | Flip status between `pending` and `paused`. Paused rows are never counted as due, so they don't fire or wake anything. |
+| `ncl tasks run <id>` | Fire once now without changing the schedule — a safe test that neither consumes a one-shot nor advances a recurring series. |
+| `ncl tasks cancel <id>` | End the series (`status='cancelled'`, `recurrence` nulled); history rows stay. `--all` is the kill switch across every live task. |
+| `ncl tasks delete <id>` | Remove the series' rows entirely. |
 
-Full parameter schemas are in the [MCP tools reference](/reference/mcp-tools#scheduling).
+Full flags are in the [ncl tasks reference](/reference/ncl-cli#tasks).
 
 </Step>
 <Step title="Gate frequent tasks with a script">
 
-Every firing that reaches the agent is a full model API call. For tasks that run more than a few times a day, `schedule_task` accepts an optional `script` — a bash script that runs *before* the agent is invoked:
+Every firing that reaches the agent is a full model API call. For tasks that run more than a few times a day, `ncl tasks create` accepts an optional `--script` — a bash script that runs *before* the agent is invoked:
 
 ```text
 Scout, every hour check for open PRs needing my review. Use a script that
@@ -78,7 +81,7 @@ Be honest about what this saves: the container still wakes on every firing (the 
 
 When you say "9am", three layers have to agree on whose 9am. The chain: the host resolves `TIMEZONE` once at startup — `process.env.TZ`, then the `.env` file's `TZ`, then the system locale, falling back to `UTC`, each candidate validated as a real IANA identifier (`src/config.ts`). Every container is spawned with `-e TZ=<that value>` (`src/container-runner.ts`), and the agent-runner's `timezone.ts` resolves the same way inside.
 
-The result: naive timestamps the agent passes (`2026-06-11T09:00:00`, no offset) and **cron expressions** — both at schedule time and when the host sweep computes the next recurrence — are all interpreted in that one zone. To pin it:
+The result: naive timestamps the agent passes (`2026-06-11T09:00:00`, no offset) and **cron expressions** — both at schedule time and when the host sweep computes the next recurrence — are all interpreted in that one instance timezone. To pin it:
 
 ```bash
 # in .env (or the host's environment)
@@ -90,31 +93,25 @@ Restart the host after changing it; the value is read once at startup.
 </Step>
 <Step title="Inspect from the host">
 
-There is no `ncl tasks` resource — the agent is the interface, and the rows live in each session's inbound database, not the central DB. To look at them directly, find the session:
+Because scheduling is a host CLI resource now, you read it directly:
 
 ```bash
-ncl sessions list --agent-group-id <agent-id>
+ncl tasks list                       # every live series in scope
+ncl tasks list --group <agent-id>    # scope to one agent group
+ncl tasks get standup-a25c           # one series: schedule, run count, failures, recent run log
 ```
 
-then read its inbound database (host-owned — query read-only, never write to it):
-
-```bash
-sqlite3 "file:data/v2-sessions/<agent_group_id>/<session_id>/inbound.db?mode=ro" \
-  "SELECT id, status, process_after, recurrence, series_id
-     FROM messages_in WHERE kind='task' ORDER BY process_after"
-```
-
-A healthy recurring series shows one `pending` row (the next run) plus one `completed` row per past firing, all sharing a `series_id`.
+Under the hood each series lives as `messages_in` rows with `kind='task'` in the agent group's isolated per-task session (`data/v2-sessions/<agent_group_id>/<task_session_id>/inbound.db`), not the central DB. A healthy recurring series shows one `pending` row (the next run) plus one `completed` row per past firing, all sharing a `series_id` — but `ncl tasks get` already surfaces that history, so you rarely need to open the database yourself.
 
 </Step>
 </Steps>
 
 ## What you built
 
-A recurring task that is nothing but data: a `messages_in` row the 60-second host sweep wakes a container for, a clone-on-completion loop keyed by `series_id`, and an optional script gate between "the task fired" and "the agent got called". No daemon, no crontab — delete the row series (via `cancel_task`) and it's gone.
+A recurring task that is nothing but data: a `messages_in` row the 60-second host sweep wakes a container for, a clone-on-completion loop keyed by `series_id`, and an optional script gate between "the task fired" and "the agent got called". No daemon, no crontab — `ncl tasks cancel` ends the series and the sweep reclaims its session.
 
 ## Next steps
 
-- [MCP tools reference](/reference/mcp-tools#scheduling) — exact parameters for all six scheduling tools
+- [ncl tasks reference](/reference/ncl-cli#tasks) — every verb and flag on the `tasks` resource
 - [Session DB schema](/reference/db-schema#session-databases) — every column on `messages_in`
 - [Multi-agent swarm](/guides/multi-agent-swarm) — schedule work that fans out to other agents

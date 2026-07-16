@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["multi-agent", "create_agent", "agent-to-agent", "agent destinations", "send_message", "sub-agents", "approval", "ncl destinations"]
 ---
 
-{/* verified-against: src/modules/agent-to-agent/{create-agent,agent-route,write-destinations,index,message-gate}.ts, src/modules/agent-to-agent/db/{agent-destinations,agent-message-policies}.ts, src/modules/approvals/primitive.ts, container/agent-runner/src/mcp-tools/agents.ts + agents.instructions.md, container/agent-runner/src/destinations.ts, src/cli/resources/{destinations,groups,policies,wirings}.ts, src/group-init.ts, src/db/messaging-groups.ts @ 08a1ac9 (v2.1.38) */}
+{/* verified-against: src/modules/agent-to-agent/{create-agent,agent-route,write-destinations,index,message-gate}.ts, src/modules/agent-to-agent/db/{agent-destinations,agent-message-policies}.ts, src/modules/approvals/primitive.ts, container/agent-runner/src/mcp-tools/agents.ts + agents.instructions.md, container/agent-runner/src/destinations.ts, src/cli/resources/{destinations,groups,policies,wirings}.ts, src/group-init.ts, src/db/messaging-groups.ts @ e926e30e (v2.1.53) */}
 
 The [introduction](/introduction) promises real teams: a worker per task, a manager that tracks what's in flight, a supervisor that pings you. This tutorial builds the smallest working version — one agent spawning and delegating to another — then scales the same three primitives into that trio. It continues from [your first agent](/guides/first-agent); you'll reuse Scout to see the approval gate.
 
@@ -45,7 +45,7 @@ dig in with web search, and report findings back to you with sources.
 The agent calls the `create_agent` MCP tool with a `name` and that role as `instructions`. The call is fire-and-forget — it returns immediately, and the host does the privileged work:
 
 1. Inserts an `agent_groups` row. The folder is the normalized name (`researcher`), with a numeric suffix if taken.
-2. Scaffolds `groups/researcher/` and seeds the **`instructions` text into the new agent's memory** — `CLAUDE.local.md` for the Claude default, or the `memory/` scaffold's landing file on a provider that owns its memory. That's the agent's persistent role and personality, editable later like any agent's memory. A default `container_configs` row comes with it, and the child inherits its creator's provider.
+2. Scaffolds `groups/researcher/` and seeds the **`instructions` text into the new agent's `instructions.prepend.md`** — its standing instructions, composed into the top of the child's `CLAUDE.md` at spawn (the same on every provider now). That's the agent's persistent role and personality, editable later like any agent's. A default `container_configs` row comes with it, and the child inherits its creator's provider.
 3. Inserts **two destination rows**: the creator gets `researcher` → new agent, and the new agent gets `parent` → creator. The edge is bidirectional from birth, so replies need no extra wiring.
 4. Projects the new destination into the parent's running container immediately, then notifies it: `Agent "researcher" created. You can now message it with <message to="researcher">...</message>.`
 

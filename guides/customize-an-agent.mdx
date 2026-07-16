@@ -1,18 +1,18 @@
 ---
 title: "Customize an agent"
-description: "Hands-on tutorial: change an agent's personality through CLAUDE.local.md, swap its model and effort with ncl, and verify the changes landed."
-keywords: ["customize", "CLAUDE.local.md", "personality", "model", "effort", "ncl groups config update", "self-customize", "/customize"]
+description: "Hands-on tutorial: change an agent's personality through instructions.prepend.md, swap its model and effort with ncl, and verify the changes landed."
+keywords: ["customize", "instructions.prepend.md", "personality", "model", "effort", "ncl groups config update", "self-customize", "/customize"]
 ---
 
-{/* verified-against: src/claude-md-compose.ts, src/container-runner.ts, src/cli/resources/groups.ts, container/agent-runner/src/providers/types.ts, container/skills/self-customize/SKILL.md, .claude/skills/customize/SKILL.md @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/claude-md-compose.ts, src/group-persona.ts, src/container-runner.ts, src/cli/resources/groups.ts, container/agent-runner/src/providers/types.ts, container/skills/self-customize/SKILL.md, .claude/skills/customize/SKILL.md @ e926e30e (v2.1.53) */}
 
 This tutorial customizes the Scout agent from [your first agent](/guides/first-agent) — any agent group works, just swap the folder and `--id`. An agent has three customization surfaces:
 
-1. **Personality and rules** — `groups/<folder>/CLAUDE.local.md`, the agent's editable persistent memory
+1. **Personality and rules** — `groups/<folder>/instructions.prepend.md`, the agent's editable standing instructions
 2. **Brain** — model, reasoning effort, and other [container config](/reference/container-config) fields, edited with `ncl`
 3. **Capabilities** — packages and MCP servers, which go through the approval flow covered in [self-modification](/extend/self-modification)
 
-One file you will **not** edit: `groups/<folder>/CLAUDE.md`. The host regenerates it on every container spawn from a shared base plus skill and MCP fragments, and mounts it read-only into the container. Anything you write there gets clobbered. `CLAUDE.local.md` is the file that's yours (and the agent's).
+One file you will **not** edit: `groups/<folder>/CLAUDE.md`. The host regenerates it on every container spawn from a shared base plus skill and MCP fragments, and mounts it read-only into the container. Anything you write there gets clobbered. `instructions.prepend.md` is the file that's yours (and the agent's); durable facts the agent accumulates over time live alongside it in the `memory/` tree.
 
 <Steps>
 <Step title="Personality, the conversational way">
@@ -23,12 +23,12 @@ The simplest path is to just tell the agent:
 pnpm run chat scout "scout, from now on answer in haiku and sign off as 'Scout'"
 ```
 
-The `self-customize` skill (on every agent by default) teaches the agent that `CLAUDE.local.md` edits are free — no approval needed — so it writes the rule into its own `groups/scout/CLAUDE.local.md` through the read-write workspace mount. The current conversation follows the rule immediately because you just said it; the file is what makes it stick for every future session.
+The `self-customize` skill (on every agent by default) teaches the agent that edits to `instructions.prepend.md` and `memory/` are free — no approval needed — so it writes the rule into its own `groups/scout/instructions.prepend.md` through the read-write workspace mount. The current conversation follows the rule immediately because you just said it; the file is what makes it stick for every future session.
 
 Check what it wrote:
 
 ```bash
-cat groups/scout/CLAUDE.local.md
+cat groups/scout/instructions.prepend.md
 ```
 
 </Step>
@@ -36,7 +36,7 @@ cat groups/scout/CLAUDE.local.md
 
 You can edit the same file yourself — useful for longer instructions you'd rather paste than dictate:
 
-```markdown groups/scout/CLAUDE.local.md
+```markdown groups/scout/instructions.prepend.md
 ## Style
 
 - Answer in haiku
@@ -53,10 +53,10 @@ You can edit the same file yourself — useful for longer instructions you'd rat
 ncl groups restart --id <agent-id>
 ```
 
-If you'd rather be guided than edit files, run `/customize` in Claude Code from your NanoClaw checkout. It's an interactive skill: it asks what you want to change, hands off to a dedicated skill when one exists (`/add-telegram`, `/manage-channels`, `/manage-mounts`, ...), and otherwise routes the change to the right surface — the agent group's memory file for persona, container config for runtime behavior, wirings for triggers.
+If you'd rather be guided than edit files, run `/customize` in Claude Code from your NanoClaw checkout. It's an interactive skill: it asks what you want to change, hands off to a dedicated skill when one exists (`/add-telegram`, `/manage-channels`, `/manage-mounts`, ...), and otherwise routes the change to the right surface — the agent group's `instructions.prepend.md` for persona, container config for runtime behavior, wirings for triggers.
 
 <Note>
-As of v2.1.4 the `/customize` skill's own text still points persona edits at the composed `groups/<folder>/CLAUDE.md`. Follow this tutorial instead: edit `CLAUDE.local.md` — anything written to the composed file is clobbered at the next spawn.
+The `/customize` skill's own text still points persona edits at the composed `groups/<folder>/CLAUDE.md`. Follow this tutorial instead: edit `instructions.prepend.md` — anything written to the composed file is clobbered at the next spawn.
 </Note>
 
 </Step>
@@ -95,20 +95,21 @@ cat groups/scout/CLAUDE.md
 ```
 
 ```text
-<!-- Composed at spawn — do not edit. Edit CLAUDE.local.md for per-group content. -->
+<!-- Composed at spawn - do not edit. Standing instructions: instructions.prepend.md. Memory: memory/. -->
+@./.claude-fragments/persona.md
 @./.claude-shared.md
 @./.claude-fragments/module-self-mod.md
 ...
 ```
 
-It's nothing but a header and imports — the shared base plus per-skill fragments. Your text isn't in it because it doesn't need to be: Claude Code auto-loads `CLAUDE.local.md` alongside `CLAUDE.md` on every spawn.
+It's a header and imports. Your `instructions.prepend.md` is inlined as the `persona.md` fragment and imported **first**, so it sits at the top of the system prompt, ahead of the shared base and the per-skill fragments. Editing the composed `CLAUDE.md` is pointless because the host rebuilds it from those sources on every spawn.
 
 </Step>
 </Steps>
 
 ## What you changed
 
-Two surfaces, two mechanisms: personality went into a file the agent and you co-own (`CLAUDE.local.md`), the brain went into a DB row (`container_configs`). Both are read at container spawn — edits apply to the next container, and `ncl groups restart` forces one now. The third surface — capabilities — works differently because it can change what the agent is able to *do*, so it goes through admin approval.
+Two surfaces, two mechanisms: personality went into a file the agent and you co-own (`instructions.prepend.md`), the brain went into a DB row (`container_configs`). Both are read at container spawn — edits apply to the next container, and `ncl groups restart` forces one now. The third surface — capabilities — works differently because it can change what the agent is able to *do*, so it goes through admin approval.
 
 ## Next steps
 
