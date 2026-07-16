@@ -4,7 +4,7 @@ description: "Update NanoClaw and its skills with /update-nanoclaw and /update-s
 keywords: ["upgrade", "update", "update-nanoclaw", "update-skills", "migrate-nanoclaw", "upstream", "merge", "rollback"]
 ---
 
-{/* verified-against: .claude/skills/update-nanoclaw/SKILL.md, .claude/skills/update-skills/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md, versions.json, scripts/upgrade-state.ts, src/upgrade-state.ts @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: .claude/skills/update-nanoclaw/SKILL.md, .claude/skills/update-skills/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md, versions.json, scripts/upgrade-state.ts, src/upgrade-state.ts @ e926e30e (v2.1.53) */}
 
 Don't update with a raw `git pull`. NanoClaw records each sanctioned upgrade in `data/upgrade-state.json`, and a startup tripwire refuses to boot if the running code's version doesn't match that marker. The supported path is the `/update-nanoclaw` skill, which handles the merge, validation, and the marker stamp for you.
 
@@ -21,8 +21,9 @@ Run `/update-nanoclaw` in a Claude Code session at your project root. The skill 
 7. **Validation.** Runs `pnpm run build` and `pnpm test`. If `container/` files changed, it also rebuilds the container image with `./container/build.sh`.
 8. **OneCLI pins.** If the `onecli-gateway` or `onecli-cli` pin in `versions.json` moved since your backup tag, the skill surfaces it and walks you through the OneCLI upgrade ([`docs/onecli-upgrades.md`](https://github.com/nanocoai/nanoclaw/blob/main/docs/onecli-upgrades.md)) before the restart — the gateway and CLI are external components, so the running versions must be bumped to match the merged code. No pin change and the step is skipped.
 9. **Breaking changes.** Scans the new `CHANGELOG.md` entries for `[BREAKING]` lines, each of which names a migration skill (`Run /<skill-name> to …`); the skill lists them and offers to run the ones you pick. A breaking change that points to a `docs/` page instead of a skill is one you follow by hand.
-10. **Marker stamp.** On success, stamps the upgrade marker (`pnpm exec tsx scripts/upgrade-state.ts set "" update-nanoclaw`) so the tripwire passes on next start.
-11. **Summary.** Prints the backup tag, conflicts resolved, and the restart command for your platform.
+10. **Skill updates.** Detects which channel and provider adapters are wired into the barrels and offers to continue into `/update-skills` — the per-skill selection happens there, not in the update itself.
+11. **Marker stamp.** On success, stamps the upgrade marker (`pnpm exec tsx scripts/upgrade-state.ts set "" update-nanoclaw`) so the tripwire passes on next start.
+12. **Summary.** Prints the backup tag, conflicts resolved, and the restart command for your platform.
 
 To roll back, reset to the backup tag the skill printed:
 
@@ -32,7 +33,7 @@ git reset --hard pre-update-<hash>-<timestamp>
 
 ## What happens to installed channels
 
-Channel and provider adapters are files copied into your tree from the long-lived `channels` and `providers` branches — they aren't part of the `main` merge, so the update itself doesn't refresh them. Instead, after the merge, `/update-nanoclaw` detects which channels and providers you have wired into the barrels (`src/channels/index.ts`, `src/providers/index.ts`) and offers to re-run each one's `/add-<name>` skill.
+Channel and provider adapters are files copied into your tree from the long-lived `channels` and `providers` branches — they aren't part of the `main` merge, so the update itself doesn't refresh them. Instead, after the merge, `/update-nanoclaw` detects which channels and providers you have wired into the barrels (`src/channels/index.ts`, `src/providers/index.ts`) and offers to continue into `/update-skills`, where you pick which ones to re-apply.
 
 Re-applying is safe and idempotent: it re-fetches the latest adapter files from upstream and overwrites only that skill's own code. Credentials in `.env`, barrel wiring, and database state are untouched. The flip side: if you edited an adapter file directly, re-applying overwrites your edits — commit first so the changes are recoverable, or skip that channel and update it manually.
 

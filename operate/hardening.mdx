@@ -4,7 +4,7 @@ description: "Lock down a NanoClaw install — egress lockdown, the mount allowl
 keywords: ["hardening", "security", "egress lockdown", "NANOCLAW_EGRESS_LOCKDOWN", "mount allowlist", "unknown_sender_policy", "command gate", "container limits"]
 ---
 
-{/* verified-against: src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/modules/permissions/{index.ts,access.ts,sender-approval.ts}, src/command-gate.ts, src/router.ts, src/db/schema.ts, src/config.ts, src/host-sweep.ts, config-examples/mount-allowlist.json, .claude/skills/manage-mounts/SKILL.md, setup/mounts.ts @ 08a1ac9 (v2.1.38) */}
+{/* verified-against: src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/modules/permissions/{index.ts,access.ts,sender-approval.ts}, src/command-gate.ts, src/router.ts, src/db/schema.ts, src/config.ts, src/host-sweep.ts, config-examples/mount-allowlist.json, .claude/skills/manage-mounts/SKILL.md, setup/mounts.ts, src/cli/resources/groups.ts @ e926e30e (v2.1.53) */}
 
 NanoClaw's isolation boundary is the Docker container: each agent runs in its own container with a scoped workspace mount (see [Container lifecycle](/concepts/container-lifecycle)). There is no micro-VM or alternative sandbox runtime — hardening means tightening what those containers can reach. This page walks the defense-in-depth controls from network to filesystem to people.
 
@@ -18,7 +18,7 @@ By default, agent containers have normal outbound internet access. Set `NANOCLAW
 
 The setup is idempotent and self-healing — NanoClaw creates the network and re-attaches the gateway on every spawn if needed. It also **fails fast**: if lockdown is enabled but the network can't be created or the gateway container can't be attached, NanoClaw throws an `EgressLockdownError` and refuses to spawn the agent rather than silently running it with open egress. If you see that error, start the gateway container (or set `NANOCLAW_EGRESS_LOCKDOWN=false` to opt out).
 
-All three variables can be set in `.env` or the process environment (`src/config.ts:56-65`) — `.env` is the simpler path for a plain "edit and restart" flow; the service definition (launchd plist or systemd unit) still works too, as described in [Configuration](/operate/configuration#applying-changes):
+All three variables can be set in `.env` or the process environment (`src/config.ts:84-88`) — `.env` is the simpler path for a plain "edit and restart" flow; the service definition (launchd plist or systemd unit) still works too, as described in [Configuration](/operate/configuration#applying-changes):
 
 ```bash
 # Linux (systemd unit)
@@ -30,6 +30,8 @@ Environment=NANOCLAW_EGRESS_LOCKDOWN=true
 Per-group container config can request `additional_mounts` — extra host directories mounted into the container. Every request is validated against an allowlist at `~/.config/nanoclaw/mount-allowlist.json`. The file lives **outside the project root** on purpose: container agents can edit files in their workspace, so the security config has to sit where they can't reach it.
 
 **If the allowlist file doesn't exist, all additional mounts are blocked.** That's the default posture; you opt in by creating the file.
+
+Mounts are also operator-only to *edit*: `ncl groups config add-mount` and `remove-mount` run only from the host socket — never from inside a container, even for an agent with global CLI scope — and take effect on the next `ncl groups restart`. Whatever they add still passes the allowlist check at spawn.
 
 ```json mount-allowlist.json
 {
@@ -83,7 +85,7 @@ Sender approvals are handled entirely through the DM card — there's no `ncl` r
 
 Slash commands are classified on the host before they ever reach a container:
 
-- **Filtered commands** (`/help`, `/login`, `/logout`, `/doctor`, `/config`, `/remote-control`) are dropped silently — they manipulate host-side CLI state and never reach the agent.
+- **Filtered commands** (`/start`, `/help`, `/login`, `/logout`, `/doctor`, `/config`, `/remote-control`) are dropped silently — they manipulate host-side CLI state and never reach the agent.
 - **Admin commands** (`/clear`, `/compact`, `/context`, `/cost`, `/files`, `/upload-trace`) require the sender to hold an `owner` or `admin` role in `user_roles`; everyone else gets a "Permission denied" reply.
 - Everything else passes through unchanged.
 

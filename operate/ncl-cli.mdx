@@ -4,13 +4,13 @@ description: "Administer a running NanoClaw host from the terminal — inspect a
 keywords: ["ncl", "cli", "admin", "unix socket", "cli_scope", "groups", "wirings", "sessions", "approvals"]
 ---
 
-{/* verified-against: src/cli/client.ts, src/cli/dispatch.ts, src/cli/socket-server.ts, src/cli/crud.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,roles,sessions,user-dms,users,wirings}.ts, src/db/container-configs.ts, bin/ncl, setup/service.ts @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/cli/client.ts, src/cli/dispatch.ts, src/cli/socket-server.ts, src/cli/crud.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,policies,roles,sessions,tasks,user-dms,users,wirings}.ts, src/db/container-configs.ts, bin/ncl, setup/service.ts @ e926e30e (v2.1.53) */}
 
 `ncl` is the admin CLI for a running NanoClaw host. It sends one request frame over a Unix socket at `data/ncl.sock` and prints the response — every command reads or mutates the host's central database live, no restart needed. The socket is `chmod 0600`, so only the user that started the host can connect.
 
 Don't confuse it with the [CLI channel](/channels/cli), which is a chat adapter for talking *to an agent* from the terminal — `ncl` is for operating the host itself.
 
-This page is the working tour. The [ncl CLI reference](/reference/ncl-cli) has every operation, flag, and enum for all twelve resources — including the operator-only [`policies`](/reference/ncl-cli#policies) gate for agent-to-agent messages.
+This page is the working tour. The [ncl CLI reference](/reference/ncl-cli) has every operation, flag, and enum for all thirteen resources — including the operator-only [`policies`](/reference/ncl-cli#policies) gate for agent-to-agent messages.
 
 ## Invoking ncl
 
@@ -27,7 +27,7 @@ The general shape is:
 ncl <resource> <verb> [target] [--key value ...] [--json]
 ```
 
-Positional words join into the command name. A trailing positional becomes the target ID only if the ID contains no dashes — the dispatcher trims a single dash-segment, so `ncl groups get abc123` works, but a real NanoClaw ID (a UUID, four hyphens) does not resolve. In practice, always pass `--id <uuid>`. Flags map to columns; hyphens and underscores are interchangeable (`--agent-group-id` = `--agent_group_id`). Run `ncl help` to list every resource, and `ncl <resource> help` for its verbs, columns, and enums.
+Positional words join into the command name. A trailing positional becomes the target ID only if the ID contains no dashes — the dispatcher trims a single dash-segment, so `ncl groups get abc123` works, but a real NanoClaw ID (a UUID, four hyphens) does not resolve. In practice, always pass `--id <uuid>`. Flags map to columns; hyphens and underscores are interchangeable (`--agent-group-id` = `--agent_group_id`). Run `ncl help` to list every resource, `ncl <resource> help` for its verbs, columns, and enums, and `ncl <resource> help <verb>` (or `--help` on any command) for a single verb's flags.
 
 ## Output and errors
 
@@ -70,6 +70,8 @@ ncl groups create --name "Research" --folder research
 ncl groups restart --id <group-id> --rebuild
 ```
 
+`create` also takes `--template <name>` to stamp the new group from a template.
+
 `restart` kills and respawns the group's containers (`--rebuild` rebuilds the image first — required after package changes; `--message <text>` leaves an on-wake instruction). `delete` cascades through sessions, wirings, roles, memberships, and destinations in one transaction.
 
 Config subcommands edit the group's `container_configs` row — changes apply on the next `restart`:
@@ -79,9 +81,10 @@ ncl groups config get --id <group-id>
 ncl groups config update --id <group-id> --model claude-sonnet-4-5 --effort high
 ncl groups config add-mcp-server --id <group-id> --name fetch --command npx --args '["mcp-fetch"]'
 ncl groups config add-package --id <group-id> --apt ffmpeg
+ncl groups config add-mount --id <group-id> --host ~/projects/site --container /workspace/extra/site --ro
 ```
 
-`config update` accepts `--provider`, `--model`, `--effort`, `--image-tag`, `--assistant-name`, `--max-messages-per-prompt`, and `--cli-scope`.
+`config update` accepts `--provider`, `--model`, `--effort`, `--image-tag`, `--assistant-name`, `--max-messages-per-prompt`, and `--cli-scope`. `config add-mount` and `remove-mount` are operator-only — they run from the host socket, never from inside a container — and mounts still pass the [allowlist check](/operate/hardening#gate-additional-mounts) at spawn.
 
 ### messaging-groups and wirings
 
@@ -93,7 +96,13 @@ ncl wirings create --messaging-group-id <mg-id> --agent-group-id <group-id> --en
 ncl wirings update --id <wiring-id> --session-mode per-thread
 ```
 
-Wiring columns: `engage_mode` (`mention` | `mention-sticky` | `pattern`), `engage_pattern`, `sender_scope` (`all` | `known`), `ignored_message_policy` (`drop` | `accumulate`), `session_mode` (`shared` | `per-thread` | `agent-shared`).
+Wiring columns: `engage_mode` (`mention` | `mention-sticky` | `pattern`), `engage_pattern`, `sender_scope` (`all` | `known`), `ignored_message_policy` (`drop` | `accumulate`), `session_mode` (`shared` | `per-thread` | `agent-shared`), `threads` (honor platform thread ids for this wiring; unset inherits the channel's default — you can turn threads *off* on a threaded platform, never *on* for one that has none), and `priority` (fanout order when several agents are wired to one chat; higher first). Engagement flags you omit on `create` default from the channel adapter's declaration.
+
+`messaging-groups send` injects a message into a chat as if a sender posted it, waking the wired agent — the host uses it to send a welcome on first wire:
+
+```bash
+ncl messaging-groups send --channel-type telegram --platform-id <chat-id> --text "hello"
+```
 
 ### users, roles, and members
 
@@ -114,6 +123,18 @@ Read-only view of the runtime units — one row per (agent group, messaging grou
 ```bash
 ncl sessions list --agent_group_id <group-id>
 ```
+
+### tasks
+
+Scheduled and recurring work, run by the host in isolated per-task sessions. Ids are stable series handles — `t-<hex>`, or `<slug>-<hex>` when created with `--name`:
+
+```bash
+ncl tasks list --status pending
+ncl tasks create --group <group-id> --prompt "Post the morning summary" --recurrence "0 7 * * *"
+ncl tasks pause --id <task-id>
+```
+
+`create` needs `--group` and `--prompt`; `--recurrence` takes a cron expression, one-shot tasks use `--process-after`, and `--script` adds a pre-run bash gate. The full verb set (`run`, `resume`, `update`, `cancel`, `delete`, `append-log`) is in the [reference](/reference/ncl-cli#tasks); the workflow tour is in [Scheduled tasks](/guides/scheduled-tasks).
 
 ### dropped-messages
 
