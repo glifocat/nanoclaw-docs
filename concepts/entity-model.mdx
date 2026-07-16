@@ -4,7 +4,7 @@ description: "The five entities behind every NanoClaw conversation — agent gro
 keywords: ["entity model", "agent groups", "messaging groups", "wirings", "messaging_group_agents", "engage_mode", "session_mode", "sender_scope", "roles", "owner", "admin", "sessions"]
 ---
 
-{/* verified-against: src/db/schema.ts, src/db/migrations/{010-engage-modes,011-pending-sender-approvals,012-channel-registration,016-messaging-group-instance}.ts, src/types.ts, src/router.ts, src/session-manager.ts, src/modules/permissions/{index.ts,access.ts}, src/command-gate.ts @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/db/schema.ts, src/db/migrations/{010-engage-modes,011-pending-sender-approvals,012-channel-registration,016-messaging-group-instance,019-wiring-threads}.ts, src/types.ts, src/router.ts, src/channels/channel-defaults.ts, src/session-manager.ts, src/modules/permissions/{index.ts,access.ts}, src/command-gate.ts @ e926e30e (v2.1.53) */}
 
 Everything NanoClaw does reduces to five entities in `data/v2.db`: **agent groups** (where agents run), **messaging groups** (where people talk), **wirings** (the edge connecting them, which holds all the behavior), **users** (who is allowed to do what), and **sessions** (the conversation state in between). This page is the mental model; for column-level detail see the [database schema](/reference/db-schema).
 
@@ -22,6 +22,7 @@ erDiagram
         string sender_scope "all | known"
         string ignored_message_policy "drop | accumulate"
         string session_mode "shared | per-thread | agent-shared"
+        int threads "NULL inherit | 1 on | 0 off"
     }
     SESSIONS {
         string thread_id "nullable"
@@ -30,7 +31,7 @@ erDiagram
 
 ## Agent groups — the unit of isolation
 
-An agent group is a workspace: a folder under `groups/<name>/` with its own working files, per-group memory (`CLAUDE.local.md`), a composed `CLAUDE.md`, and a container configuration (the `container_configs` table — packages, mounts, model and skills config). Every session an agent group owns runs in a container that sees only that workspace. All agent groups are equal — privilege lives on users, not on groups.
+An agent group is a workspace: a folder under `groups/<name>/` with its own working files, per-group standing instructions (`instructions.prepend.md`) and durable memory (the `memory/` tree), a composed `CLAUDE.md`, and a container configuration (the `container_configs` table — packages, mounts, model and skills config). Every session an agent group owns runs in a container that sees only that workspace. All agent groups are equal — privilege lives on users, not on groups.
 
 ## Messaging groups — a platform conversation
 
@@ -40,7 +41,7 @@ You don't pre-register these. When a mention or DM arrives on a chat NanoClaw ha
 
 ## Wirings — where the behavior lives
 
-A wiring (`messaging_group_agents` row) connects one messaging group to one agent group. It's many-to-many: one chat can feed several agents, one agent can serve several chats. The wiring — not the agent, not the chat — holds the four orthogonal behavior axes:
+A wiring (`messaging_group_agents` row) connects one messaging group to one agent group. It's many-to-many: one chat can feed several agents, one agent can serve several chats. The wiring — not the agent, not the chat — holds the five orthogonal behavior axes:
 
 ### `engage_mode` — when the agent wakes
 
@@ -66,11 +67,15 @@ When a message doesn't engage a wiring, `drop` skips it silently. `accumulate` s
 
 `shared` (one session for the whole chat), `per-thread` (one per thread), or `agent-shared` (one session for the entire agent group, across every chat wired with this mode — useful when GitHub and Slack should land in the same conversation).
 
+### `threads` — honoring platform threads
+
+A per-wiring override on whether inbound thread ids are honored for this wiring. `NULL` (the default) inherits the channel adapter's declared default for the context (DM versus group); `1` forces thread honoring on, `0` forces it off. It's hard-ANDed with the adapter's raw capability at router fanout: it can disable threads on a thread-capable platform, but never invent them on one that has none. Setting `threads = 0` also lifts the per-thread forcing described below.
+
 ## Sessions — the conversation state
 
 A session is one conversation between an agent group and a messaging group (optionally scoped to a thread): one folder under `data/v2-sessions/`, one pair of inbound/outbound databases, and one container while running. The wiring's `session_mode` decides the lookup key, but the router applies two overrides based on what the adapter can do:
 
-1. **Thread-capable adapters force `per-thread` in group chats.** On Discord, Slack, or Teams channels, every thread gets its own session even if the wiring says `shared` — only `agent-shared` overrides this, because it's a cross-channel directive the adapter knows nothing about. DMs are exempt: sub-threads in a DM collapse into one conversation (for `shared` wirings — an explicit `per-thread` wiring is honored in DMs, as the table shows).
+1. **Thread-capable adapters force `per-thread` in group chats.** On Discord, Slack, or Teams channels, every thread gets its own session even if the wiring says `shared` — `agent-shared` overrides this (a cross-channel directive the adapter knows nothing about), and so does a per-wiring `threads = 0`. DMs are exempt: whether a DM's sub-threads collapse into one conversation or stay separate follows the channel's declared DM thread default and any per-wiring `threads` override, not `session_mode`.
 2. **Thread-less adapters collapse `per-thread` to `shared`.** WhatsApp, Telegram, and iMessage have no thread IDs — the router nulls the thread before routing, and a `per-thread` lookup with no thread is identical to `shared`.
 
 What you set versus what you actually get:
@@ -80,6 +85,8 @@ What you set versus what you actually get:
 | `shared` | `per-thread` (forced) | `shared` | `shared` |
 | `per-thread` | `per-thread` | `per-thread` | `shared` (collapses) |
 | `agent-shared` | `agent-shared` | `agent-shared` | `agent-shared` |
+
+The DM column assumes the channel's default DM thread behavior; a per-wiring `threads` override changes it, and `threads = 0` also disables the forced `per-thread` in the group-chat column (see the [`threads` axis](#threads-honoring-platform-threads) above).
 
 ## Users, roles, and members
 

@@ -4,7 +4,7 @@ description: "How the nanoclaw repo is laid out, the dev loop, the three-branch 
 keywords: ["contributing", "development", "pnpm", "vitest", "bun", "channels branch", "providers branch", "repo layout", "pull requests", "token count"]
 ---
 
-{/* verified-against: package.json, CONTRIBUTING.md, RELEASING.md, vitest.config.ts, vitest.skills.config.ts, eslint.config.js, .github/workflows/{ci.yml,update-tokens.yml}, repo-tokens/README.md, CLAUDE.md @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: package.json, CONTRIBUTING.md, RELEASING.md, vitest.config.ts, vitest.skills.config.ts, eslint.config.js, .github/workflows/{ci.yml,label-pr.yml}, repo-tokens/README.md, CLAUDE.md @ e926e30e (v2.1.53) */}
 
 This page is for contributing to [nanocoai/nanoclaw](https://github.com/nanocoai/nanoclaw) itself — fixing bugs, simplifying code, or adding a skill to the upstream repo. If you just want to extend your own installation, you don't need any of this: see [Extending NanoClaw](/extend/overview).
 
@@ -26,7 +26,7 @@ The upstream [CONTRIBUTING.md](https://github.com/nanocoai/nanoclaw/blob/main/CO
 
 ## The whole repo fits in context
 
-The token badge in the README currently reads **~204k tokens** for the runtime surface (mainly `src/`, `container/agent-runner/src/`, the Dockerfile, and `CLAUDE.md` — host tests excluded). That's deliberate: the codebase is kept small enough for a coding agent to hold it in context, which is also why feature PRs are redirected to skills. The badge is auto-generated — the `update-tokens.yml` workflow runs the `repo-tokens/` action on every push to `main` that touches `src/`, `container/`, `launchd/`, or `CLAUDE.md` and commits the new badge. Don't update it by hand.
+The token badge in the README currently reads **~226k tokens** for the runtime surface (mainly `src/`, `container/agent-runner/src/`, the Dockerfile, and `CLAUDE.md` — host tests excluded). That's deliberate: the codebase is kept small enough for a coding agent to hold it in context, which is also why feature PRs are redirected to skills. The badge comes from the `repo-tokens/` action. The `update-tokens.yml` workflow that regenerated it on every push has been removed, so the number is refreshed by running that action rather than automatically. Don't hand-edit the badge.
 
 ## Dev loop
 

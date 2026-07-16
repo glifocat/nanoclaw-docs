@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["security", "threat model", "prompt injection", "container isolation", "egress lockdown", "mount allowlist", "approvals", "credentials", "defense in depth"]
 ---
 
-{/* verified-against: src/container-runner.ts, src/egress-lockdown.ts, src/inbox-safety.ts, src/session-manager.ts, src/modules/mount-security/index.ts, src/command-gate.ts, src/modules/permissions/{index.ts,access.ts,channel-approval.ts,sender-approval.ts}, src/modules/approvals/{index.ts,primitive.ts,onecli-approvals.ts,reason-capture.ts,finalize.ts,response-handler.ts}, src/modules/agent-to-agent/{message-gate.ts,agent-route.ts,db/agent-message-policies.ts}, src/modules/self-mod/index.ts, container/Dockerfile, pnpm-workspace.yaml, docs/SECURITY.md @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/container-runner.ts, src/egress-lockdown.ts, src/inbox-safety.ts, src/session-manager.ts, src/modules/mount-security/index.ts, src/command-gate.ts, src/modules/permissions/{index.ts,access.ts,channel-approval.ts,sender-approval.ts}, src/modules/approvals/{index.ts,primitive.ts,onecli-approvals.ts,reason-capture.ts,finalize.ts,response-handler.ts}, src/modules/agent-to-agent/{message-gate.ts,agent-route.ts,db/agent-message-policies.ts}, src/modules/self-mod/index.ts, container/Dockerfile, pnpm-workspace.yaml, docs/SECURITY.md @ e926e30e (v2.1.53) */}
 
 NanoClaw connects an AI agent with real tools — a shell, a filesystem, network access — to chat platforms where anyone can type. Every inbound message is untrusted input fed straight into the model's context, and no model reliably distinguishes "instructions from my operator" from "instructions an attacker pasted into the group chat." So the design assumption is blunt: **prompt injection eventually succeeds, and the agent acts as if the attacker wrote its instructions.**
 
@@ -86,9 +86,9 @@ The host process itself is in the trusted zone, so its dependencies matter: pnpm
 Be honest about the gap: **anything the agent can legitimately do, it can do while manipulated.** No layer above distinguishes a sincere action from an injected one — they only bound the action space. A compromised agent can still:
 
 - **Message anyone in its destinations** — including posting attacker-chosen content to your team channel, or leaking conversation context to another chat it legitimately serves.
-- **Read and destroy its whole workspace** — every session of an agent group shares the group folder read-write, including `CLAUDE.local.md` memory — and it can read whatever its allowlisted mounts expose (read-write only where explicitly granted).
+- **Read and destroy its whole workspace** — every session of an agent group shares the group folder read-write, including its `memory/` tree and `instructions.prepend.md` — and it can read whatever its allowlisted mounts expose (read-write only where explicitly granted).
 - **Spend through granted credentials** — it can't extract keys, but it can make authenticated API calls with everything its group was granted (per-request approval, where enabled, is the brake).
-- **Poison its own memory** — instructions written to `CLAUDE.local.md` today shape every future session of that group.
+- **Poison its own memory** — instructions written to its `memory/` tree or `instructions.prepend.md` today shape every future session of that group.
 
 The defense against all four is the same and it's yours, not the software's: **scoping**. An agent that talks to strangers should not share a group with your code repo and deploy credentials; chats with different audiences should not share files or memory. The decision guide is [Isolation levels](/concepts/isolation-levels).
 
