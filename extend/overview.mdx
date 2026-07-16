@@ -4,9 +4,9 @@ description: "What a NanoClaw skill is in v2 — SKILL.md workflows that Claude 
 keywords: ["skills", "extend", "SKILL.md", "registry branches", "channels branch", "providers branch", "REMOVE.md", "container skills", "additive fetch"]
 ---
 
-{/* verified-against: CONTRIBUTING.md, docs/skills-model.md, .claude/skills/{add-telegram,add-codex,add-gmail-tool,manage-mounts}/SKILL.md, .claude/skills/{add-telegram,add-gmail-tool}/REMOVE.md, container/skills/, src/container-runner.ts, setup/providers/index.ts @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: CONTRIBUTING.md, docs/skills-model.md, docs/skill-guidelines.md, .claude/skills/{add-telegram,add-codex,add-gmail-tool,manage-mounts}/SKILL.md, .claude/skills/{add-telegram,add-gmail-tool}/REMOVE.md, container/skills/, src/container-runner.ts, setup/providers/index.ts, setup/channels/run-channel-skill.ts @ e926e30e (v2.1.53) */}
 
-A NanoClaw skill is a **SKILL.md instruction workflow** in `.claude/skills/` that Claude Code executes in your checkout. When you run `/add-telegram` or `/manage-mounts`, Claude reads the skill's instructions and performs them — copying files, appending an import, installing a dependency, running a test. There is no plugin engine, no manifest.yaml, and no skill state file. The skill *is* the markdown.
+A NanoClaw skill is a **SKILL.md instruction workflow** in `.claude/skills/` that Claude Code executes in your checkout. When you run `/add-telegram` or `/manage-mounts` — or the setup wizard dispatches an `/add-<channel>` skill for you — Claude reads the skill's instructions and performs them: copying files, appending an import, installing a dependency, running a test. There is no manifest.yaml and no skill state file. The skill *is* the markdown — the mechanical steps in trunk install skills also carry `nc:` directive fences, so a deterministic parser can apply the same document an agent reads, and anything it can't apply falls back to the prose beside it.
 
 <Note>
 This URL previously documented a different model: skills as `skill/*` git branches that you merged into your fork and removed with `git revert`. That model was designed for v1 and **never shipped in v2** — skills are not distributed as `skill/*` branches you merge, and no skill installs by merging a branch. If a skill's install instructions say `git merge`, it isn't built for v2. This page describes how skills actually work as of v2.1.4.
@@ -23,13 +23,13 @@ Channel and provider adapters live on two long-lived **registry branches** (`cha
     `git fetch origin channels`
   </Step>
   <Step title="Copy the files in">
-    `git show origin/channels:src/channels/telegram.ts > src/channels/telegram.ts` — repeated for the adapter's helpers, its tests, and its setup step. The tests travel with the code on the branch.
+    `git show origin/channels:src/channels/telegram.ts > src/channels/telegram.ts` — repeated for the adapter's helpers and their tests. The tests travel with the code on the branch. (The `pair-telegram` setup step ships in trunk, so it isn't copied.)
   </Step>
-  <Step title="Wire the barrel and the setup step">
-    Append `import './telegram.js';` to `src/channels/index.ts` so the adapter self-registers at startup, and add the `pair-telegram` entry to the `STEPS` map in `setup/index.ts`. These one-line appends are the only edits to existing code.
+  <Step title="Wire the barrel">
+    Append `import './telegram.js';` to `src/channels/index.ts` so the adapter self-registers at startup. This one-line append is the skill's only reach-in into existing code — its `STEPS`-map entry for `setup/index.ts` already ships in trunk and idempotently skips on a normal install.
   </Step>
   <Step title="Install the dependency">
-    `pnpm install @chat-adapter/telegram` — the skill installs the pinned adapter version.
+    The skill pins `@chat-adapter/telegram` to an exact version — never a range or `latest`; the supply-chain policy rejects both.
   </Step>
   <Step title="Build and run the registration test">
     `pnpm run build`, then the copied registration test — it imports the real channel barrel and asserts the registry contains `telegram`. If the import line is deleted, the barrel fails to evaluate, or the dependency is missing, this test goes red.
@@ -39,7 +39,7 @@ Channel and provider adapters live on two long-lived **registry branches** (`cha
 Three properties hold across every install skill:
 
 - **Additive fetch, never a merge.** Merging a registry branch into a customized install is exactly the conflict fight this model exists to avoid. The skill copies in only the files it needs.
-- **Idempotent.** Each skill starts with a pre-flight check and every step is safe to re-run. Re-running a half-applied install completes it instead of breaking it.
+- **Idempotent.** Every step guards itself, and the `nc:` directives are idempotent by construction (`copy` overwrites, `append` skips-if-present). Re-running a half-applied install completes it instead of breaking it.
 - **Reversible via REMOVE.md.** Skills that leave anything behind ship a `REMOVE.md` alongside the `SKILL.md` that reverses every change — delete the copied files, remove the barrel import, uninstall the package, rebuild. No `git revert` involved.
 
 ## The four categories of host skills
@@ -59,7 +59,7 @@ Upstream's CONTRIBUTING.md folds these into a slightly different taxonomy (chann
 
 ## Container skills: the fifth thing
 
-Everything above runs on the **host**, in your checkout. Container skills (`container/skills/`) are different: they're mounted read-only at `/app/skills` into every agent container at spawn, and the agent inside the container loads them at runtime. You never invoke them yourself — they teach the agent how to browse the web (`agent-browser`), format Slack messages (`slack-formatting`), or even change its own NanoClaw install on request (`self-customize` — see [Self-modification](/extend/self-modification)).
+Everything above runs on the **host**, in your checkout. Container skills (`container/skills/`) are different: they're mounted read-only at `/app/skills` into every agent container at spawn, and the agent inside the container loads them at runtime. You never invoke them yourself — they teach the agent how to browse the web (`agent-browser`), introduce itself on a newly wired channel (`welcome`), or even change its own NanoClaw install on request (`self-customize` — see [Self-modification](/extend/self-modification)).
 
 Which container skills a group gets is controlled by the `skills` column in its container config — `"all"` or a pinned list. See [Container config](/reference/container-config#skills).
 

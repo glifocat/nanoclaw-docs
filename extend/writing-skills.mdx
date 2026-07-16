@@ -4,9 +4,9 @@ description: "How to author a NanoClaw skill: SKILL.md anatomy, idempotent apply
 keywords: ["writing skills", "SKILL.md", "REMOVE.md", "skill authoring", "idempotency", "registration test", "skill-guidelines", "vitest", "integration points"]
 ---
 
-{/* verified-against: docs/skill-guidelines.md, CONTRIBUTING.md, vitest.skills.config.ts, .claude/skills/{add-telegram,manage-mounts,update-skills,add-ollama-tool}/SKILL.md, .claude/skills/add-telegram/REMOVE.md @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: docs/skill-guidelines.md, docs/skill-directives.md, CONTRIBUTING.md, vitest.skills.config.ts, .claude/skills/{add-telegram,manage-mounts,update-skills,add-ollama-tool}/SKILL.md, .claude/skills/add-telegram/REMOVE.md @ e926e30e (v2.1.53) */}
 
-A skill is a markdown file that Claude Code executes — there's no engine to integrate with, so writing one is mostly writing good instructions. The bar upstream holds skills to is [docs/skill-guidelines.md](https://github.com/nanocoai/nanoclaw/blob/main/docs/skill-guidelines.md), and it boils down to two principles: **minimal integration surface** (mostly add files; keep reach-ins into existing code to a line or two that calls your own code) and **a test for every functional integration point** (one that goes red if the wiring is deleted or drifts). This page covers the conventions; [the overview](/extend/overview) explains the model.
+A skill is a markdown file that Claude Code executes — there's no engine you must integrate with, so writing one is mostly writing good instructions. The bar upstream holds skills to is [docs/skill-guidelines.md](https://github.com/nanocoai/nanoclaw/blob/main/docs/skill-guidelines.md), and it boils down to two principles: **minimal integration surface** (mostly add files; keep reach-ins into existing code to a line or two that calls your own code) and **a test for every functional integration point** (one that goes red if the wiring is deleted or drifts). This page covers the conventions; [the overview](/extend/overview) explains the model.
 
 <Tip>
 Don't start from a blank file. The [`/learn`](/reference/skills-catalog#operational-skills) skill distills a `SKILL.md` from a source — a directory, a URL, pasted notes, or the work you just did in a conversation — authored to these same guidelines, and refines an existing skill the same way. Generate the first draft, then tighten it by hand against the conventions below.
@@ -28,19 +28,15 @@ Instructions here...
 - `name` — lowercase, alphanumeric plus hyphens, max 64 characters. This becomes the slash command (`/my-skill`).
 - `description` — required, and load-bearing: **it's how Claude decides whether to invoke the skill**. Write what it does *and* when to use it. `manage-mounts` even lists its trigger phrases: `Triggers on "mounts", "mount allowlist", "agent access to directories", "container mounts"`.
 
-The body is prose an agent can run. Real skills converge on the same shape: a pre-flight check, numbered steps, then a build-and-validate step at the end. Keep it under 500 lines — move detail to separate reference files in the skill directory — and put code in separate files, never inline in the markdown.
+The body is prose an agent can run. Real skills converge on the same shape: numbered apply steps, then a build-and-validate step at the end. Keep it under 500 lines — move detail to separate reference files in the skill directory — and put code in separate files, never inline in the markdown.
 
 ## Conventions that make a skill safe to re-run
 
 Apply must be **idempotent**: upgrades re-run it (`/update-skills` works by re-running each installed skill's own apply), and a skill that half-applies twice is a bug. Three conventions from the in-tree skills:
 
-**Pre-flight check.** Start with an explicit "is this already applied?" gate. From `add-telegram`:
+**Every step guards itself.** Each step states its own skip condition — "skipped if the line is already present", "overwrite — the branch is canonical" — so a partial apply completes instead of duplicating lines. The trunk channel and provider skills (the ones the setup wizard drives) go further: each mechanical step also carries an **`nc:<kind>` directive fence** (`copy`, `append`, `dep`, `json-merge`, plus `run`, `prompt`, `operator`, `env-set`) that a deterministic engine can apply from the same document an agent reads. Directives are idempotent by construction (`copy` overwrites, `append` skips-if-present, `env-set` sets-if-absent), and anything the engine can't apply falls back to the prose beside the fence — so the prose must stand on its own. For a contributed skill the fences are **optional**: you're held to the checklist on this page; opting in brings the conformance suite and the directive lint (`pnpm exec tsx scripts/skill-directives.ts .claude/skills/<name>/SKILL.md`) with it. Grammar and semantics: [docs/skill-directives.md](https://github.com/nanocoai/nanoclaw/blob/main/docs/skill-directives.md).
 
-> Skip to **Credentials** if all of these are already in place: `src/channels/telegram.ts` [...] exists, `src/channels/index.ts` contains `import './telegram.js';`, [...] `@chat-adapter/telegram` is listed in `package.json` dependencies. Otherwise continue. Every step below is safe to re-run.
-
-Each individual step also carries its own guard ("skip if already present") so a partial apply completes instead of duplicating lines.
-
-**Pinned versions.** Dependencies install at an exact version — `pnpm install @chat-adapter/telegram@<exact-version>`, never `latest`. Same for Dockerfile-installed binaries: pin with an `ARG <X>_VERSION=` line.
+**Pinned versions.** Dependencies install at an exact version — `add-telegram` pins `@chat-adapter/telegram@<exact-version>` in its `nc:dep` fence; the supply-chain policy rejects ranges and `latest`. Same for Dockerfile-installed binaries: pin with an `ARG <X>_VERSION=` line.
 
 **Present-tense DO steps only.** A skill is a standalone artifact with no memory of its own edits. No "earlier versions did X", no "no changes needed here" — those are flagged anti-patterns. So is a separate VERIFY.md: tests are the verification, and the final step is always `pnpm run build` plus running the skill's own tests.
 
