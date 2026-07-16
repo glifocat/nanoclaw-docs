@@ -1,29 +1,29 @@
 ---
 title: "Agent self-modification"
 description: "What agents can change about themselves — editing their own memory freely, and requesting packages or MCP servers through admin approval."
-keywords: ["self-modification", "install_packages", "add_mcp_server", "CLAUDE.local.md", "approval", "self-customize", "rebuild", "agent memory"]
+keywords: ["self-modification", "install_packages", "add_mcp_server", "memory", "instructions.prepend.md", "approval", "self-customize", "rebuild", "agent memory"]
 ---
 
-{/* verified-against: src/modules/self-mod/{index,request,apply}.ts, src/modules/approvals/primitive.ts, container/agent-runner/src/mcp-tools/self-mod.ts, container/agent-runner/src/mcp-tools/self-mod.instructions.md, container/skills/self-customize/SKILL.md, src/container-runner.ts, src/claude-md-compose.ts @ cb6e3d1 (v2.1.23) */}
+{/* verified-against: src/modules/self-mod/{index,request,apply}.ts, src/modules/approvals/primitive.ts, container/agent-runner/src/mcp-tools/self-mod.ts, container/agent-runner/src/mcp-tools/self-mod.instructions.md, container/agent-runner/src/memory/scaffold.ts, container/skills/self-customize/SKILL.md, src/container-runner.ts, src/claude-md-compose.ts, src/group-persona.ts @ e926e30e (v2.1.53) */}
 
-Agents can change their own environment — but every change that touches the container goes through you. The self-mod module exposes exactly two operations, `install_packages` and `add_mcp_server`, and **both are always approval-gated**: the agent submits a request, an admin gets a card, and nothing changes until someone taps Approve. The one thing an agent can change freely is its own memory file.
+Agents can change their own environment — but every change that touches the container goes through you. The self-mod module exposes exactly two operations, `install_packages` and `add_mcp_server`, and **both are always approval-gated**: the agent submits a request, an admin gets a card, and nothing changes until someone taps Approve. What an agent can change freely is its own memory and standing instructions.
 
 ## What an agent can change
 
 | Surface | Approval | What happens |
 | --- | --- | --- |
-| `CLAUDE.local.md` and workspace files | None — direct edit | Persists immediately; it's a plain file on the host |
+| `memory/`, `instructions.prepend.md`, and workspace files | None — direct edit | Persists immediately; they're plain files on the host |
 | apt / npm packages | Admin card | Container config updated, image rebuilt, container restarted |
 | MCP servers | Admin card | Container config updated, container restarted (no rebuild) |
 | Its own source code, composed `CLAUDE.md`, `container.json` | Not possible | Mounted read-only |
 
 ## Free edits: the agent's own memory
 
-The group folder is mounted read-write at `/workspace/agent/`, so the agent can edit `CLAUDE.local.md` — its persistent per-group memory and instructions — without asking anyone. This is where "remember that I prefer short answers" lands. The [self-customize container skill](/reference/skills-catalog#container-skills) teaches exactly this: workspace files and `CLAUDE.local.md` are direct edits, everything else has a workflow.
+The group folder is mounted read-write at `/workspace/agent/`, so the agent can edit its own durable state without asking anyone: the **`memory/` tree** (durable facts and accumulated memory, scaffolded idempotently at boot for every provider) and **`instructions.prepend.md`** (its standing instructions and persona). This is where "remember that I prefer short answers" lands — in `memory/`. The [self-customize container skill](/reference/skills-catalog#container-skills) teaches exactly this: memory, standing instructions, and workspace files are direct edits, everything else has a workflow.
 
 The boundary is enforced by nested read-only mounts on top of the read-write group dir:
 
-- the composed `CLAUDE.md` is read-only and regenerated from scratch every spawn — edits would be lost anyway, so writes are blocked and the agent is told to use `CLAUDE.local.md`
+- the composed `CLAUDE.md` is read-only and regenerated from scratch every spawn — edits would be lost anyway, so writes are blocked and the header points the agent at the writable surfaces instead: `instructions.prepend.md` for standing instructions, `memory/` for memory
 - `container.json` (the materialized [container config](/reference/container-config)) is read-only — config changes only land through the approval paths below
 - the agent-runner source at `/app/src` is read-only — code changes go through a builder agent, not in-place edits
 
@@ -79,7 +79,7 @@ ncl groups config remove-mcp-server --id <group-id> --name <server>
 ncl groups restart --id <group-id>
 ```
 
-`CLAUDE.local.md` edits have no approval trail — it's a plain file at `groups/<folder>/CLAUDE.local.md` on the host, and the groups directory is not a git repository. To review, read the file; to revert, edit it (or restore from your own backups).
+Memory and instruction edits have no approval trail — they're plain files under `groups/<folder>/` on the host (the `memory/` tree and `instructions.prepend.md`), and the groups directory is not a git repository. To review, read the files; to revert, edit them (or restore from your own backups).
 
 ## Where the guardrails sit
 

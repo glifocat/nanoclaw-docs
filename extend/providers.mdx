@@ -5,7 +5,7 @@ tag: "UPDATED"
 keywords: ["providers", "agent provider", "claude", "opencode", "codex", "ollama", "local models", "agent_provider", "model", "effort", "provider selection", "switch provider", "migrate-memory"]
 ---
 
-{/* verified-against: container/agent-runner/src/providers/{types,factory,claude,provider-registry}.ts, container/agent-runner/src/{config,index,memory-scaffold,poll-loop}.ts, container/agent-runner/src/memory-templates/, src/container-runner.ts, src/container-config.ts, src/providers/{claude,provider-container-registry}.ts, src/cli/resources/{groups,sessions}.ts, .claude/skills/{add-opencode,add-ollama-provider,migrate-memory}/SKILL.md, src/group-init.ts, setup/auto.ts, setup/providers/registry.ts, setup/provider-auth.ts, docs/ollama.md, docs/provider-migration.md @ trunk e3986eb (v2.1.16); container/cli-tools.json, .claude/skills/add-codex/{SKILL.md,REMOVE.md}, setup/add-codex.sh @ trunk cb6e3d1 (v2.1.23); src/{group-persona,group-skills}.ts @ trunk b6cb53e (v2.1.38); opencode.ts, codex.ts, codex-app-server.ts, codex-agents-md.ts, codex-host-contribution.ts, exchange-archive.ts, setup/providers/codex.ts @ providers branch d2dd91b */}
+{/* verified-against: container/agent-runner/src/providers/{types,factory,claude,provider-registry}.ts, container/agent-runner/src/{config,index,poll-loop}.ts, container/agent-runner/src/memory/scaffold.ts, src/container-runner.ts, src/container-config.ts, src/providers/{claude,provider-container-registry}.ts, src/provider-surfaces.test.ts, src/cli/resources/{groups,sessions}.ts, .claude/skills/{add-opencode,add-ollama-provider,add-codex,migrate-memory}/SKILL.md, .claude/skills/add-codex/REMOVE.md, src/{group-init,group-persona,group-skills}.ts, setup/auto.ts, setup/providers/registry.ts, setup/provider-auth.ts, docs/ollama.md, docs/provider-migration.md, container/cli-tools.json @ trunk e926e30e (v2.1.53); opencode.ts, codex.ts, codex-app-server.ts, codex-agents-md.ts, codex-host-contribution.test.ts, exchange-archive.ts, setup/providers/codex.ts @ providers branch f2b75837 */}
 
 A **provider** is the agent CLI that runs inside a group's container — the thing that actually plans, calls tools, and writes replies. By default that's Claude Code via the Claude Agent SDK. The provider is pluggable: the agent runner selects an implementation from an open registry at startup, and the trunk ships only `claude` (plus a `mock` provider for tests).
 
@@ -27,7 +27,7 @@ Every code path that creates a session on trunk writes `agent_provider = null`, 
 
 ## Claude (default)
 
-The Claude provider wraps the Claude Agent SDK. Its `model` accepts an alias (`sonnet`, `opus`, `haiku`) or a full model ID, and `effort` is one of `low`, `medium`, `high`, `xhigh`, `max` — both optional, both falling back to the SDK default. It's also the most fully integrated provider in-tree: native slash-command handling, mid-turn input streaming, native memory (`CLAUDE.local.md`), and transcript rotation that archives oversized session histories before a cold resume can wedge the container.
+The Claude provider wraps the Claude Agent SDK. Its `model` accepts an alias (`sonnet`, `opus`, `haiku`) or a full model ID, and `effort` is one of `low`, `medium`, `high`, `xhigh`, `max` — both optional, both falling back to the SDK default. It's also the most fully integrated provider in-tree: native slash-command handling, mid-turn input streaming, and transcript rotation that archives oversized session histories before a cold resume can wedge the container.
 
 To point it at any Anthropic-compatible endpoint, set `ANTHROPIC_BASE_URL` in `.env` — the real token stays in the vault and is injected on the wire. See [Credentials](/operate/credentials#anthropic-credentials).
 
@@ -80,18 +80,18 @@ Verified against the provider sources on the `providers` branch:
 
 - **Slash commands aren't native.** OpenCode and Codex declare `supportsNativeSlashCommands = false`, so the poll loop formats slash commands as ordinary chat text instead of executing them.
 - **No mid-turn input.** Both queue follow-up messages and drain them between turns; the Claude provider streams them into the live turn.
-- **No `@-import` expansion.** Codex's app-server doesn't expand `@-import` directives or auto-load a native memory file, so the Codex provider composes its own `AGENTS.md` (group instructions plus skills, under a 32 KB cap) fresh on each spawn instead of leaning on the host's `CLAUDE.md` machinery.
+- **No `@-import` expansion.** Codex's app-server doesn't expand `@-import` directives, so the Codex provider composes its own `AGENTS.md` (group instructions plus skills, under a 32 KB cap) fresh on each spawn instead of leaning on the host's composed `CLAUDE.md`.
 - **No transcript rotation.** Only the Claude provider implements `maybeRotateContinuation` — the guard against unresumable, oversized session transcripts.
 
 ## Provider capability hooks
 
-A provider implementation declares a handful of optional capabilities. The runner and host read them by name and apply them generically — never branching on a hardcoded provider name — so each is opt-in and default-off: a provider that declares none behaves exactly as before the hooks existed. The three that shape the agent's environment:
-
-- **Persistent memory scaffold** (`usesMemoryScaffold`). A provider with no native memory of its own opts in, and the runner builds an idempotent `memory/` tree in the agent's host-backed workspace (`/workspace/agent`) at boot: `memory/index.md`, `memory/system/definition.md`, plus `memory/memories/` (durable facts, people, projects, decisions) and `memory/data/` (structured reference data). It persists across container restarts and only writes what's missing, so the agent's own edits are never clobbered. Claude omits the flag because it already has native memory (`CLAUDE.local.md`), so its memory is left untouched.
+A provider implementation declares a handful of optional capabilities. The runner and host read them by name and apply them generically — never branching on a hardcoded provider name — so each is opt-in and default-off: a provider that declares none behaves exactly as before the hooks existed. The two that shape the agent's environment:
 
 - **Exchange archiving** (`onExchangeComplete`). The poll loop calls this after every completed exchange — a result, a wrapping retry, or an error — handing the provider a `ProviderExchange` (the prompt, the result, the continuation id, and a `completed` / `undelivered` / `error` status). A provider whose harness already keeps an on-disk transcript (the Claude Agent SDK writes `.jsonl`) omits it; one that keeps no transcript implements it to archive each round-trip itself, e.g. as markdown under the agent's `conversations/` dir. It's best-effort — the loop catches and logs anything it throws.
 
-- **Owning the agent surfaces** (`providesAgentSurfaces`). By default the host composes the project doc, skill-discovery links, and provider state dir, then mounts them into the container — the composed `CLAUDE.md`, the skill fragments, and `CLAUDE.local.md` seeding. A provider can declare at registration time that it owns these surfaces; the host then skips all of that, and the provider's own config fn composes and mounts its equivalents (it receives the group dir and the resolved skill list to do so).
+- **Owning the agent surfaces** (`providesAgentSurfaces`). By default the host composes the project doc, skill-discovery links, and provider state dir, then mounts them into the container — the composed `CLAUDE.md`, the skill fragments, and the provider-neutral `instructions.prepend.md` staging. A provider can declare at registration time that it owns these surfaces; the host then skips all of that, and the provider's own config fn composes and mounts its equivalents (it receives the group dir and the resolved skill list to do so).
+
+Persistent memory is deliberately **not** a hook (there is no `usesMemoryScaffold` flag): every provider shares one persistent `memory/` tree. The runner scaffolds it unconditionally at boot in the agent's host-backed workspace (`/workspace/agent`) — `memory/index.md` plus the `memory/system/` doctrine files — writing only what's missing, so the agent's own edits and accumulated memory are never clobbered. Because the tree lives in the group dir, it persists across container restarts. What each provider *must* implement is `registerMemorySessionHook`, the interface method that wires the shared tree into that provider's own harness.
 
 ## Choosing a provider during setup
 
@@ -114,10 +114,9 @@ Config changes are saved immediately but only take effect on the next container 
 
 Provider-neutral state stays put: group identity, wiring, members, roles, destinations, container config, skills, MCP servers, mounts, workspace files (`groups/<folder>/`), and conversation archives (`conversations/`). Agent surfaces are composed fresh at every spawn, so nothing migrates there.
 
-Two things are provider-specific and **do not** carry across:
+**Agent memory carries too.** The `memory/` tree is universal and provider-neutral — it lives in the group's host-backed workspace, and every provider scaffolds and reads the same tree — so the new provider picks up the memory where the old one left off. Standing instructions (`instructions.prepend.md`) are equally provider-neutral. (`/migrate-memory` still exists, but it's a one-time cutover for legacy v1-era stores — `CLAUDE.md` / `CLAUDE.local.md` / `.seed.md` — into the tree, not part of a provider switch.)
 
-- **Agent memory.** Each provider keeps its own store — Claude's is `CLAUDE.local.md`, scaffold providers like Codex keep a `memory/` tree. A switch never touches the old store; the new provider starts with its own. To carry memory across, run **`/migrate-memory`** — the coding agent reads the source store, distills it into the target store (copy, never move), and restarts the group. Both directions work.
-- **In-flight conversation context.** Continuations are per-provider, so the new provider starts a fresh thread; the old slot is kept, so switching back resumes where you left off. Recent context is recoverable from the `conversations/` archives.
+One thing is provider-specific and **does not** carry across: **in-flight conversation context**. Continuations are per-provider, so the new provider starts a fresh thread; the old slot is kept, so switching back resumes where you left off. Recent context is recoverable from the `conversations/` archives.
 
 Switching to a provider that isn't installed (or a typo'd name) fails the container at boot — the host logs `Container exited non-zero` with a `stderrTail` like `Unknown provider: codexx. Registered: claude, codex`.
 
