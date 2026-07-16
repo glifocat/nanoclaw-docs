@@ -4,7 +4,7 @@ description: "How NanoClaw channels work: the built-in CLI channel, the adapter 
 keywords: ["channels", "adapters", "channel registry", "chat sdk", "webhook", "add-telegram", "add-discord", "add-slack", "manage-channels"]
 ---
 
-{/* verified-against: src/channels/{adapter,channel-registry,index,chat-sdk-bridge,cli}.ts, src/webhook-server.ts, .claude/skills/{manage-channels,add-telegram}/SKILL.md, upstream/channels:src/channels/ @ cb6e3d1 (v2.1.23); channels @ 90dd87d */}
+{/* verified-against: src/channels/{adapter,channel-registry,channel-defaults,index,chat-sdk-bridge,cli}.ts, src/webhook-server.ts, setup/auto.ts, setup/channels/run-channel-skill.ts, .claude/skills/{manage-channels,add-telegram}/SKILL.md @ e926e30e (v2.1.53); channels branch src/channels/ @ 9e14cd0c */}
 
 NanoClaw trunk ships channel **infrastructure** — the adapter interface, the registry, the Chat SDK bridge, the webhook server — plus one built-in channel: `cli`, an always-on local-terminal channel that needs no credentials. Every platform adapter (Telegram, Discord, Slack, WhatsApp, …) lives on the `channels` branch of the repo and is installed on demand with an `/add-<channel>` skill. Your fork only contains the channels you actually use.
 
@@ -45,7 +45,7 @@ The skills are idempotent — every step is safe to re-run, and each skill start
 
 ## Adapter catalog
 
-Everything on the `channels` branch right now. "Setup wizard" means the channel has a guided flow in `setup/channels/` that the first-run setup offers; channels without one are installed with their `/add-<channel>` skill directly.
+Everything on the `channels` branch right now. "Setup wizard" means the first-run setup offers the channel and runs its `/add-<channel>` skill for you; the others are installed by running the skill directly.
 
 | Channel | Setup wizard? | Install | Notes |
 |---------|---------------|---------|-------|

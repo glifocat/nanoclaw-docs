@@ -4,7 +4,7 @@ description: "Connect NanoClaw to Microsoft Teams via the Chat SDK adapter — A
 keywords: ["teams", "microsoft teams", "add-teams", "azure bot", "app registration", "client secret", "sideload", "manifest", "webhook", "chat sdk", "threads"]
 ---
 
-{/* verified-against: src/channels/teams.ts (channels branch), src/channels/chat-sdk-bridge.ts, src/webhook-server.ts, setup/channels/teams.ts, setup/add-teams.sh, .claude/skills/add-teams/SKILL.md @ cb6e3d1 (v2.1.23); channels @ 90dd87d */}
+{/* verified-against: src/channels/chat-sdk-bridge.ts, src/webhook-server.ts, setup/channels/teams-manifest-build.ts, .claude/skills/add-teams/SKILL.md @ e926e30e (v2.1.53); channels branch src/channels/teams.ts @ 9e14cd0c */}
 
 The Teams adapter connects NanoClaw to a bot you register in Azure. It's built on the Chat SDK bridge (`@chat-adapter/teams` 4.29.0, pinned — the `/add-teams` skill may pin a slightly newer adapter version) and receives messages over **webhooks**: Azure Bot Service POSTs to NanoClaw's shared webhook server, so Teams needs a **public HTTPS URL** that reaches your machine.
 
@@ -45,7 +45,7 @@ Teams is offered in the first-run setup wizard, or add it later by running `/add
     The wizard builds a Teams app package (manifest + icons, zipped into `data/teams/`, named from `NANOCLAW_AGENT_NAME` or "NanoClaw"). In Teams: **Apps → Manage your apps → Upload an app → Upload a custom app**, select the zip. If that option is missing, your tenant admin has disabled sideloading (Teams Admin Center → Teams apps → Setup policies → Upload custom apps = On).
   </Step>
   <Step title="Adapter install">
-    `setup/add-teams.sh` copies the adapter from the `channels` branch, installs the pinned package, builds, writes `TEAMS_APP_ID`, `TEAMS_APP_PASSWORD`, `TEAMS_APP_TYPE` (and `TEAMS_APP_TENANT_ID` for single tenant) to `.env` (synced to `data/env/env`), and restarts the service.
+    The `/add-teams` skill copies the adapter from the `channels` branch, installs the pinned package, builds, writes `TEAMS_APP_ID`, `TEAMS_APP_PASSWORD`, `TEAMS_APP_TYPE` (and `TEAMS_APP_TENANT_ID` for single tenant) to `.env` (synced to `data/env/env`), and restarts the service.
   </Step>
   <Step title="DM the bot to finish wiring">
     Unlike Discord or Telegram, the Teams platform ID is only discoverable after the **first inbound message**. Find your bot in Teams and send it a message; NanoClaw auto-creates a messaging group for the conversation. The wizard offers to hand off to Claude to walk you through the rest — watching `logs/nanoclaw.log` for the inbound, finding the auto-created group, and wiring it to an agent — or you can do it yourself with `/manage-channels`.
