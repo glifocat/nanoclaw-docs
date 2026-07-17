@@ -1,12 +1,12 @@
 ---
 title: "Skills: how NanoClaw extends itself"
-description: "What a NanoClaw skill is in v2 — SKILL.md workflows that Claude Code executes in your checkout, fetching code additively from registry branches. Never a git merge."
+description: "What a NanoClaw skill is in v2 — SKILL.md workflows that a coding harness executes in your checkout, fetching code additively from registry branches. Never a git merge."
 keywords: ["skills", "extend", "SKILL.md", "registry branches", "channels branch", "providers branch", "REMOVE.md", "container skills", "additive fetch"]
 ---
 
 {/* verified-against: CONTRIBUTING.md, docs/skills-model.md, docs/skill-guidelines.md, .claude/skills/{add-telegram,add-codex,add-gmail-tool,manage-mounts}/SKILL.md, .claude/skills/{add-telegram,add-gmail-tool}/REMOVE.md, container/skills/, src/container-runner.ts, setup/providers/index.ts, setup/channels/run-channel-skill.ts @ e926e30e (v2.1.53) */}
 
-A NanoClaw skill is a **SKILL.md instruction workflow** in `.claude/skills/` that Claude Code executes in your checkout. When you run `/add-telegram` or `/manage-mounts` — or the setup wizard dispatches an `/add-<channel>` skill for you — Claude reads the skill's instructions and performs them: copying files, appending an import, installing a dependency, running a test. There is no manifest.yaml and no skill state file. The skill *is* the markdown — the mechanical steps in trunk install skills also carry `nc:` directive fences, so a deterministic parser can apply the same document an agent reads, and anything it can't apply falls back to the prose beside it.
+A NanoClaw skill is a **SKILL.md instruction workflow** in `.claude/skills/` that a coding harness (Claude Code, Codex, OpenCode) executes in your checkout. When you invoke `add-telegram` or `manage-mounts`, the coding harness reads the skill's instructions and performs them: copying files, appending an import, installing a dependency, running a test. There is no manifest.yaml and no skill state file. The skill *is* the markdown — the mechanical steps in trunk install skills also carry `nc:` directive fences, so the setup wizard can apply the same document a coding harness would read, and anything it can't apply mechanically falls back to the prose beside it. Two readers, one document.
 
 <Note>
 This URL previously documented a different model: skills as `skill/*` git branches that you merged into your fork and removed with `git revert`. That model was designed for v1 and **never shipped in v2** — skills are not distributed as `skill/*` branches you merge, and no skill installs by merging a branch. If a skill's install instructions say `git merge`, it isn't built for v2. This page describes how skills actually work as of v2.1.4.
@@ -44,14 +44,18 @@ Three properties hold across every install skill:
 
 ## The four categories of host skills
 
-These are the skills you invoke as slash commands in Claude Code from your NanoClaw checkout. The [skills catalog](/reference/skills-catalog) lists all of them; here's what each category does, with one worked example apiece.
+These are the skills you invoke from your coding harness in your NanoClaw checkout. The [skills catalog](/reference/skills-catalog) lists all of them; here's what each category does, with one worked example apiece.
+
+<Note>
+The `/name` form below is Claude Code's. Codex invokes the same skill as `$add-telegram` and does not accept `/add-telegram`; OpenCode loads it through its own `skill` tool, with no typed form. The skill file is the same one in every case. A few skills still phrase their steps in Claude Code's tool vocabulary, which other harnesses follow best-effort.
+</Note>
 
 | Category | Example | What installing looks like |
 | --- | --- | --- |
 | **Channel installs** | `/add-telegram` | The flow above: copy the adapter from the `channels` branch, append the barrel import, pin the dependency, run the registration test. See [Channels overview](/channels/overview). |
 | **Provider installs** | `/add-codex` | Same pattern against the `providers` branch, but multi-point: a provider spans three trees — the host, the container's agent-runner, and setup — so the skill appends an import to each of the three provider barrels and runs a registration guard per tree. See [Providers](/extend/providers). |
 | **Tool installs** | `/add-gmail-tool` | Wires an MCP server into selected agent groups with vault-managed credentials: the container only ever sees `onecli-managed` placeholder stubs, and the OneCLI gateway injects real OAuth tokens in flight. See [Tools](/extend/tools). |
-| **Operational skills** | `/manage-mounts` | Pure instruction workflows — no code copied, nothing fetched. The SKILL.md walks Claude through a task, like editing the mount allowlist through the setup CLI and restarting the service. |
+| **Operational skills** | `/manage-mounts` | Pure instruction workflows — no code copied, nothing fetched. The SKILL.md walks the coding harness through a task, like editing the mount allowlist through the setup CLI and restarting the service. |
 
 <Note>
 Upstream's CONTRIBUTING.md folds these into a slightly different taxonomy (channel/provider, utility, operational, container), but the install mechanics are what matter: registry-branch fetch for channels and providers, self-contained files for tools, instructions only for operational skills.
