@@ -1,6 +1,6 @@
 ---
 title: "Skills catalog"
-description: "Every skill that ships with NanoClaw — host-side workspace skills you invoke from a coding-agent session, and container skills mounted into every agent container."
+description: "Every skill that ships with NanoClaw — host-side workspace skills you invoke from your coding harness, and container skills mounted into every agent container."
 keywords: ["skills", "catalog", "reference", "add-channel", "providers", "tools", "container skills", "workspace skills", "slash commands"]
 ---
 
@@ -8,8 +8,12 @@ keywords: ["skills", "catalog", "reference", "add-channel", "providers", "tools"
 
 NanoClaw ships two kinds of skills:
 
-- **Host-side workspace skills** (`.claude/skills/`) — invoked from a coding-agent session in your NanoClaw checkout. They install channels, providers, and tools, or operate and maintain your install. 48 skills total: 17 channel installs, 3 provider installs, 11 tool installs, and 17 operational skills.
+- **Host-side workspace skills** (`.claude/skills/`) — invoked from your coding harness in your NanoClaw checkout. They install channels, providers, and tools, or operate and maintain your install. 48 skills total: 17 channel installs, 3 provider installs, 11 tool installs, and 17 operational skills.
 - **Container skills** (`container/skills/`) — 6 skills mounted into every agent container at `/app/skills`. The agent loads them at runtime; you don't invoke them yourself.
+
+<Note>
+The `/name` form used throughout this page is Claude Code's. Codex invokes the same skills as `$name` and does not accept the slash form; OpenCode loads them through its own `skill` tool, with no typed form. The skills are identical across harnesses — only the way you reach for one changes.
+</Note>
 
 For how skills work and how to write your own, see [Extending NanoClaw](/extend/overview).
 
