@@ -12,7 +12,7 @@ NanoClaw ships two kinds of skills:
 - **Container skills** (`container/skills/`) — 6 skills mounted into every agent container at `/app/skills`. The agent loads them at runtime; you don't invoke them yourself.
 
 <Note>
-The `/name` form used throughout this page is Claude Code's. Codex invokes the same skills as `$name` and does not accept the slash form; OpenCode loads them through its own `skill` tool, with no typed form. The skills are identical across harnesses — only the way you reach for one changes.
+The `/name` form used throughout this page is Claude Code's. Codex invokes the same skills as `$name` and does not accept `/name`; OpenCode loads them through its own `skill` tool, with no typed form. The skill files are the same ones in every case. A few skills still phrase their steps in Claude Code's tool vocabulary, which other harnesses follow best-effort.
 </Note>
 
 For how skills work and how to write your own, see [Extending NanoClaw](/extend/overview).
