@@ -1,5 +1,6 @@
 ---
 title: Quick start
+tag: "UPDATED"
 description: Get NanoClaw running in one command with the scripted installer.
 icon: "bolt"
 keywords: ["setup", "install", "getting started", "nanoclaw.sh", "setup wizard", "first agent", "things to try"]
@@ -32,6 +33,10 @@ Everything else — Homebrew on macOS, Node 22, pnpm, Docker, the OneCLI vault �
 
   <Step title="Answer the wizard">
     Press Enter on **Standard setup** (or pick **Advanced** to override defaults), then the wizard walks through:
+
+    <Frame caption="The wizard right after the system check — the sandbox build that follows is the long step (3–10 minutes on a first build).">
+      <img src="/images/setup-wizard.png" alt="Terminal running the NanoClaw setup wizard: the NanoClaw splash art, Standard setup selected, the system check passed, and the sandbox build starting" />
+    </Frame>
 
     1. **System check** — verifies your environment
     2. **Sandbox build** — builds the agent container image. First build pulls a base image and takes 3–10 minutes on a fresh machine.
