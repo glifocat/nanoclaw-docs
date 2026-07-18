@@ -41,6 +41,13 @@ Two things are intentionally left behind, plus one the script defers:
 
 ## Run the migration
 
+The migration is two actors in sequence: the script does everything deterministic, then hands off to Claude for the parts that need judgment.
+
+```mermaid
+flowchart LR
+    S["migrate-v2.sh<br/>phases 0–3"] --> W["service switchover"] --> H["handoff.json"] --> K["/migrate-from-v1 skill"] --> V["verify + restart"]
+```
+
 The script is idempotent — re-running it skips what's already done, so a failed step never forces you to start over.
 
 <Steps>

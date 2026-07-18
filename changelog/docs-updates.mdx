@@ -5,6 +5,15 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Flow diagrams for installation and migration" description="2026-07-18" tags={["Updated"]}>
+  First visuals in the Get started section, from a rich-content survey of those four pages:
+
+  - **`migrate-from-v1`** — a flow diagram ahead of the step-by-step walkthrough, showing the migration's two-actor shape: `migrate-v2.sh` does the deterministic phases, `handoff.json` carries the state, and the `/migrate-from-v1` skill finishes the judgment calls before the health check
+  - **`installation`** — a small diagram of the three-stage installer chain (`nanoclaw.sh` → `setup.sh` → `setup:auto`) under "What the installer does under the hood"
+
+  Both diagrams restate prose that was verified at `e926e30e`; no claims changed, so `verified-against` stamps stay put. More from the survey (hero chat screenshot on the introduction, a wizard terminal capture on the quickstart) lands separately.
+</Update>
+
 <Update label="Signal read receipts + env-var line-citation refresh" description="2026-07-18" tags={["Updated", "Fixed"]}>
   Micro-sweep of the delta since v2.1.53: trunk `e926e30e` → `d23db4f3` (11 commits, no release), channels branch `9e14cd0c` → `7f24dd31` (one merge).
 
