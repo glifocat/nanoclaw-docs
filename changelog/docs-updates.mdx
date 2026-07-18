@@ -5,6 +5,14 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Signal read receipts + env-var line-citation refresh" description="2026-07-18" tags={["Updated", "Fixed"]}>
+  Micro-sweep of the delta since v2.1.53: trunk `e926e30e` → `d23db4f3` (11 commits, no release), channels branch `9e14cd0c` → `7f24dd31` (one merge).
+
+  - **`channels/signal`** — the managed daemon now starts with `--send-read-receipts` ([nanoclaw#3062](https://github.com/nanocoai/nanoclaw/pull/3062)), so senders see messages marked read once the daemon receives them. New Platform notes bullet, including the caveat that an externally run daemon needs the flag added manually. Channels-branch stamp bumped to `7f24dd31` here and on `channels/overview` (whole-dir citation; overview's claims are unaffected). The other channel pages cite files that are byte-identical across the two SHAs, so their stamps stay put per the drift-detection rule
+  - **`reference/environment-variables`** — 25 of the 35 `file:line` citations pointed at the wrong lines, and were already wrong at the `e926e30e` stamp (a `src/config.ts` restructure predates the sweep; the sweep verified names and defaults but not line numbers). Every citation is now script-verified against source: the cited line must actually mention the variable. Trunk stamp stays at `e926e30e` — the cited files are identical at `d23db4f3` apart from a `claude.ts` change well below the cited region
+  - **Checked, no docs impact**: compaction no longer surfaces as a synthetic "Context compacted." result — it logs as activity instead ([nanoclaw#3083](https://github.com/nanocoai/nanoclaw/pull/3083)); no page ever claimed it appeared in chat. Upstream's CHANGELOG dedup ([nanoclaw#3063](https://github.com/nanocoai/nanoclaw/pull/3063)) touched unreleased entries the portal doesn't mirror, and [nanoclaw#3084](https://github.com/nanocoai/nanoclaw/pull/3084) is test-only
+</Update>
+
 <Update label="Skills are run by a coding harness, not Claude Code" description="2026-07-17" tags={["Updated", "Fixed"]}>
   The skills pages said a NanoClaw skill is a workflow "that Claude Code executes in your checkout". Any agents-convention coding harness runs them, and upstream built that on purpose: [nanoclaw#2810](https://github.com/nanocoai/nanoclaw/pull/2810) added `.agents/skills → ../.claude/skills` and `AGENTS.md → CLAUDE.md` so "an agents-convention harness (e.g. Codex) read the same skills and instructions as the `.claude` setup". Both symlinks still resolve at `e926e30e`, and all three harnesses really do find our skills — Claude Code via `.claude/skills`, Codex via `.agents/skills`, OpenCode via all of `.opencode/skills`, `.claude/skills` and `.agents/skills`. Fixed in [#355](https://github.com/glifocat/nanoclaw-docs/pull/355):
 
