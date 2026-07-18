@@ -1,10 +1,11 @@
 ---
 title: "Signal"
+tag: "UPDATED"
 description: "Connect NanoClaw to Signal via a native signal-cli adapter — QR-code device linking, a local JSON-RPC daemon, and no bot API required."
 keywords: ["signal", "signal-cli", "add-signal", "linked devices", "qr code", "json-rpc", "daemon", "secondary device"]
 ---
 
-{/* verified-against: setup/install-signal-cli.sh, setup/signal-auth.ts, .claude/skills/add-signal/SKILL.md @ e926e30e (v2.1.53); channels branch src/channels/signal.ts @ 9e14cd0c */}
+{/* verified-against: setup/install-signal-cli.sh, setup/signal-auth.ts, .claude/skills/add-signal/SKILL.md @ e926e30e (v2.1.53); channels branch src/channels/signal.ts @ 7f24dd31 */}
 
 The Signal adapter is **native** — no Chat SDK bridge, only Node.js builtins. Signal has no bot API, so NanoClaw talks to [signal-cli](https://github.com/AsamK/signal-cli), which it spawns as a local daemon and drives over a newline-delimited **JSON-RPC TCP socket** (`127.0.0.1:7583` by default). Setup links NanoClaw to your existing Signal account as a **secondary device** — no new phone number needed; your assistant sends and receives as the number on your phone. All connections are outbound, so no public URL, webhook, or open port; works behind NAT and on a laptop.
 
@@ -51,6 +52,7 @@ To wire group chats or more DMs later, run `/manage-channels`. DMs are identifie
 - **Replies and mentions** — quoted replies pass the quoted text and sender to the agent as context. Inbound @mentions are resolved from Signal's placeholder protocol to display names, so the agent sees `@Alice` instead of a raw UUID.
 - **Group engagement** — group wirings default to mention engagement: the agent responds only when the linked account is @-tagged in the group. DMs always count as addressed to the agent. Override per wiring with a different [engage mode](/reference/ncl-cli#wirings).
 - **Typing indicator** — shown while the agent works, in DMs only (Signal has no group typing).
+- **Read receipts** — NanoClaw starts the managed daemon with `--send-read-receipts`, so senders see their messages marked read once the daemon receives them. An externally run daemon (`SIGNAL_MANAGE_DAEMON=false`) sends read receipts only if you add the flag to its command line yourself.
 - **Groups** — modern Signal groups (GroupV2) are detected by their group ID; group messages route to a `group:<groupId>` chat, separate from each member's DM.
 - **No auto-reconnect** — if the daemon drops the TCP connection, the adapter marks itself disconnected and logs a warning rather than retrying. Restart the service to re-establish.
 
