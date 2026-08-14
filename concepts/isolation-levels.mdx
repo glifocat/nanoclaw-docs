@@ -6,13 +6,13 @@ keywords: ["isolation", "session_mode", "shared", "per-thread", "agent-shared", 
 
 {/* verified-against: src/session-manager.ts, src/router.ts, src/channels/channel-defaults.ts, src/container-runner.ts, .claude/skills/manage-channels/SKILL.md, src/cli/resources/wirings.ts @ 639577c3 */}
 
-Every time you wire a chat to an agent, you answer one question: should this conversation share anything with the others? NanoClaw gives you four levels, built from two dials in the [entity model](/concepts/entity-model) — which agent group the wiring points at, and the wiring's `session_mode`. This page walks them from most to least isolated.
+Every time you wire a chat to an agent, you answer one question: should this conversation share anything with the others? NanoClaw gives you four levels, built from two dials in the [entity model](/concepts/entity-model) — which agent group the wiring points at, and the wiring's `session_mode`. From most to least isolated they run: separate agent groups, then within one group `per-thread`, `shared`, and finally `agent-shared`. The walkthrough below starts at the group boundary — the strongest split — and then takes the three session modes.
 
 | Level | Conversation history | Files & memory | Container config & credentials |
 |---|---|---|---|
 | Separate agent groups | Separate | Separate | Separate |
-| One group, session per chat (`shared`) | Separate | **Shared** | Shared |
 | One group, session per thread (`per-thread`) | Separate per thread | **Shared** | Shared |
+| One group, session per chat (`shared`) | Separate | **Shared** | Shared |
 | One conversation (`agent-shared`) | One for everything | Shared | Shared |
 
 ## Separate agent groups — nothing shared

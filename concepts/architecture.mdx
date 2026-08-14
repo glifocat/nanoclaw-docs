@@ -7,14 +7,14 @@ keywords: ["architecture", "host process", "router", "delivery", "host sweep", "
 
 {/* verified-against: src/index.ts, src/router.ts, src/delivery.ts, src/session-manager.ts, src/host-sweep.ts, src/container-runner.ts, src/claude-md-compose.ts, src/group-persona.ts, src/webhook-server.ts, src/host-lifecycle.ts, container/agent-runner/src/{index,poll-loop,formatter,compact-instructions}.ts @ 639577c3 */}
 
-NanoClaw is one Node.js host process plus one Docker container per active session. The host owns the channels, the routing, and the container lifecycle; the agent runs inside the container and never talks to the network on NanoClaw's behalf. Between them sits the core idea: **every message is a row in SQLite**. There is no internal message bus, no RPC, no shared memory — the host writes rows the container reads, the container writes rows the host reads, and everything else is polling.
+NanoClaw is one Node.js host process plus one Docker container per active session. The host owns the channels, the routing, and the container lifecycle; the agent runs inside the container and never touches the messaging platforms — that traffic is all host. (The agent's own network egress is a separate matter: open by default, [lockable](/operate/hardening#lock-down-network-egress).) Between them sits the core idea: **every message is a row in SQLite**. There is no internal message bus, no RPC, no shared memory — the host writes rows the container reads, the container writes rows the host reads, and everything else is polling.
 
 Each session owns a pair of database files in its session folder:
 
 - `inbound.db` — host writes, container reads. Inbound messages, scheduled tasks, routing defaults.
 - `outbound.db` — container writes, host reads. Agent replies, processing acknowledgements, session state.
 
-One writer per file, opposite directions. A crashed container can never corrupt the host's queue, and the host never contends with an agent for a write lock across the Docker mount boundary.
+One writer per file, opposite directions — so a crashed container can never corrupt the host's queue. (Two narrow host-side writes to `outbound.db` bend the rule deliberately; the invariants section below explains why they're safe.)
 
 ## A message, end to end
 
@@ -135,7 +135,7 @@ The session pair **is** the host-container IPC system — there is no other chan
 
 1. **`journal_mode=DELETE`, not WAL** — WAL's memory-mapped `-shm` file doesn't refresh across the host-to-container mount, so a WAL-mode container would silently miss every new message.
 2. **The host opens, writes, and closes per operation** — a long-lived host connection would freeze the container's view of the file at first read.
-3. **One writer per file** — DELETE-mode journal unlinking isn't atomic across the mount, so concurrent writers would corrupt the database. Hence the split into two files with opposite ownership; the host only writes `outbound.db` when no container is running.
+3. **One writer per file** — DELETE-mode journal unlinking isn't atomic across the mount, so concurrent writers would corrupt the database. Hence the split into two files with opposite ownership. The host itself writes rows into `outbound.db` in just two deliberate cases — command-gate denials, answered without waking the container, and clearing a killed container's orphaned processing claims after the container is already gone — both opened with the same DELETE journal and `busy_timeout` discipline.
 
 ## Related pages
 
