@@ -15,7 +15,7 @@ Everything below answers the question that assumption forces: *what can a fully 
 flowchart TD
     M["Untrusted message"] --> S["Sender policies + engagement gates"]
     S --> CG["Command gate (host)"]
-    CG --> C["Container — one session's blast radius"]
+    CG --> C["Container — one agent group's blast radius"]
     C --> F["Filesystem: mounts only,<br/>allowlist for anything extra"]
     C --> N["Network: vault proxy,<br/>egress lockdown optional"]
     N --> A["Approval cards for<br/>privileged actions"]
@@ -23,9 +23,11 @@ flowchart TD
 <img className="block dark:hidden" src="/images/diagrams/security-light.svg" alt="Containment view of the security model: an assumed-injected agent inside the container boundary, sender policies and the command gate on the inbound side, and bounded filesystem, network, and privileged-action paths crossing out" />
 <img className="hidden dark:block" src="/images/diagrams/security-dark.svg" alt="Containment view of the security model: an assumed-injected agent inside the container boundary, sender policies and the command gate on the inbound side, and bounded filesystem, network, and privileged-action paths crossing out" />
 
-## Container isolation — the blast radius is one session
+## Container isolation — the blast radius is one agent group
 
 A compromised agent is a compromised *container*, and every active session gets its own. The container runs as the unprivileged `node` user (or your host uid/gid), and `--rm` so nothing persists past exit. Every spawn also carries the same hardening flags, unconditionally and with no per-group override: `--cap-drop=ALL` and `--security-opt no-new-privileges` (depth against a root-in-container path — under the normal user mapping the capability sets are already empty), `--init` so signals actually reach the runner instead of being discarded at PID 1, and a `--pids-limit` fork-bomb backstop. The image itself strips the setuid-root bit from every binary Debian ships (`mount`, `su`, `passwd`, and friends), none of which an unprivileged agent needs. Its filesystem view is exactly the [mount table](/concepts/container-lifecycle#spawn--the-world-rebuilt-every-time): the session folder, the group workspace, and read-only shared code. No host home directory, no `.ssh`, no Docker socket. Its own `container.json` and composed `CLAUDE.md` are re-mounted read-only on top of the writable workspace, so the agent can read its configuration but not rewrite it to grant itself more.
+
+One boundary the container does *not* draw: every session of an agent group mounts the same group workspace read-write, so what a compromised session reaches is the **group's** files and `memory/` tree, not just its own conversation's. Session databases stay separate — chat histories don't leak between sessions — but the honest unit of blast radius is the agent group, which is why different trust domains belong in [separate agent groups](/concepts/isolation-levels).
 
 The container is also disposable by design — the host kills it on a stale heartbeat and rebuilds the entire environment at next spawn, so a compromised process doesn't outlive its session. See [Container lifecycle](/concepts/container-lifecycle).
 

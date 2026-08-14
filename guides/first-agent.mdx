@@ -112,7 +112,7 @@ Look for `status` = `active` and `container_status` = `running`. And the contain
 docker ps --filter name=nanoclaw-v2-scout
 ```
 
-It stays warm for a while after the conversation, then exits; the host respawns it on the next message. To force a fresh one (with an image rebuild, e.g. after adding packages):
+It stays warm for a while after the conversation until the host's sweep kills it — the runner never exits just for being idle — and the host respawns it on the next message. To force a fresh one (with an image rebuild, e.g. after adding packages):
 
 ```bash
 ncl groups restart --id <agent-id> --rebuild

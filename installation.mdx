@@ -32,7 +32,7 @@ Two hosts the installer explicitly flags in pre-flight:
 | Dependency | Where it runs | How it's installed |
 |---|---|---|
 | Homebrew (macOS only) | Host | Official installer, after a prompt. Pulls in Apple's Command Line Tools (can take 5–10 minutes on a factory Mac). |
-| Node 22 | Host | `uvx nodeenv -n lts` if `uvx` is present; otherwise `brew install node@22` (macOS) or NodeSource + `apt-get` (Linux). Skipped if you already have Node 20+. |
+| Node 22 | Host | `uvx nodeenv -n lts` if `uvx` is present; otherwise `brew install node@22` (macOS) or NodeSource + `apt-get` (Linux). Skipped if you already have Node 20+. An existing older Node is never upgraded in place — setup stops and asks you to upgrade it yourself. |
 | pnpm 10 | Host | `corepack enable`, falling back to `npm install -g pnpm@<pinned>` at the version from `packageManager`. |
 | Docker | Host | `brew install --cask docker` (macOS) or `get.docker.com` + `usermod -aG docker` (Linux/WSL). Setup also starts the daemon and works around stale group membership (`sg docker` re-exec, or a temporary ACL on the socket) so you don't have to log out and back in. |
 | OneCLI vault | Host | Installed by the wizard, or reuses an existing healthy OneCLI instance if it finds one. |
@@ -45,7 +45,7 @@ Build tools (Xcode Command Line Tools on macOS, `gcc`/`make` on Linux) are check
 `bash nanoclaw.sh` is a three-stage chain:
 
 1. **`nanoclaw.sh`** — pre-flight checks (RAM floor, GCE detection, root warning, Homebrew prompt on macOS), then runs the bootstrap under a spinner. Bash only — nothing else exists on the machine yet.
-2. **`setup.sh`** — detects the platform (macOS / Linux / WSL), installs Node 22 via `setup/install-node.sh` if Node 20+ isn't present, gets pnpm onto the PATH, runs `pnpm install --frozen-lockfile`, and verifies the `better-sqlite3` native module loads.
+2. **`setup.sh`** — detects the platform (macOS / Linux / WSL), installs Node 22 via `setup/install-node.sh` if Node 20+ isn't present (the helper never replaces an existing older Node — setup fails with `node_missing` and asks you to upgrade instead), gets pnpm onto the PATH, runs `pnpm install --frozen-lockfile`, and verifies the `better-sqlite3` native module loads.
 3. **`pnpm run setup:auto`** — the interactive wizard (`setup/auto.ts`). This is where the container build, OneCLI vault, provider auth, service install, and channel pairing happen. [Quick start](/quickstart) walks through every wizard step.
 
 {/* Diagram source (Mermaid) - kept for regeneration. Edit this, then redraw the
@@ -70,7 +70,7 @@ Two consequences worth knowing:
 - **Agent source is never baked into the image.** The host bind-mounts `container/agent-runner/src` read-only at `/app/src`, so agent-runner changes take effect on the next container spawn without a rebuild. The host's own `src/` is different: the service runs the compiled `dist/`, so host changes need `pnpm run build` and a service restart.
 - **The image is per-checkout**: `nanoclaw-agent-v2-<slug>:latest`, where the slug is the first 8 hex chars of `sha1(projectRoot)`. Two NanoClaw installs on one host never clobber each other's image, service, or containers.
 
-The container step can fetch a pre-built image instead of building one: sign in with your NanoClaw account, and setup pulls the reference pinned as `agent-image` in `versions.json` — implemented by `container/pull.sh` — and retags it to the same local tag a build would produce. The choice persists as `NANOCLAW_HARDENED_IMAGE` in `.env`. See [Get started with the Echo hardened runtime](/guides/echo-hardened-runtime).
+The container step fetches a pre-built image by default: sign in with your NanoClaw account, and setup pulls the reference pinned as `agent-image` in `versions.json` — implemented by `container/pull.sh` — and retags it to the same local tag a build would produce. Building locally is the explicit **Build it here** choice (and the fallback when the pin or its login script is missing, sign-in doesn't complete, or the provider isn't claude). The choice persists as `NANOCLAW_HARDENED_IMAGE` in `.env`. See [Get started with the Echo hardened runtime](/guides/echo-hardened-runtime).
 
 **Docker is the only supported runtime.** `src/container-runtime.ts` hardcodes the binary (`CONTAINER_RUNTIME_BIN = 'docker'`) behind a single-file abstraction — all runtime-specific logic lives in that one file, but nothing else is wired up today.
 
