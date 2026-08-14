@@ -219,3 +219,17 @@ Source of truth: `repo-tokens/badge.svg` in upstream (auto-generated) — the ON
 - No marketing language, filler phrases, or emoji
 - Include code examples and link to related pages
 - Always preview locally with `mint dev` before submitting PRs
+
+STE-inspired habits for procedural text (steps, warnings, troubleshooting),
+borrowed from ASD-STE100 without aiming for full compliance:
+
+- One instruction per sentence. A step that says two things is two steps.
+- One term per concept across a page and its neighbors. If the wizard
+  "stamps" an agent, no page calls the same action "provisioning".
+- Alternatives go in a numbered or bulleted list, not a comma chain with "or".
+- Write comparisons out: "Node 20 or higher", not "Node 20+".
+- A short conditional beats a parenthetical: "If uv is available, ..." rather
+  than "(when uv is available)".
+
+These bind hardest on troubleshooting pages and quoted error messages, where
+readers are stressed and often reading in a second language.
