@@ -5,6 +5,12 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Dial integration guide staged ahead of release" description="2026-08-21" tags={["New"]}>
+  Added a provisional [Dial channel guide](/channels/dial) for the adapter merged through [nanoclaw#3041](https://github.com/nanocoai/nanoclaw/pull/3041) and the setup flow proposed in [nanoclaw#3050](https://github.com/nanocoai/nanoclaw/pull/3050). It covers setup, SMS owner pairing, owner-only versus public access, threaded per-correspondent sessions, voice-call events, loop-safe delivery-failure notices, 10DLC expectations, per-agent access to the optional cross-channel phone tool, multiple numbers, and service-level troubleshooting.
+
+  The adapter claims are anchored to the `channels` merge commit. The page remains visibly unreleased while the setup PR is open; re-verify that PR's merged SHA, remove the warning, and replace the proposed catalog status before publishing.
+</Update>
+
 <Update label="Post-v2.2 drift sweep: runtime, access policy, and session history" description="2026-08-20" tags={["Updated", "Fixed"]}>
   Re-verified the public docs against `nanocoai/nanoclaw@dce271c6` and corrected the user-facing drift introduced after the v2.2.0 release.
 

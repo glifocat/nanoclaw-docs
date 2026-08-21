@@ -139,7 +139,7 @@
           {
             "group": "Channels",
             "icon": "tower-broadcast",
-            "pages": ["channels/overview", "channels/whatsapp", "channels/telegram", "channels/discord", "channels/slack", "channels/signal", "channels/imessage", "channels/teams", "channels/cli", "channels/more-channels"]
+            "pages": ["channels/overview", "channels/whatsapp", "channels/telegram", "channels/discord", "channels/slack", "channels/signal", "channels/imessage", "channels/teams", "channels/dial", "channels/cli", "channels/more-channels"]
           },
           {
             "group": "Operate",

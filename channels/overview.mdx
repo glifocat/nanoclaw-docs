@@ -61,6 +61,7 @@ Everything on the `channels` branch right now. "Setup wizard" means the first-ru
 | Signal | Yes | `/add-signal` | Native; requires signal-cli with a linked account |
 | iMessage | Yes | `/add-imessage` | Local backend: Chat SDK on this Mac (Full Disk Access); hosted backend: native adapter via photon.codes (`spectrum-ts`) |
 | Microsoft Teams | Yes | `/add-teams` | Chat SDK; webhook-based; thread-based |
+| Dial | Proposed | `/add-dial` | Native; dedicated number for SMS and AI voice calls; each correspondent is a thread |
 | Google Chat | — | `/add-gchat` | Chat SDK; thread-based |
 | GitHub | — | `/add-github` | Chat SDK; issue and PR conversations via webhook |
 | Linear | — | `/add-linear` | Chat SDK; issue threads |
@@ -124,6 +125,9 @@ If you're setting up your very first channel, `/init-first-agent` handles the wh
   </Card>
   <Card title="Microsoft Teams" icon="users" href="/channels/teams">
     Bot registration, webhook
+  </Card>
+  <Card title="Dial" icon="phone" href="/channels/dial">
+    SMS and AI voice calls
   </Card>
   <Card title="CLI" icon="terminal" href="/channels/cli">
     Built-in terminal channel

@@ -1,0 +1,92 @@
+---
+title: "Dial"
+description: "Give a NanoClaw agent a phone number for SMS and AI voice calls with Dial."
+keywords: ["Dial", "phone number", "SMS", "voice calls", "10DLC", "add-dial", "pairing"]
+tag: "NEW"
+---
+
+{/* provisional: setup PR is open. Re-verify its merged head before publishing. */}
+{/* verified-against: nanocoai/nanoclaw#3050 .claude/skills/{add-dial,add-dial-number,add-dial-tool}/ + setup/{auto,pair-dial}.ts @ c633d6c1; channels branch merge of nanocoai/nanoclaw#3041 src/channels/{dial,dial-pairing,dial-user-agent}.ts @ 3db8d0dc */}
+
+Dial gives your agent a real phone number for **SMS and AI voice calls**. NanoClaw uses a native adapter: inbound events arrive through Dial's local listen daemon, while outbound texts go through the `dial` CLI. You don't need a public webhook.
+
+One Dial number is one threaded NanoClaw messaging group. Each person who texts or calls the line gets a separate thread and session, and replies leave from the same number they contacted. One install can serve multiple Dial numbers.
+
+<Warning>
+  The Dial adapter has merged into the `channels` branch through [nanoclaw#3041](https://github.com/nanocoai/nanoclaw/pull/3041), but its setup flow in [nanoclaw#3050](https://github.com/nanocoai/nanoclaw/pull/3050) is not merged yet. Setup commands may still change.
+</Warning>
+
+## Prerequisites
+
+- A working NanoClaw install ([quickstart](/quickstart))
+- An email address you can verify with a one-time code
+- A phone that can send an SMS to the new Dial number for owner pairing
+- A host that can run Dial's local listen service through launchd or systemd user services
+
+## Install
+
+Dial is proposed for the first-run channel picker. To add it later, run `/add-dial` in your coding harness. The installer:
+
+<Steps>
+  <Step title="Install and sign in to Dial">
+    The skill installs the `dial` CLI if needed, signs you in with an emailed six-digit code, and provisions or reuses the account's newest number. It records the CLI's absolute path as `DIAL_CLI_PATH` so the NanoClaw service can find it outside your interactive shell.
+  </Step>
+  <Step title="Choose who can text the line">
+    Choose `owner` to admit only the phone you pair, or `public` to let anyone who knows the number start a conversation. The choice is stored as that line's `unknown_sender_policy`; the adapter does not overwrite later changes made with `ncl`.
+  </Step>
+  <Step title="Start inbound delivery">
+    Setup restarts NanoClaw, installs Dial's listen daemon, and registers a local command target that spools SMS and call events into `data/dial/inbound/` for the adapter.
+  </Step>
+  <Step title="Pair your phone">
+    Setup prints a six-digit code and QR. Text only that code from the phone you want to own the line. Codes expire after ten minutes; five wrong attempts lock pairing for that line for fifteen minutes.
+  </Step>
+  <Step title="Optionally add phone tools">
+    The separate Dial tool lets selected sandboxed agents send SMS and place AI calls even when the current conversation arrived through another channel. It installs the `dial-cli` container skill for every agent, then uses OneCLI rules to grant the credential only to the agent groups you choose. Unselected agents receive `403 blocked_by_policy` if they try to use Dial.
+  </Step>
+</Steps>
+
+## Access and session model
+
+- **Owner-only is the safe default.** A public caller reaches an agent that may hold Dial account access, including the ability to inspect account activity or purchase numbers. Choose `public` only for an intentionally public receptionist or support line.
+- **Every correspondent is a thread.** The adapter declares thread support, so each remote E.164 number gets a separate session under the line's messaging group.
+- **Pairing grants ownership out of band.** Receiving the correct SMS records a candidate; the setup process performs the owner grant. An inbound message cannot grant itself a privileged role.
+- **Call events become messages.** Ended calls and transcripts enter the appropriate thread. An outbound call's result goes to the paired owner's thread.
+- **Delivery failures are visible without loops.** Carrier failures arrive asynchronously. The adapter adds a system notice to the affected thread, tells the agent not to resend over the same broken route, and suppresses repeat notices for that line and correspondent for one hour. It ignores delivery events for sends made outside this adapter.
+
+## Choose which agents get phone tools
+
+The optional `/add-dial-tool` flow asks which agent groups may text, call, or buy numbers with the Dial account. This is separate from who may contact the Dial channel.
+
+- Chosen agents receive access to the Dial credential through OneCLI.
+- Unchosen agents keep the CLI and skill but receive a host-level block rule for `api.getdial.ai`.
+- New agent groups start with vault-wide access, so they can use Dial until you re-run `/add-dial-tool` and update the selection.
+- Re-running the skill changes only the per-agent Dial rules; it does not remove their other credentials.
+
+## US outbound SMS and 10DLC
+
+Calls and inbound texts work after pairing. US carriers can reject outbound application-to-person SMS until the number has 10DLC registration. The proposed setup flow links to Dial's number dashboard and currently quotes a $25 registration fee with a typical wait of 3–5 business days. Confirm current pricing and timing with Dial before purchasing.
+
+## Add another number
+
+Run `/add-dial-number` after the first Dial line is working. Each additional number gets its own messaging group and access policy, but the account uses one listen daemon for all its numbers. Pass the access policy explicitly when registering the group:
+
+```bash
+ncl messaging-groups create \
+  --channel-type dial \
+  --platform-id "+14155550123" \
+  --is-group 1 \
+  --name "Support line" \
+  --unknown-sender-policy public
+```
+
+The adapter routes on the number that received the event, so replies use the correct line. Use `strict` instead of `public` for an owner-only line.
+
+## Troubleshooting
+
+- **The channel connects but receives no texts or calls** — confirm `DIAL_CLI_PATH` in `.env`, run `dial listen install`, and check `dial local-target list`. The service must be able to resolve both the Dial executable and its `node` interpreter.
+- **Pairing waits forever** — NanoClaw must be running because the live adapter consumes the code. Send only the six digits, and issue a fresh code if the previous one has expired.
+- **Outbound texts to US numbers fail** — check the number's 10DLC registration. Calls and inbound texts working does not mean outbound SMS has carrier approval.
+- **A second number routes through the first line** — re-run `/add-dial` to refresh the adapter before adding more numbers.
+- **A public line should become private** — find the row with `ncl messaging-groups list`, then run `ncl messaging-groups update --id <id> --unknown-sender-policy strict`.
+
+For service logs, restarts, and wiring checks, see [troubleshooting](/operate/troubleshooting).
