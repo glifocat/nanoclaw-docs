@@ -45,7 +45,7 @@ Build tools (Xcode Command Line Tools on macOS, `gcc`/`make` on Linux) are check
 
 1. **`nanoclaw.sh`** — pre-flight checks (RAM floor, GCE detection, root warning, Homebrew prompt on macOS), then runs the bootstrap under a spinner. Bash only — nothing else exists on the machine yet.
 2. **`setup.sh`** — detects the platform (macOS / Linux / WSL), installs or upgrades to Node 22 via `setup/install-node.sh` if Node 22+ isn't present, gets pnpm onto the PATH, runs `pnpm install --frozen-lockfile`, and verifies the `better-sqlite3` native module loads.
-3. **`pnpm run setup:auto`** — the interactive wizard (`setup/auto.ts`). This is where the container build, OneCLI vault, provider auth, service install, and channel pairing happen. [Quick start](/quickstart) walks through every wizard step.
+3. **`pnpm run setup:auto`** — the interactive wizard (`setup/auto.ts`). This is where the container build, [credential gateway](/operate/gateways) install (OneCLI by default; Advanced setup can pick Iron Proxy), provider auth, service install, and channel pairing happen. [Quick start](/quickstart) walks through every wizard step.
 
 {/* Diagram source (Mermaid) - kept for regeneration. Edit this, then redraw the
     SVG pair below with the diagram-design skill (see CLAUDE.md, Diagrams section).

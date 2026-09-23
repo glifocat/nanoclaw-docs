@@ -4,6 +4,7 @@ description: "Core environment settings NanoClaw reads — .env keys, host proce
 keywords: ["environment variables", ".env", "configuration", "ASSISTANT_NAME", "LOG_LEVEL", "NANOCLAW_SKIP", "NANOCLAW_EGRESS_LOCKDOWN", "setup", "reference"]
 ---
 
+{/* verified-against (scoped correction) — NANOCLAW_GATEWAY_PROVIDER kinds: src/gateway-providers/index.ts @ 143db6c9 (v2.4.0) */}
 {/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/container-runner.ts, src/providers/claude.ts, setup/onecli.ts, setup/lib/setup-config.ts, setup/lib/claude-assist.ts, setup/lib/diagnostics.ts, setup/signal-auth.ts, setup/container.ts, setup/migrate-v2/select-channels.ts, migrate-v2.sh, setup/registry-login.ts, setup/lib/registry-state.ts, container/pull.sh, container/agent-runner/src/{timezone.ts,providers/claude.ts} @ 639577c3; setup/auto.ts + template behavior @ 20d61af; model/fast-mode and env parsing: src/config.ts, src/env.ts, src/container-config.ts, container/agent-runner/src/providers/claude.ts; driver and gateway settings: src/drivers/index.ts, src/gateway-providers/index.ts, src/install-slug.ts @ b76fcb3d */}
 
 Core environment settings read by the NanoClaw host, setup wizard, and agent runner. For how to actually set these — `.env` editing, service definitions, restart commands — see [Configuration](/operate/configuration).
@@ -31,7 +32,7 @@ NanoClaw's own parser ([`src/env.ts`](https://github.com/nanocoai/nanoclaw/blob/
 | `NANOCLAW_DEFAULT_MODEL` | provider default | `src/config.ts` → `configFromDb` | Install-wide model used when the group's model is `NULL`. The group's own model wins. Restart the host to reload the setting, then restart affected agent sessions to apply it. |
 | `NANOCLAW_FAST_MODE` | `false` | `src/config.ts` → Claude provider `settings.fastMode` | Enables the Claude fast serving tier only for `1` or `true` (case-insensitive). Other values stay off. May change provider billing. No per-group fast-mode field; other providers must explicitly support the option. |
 | `NANOCLAW_RUNTIME_DRIVER` | `docker` | `src/drivers/index.ts` | Registered session driver. Process environment, then `.env`; unknown names abort startup. |
-| `NANOCLAW_GATEWAY_PROVIDER` | `onecli` | `src/gateway-providers/index.ts` | Registered gateway provider. Process environment, then `.env`; unknown names fail instead of disabling the gateway. |
+| `NANOCLAW_GATEWAY_PROVIDER` | `onecli` | `src/gateway-providers/index.ts` | Registered gateway provider: `onecli` or `iron-proxy`. Process environment, then `.env`; unknown names fail instead of disabling the gateway. See [Credential gateways](/operate/gateways). |
 | `NANOCLAW_SESSION_MATERIAL_ROOT` | `data/session-materials` | `src/drivers/index.ts` | Root for materialized session files. Process environment, then `.env`. |
 | `ANTHROPIC_BASE_URL` | — | `src/providers/claude.ts:21` | Custom Anthropic-compatible endpoint, passed into agent containers with a placeholder auth token. Only active when setup has registered the custom-endpoint provider config; the real token stays in the vault. |
 
