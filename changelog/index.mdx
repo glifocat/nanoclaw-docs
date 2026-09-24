@@ -5,19 +5,38 @@ icon: "tag"
 rss: true
 ---
 
-{/* verified-against (current-main additions): src/config.ts, src/container-config.ts, src/host-sweep.ts, src/reconcile-session.ts, src/container-runner.ts, src/delivery.ts, src/modules/permissions/user-dm.ts, src/cli/resources/tasks.ts, container/agent-runner/src/mcp-tools/interactive.ts, setup/channels/slack-auto-register.ts @ b76fcb3d */}
+{/* verified-against (v2.4.0 entry): CHANGELOG.md, docs/release-2.4-update.md, setup/auto.ts, src/gateway-providers/index.ts, src/config.ts, src/cli/resources/tasks.ts @ 143db6c9 (v2.4.0) */}
 
-<Update label="Unreleased — current main" description="2026-09-05" tags={["Feature", "Fix"]}>
-  These changes are verified on upstream `main` at [`b76fcb3d`](https://github.com/nanocoai/nanoclaw/commit/b76fcb3db0236b36a4d50bed02e89eff472d0e67). They are not a new numbered release; the latest release listed below remains v2.3.0. For a guided installation and first conversation, follow the [quickstart](/quickstart), or [start with a template](/templates/getting-started). See [Docs updates](/changelog/docs-updates) for documentation changes.
+<Update label="v2.4.0" description="2026-09-23" tags={["Breaking", "Feature", "Fix", "Skill"]}>
+  Released 2026-09-23 as [v2.4.0](https://github.com/nanocoai/nanoclaw/releases/tag/v2.4.0) (`143db6c9`). Update with `/update-nanoclaw`; read the two breaking items first. Upstream [Updating to NanoClaw 2.4](https://github.com/nanocoai/nanoclaw/blob/main/docs/release-2.4-update.md) has the full procedure.
 
-  Documentation maintenance now includes a repository readiness plan and a pull-request validation workflow; this is not a product release.
+  **Before you update**
 
-  - **Install-wide model defaults and Claude fast mode.** `NANOCLAW_DEFAULT_MODEL` supplies the model when a group has no override. `NANOCLAW_FAST_MODE` enables the Claude SDK's faster serving tier; it can increase cost. See [Configuration](/operate/configuration).
-  - **Durable host coordination.** Host leases and session claims fence spawning, adoption, and completion. Delivery failure counts survive host restarts. Runtime terminal events and mailbox writes enqueue reconciliation, with a periodic full resync as a recovery floor. See [Architecture](/concepts/architecture) and [Database schema](/reference/db-schema).
-  - **DM routing preserves the adapter instance.** Named bot instances resolve their own approval DM route instead of reusing another instance's cached route.
-  - **Slack companion skills move onto main.** `slack-a2a-rooms` and `slack-agent-flow` now have their canonical home in the checkout. Channel bridges can recover content carried only in a platform's raw message payload.
-  - **Task updates reject blank prompts.** Omit `--prompt` to retain the existing prompt. See [ncl reference](/reference/ncl-cli#tasks).
-  - **Card actions are explicitly link-only.** `send_card` reports dropped callback or invalid actions; use `ask_user_question` for interactive choices. See [MCP tools](/reference/mcp-tools).
+  - **Breaking: credential gateways install through skills, and the host refuses to start without one.** `/add-onecli` supplies OneCLI and `/add-iron-proxy` adds optional Iron Proxy support. OneCLI stays the Standard setup default, the gateway picker appears only in Advanced setup, and upgrades keep the existing selection. Setting `NANOCLAW_GATEWAY_PROVIDER` alone installs nothing. **Migration:** `/update-nanoclaw` installs the selected gateway before cutover; a hand-merged fork must run `/add-onecli` (or its gateway's skill) before restarting. See [Credential gateways](/operate/gateways).
+  - **Breaking: custom source that composes agent instructions must move to the new module.** `src/claude-md-compose.ts` is now `src/project-doc-compose.ts` and `composeGroupClaudeMd(group)` became `composeGroupProjectDoc(group, groupDir, spec)`; the `/app/CLAUDE.md` and `.claude-fragments` mounts are gone, and every instruction section now reaches the model. Standard installations need no source edits.
+  - **Claude groups with no model set move to Opus 5.5**, which changes cost and usage-limit burn. Set `NANOCLAW_DEFAULT_MODEL` in `.env` or `ncl groups config update --id <group> --model <model>` before updating to keep a model.
+  - **Codex groups with no model set start new threads on `gpt-6-astra`** (`/add-codex` pins `@openai/codex` 0.155.1); groups with a model, and existing threads, keep theirs. Pin with `ncl groups config update --id <group-id> --model gpt-5.6-sol`, then `ncl groups restart --id <group-id>`.
+  - **Claude agents default to a concise tone** unless the group's Claude settings already set `outputStyle`.
+  - **Existing OpenCode installs must re-run `/add-opencode`**, rebuild the agent image, and restart.
+  - **Cutover stops this install's agent containers itself.** `/update-nanoclaw` no longer waits on an idle container; an agent mid-turn loses that turn. See [Upgrading](/operate/upgrading).
+
+  **New**
+
+  - **Iron Proxy is an alternative local gateway** with the Iron Control web console; Codex works through it, including WebSocket turns. See [Credential gateways](/operate/gateways).
+  - **Echo's hardened image and a managed Slack app are set up through the community portal** with one browser sign-in. See [Echo hardened runtime](/guides/echo-hardened-runtime).
+  - **Install-wide model and speed knobs.** `NANOCLAW_DEFAULT_MODEL` fills in a group's missing model and `NANOCLAW_FAST_MODE=1` enables the faster, pricier tier. The host reads both from `.env` at startup, so restart the host after changing them; each group then picks the value up at its next container start. `ncl groups config update --id <group-id> --speed fast` sets the tier per group. See [Configuration](/operate/configuration).
+  - **Mattermost is a channel** via `/add-mattermost`. See [Mattermost](/channels/mattermost).
+  - **The OpenCode provider is reworked** with host-managed authentication and model selection. See [Agent providers](/extend/providers).
+  - **Host restarts keep approvals and delivery state.** Approval cards, retry counts, and session claims live in the central database, and a second host in the same checkout no longer takes over a running host's `ncl` socket.
+  - **`ncl status` shows the running host process and its connected channel adapters.** Agents run on Claude Code 2.1.280, and the Slack companion skills ship on `main`.
+
+  **Fixes**
+
+  - Codex turns wait for every MCP server to start instead of completing with nothing sent; replies stay in the thread they answer; busy installs no longer see latency grow with session count.
+  - Quoted `.env` values read the same in setup and the host, and `WEBHOOK_PORT` is read from `.env`. See [Environment variables](/reference/environment-variables).
+  - `/update-nanoclaw` loads its controller again and is correct on macOS; setup is sturdier on Linux; concurrent SQLite migrations no longer fail setup.
+  - `ncl tasks update` rejects an empty `--prompt`; `send_card` link-only actions and `ask_user_question` are described to agents. See [ncl reference](/reference/ncl-cli#tasks).
+  - **Security:** setup redacts resolved secrets in skill logs, the agent image is repinned to `hardened-2026-08-24` on Bun 1.4.0, and pnpm's 3-day `minimumReleaseAge` gate is enforced.
 </Update>
 
 <Update label="v2.3.0" description="2026-08-24" tags={["Breaking", "Feature", "Fix", "Skill"]}>

@@ -7,6 +7,7 @@ keywords: ["ncl", "cli", "reference", "commands", "flags", "groups", "wirings", 
 {/* verified-against: src/cli/dispatch.ts, src/cli/crud.ts, src/cli/client.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/registry.ts, src/cli/frame.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,policies,roles,sessions,tasks,user-dms,users,wirings}.ts, src/channels/channel-defaults.ts, src/modules/cross-session-context/{index,history}.ts, bin/ncl @ dce271c6; template behavior @ 20d61af */}
 
 {/* verified-against (scoped correction): src/cli/resources/{tasks,groups}.ts, src/modules/permissions/user-dm.ts, src/channels/chat-sdk-bridge.ts @ b76fcb3d */}
+{/* verified-against (scoped correction) — tasks synopsis flags: src/cli/resources/tasks.ts @ 143db6c9 (v2.4.0) */}
 
 Exhaustive reference for the `ncl` admin CLI. For a task-oriented walkthrough, see [The ncl admin CLI](/operate/ncl-cli).
 
@@ -176,14 +177,14 @@ Scheduled tasks — the CLI home for what used to be the agent's `schedule_task`
 | Operation | Invocation | Access |
 | --- | --- | --- |
 | list | `ncl tasks list [--status <pending\|paused>] [--group <id>] [--session <id>] [--all]` | open |
-| get | `ncl tasks get --id <series-id> [--session <id>]` | open |
+| get | `ncl tasks get --id <series-id> [--group <id>] [--session <id>]` | open |
 | create | `ncl tasks create --prompt <text> [--name <name>] [--process-after <when>] [--recurrence <cron>] [--script <bash>] [--group <id>] [--dangerously-override-recurrence-limit]` | open |
-| update | `ncl tasks update --id <series-id> [--prompt] [--process-after] [--recurrence] [--script]` | open |
-| run | `ncl tasks run --id <series-id>` | open |
-| pause / resume | `ncl tasks pause --id <series-id>` / `ncl tasks resume --id <series-id>` | open |
-| cancel | `ncl tasks cancel (--id <series-id> \| --all)` | open |
-| delete | `ncl tasks delete --id <series-id>` | open |
-| append-log | `ncl tasks append-log --msg <text> [--id <series-id>]` | open |
+| update | `ncl tasks update --id <series-id> [--prompt] [--process-after] [--recurrence] [--dangerously-override-recurrence-limit] [--script] [--group <id>] [--session <id>]` | open |
+| run | `ncl tasks run --id <series-id> [--group <id>] [--session <id>]` | open |
+| pause / resume | `ncl tasks pause --id <series-id> [--group <id>] [--session <id>]` / `ncl tasks resume --id <series-id> [--group <id>] [--session <id>]` | open |
+| cancel | `ncl tasks cancel (--id <series-id> \| --all) [--group <id>] [--session <id>]` | open |
+| delete | `ncl tasks delete --id <series-id> [--group <id>] [--session <id>]` | open |
+| append-log | `ncl tasks append-log --msg <text> [--id <series-id>] [--group <id>]` | open |
 
 | Flag | Notes |
 | --- | --- |

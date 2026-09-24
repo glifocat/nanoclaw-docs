@@ -29,8 +29,9 @@ Variables come from two sources, and the distinction matters:
 | `NANOCLAW_DEFAULT_MODEL` | provider SDK default | Model used at the next spawn for groups without their own model. Unlike the provider default, this is not stamped at group creation. |
 | `NANOCLAW_FAST_MODE` | `false` | Enables the faster, higher-priced serving tier for the Claude provider. Only `1` or `true` enables it, case-insensitively. |
 | `NANOCLAW_RUNTIME_DRIVER` | `docker` | Selects an installed session driver. Docker is the only driver shipped here; an unregistered value fails. |
-| `NANOCLAW_GATEWAY_PROVIDER` | `onecli` | Selects an installed credential-gateway provider. An unregistered value fails. |
+| `NANOCLAW_GATEWAY_PROVIDER` | `onecli` | Selects an installed credential-gateway provider (`onecli` or `iron-proxy`). An unregistered value fails. See [Credential gateways](/operate/gateways). |
 | `NANOCLAW_SESSION_MATERIAL_ROOT` | `data/session-materials` | Host directory admitted for session identity material. |
+| `WEBHOOK_PORT` | `3000` | Port for the local webhook server. Process environment first, then `.env`. Must be an integer from 1 to 65535. |
 | `ONECLI_URL` | — | URL of the OneCLI Agent Vault. |
 | `ONECLI_API_KEY` | — | API key for the vault. See [Credentials](/operate/credentials). |
 | `TZ` | system timezone, else `UTC` | IANA timezone for scheduled tasks and message timestamps. Invalid values are skipped, not errored. |
@@ -65,7 +66,6 @@ See the [environment variables reference](/reference/environment-variables) for 
 
 | Variable | Default | What it does |
 |---|---|---|
-| `WEBHOOK_PORT` | `3000` | Port for the local webhook server. |
 | `LOG_LEVEL` | `info` | One of `debug`, `info`, `warn`, `error`, `fatal`. |
 
 See [Hardening](/operate/hardening) for the full egress lockdown and sandboxing story.
