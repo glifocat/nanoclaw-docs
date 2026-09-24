@@ -4,7 +4,7 @@ description: "Core environment settings NanoClaw reads — .env keys, host proce
 keywords: ["environment variables", ".env", "configuration", "ASSISTANT_NAME", "LOG_LEVEL", "NANOCLAW_SKIP", "NANOCLAW_EGRESS_LOCKDOWN", "setup", "reference"]
 ---
 
-{/* verified-against (scoped correction) — NANOCLAW_GATEWAY_PROVIDER kinds: src/gateway-providers/index.ts @ 143db6c9 (v2.4.0) */}
+{/* verified-against (scoped correction) — WEBHOOK_PORT source and NANOCLAW_GATEWAY_PROVIDER kinds: src/config.ts, src/gateway-providers/index.ts @ 143db6c9 (v2.4.0) */}
 {/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/container-runner.ts, src/providers/claude.ts, setup/onecli.ts, setup/lib/setup-config.ts, setup/lib/claude-assist.ts, setup/lib/diagnostics.ts, setup/signal-auth.ts, setup/container.ts, setup/migrate-v2/select-channels.ts, migrate-v2.sh, setup/registry-login.ts, setup/lib/registry-state.ts, container/pull.sh, container/agent-runner/src/{timezone.ts,providers/claude.ts} @ 639577c3; setup/auto.ts + template behavior @ 20d61af; model/fast-mode and env parsing: src/config.ts, src/env.ts, src/container-config.ts, container/agent-runner/src/providers/claude.ts; driver and gateway settings: src/drivers/index.ts, src/gateway-providers/index.ts, src/install-slug.ts @ b76fcb3d */}
 
 Core environment settings read by the NanoClaw host, setup wizard, and agent runner. For how to actually set these — `.env` editing, service definitions, restart commands — see [Configuration](/operate/configuration).
@@ -34,6 +34,7 @@ NanoClaw's own parser ([`src/env.ts`](https://github.com/nanocoai/nanoclaw/blob/
 | `NANOCLAW_RUNTIME_DRIVER` | `docker` | `src/drivers/index.ts` | Registered session driver. Process environment, then `.env`; unknown names abort startup. |
 | `NANOCLAW_GATEWAY_PROVIDER` | `onecli` | `src/gateway-providers/index.ts` | Registered gateway provider: `onecli` or `iron-proxy`. Process environment, then `.env`; unknown names fail instead of disabling the gateway. See [Credential gateways](/operate/gateways). |
 | `NANOCLAW_SESSION_MATERIAL_ROOT` | `data/session-materials` | `src/drivers/index.ts` | Root for materialized session files. Process environment, then `.env`. |
+| `WEBHOOK_PORT` | `3000` | `src/config.ts:112` | Port for the local webhook server. Process environment, then `.env`, resolved when the listener starts. Must be an integer from 1 to 65535; anything else is a startup error. |
 | `ANTHROPIC_BASE_URL` | — | `src/providers/claude.ts:21` | Custom Anthropic-compatible endpoint, passed into agent containers with a placeholder auth token. Only active when setup has registered the custom-endpoint provider config; the real token stays in the vault. |
 
 ## Host process environment only
@@ -46,7 +47,6 @@ Read from `process.env` at host startup, with no `.env` fallback. Putting these 
 | `CONTAINER_IMAGE` | per-install tag | `src/config.ts:70` | Full agent image override (name and tag). |
 | `CONTAINER_IMAGE_BASE` | per-install name | `src/config.ts:69` | Base image name override. The default embeds an install slug so two checkouts on one host don't clobber each other's image. |
 | `NANOCLAW_TEMPLATES_DIR` | `templates/` at the project root | `src/config.ts:63` | Local directory [templates](/templates/overview) resolve against; `--template <ref>` is relative to it. A local path only, never a URL. Resolved **once at host startup**, so setting it on an `ncl` invocation has no effect — `ncl` is a socket client and the host has already resolved the path. Change it in the service definition and restart the host. |
-| `WEBHOOK_PORT` | `3000` | `src/webhook-server.ts:113` | Port for the local webhook server. |
 | `LOG_LEVEL` | `info` | `src/log.ts:16` | One of `debug`, `info`, `warn`, `error`, `fatal`. |
 
 <Note>

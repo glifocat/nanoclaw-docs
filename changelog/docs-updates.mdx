@@ -5,8 +5,11 @@ icon: "file-pen"
 rss: true
 ---
 
-<Update label="Credential gateways page" description="2026-09-23" tags={["New"]}>
+<Update label="Credential gateways page and reference fixes" description="2026-09-23" tags={["New", "Fixed"]}>
   Added [Credential gateways](/operate/gateways): what a gateway is, how Standard and Advanced setup choose between OneCLI and Iron Proxy, the `/add-onecli` and `/add-iron-proxy` skills, the 2.4.0 migration step for hand-merged forks, and how a gateway skill is built. [Installation](/installation), [Configuration](/operate/configuration), and [Environment variables](/reference/environment-variables) now link to it.
+
+  - `WEBHOOK_PORT` is read from `.env` as well as the process environment; the [troubleshooting](/operate/troubleshooting#webhook-channel-is-silent) advice and the environment-variables table now say so.
+  - The `ncl tasks` synopses in the [CLI reference](/reference/ncl-cli#tasks) show the `--group` and `--session` scoping flags and the recurrence-limit override on `update`.
 </Update>
 
 <Update label="What to prepare for the quickstart" description="2026-09-05" tags={["Updated"]}>
