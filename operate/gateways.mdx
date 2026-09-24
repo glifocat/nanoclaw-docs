@@ -5,9 +5,9 @@ keywords: ["gateway", "credential gateway", "OneCLI", "Iron Proxy", "NANOCLAW_GA
 tag: "NEW"
 ---
 
-{/* verified-against: setup/auto.ts:182-193,328-340, setup/gateways/catalog.ts, setup/gateways/install.ts, src/gateway-providers/{index,installed}.ts, .claude/skills/{add-onecli,add-iron-proxy}/{SKILL.md,gateway.json,payload/}, docs/gateway-seam.md, docs/release-2.4-update.md, CHANGELOG.md (2.4.0) @ 143db6c9 (v2.4.0) */}
+{/* verified-against: src/index.ts, src/gateway-approval-coordinator.ts, src/modules/mount-security/index.ts, scripts/skill-apply.ts, setup/auto.ts:182-193,328-340, setup/gateways/catalog.ts, setup/gateways/install.ts, src/gateway-providers/{index,installed}.ts, .claude/skills/{add-onecli,add-iron-proxy}/{SKILL.md,gateway.json,payload/}, docs/gateway-seam.md, docs/release-2.4-update.md, CHANGELOG.md (2.4.0) @ 143db6c9 (v2.4.0) */}
 
-Your assistant never receives real credentials. NanoClaw stores them in a **credential gateway** on the host, and the gateway adds them to each outbound request at the network boundary. An agent container only ever holds placeholders, so a prompt injection or a misbehaving tool cannot read or leak a key.
+Your assistant never receives real credentials. NanoClaw stores them in a **credential gateway** on the host, and the gateway adds them to each outbound request at the network boundary. An agent container only ever holds placeholders for the credentials the gateway manages, so a prompt injection or a misbehaving tool cannot read those keys from the container. Files you mount into the sandbox yourself are a separate matter; see [Hardening](/operate/hardening).
 
 Since NanoClaw 2.4.0 the gateway is an installable choice rather than a built-in. This page covers which gateways exist, how setup picks one, and what to do when you update a fork by hand. For how OneCLI itself stores secrets, stubs credentials, and asks for approval, see [Credentials](/operate/credentials).
 
@@ -16,7 +16,7 @@ Since NanoClaw 2.4.0 the gateway is an installable choice rather than a built-in
 | Gateway | How you get it | What it is |
 |---|---|---|
 | **OneCLI** (default) | Standard setup, or Advanced setup with the default kept | The OneCLI Agent Vault and its HTTPS proxy. Every new install uses it unless you choose otherwise. |
-| **Iron Proxy** | Advanced setup, or `/add-iron-proxy` | One central Iron Proxy plus the Iron Control web console (Secrets, Credentials, OAuth Apps, Principals) on Docker. Each request passes the front identity and allowlist, then human approval, then stored credentials, before it reaches the upstream service. |
+| **Iron Proxy** | Advanced setup, or `/add-iron-proxy` | One central Iron Proxy plus the Iron Control web console (Secrets, Credentials, OAuth Apps, Principals) on Docker. Each request passes the front identity and allowlist, then NanoClaw's approval step, then stored credentials, before it reaches the upstream service. Requests to the agent provider's own model domains and configured reads are approved automatically; the rest go to a human. |
 
 **Standard setup** installs OneCLI without asking. **Advanced setup** shows a gateway picker built from the installed gateway skills, with OneCLI listed first as the default (`setup/auto.ts:183`). Setup then installs the chosen gateway and prints a one-line reminder that credentials are only added at the network boundary (`setup/auto.ts:328`).
 
@@ -53,7 +53,7 @@ Do not switch gateways to get through an update. Changing gateways means re-regi
 2. Stop this copy's host and its agent containers, then merge.
 3. Run `/add-onecli` for an existing OneCLI install, or the skill for the gateway you had selected. Keep its existing connection settings and credentials.
 4. Confirm `.env` records the matching `NANOCLAW_GATEWAY_PROVIDER`.
-5. Build, restart, and check the host log for successful gateway initialization. A startup error such as `No gateway provider is registered in this build` means the gateway payload is missing.
+5. Build, restart, and check the host log for successful gateway initialization. A startup error such as `No gateway provider is registered in this build` means the gateway payload is missing. A hand merge also trips the startup upgrade tripwire, which runs before gateway selection; [Upgrading](/operate/upgrading) explains how to clear it.
 6. Send a message through an existing agent and confirm a credentialed request and an approval-gated action still work.
 
 Forks with their own gateway wiring must implement the current contract. The upstream [gateway seam](https://github.com/nanocoai/nanoclaw/blob/main/docs/gateway-seam.md#migrating-an-existing-installation) document has the full detect, verify, and rollback procedure, and [Updating to NanoClaw 2.4](https://github.com/nanocoai/nanoclaw/blob/main/docs/release-2.4-update.md) covers the other 2.4.0 changes. See also [Upgrading](/operate/upgrading).
@@ -74,6 +74,6 @@ When the skill is applied, the payload lands in ordinary paths:
 - `container/skills/<kind>-gateway/` — the agent-facing skill mounted into containers
 - one appended line in `src/gateway-providers/installed.ts` — the registration import
 
-Nothing outside those paths is rewritten. At startup the host resolves exactly one provider from `NANOCLAW_GATEWAY_PROVIDER`, and only the selected gateway's agent skills reach a container, so an agent is never told about a gateway it is not behind.
+Beyond those, a skill can add files of its own (OneCLI also copies its upgrade runbook into `docs/`) and declare package dependencies that the skill engine installs with `pnpm add`. At startup the host resolves exactly one provider from `NANOCLAW_GATEWAY_PROVIDER`, and only the selected gateway's agent skills reach a container, so an agent is never told about a gateway it is not behind.
 
 The contract itself, including session lifecycle, human approval, and the `gateway-trust` mount class, is in the upstream [gateway seam](https://github.com/nanocoai/nanoclaw/blob/main/docs/gateway-seam.md) document. For skill mechanics, see [Writing skills](/extend/writing-skills).
