@@ -4,13 +4,14 @@ description: "Every skill that ships with NanoClaw — host-side workspace skill
 keywords: ["skills", "catalog", "reference", "add-channel", "providers", "tools", "container skills", "workspace skills", "slash commands"]
 ---
 
+{/* verified-against (scoped correction) — gateway skills: .claude/skills/ and container/skills/ listings, .claude/skills/{add-onecli,add-iron-proxy}/{SKILL.md,payload/} @ 143db6c9 (v2.4.0) */}
 {/* verified-against: main .claude/skills/ and container/skills/ listings + each skill's SKILL.md frontmatter @ 294ef2ae; channels .claude/skills/{add-slack,slack-a2a-rooms,slack-agent-flow,slack-multi-instance}/SKILL.md @ d69c9c5d; current main setup/channels/slack-auto-register.ts @ 001dfa02 */}
 
 {/* verified-against (scoped correction): .claude/skills/ listings, .claude/skills/{add-codex,add-opencode,add-ollama-provider,update-skills}/SKILL.md, setup/channels/{slack-auto-register,run-channel-skill}.ts @ b76fcb3d */}
 
 NanoClaw ships two kinds of skills:
 
-- **Host-side workspace skills** (`.claude/skills/`) — invoked from your coding harness in your NanoClaw checkout. They install channels, providers, and tools, or operate and maintain your install. 52 skills total: 20 channel installs, 3 provider installs, 12 tool installs, 15 operational skills, and 2 Slack feature skills.
+- **Host-side workspace skills** (`.claude/skills/`) — invoked from your coding harness in your NanoClaw checkout. They install channels, providers, and tools, or operate and maintain your install. 53 skills total: 20 channel installs, 3 provider installs, 12 tool installs, 16 operational skills, and 2 Slack feature skills.
 - **Container skills** (`container/skills/`) — 5 skills mounted into every agent container at `/app/skills`. The agent loads them at runtime; you don't invoke them yourself.
 
 <Note>
@@ -94,7 +95,8 @@ Setup, maintenance, migration, and day-to-day administration of your install.
 | `/customize` | Adds new capabilities or modifies NanoClaw behavior — interactive skill that asks questions to understand what you want |
 | `/debug` | Debugs container agent issues — logs, session DBs, mounts, authentication problems, and common failures |
 | `/init-first-agent` | Walks you through creating the first agent for a DM channel — resolves your channel identity, wires the DM group, and triggers a welcome DM |
-| `/init-onecli` | Installs and initializes OneCLI Agent Vault, migrating existing `.env` credentials to the vault |
+| `/add-iron-proxy` | Installs or refreshes Iron Proxy and its Iron Control web console as the [credential gateway](/operate/gateways) — an alternative to OneCLI, offered in Advanced setup |
+| `/add-onecli` | Installs or refreshes OneCLI as the [credential gateway](/operate/gateways) — the default; also what `/update-nanoclaw` applies to an install that predates 2.4.0 |
 | `/learn` | Distills a reusable skill from a source — a directory, URL, pasted notes, or the work just done in the conversation — or refines an existing one, writing a `.claude/skills/<name>/SKILL.md` to the project's skill guidelines. Creates or refines skills; it doesn't install them from a registry |
 | `/manage-channels` | Wires channels to agent groups, manages isolation levels, and adds new channel groups |
 | `/manage-mounts` | Configures which host directories agent containers can access — view, add, or remove mount allowlist entries |
@@ -115,7 +117,7 @@ Mounted into every agent container at `/app/skills`. The agent picks them up aut
 | --- | --- |
 | `agent-browser` | Browses the web for any task — research, web apps, forms, screenshots, data extraction, page testing |
 | `frontend-engineer` | Enforces a build-test-verify workflow for web projects — never done until built, tested, responsive, accessible, and visually verified |
-| `onecli-gateway` | Transparent HTTPS proxy that injects stored credentials into outbound calls — the agent makes plain HTTP requests and the gateway handles auth |
+| `onecli-gateway` / `iron-proxy-gateway` | Installed by the selected gateway skill (`/add-onecli` or `/add-iron-proxy`), not shipped in `container/skills/` on `main`. Tells the agent how the transparent HTTPS proxy injects stored credentials into outbound calls. The whole `container/skills/` directory is mounted read-only, but only the selected gateway's skill is composed into the agent's instructions. See [Credential gateways](/operate/gateways) |
 | `self-customize` | Lets the agent customize itself — add capabilities, install packages, add MCP servers, edit code or its memory files |
 | `welcome` | Introduces the agent to a newly connected channel — triggered automatically when a channel is first wired |
 
