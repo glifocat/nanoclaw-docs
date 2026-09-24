@@ -5,6 +5,7 @@ keywords: ["gateway", "credential gateway", "OneCLI", "Iron Proxy", "NANOCLAW_GA
 tag: "NEW"
 ---
 
+{/* verified-against (scoped correction) — skills mount: src/container-runner.ts @ 143db6c9 (v2.4.0) */}
 {/* verified-against: src/index.ts, src/gateway-approval-coordinator.ts, src/modules/mount-security/index.ts, scripts/skill-apply.ts, setup/auto.ts:182-193,328-340, setup/gateways/catalog.ts, setup/gateways/install.ts, src/gateway-providers/{index,installed}.ts, .claude/skills/{add-onecli,add-iron-proxy}/{SKILL.md,gateway.json,payload/}, docs/gateway-seam.md, docs/release-2.4-update.md, CHANGELOG.md (2.4.0) @ 143db6c9 (v2.4.0) */}
 
 Your assistant never receives real credentials. NanoClaw stores them in a **credential gateway** on the host, and the gateway adds them to each outbound request at the network boundary. An agent container only ever holds placeholders for the credentials the gateway manages, so a prompt injection or a misbehaving tool cannot read those keys from the container. Files you mount into the sandbox yourself are a separate matter; see [Hardening](/operate/hardening).
@@ -74,6 +75,6 @@ When the skill is applied, the payload lands in ordinary paths:
 - `container/skills/<kind>-gateway/` — the agent-facing skill mounted into containers
 - one appended line in `src/gateway-providers/installed.ts` — the registration import
 
-Beyond those, a skill can add files of its own (OneCLI also copies its upgrade runbook into `docs/`) and declare package dependencies that the skill engine installs with `pnpm add`. At startup the host resolves exactly one provider from `NANOCLAW_GATEWAY_PROVIDER`, and only the selected gateway's agent skills reach a container, so an agent is never told about a gateway it is not behind.
+Beyond those, a skill can add files of its own (OneCLI also copies its upgrade runbook into `docs/`) and declare package dependencies that the skill engine installs with `pnpm add`. At startup the host resolves exactly one provider from `NANOCLAW_GATEWAY_PROVIDER`, and only the selected gateway's agent skills are composed into a container's instructions, so an agent is not told about a gateway it is not behind. The whole `container/skills/` directory is still mounted read-only at `/app/skills`.
 
 The contract itself, including session lifecycle, human approval, and the `gateway-trust` mount class, is in the upstream [gateway seam](https://github.com/nanocoai/nanoclaw/blob/main/docs/gateway-seam.md) document. For skill mechanics, see [Writing skills](/extend/writing-skills).
