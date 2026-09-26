@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Install on Proxmox VE" description="2026-09-26" tags={["New"]}>
+  [Installation](/installation#install-on-proxmox-ve) now covers the NanoClaw helper for Proxmox VE: the pinned one-line install, what the container gets, the setup-wizard handoff, updating with `update`, and where to get help. The helper is maintained by the NanoClaw team on its own fork, not by community-scripts.
+</Update>
+
 <Update label="Gateway follow-ups: skills catalog, credentials, and cutover" description="2026-09-24" tags={["Updated", "Fixed"]}>
   The [skills catalog](/reference/skills-catalog) replaces the retired `/init-onecli` with `/add-onecli` and `/add-iron-proxy`, and notes that the gateway container skill comes from the selected gateway skill. [Credentials](/operate/credentials) now says OneCLI is the default gateway rather than the only one, describes `/add-onecli` for existing installs, and adds an Iron Proxy section. [Upgrading](/operate/upgrading) describes the 2.4.0 cutover, which stops this install's agent containers itself instead of waiting on them.
 </Update>
