@@ -121,14 +121,14 @@ For Anthropic-compatible custom endpoints, set `ANTHROPIC_BASE_URL` in `.env` �
 
 ## Install on Proxmox VE
 
-{/* verified-against: ct/nanoclaw.sh, install/nanoclaw-install.sh @ glifocat/nanoclaw-proxmox nanoclaw-helper-v2.1 (64a63e82); engine community-scripts/core @ 6f908859 */}
+{/* verified-against: ct/nanoclaw.sh, install/nanoclaw-install.sh @ glifocat/nanoclaw-proxmox nanoclaw-helper-v2.2 (d1343faa); engine community-scripts/core @ 6f908859 */}
 
 On a Proxmox VE host, a helper script creates a container and installs NanoClaw in it. The NanoClaw team maintains it on its own fork, [glifocat/nanoclaw-proxmox](https://github.com/glifocat/nanoclaw-proxmox). It uses the community-scripts engine but is not part of community-scripts, so report problems to NanoClaw, not to that project.
 
 Run this in the Proxmox VE host shell as root:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/glifocat/nanoclaw-proxmox/nanoclaw-helper-v2.1/ct/nanoclaw.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/glifocat/nanoclaw-proxmox/nanoclaw-helper-v2.2/ct/nanoclaw.sh)"
 ```
 
 It supports Proxmox VE 8.0–8.9 and 9.0–9.2 and refuses other versions.
@@ -141,17 +141,17 @@ The helper creates:
 
 - **An unprivileged Debian 13 LXC** with 2 cores, 8 GiB RAM and a 40 GiB disk by default. The helper's advanced settings let you change them. Nesting and keyctl are enabled so Docker can run inside the container.
 - **The runtime:** Docker, Node.js 22 and pnpm.
-- **NanoClaw itself:** the latest release in `/opt/nanoclaw`, built and owned by a dedicated `nanoclaw` account rather than root. The checkout is a git repository at the release tag, so skills and the updater work as they do on any other install.
+- **NanoClaw itself:** the latest release in `/home/nanoclaw/nanoclaw`, the home folder of a dedicated `nanoclaw` account that builds and owns it instead of root. The checkout is a git repository at the release tag, so skills and the updater work as they do on any other install.
 
 At the end, an interactive run asks **Start NanoClaw setup now?** Answer `y` to open the [setup wizard](/quickstart) as the `nanoclaw` user; it takes care of sign-in, the OneCLI vault, the agent image and the service. If you skip it, the helper prints the command to start the wizard from the host later:
 
 ```bash
-pct exec <CTID> --keep-env 0 -- machinectl shell nanoclaw@ /usr/bin/bash -lc 'cd /opt/nanoclaw && exec bash nanoclaw.sh'
+pct exec <CTID> --keep-env 0 -- machinectl shell nanoclaw@ /usr/bin/bash -lc 'cd /home/nanoclaw/nanoclaw && exec bash nanoclaw.sh'
 ```
 
-**Updating:** open the container's shell (`pct enter <CTID>`) and run `update`. It checks for a newer NanoClaw release and applies it through NanoClaw's own [update transaction](/operate/upgrading). When a release lists breaking changes that need manual steps, the helper does not apply it: it prints those steps, keeps the running version, and you finish the update with `/update-nanoclaw` from `/opt/nanoclaw` as the `nanoclaw` user.
+**Updating:** open the container's shell (`pct enter <CTID>`) and run `update`. It checks for a newer NanoClaw release and applies it through NanoClaw's own [update transaction](/operate/upgrading). When a release lists breaking changes that need manual steps, the helper does not apply it: it prints those steps, keeps the running version, and you finish the update with `/update-nanoclaw` from `/home/nanoclaw/nanoclaw` as the `nanoclaw` user.
 
-The link is pinned to the `nanoclaw-helper-v2.1` tag, and so are the install script and the community-scripts engine it loads. A container's `update` command keeps using that helper version. It still installs new NanoClaw releases.
+The link is pinned to the `nanoclaw-helper-v2.2` tag, and so are the install script and the community-scripts engine it loads. A container's `update` command keeps using that helper version. It still installs new NanoClaw releases. Containers created with helper v2.1 or earlier keep NanoClaw in `/opt/nanoclaw`.
 
 For help, [open an issue](https://github.com/nanocoai/nanoclaw/issues/new/choose) on the NanoClaw repository and mention Proxmox VE, or ask in [Discord](https://discord.gg/VDdww8qS42).
 
