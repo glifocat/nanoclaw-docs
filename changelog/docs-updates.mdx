@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Proxmox VE helper v2.2" description="2026-09-30" tags={["Updated"]}>
+  The one-line install in [Installation](/installation#install-on-proxmox-ve) now uses helper v2.2, which installs NanoClaw in `/home/nanoclaw/nanoclaw`, the home folder of the `nanoclaw` account, like a manual install. Containers from earlier helper versions keep `/opt/nanoclaw`. When the community-scripts engine cannot load, for example when the command is run on a laptop instead of the Proxmox VE host, it now stops with a clear message instead of reporting an install that never happened.
+</Update>
+
 <Update label="Install on Proxmox VE" description="2026-09-26" tags={["New"]}>
   [Installation](/installation#install-on-proxmox-ve) now covers the NanoClaw helper for Proxmox VE: the pinned one-line install, what the container gets, the setup-wizard handoff, updating with `update`, and where to get help. The helper is maintained by the NanoClaw team on its own fork, not by community-scripts.
 </Update>
