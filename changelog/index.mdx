@@ -5,7 +5,32 @@ icon: "tag"
 rss: true
 ---
 
+{/* verified-against (v2026.10.0 entry): scripts/update-nanoclaw.ts, scripts/update/{channel,transaction}.ts, .claude/skills/add-onecli/{versions.json,payload/docs/onecli-upgrades.md}, .claude/skills/add-iron-proxy/{scripts/setup.ts,front-proxy/main.go}, setup/service.ts, src/gateway-read-policy.ts, container/agent-runner/src/providers/claude.ts, container/agent-runner/src/provider-contracts/claude.ts, .claude/skills/add-dial-tool/scripts/dial-policy.ts, .claude/skills/add-whatsapp/SKILL.md, src/command-gate.ts, src/anchored-dir.ts, package.json @ 7203e00d (v2026.10.0) */}
 {/* verified-against (v2.4.0 entry): CHANGELOG.md, docs/release-2.4-update.md, setup/auto.ts, src/gateway-providers/index.ts, src/config.ts, src/cli/resources/tasks.ts @ 143db6c9 (v2.4.0) */}
+
+<Update label="v2026.10.0" description="2026-10-09" tags={["Breaking", "Feature", "Fix", "Skill"]}>
+  Released 2026-10-09 as [v2026.10.0](https://github.com/nanocoai/nanoclaw/releases/tag/v2026.10.0) (`7203e00d`), the first release with calendar version numbers (`YYYY.M.PATCH`). Update with `/update-nanoclaw`; read **Before you update** first.
+
+  **Before you update**
+
+  - **Breaking: OneCLI installs must upgrade the OneCLI gateway to exactly 1.42.0.** `/update-nanoclaw` never upgrades a running gateway. Follow `docs/onecli-upgrades.md` in your install, which also tells you when it does not apply. Do not go past 1.42.0: later gateway versions are not supported yet. New installs already get 1.42.0.
+  - **`/update-nanoclaw` now installs the newest release, not the tip of `main`.** `NANOCLAW_UPDATE_CHANNEL` in `.env` picks the channel: `stable` (the default) follows releases, `beta` takes release candidates, and `edge` follows `main`. To keep following `main`, run `pnpm exec tsx scripts/update-nanoclaw.ts set-channel --channel edge` in your NanoClaw folder.
+  - **Iron Proxy installs: rerun the Iron setup once after updating** with `pnpm exec tsx .claude/skills/add-iron-proxy/scripts/setup.ts`. Add `--with-control` if you use the Iron Control console.
+
+  **New**
+
+  - **Iron Proxy can reach a keyless model on the same machine over plain HTTP**, for example `http://host.docker.internal:<port>/v1`. See [Credential gateways](/operate/gateways).
+  - **The service can use an outbound proxy** from `HTTPS_PROXY`, `HTTP_PROXY` or `ALL_PROXY`, and `NO_PROXY`, set in your setup shell or `.env`.
+  - **Iron Proxy can skip the approval card for reads that send no credential** when you set `NANOCLAW_GATEWAY_UNCREDENTIALED_READS=true` in `.env`. It is off by default.
+  - **A failed Claude run shows Claude's own short reason** in the chat for known failures, such as an invalid API key.
+
+  **Fixes**
+
+  - **`/update-nanoclaw` and rollback are more dependable.** A rollback swaps your `data/` snapshot back in by rename instead of deleting it first.
+  - **New Claude groups no longer default to the `Concise` output style.** A group that already has an output style keeps it.
+  - **`/add-dial-tool` works again on OneCLI gateway 1.42.0.**
+  - **Security:** WhatsApp moves to Baileys 7.0.0-rc14, agents can no longer redirect host file operations outside their own folders, and only admins can run `/clear` and `/upload-trace`. On Linux, if your outbound proxy has a password, rerun `pnpm exec tsx setup/index.ts --step service` to move it out of your service file into a private file. See the [release notes](https://github.com/nanocoai/nanoclaw/releases/tag/v2026.10.0) for the full list.
+</Update>
 
 <Update label="v2.4.0" description="2026-09-23" tags={["Breaking", "Feature", "Fix", "Skill"]}>
   Released 2026-09-23 as [v2.4.0](https://github.com/nanocoai/nanoclaw/releases/tag/v2.4.0) (`143db6c9`). Update with `/update-nanoclaw`; read the two breaking items first. Upstream [Updating to NanoClaw 2.4](https://github.com/nanocoai/nanoclaw/blob/main/docs/release-2.4-update.md) has the full procedure.
