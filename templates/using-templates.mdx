@@ -5,7 +5,7 @@ keywords: ["ncl groups create --template", "stamp agent", "template ref", "NANOC
 tag: "UPDATED"
 ---
 
-{/* verified-against: src/templates/{create-agent,local-dir,parse}.ts, src/cli/resources/{groups,tasks}.ts @ 20d61af; setup/{templates,auto}.ts, docs/templates.md @ 20d61af */}
+{/* verified-against: src/templates/{create-agent,restamp,local-dir,parse}.ts, src/cli/resources/{groups,tasks}.ts, src/config.ts, src/group-persona.ts, src/container-runner.ts, src/container-config.ts, src/modules/self-mod/request.ts, setup/{auto,templates}.ts, setup/lib/setup-config.ts, nanoclaw.sh @ 7203e00d (v2026.10.0) */}
 
 {/* verified-against (scoped correction): setup/{auto,templates}.ts, src/cli/resources/groups.ts @ b76fcb3d */}
 
@@ -39,7 +39,7 @@ Existing installs see **"Would you like to add or update an agent from a templat
 
 ### Presetting a template
 
-Advanced setup exposes the pick as **First-agent template**, which resolves to a local ref. The same setting is available as a flag or an environment variable:
+Advanced setup exposes the pick as **Agent template**, which resolves to a local ref. The same setting is available as a flag or an environment variable:
 
 ```bash
 bash nanoclaw.sh --template-path <category>/<template>
