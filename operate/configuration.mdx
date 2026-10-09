@@ -5,7 +5,7 @@ keywords: ["configuration", "environment variables", ".env", "container config",
 tag: "UPDATED"
 ---
 
-{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/webhook-server.ts, src/egress-lockdown.ts, src/host-sweep.ts, src/providers/claude.ts, src/container-config.ts, src/db/container-configs.ts, setup/set-env.ts, setup/service.ts, setup/container.ts, container/pull.sh @ 639577c3; instance model and runtime settings: src/config.ts, src/container-config.ts, src/drivers/index.ts, src/gateway-providers/index.ts, container/agent-runner/src/providers/claude.ts @ b76fcb3d */}
+{/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/install-slug.ts, src/drivers/index.ts, src/gateway-providers/index.ts, src/gateway-read-policy.ts, src/egress-lockdown.ts, src/container-config.ts, src/db/container-configs.ts, src/db/migrations/015-cli-scope.ts, src/providers/claude.ts, setup/service.ts, setup/container.ts, setup/lib/registry-state.ts, container/pull.sh, .claude/skills/add-onecli/payload/src/gateway-providers/onecli.ts @ 7203e00d (v2026.10.0) */}
 
 NanoClaw has two configuration layers:
 
@@ -17,7 +17,7 @@ NanoClaw has two configuration layers:
 Variables come from two sources, and the distinction matters:
 
 - A **small set is read from `.env`** at the project root by NanoClaw's own parser. These work with a plain "edit `.env`, restart" flow. Values are not loaded into `process.env`, so secrets don't leak to child processes; a value already in the process environment takes precedence.
-- **The process-only settings listed below are read from `process.env` only.** The launchd plist, systemd unit, and nohup wrapper that setup generates set just `PATH` and `HOME` — they do **not** source `.env`. Putting these variables in `.env` has no effect; you have to set them in the service environment (see [Applying changes](#applying-changes)).
+- **The process-only settings listed below are read from `process.env` only.** The launchd plist and systemd unit that setup generates set `PATH` and `HOME`, plus the outbound proxy variables when a proxy is configured (see [Environment variables](/reference/environment-variables#outbound-proxy)). The nohup wrapper loads only that proxy file. None of them source `.env`. Putting these variables in `.env` has no effect; you have to set them in the service environment (see [Applying changes](#applying-changes)).
 
 ### Read from .env
 
@@ -29,7 +29,7 @@ Variables come from two sources, and the distinction matters:
 | `NANOCLAW_DEFAULT_MODEL` | provider SDK default | Model used at the next spawn for groups without their own model. Unlike the provider default, this is not stamped at group creation. |
 | `NANOCLAW_FAST_MODE` | `false` | Enables the faster, higher-priced serving tier for the Claude provider. Only `1` or `true` enables it, case-insensitively. |
 | `NANOCLAW_RUNTIME_DRIVER` | `docker` | Selects an installed session driver. Docker is the only driver shipped here; an unregistered value fails. |
-| `NANOCLAW_GATEWAY_PROVIDER` | `onecli` | Selects an installed credential-gateway provider (`onecli` or `iron-proxy`). An unregistered value fails. See [Credential gateways](/operate/gateways). |
+| `NANOCLAW_GATEWAY_PROVIDER` | the only installed gateway | Selects an installed credential-gateway provider (`onecli` or `iron-proxy`). Unset works only when exactly one gateway is installed. An unregistered value fails. See [Credential gateways](/operate/gateways). |
 | `NANOCLAW_SESSION_MATERIAL_ROOT` | `data/session-materials` | Host directory admitted for session identity material. |
 | `WEBHOOK_PORT` | `3000` | Port for the local webhook server. Process environment first, then `.env`. Must be an integer from 1 to 65535. |
 | `ONECLI_URL` | — | URL of the OneCLI Agent Vault. |
@@ -37,6 +37,7 @@ Variables come from two sources, and the distinction matters:
 | `TZ` | system timezone, else `UTC` | IANA timezone for scheduled tasks and message timestamps. Invalid values are skipped, not errored. |
 | `CONTAINER_CPU_LIMIT` | _unset_ (unbounded) | Opt-in CPU cap per container, passed to `docker create --cpus` (e.g. `2`). Can be set in `.env` or the process environment. |
 | `CONTAINER_MEMORY_LIMIT` | _unset_ (unbounded) | Opt-in memory cap per container, passed to `docker create --memory` (e.g. `8g`). Hard cap only on a swapless host. Can be set in `.env` or the process environment. |
+| `CONTAINER_PIDS_LIMIT` | `2048` | Process and thread cap per container, passed to `docker create --pids-limit`. The one container limit that is on by default. Set `0` or a non-numeric value to drop the cap. Can be set in `.env` or the process environment. |
 | `NANOCLAW_EGRESS_LOCKDOWN` | `false` | Set `true` to force all agent traffic through the OneCLI gateway on an internal Docker network. Fails fast if the gateway isn't running. Can be set in `.env` or the process environment. See [Hardening](/operate/hardening). |
 | `NANOCLAW_EGRESS_NETWORK` | `nanoclaw-egress` | Name of the locked-down Docker network. Can be set in `.env` or the process environment. |
 | `ONECLI_GATEWAY_CONTAINER` | `onecli` | Name of the gateway container attached as the only egress hop. Can be set in `.env` or the process environment. |
@@ -82,6 +83,8 @@ Fields per group:
 | `model`, `effort` | Model and reasoning effort passed to the provider. |
 | `assistant_name` | Per-group assistant name override. |
 | `max_messages_per_prompt` | Maximum inbound messages supplied in one provider turn for this group. |
+| `timezone` | IANA timezone for this group. Overrides the install timezone for scheduled tasks and the container's `TZ`. Unset or invalid falls back to the install timezone. |
+| `speed` | Provider-declared speed tier for this group (Claude: `standard` or `fast`). Empty follows the install default (`NANOCLAW_FAST_MODE`). |
 | `image_tag` | Custom container image for this group. |
 | `cli_scope` | What the group's agent can do via the internal CLI: `disabled`, `group` (own group only, the default), or `global`. |
 | `skills` | Skill list for the group, or `all`. |
