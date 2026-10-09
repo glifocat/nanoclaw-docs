@@ -5,6 +5,7 @@ keywords: ["telegram", "botfather", "bot token", "add-telegram", "pairing code",
 ---
 
 {/* verified-against: .claude/skills/add-telegram/SKILL.md, setup/pair-telegram.ts, setup/channels/telegram-pre-step.ts @ 294ef2ae; channels branch src/channels/telegram.ts + telegram-pairing.ts @ 4a263658 */}
+{/* verified-against (scoped correction): token validation: .claude/skills/add-telegram/SKILL.md @ 7203e00d (v2026.10.0) */}
 
 The Telegram adapter connects NanoClaw to a bot you create through @BotFather. It's built on the Chat SDK bridge (`@chat-adapter/telegram` 4.29.0, pinned) and runs in **polling mode** — NanoClaw polls Telegram's Bot API for updates, so you don't need a public URL, webhook, or open port. Works behind NAT and on a laptop.
 
@@ -59,7 +60,7 @@ If the picker is unavailable, add the bot to the group manually and post `/start
 
 ## Troubleshooting
 
-- **"Telegram didn't accept that token"** — `getMe` rejected it. Re-copy the full token from @BotFather (it's easy to truncate); it must match `<digits>:<chars>`. "Couldn't reach Telegram" instead means a network problem — check connectivity and retry setup.
+- **The token step fails** — the token must match `<digits>:<35 or more characters>`, and `getMe` must accept it. Re-copy the full token from @BotFather (it's easy to truncate), and check that this machine can reach `api.telegram.org`.
 - **Pairing never completes**: the service must be running and polling for the code to be observed. Also make sure you sent *only* the 6 digits, in the chat you want to register. In a group with Group Privacy ON, the bot can't see the bare code; send `@<botname> 123456`.
 - **"Got "NNNNNN", which doesn't match"**: a wrong code invalidates the pairing on the spot; the wizard prints a fresh code automatically, up to 5 regenerated codes per run. The step fails on the sixth wrong guess; re-run setup for a new batch.
 - **Bot ignores group messages** — that's Group Privacy doing its job. Either @mention the bot, or turn privacy off in @BotFather and re-add the bot to the group.

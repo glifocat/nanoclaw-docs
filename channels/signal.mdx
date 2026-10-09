@@ -5,6 +5,7 @@ keywords: ["signal", "signal-cli", "add-signal", "linked devices", "qr code", "j
 ---
 
 {/* verified-against: setup/install-signal-cli.sh, setup/signal-auth.ts, .claude/skills/add-signal/SKILL.md @ 4e83a0a0; channels branch src/channels/signal.ts @ 6ee516ad */}
+{/* verified-against (scoped correction): signal-cli installer: setup/install-signal-cli.sh, .claude/skills/add-signal/SKILL.md @ 7203e00d (v2026.10.0) */}
 
 The Signal adapter is **native** — no Chat SDK bridge, only Node.js builtins. Signal has no bot API, so NanoClaw talks to [signal-cli](https://github.com/AsamK/signal-cli), which it spawns as a local daemon and drives over a newline-delimited **JSON-RPC TCP socket** (`127.0.0.1:7583` by default). Setup links NanoClaw to your existing Signal account as a **secondary device** — no new phone number needed; your assistant sends and receives as the number on your phone. All connections are outbound, so no public URL, webhook, or open port; works behind NAT and on a laptop.
 
@@ -12,7 +13,7 @@ The Signal adapter is **native** — no Chat SDK bridge, only Node.js builtins. 
 
 - A phone with Signal installed and registered — you'll scan a QR code from **Settings → Linked Devices**
 - A working NanoClaw install ([quickstart](/quickstart))
-- signal-cli — the wizard auto-installs it: Homebrew on macOS (so Homebrew is required there), or the native release binary (v0.14.3, ~96 MB, no Java, no sudo) to `~/.local/bin` on Linux. The `/add-signal` skill may fetch a newer signal-cli release.
+- signal-cli — the wizard auto-installs it: Homebrew on macOS (so Homebrew is required there), or the native release binary (v0.14.3, ~96 MB, no Java, no sudo) to `~/.local/bin` on Linux. The `/add-signal` skill runs the same installer when signal-cli is missing.
 
 If you'd rather give NanoClaw its own dedicated number (a SIM or VoIP number it owns entirely), the `/add-signal` skill documents a manual `signal-cli register` flow with captcha and SMS/voice verification. The wizard only does device linking.
 

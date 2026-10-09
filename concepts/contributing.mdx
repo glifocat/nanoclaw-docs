@@ -5,6 +5,7 @@ keywords: ["contributing", "development", "pnpm", "vitest", "bun", "channels bra
 ---
 
 {/* verified-against: package.json, CONTRIBUTING.md, RELEASING.md, vitest.config.ts, vitest.skills.config.ts, eslint.config.js, .github/workflows/{ci.yml,label-pr.yml}, repo-tokens/README.md, CLAUDE.md @ 639577c3 */}
+{/* verified-against (scoped correction): image tag, CI, test commands, release channel: container/build.sh, src/install-slug.ts, .github/workflows/{ci,release}.yml, container/agent-runner/package.json, vitest.config.ts, scripts/release.mjs @ 7203e00d (v2026.10.0) */}
 
 This page is for contributing to [nanocoai/nanoclaw](https://github.com/nanocoai/nanoclaw) itself — fixing bugs, simplifying code, or adding a skill to the upstream repo. If you just want to extend your own installation, you don't need any of this: see [Extending NanoClaw](/extend/overview).
 
@@ -44,21 +45,21 @@ pnpm run typecheck    # tsc --noEmit
 pnpm run format       # prettier --write
 
 # Container image
-./container/build.sh  # rebuild nanoclaw-agent:latest
+./container/build.sh  # rebuild nanoclaw-agent-v2-<slug>:latest
 
 # Agent-runner (Bun, separate tree)
 cd container/agent-runner
 bun install
-bun test              # container tests (bun:test)
+bun run test          # container tests (bun:test, runs `bun test --isolate`)
 ```
 
-CI on every PR runs `format:check`, typechecks for both trees, host tests under vitest, and agent-runner tests under `bun test`.
+CI on every PR and on pushes to `main` runs `format:check`, typechecks for both trees, host tests under vitest and agent-runner tests (`bun run test`) on Node 22 and 24, plus a check that the skill-pin mirror is current (`pnpm run skill-pins:check`) and the Go tests for the Iron Proxy front proxy.
 
 ## Test layout
 
 Tests are split across three configs because the two runtimes can't share one:
 
-- **`vitest.config.ts`** — host tests: `src/**/*.test.ts`, `setup/**/*.test.ts`, `scripts/**/*.test.ts`, `container/*.test.ts`. Run with `pnpm test`.
+- **`vitest.config.ts`** — host tests: `src/**/*.test.ts`, `setup/**/*.test.ts`, `scripts/**/*.test.ts`, `container/*.test.ts`, and `.claude/skills/*/scripts/**/*.test.ts` (a gateway skill's own scripts). Run with `pnpm test`.
 - **`vitest.skills.config.ts`** — skill registration tests: `.claude/skills/**/tests/*.test.ts`. Run with `pnpm exec vitest run --config vitest.skills.config.ts`.
 - **`container/agent-runner`** — Bun tests, because they depend on `bun:sqlite`, which vitest (Node) can't load. Import from `bun:test`, not `vitest`.
 
@@ -79,7 +80,7 @@ Where your PR goes depends on what you're contributing:
 
 ## Releases
 
-Maintainers cut a GitHub Release for `package.json` version bumps that land on `main`, published through a gated release workflow with a protected environment and required approvers: a `vX.Y.Z` tag, a `CHANGELOG.md` entry, and a release body that mirrors it. Every release is stable — there's no pre-release channel — and published tags are immutable and never moved, so pinning a tag is the reproducible choice for forks. Details in [RELEASING.md](https://github.com/nanocoai/nanoclaw/blob/main/RELEASING.md).
+Maintainers cut a GitHub Release for `package.json` version bumps that land on `main`, published through a gated release workflow with a protected environment and required approvers: a `vX.Y.Z` tag, a `CHANGELOG.md` entry, and a release body that mirrors it. A version with an `-rc.N` suffix is published as a GitHub pre-release through a separate protected `prerelease` environment and never becomes the latest release; every other version is a stable release. Published tags are annotated, immutable and never moved, so pinning a tag is the reproducible choice for forks. Details in [RELEASING.md](https://github.com/nanocoai/nanoclaw/blob/main/RELEASING.md).
 
 ## Where to go
 

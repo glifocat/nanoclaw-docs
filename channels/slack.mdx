@@ -6,13 +6,12 @@ keywords: ["slack", "add agent to slack", "slack agent", "managed slack app", "m
 tag: "UPDATED"
 ---
 
-{/* verified-against: main setup/channels/{slack-auto,slack-auto-register}.ts @ 9673da4a; channels .claude/skills/{add-slack,slack-agent-flow,slack-a2a-rooms}/SKILL.md, .claude/skills/slack-agent-flow/src/modules/slack-agent-flow/{orchestrate,index,provision}.ts, .claude/skills/slack-a2a-rooms/src/channels/slack-a2a.ts @ d7fc4c39; current setup/channels/slack-auto-register.ts, nanoclaw.sh @ 001dfa02; channels src/provisioning/slack-app.ts @ 9740352a; managed completion, room engagement, and SDK event limits: setup/channels/{slack-auto,slack-auto-register,run-channel-skill}.ts, .claude/skills/slack-agent-flow/src/modules/slack-agent-flow/orchestrate.ts, src/channels/chat-sdk-bridge.ts @ b76fcb3d; pasted tables: channels branch src/channels/{slack,slack-raw-text}.ts @ 6d5c1d08 */}
+{/* verified-against: setup/channels/slack-auto.ts, setup/channels/slack-auto-register.ts, setup/channels/run-channel-skill.ts, setup/channels/companions.ts, setup/portal.ts, setup/slack-worker.ts, setup/auto.ts, src/community-portal/slack-job.ts, .claude/skills/slack-agent-flow/scripts/slack-agent-flow-finish.ts, .claude/skills/slack-agent-flow/src/modules/slack-agent-flow/provision.ts, .claude/skills/add-slack/SKILL.md @ 7203e00d (v2026.10.0); channels branch src/channels/{slack,slack-a2a-guard}.ts, src/provisioning/slack-app.ts, .claude/skills/slack-a2a-rooms/src/channels/slack-a2a.ts, .claude/skills/add-slack/SKILL.md, .claude/skills/slack-agent-flow/container/agent-runner/src/mcp-tools/rooms.ts @ d73e8f44 */}
+{/* verified-against (pasted tables, not re-checked in this sweep): channels branch src/channels/{slack,slack-raw-text}.ts @ 6d5c1d08 */}
 
 Give each NanoClaw agent its own identity in Slack. You can talk to an agent in a direct message, bring several agents into one shared room, and use a room canvas as shared working context.
 
-Setup asks how you want to create the Slack app. **Create it for me** is the default: NanoClaw builds the manifest, chooses the scopes, installs the app, and stores the tokens. **I will create it myself** is the advanced alternative, for operators who create the app themselves at [api.slack.com/apps](https://api.slack.com/apps).
-
-Setup also falls back to the manual walkthrough on its own. It does that when you do not complete the NanoClaw sign-in, when Slack rejects the app creation, or when the managed Slack service cannot be reached.
+When you choose Slack in the setup wizard, setup creates the Slack app for you through the NanoClaw portal. It asks to open the perks dashboard in your browser, where you sign in with your NanoClaw account and pick the workspace. NanoClaw then builds the manifest, chooses the scopes, creates the app, installs it, and stores the tokens. If you decline, setup returns to the channel list. To create the app yourself at [api.slack.com/apps](https://api.slack.com/apps), run `/add-slack` from Claude Code, which walks you through creating the app by hand. The "Create it for me" and "I will create it myself" prompt appears in the wizard only when `SLACK_MANAGER_TOKEN` is set.
 
 ## What you get
 
@@ -66,7 +65,7 @@ You need:
 - A working [NanoClaw install](/quickstart)
 - Permission to install apps in the target Slack workspace
 
-Managed setup also needs a NanoClaw account. Setup prompts you to sign in, then stores the install token at `~/.config/nanoclaw/account.json`. You never create or paste that token yourself. The manual app path needs no account.
+Managed setup also needs a NanoClaw account. Setup walks you through signing in from the portal link, then stores the install token at `~/.config/nanoclaw/account.json`. You never create or paste that token yourself. The manual app path needs no account.
 
 Slack workspace policy still applies. A workspace that turns on Slack's Admin Approved Apps policy refuses the automatic install, and a workspace admin has to approve the app before you can finish setup.
 
@@ -83,22 +82,18 @@ Slack workspace policy still applies. A workspace that turns on Slack's Admin Ap
         ```
       </Step>
       <Step title="Choose Slack">
-        Select Slack when the setup wizard asks for a channel. When it asks how to create the app, select **Create it for me**.
+        Select Slack when the setup wizard asks for a channel, then choose how the account is registered (Owner, Admin, or Member).
       </Step>
       <Step title="Connect your workspace">
-        Sign in with your NanoClaw account if prompted. Approve the Slack workspace connection in your browser, then return to the terminal.
-
-        If more than one workspace is connected, select the workspace where the agent should live.
+        Agree to open the perks dashboard. Setup prints one portal link and opens it. Sign in with your NanoClaw account if needed, connect or pick the Slack workspace where the agent should live, and enable Slack. Setup continues on its own once you decide.
       </Step>
       <Step title="Let NanoClaw create the app">
-        NanoClaw creates a Socket Mode app, installs it, and stores the derived bot and app tokens in `.env`. The host never receives the workspace-level manager credential when provisioning runs through the managed service.
+        NanoClaw creates a Socket Mode app in that workspace and saves its tokens. Setup then hands the install to a background worker, so you can keep setting up NanoClaw while it finishes.
 
-        If the workspace requires admin approval, managed setup opens the app's install link and waits up to five minutes for approval. When the managed service returns the bot token, setup continues without token pasting.
-
-        If approval takes longer, the provisioning module is older, or you use a manager token directly, setup falls back to **Finish installing in Slack**. After approval, install the app, open **OAuth & Permissions**, and paste the `xoxb-…` Bot User OAuth Token at the next prompt. The app-level token is already stored.
+        If the workspace requires admin approval, finish the installation from the portal. The worker waits for the approval for up to 7 days.
       </Step>
       <Step title="Open the agent DM">
-        Setup resolves your Slack member ID, wires the direct message to the first agent group, restarts the service, and sends the welcome message. Reply in Slack to verify the connection.
+        When the install finishes, the worker stores the tokens in `.env`, wires the direct message to the first agent group, restarts the service, and the agent sends you a welcome message in Slack. If it fails, setup tells you to check the portal and resume with `pnpm exec tsx setup/portal.ts --stage slack`.
       </Step>
     </Steps>
   </Tab>
@@ -237,7 +232,7 @@ After editing instance tokens by hand, restart NanoClaw so the adapter registers
 
 ## Troubleshooting
 
-- **Slack asks for admin approval** — ask a workspace admin to approve the app through the install link. Managed setup waits for the token automatically; if it falls back to manual completion, install the app and paste the new `xoxb-…` token. Provisioning does not bypass the workspace policy.
+- **Slack asks for admin approval** — ask a workspace admin to approve the app. Setup finishes in the background once the approval lands (it waits up to 7 days), and the agent then DMs you in Slack. If the saved install shows as failed, check its progress in the portal and resume with `pnpm exec tsx setup/portal.ts --stage slack`. If it shows as expired, review the existing app in the portal before restarting Slack setup. Provisioning does not bypass the workspace policy.
 - **The welcome DM arrives, but replies disappear** — for Socket Mode, confirm `SLACK_APP_TOKEN` is set, Socket Mode is enabled, and the four bot events are subscribed. For webhook mode, confirm the public URL is reachable and uses the matching Signing Secret.
 - **The token is rejected** — use the Bot User OAuth Token from **OAuth & Permissions**, not a user token. A bot token starts with `xoxb-`; an App-Level Token starts with `xapp-`.
 - **A new agent exists but has no Slack bot** — follow the finish command in the failure message. The agent group remains usable while the Slack provisioning leg is retried.
