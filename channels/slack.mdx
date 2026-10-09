@@ -11,7 +11,11 @@ tag: "UPDATED"
 
 Give each NanoClaw agent its own identity in Slack. You can talk to an agent in a direct message, bring several agents into one shared room, and use a room canvas as shared working context.
 
-When you choose Slack in the setup wizard, setup creates the Slack app for you through the NanoClaw portal. It asks to open the perks dashboard in your browser, where you sign in with your NanoClaw account and pick the workspace. NanoClaw then builds the manifest, chooses the scopes, creates the app, installs it, and stores the tokens. If you decline, setup returns to the channel list. To create the app yourself at [api.slack.com/apps](https://api.slack.com/apps), run `/add-slack` from Claude Code, which walks you through creating the app by hand. The "Create it for me" and "I will create it myself" prompt appears in the wizard only when `SLACK_MANAGER_TOKEN` is set.
+When you choose Slack in the setup wizard, NanoClaw creates the Slack app for you. Setup asks to open the perks dashboard in your browser. There you sign in with your NanoClaw account and pick the workspace. NanoClaw then creates the app, installs it, and stores its tokens.
+
+If you say no to the browser question, setup goes back to the channel list. You can connect Slack later.
+
+To create the app yourself at [api.slack.com/apps](https://api.slack.com/apps), run `/add-slack` from Claude Code. It walks you through each screen.
 
 ## What you get
 
@@ -82,18 +86,18 @@ Slack workspace policy still applies. A workspace that turns on Slack's Admin Ap
         ```
       </Step>
       <Step title="Choose Slack">
-        Select Slack when the setup wizard asks for a channel, then choose how the account is registered (Owner, Admin, or Member).
+        Select Slack when the setup wizard asks for a channel. When it asks **How should this Slack account be registered?**, choose **Owner** for your own account. The other options are for adding teammates later.
       </Step>
       <Step title="Connect your workspace">
-        Agree to open the perks dashboard. Setup prints one portal link and opens it. Sign in with your NanoClaw account if needed, connect or pick the Slack workspace where the agent should live, and enable Slack. Setup continues on its own once you decide.
+        Answer yes to open the perks dashboard. Setup prints a link and opens it in your browser. Sign in with your NanoClaw account if asked, pick the Slack workspace where the agent should live, and turn on Slack. Terminal says **Setup continues automatically as soon as it is enabled.** and moves on by itself.
       </Step>
       <Step title="Let NanoClaw create the app">
-        NanoClaw creates a Socket Mode app in that workspace and saves its tokens. Setup then hands the install to a background worker, so you can keep setting up NanoClaw while it finishes.
+        NanoClaw creates a Socket Mode app in that workspace and saves its tokens. The install finishes in the background, so setup can carry on with the next step.
 
-        If the workspace requires admin approval, finish the installation from the portal. The worker waits for the approval for up to 7 days.
+        If your workspace needs an admin to approve new apps, get that approval and follow progress in the portal. Setup keeps waiting for it for up to 7 days.
       </Step>
       <Step title="Open the agent DM">
-        When the install finishes, the worker stores the tokens in `.env`, wires the direct message to the first agent group, restarts the service, and the agent sends you a welcome message in Slack. If it fails, setup tells you to check the portal and resume with `pnpm exec tsx setup/portal.ts --stage slack`.
+        When the install finishes, NanoClaw stores the tokens in `.env`, wires your direct message to the first agent group, restarts the service, and the agent sends you a welcome message in Slack. If Terminal says the Slack installation needs attention, open the portal to see what happened, then run `pnpm exec tsx setup/portal.ts --stage slack` from the `nanoclaw` folder to resume.
       </Step>
     </Steps>
   </Tab>
@@ -219,7 +223,7 @@ Agents can receive files, send generated files, and add reactions. Slack uses [m
 | `SLACK_BOT_TOKEN` | Bot User OAuth Token for the default Slack identity. Starts with `xoxb-`. |
 | `SLACK_APP_TOKEN` | App-Level Token for Socket Mode. Starts with `xapp-`. When present, the adapter uses Socket Mode. |
 | `SLACK_SIGNING_SECRET` | Verifies incoming requests in webhook mode. Not required for Socket Mode. |
-| `SLACK_MANAGER_TOKEN` | Advanced alternative to the managed service. Supply your own Slack workspace manager token to create apps directly against Slack. Setup never produces one. It is not passed into agent containers. |
+| `SLACK_MANAGER_TOKEN` | Advanced alternative to the managed service. Supply your own Slack workspace manager token to create apps directly against Slack. Setup never produces one. It is not passed into agent containers. When it is set, the setup wizard first asks **How do you want to create the Slack app?** with **Create it for me** and **I will create it myself**; without it, setup goes straight to the portal flow. |
 | `SLACK_SERVICE_BASE` | Overrides the managed Slack service URL. Most installs should leave it unset. |
 | `SLACK_INSTANCES` | Comma-separated names for additional Slack bot identities, such as `research,qa`. |
 | `SLACK_BOT_TOKEN_<NAME>` | Bot token for a named identity. Uppercase the name and replace dashes with underscores. |
