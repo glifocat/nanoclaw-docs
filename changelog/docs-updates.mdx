@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Auto-compact window can be set on the host" description="2026-10-04" tags={["Fixed"]}>
+  [Environment variables](/reference/environment-variables) now says `CLAUDE_CODE_AUTO_COMPACT_WINDOW` can be set in `.env` or the host process environment from v2026.10.0, which passes it into Claude agent containers. It must be a positive integer, and affected sessions need a restart. In v2.4.0 and earlier, a host value is ignored.
+</Update>
+
 <Update label="Setup commits its own files" description="2026-10-04" tags={["Updated"]}>
   [Upgrading](/operate/upgrading) now explains that setup commits the files skill installs add, as local `setup: apply <skill>` commits. For a dirty tree before an update, commit what is left as a local customization instead of stashing it, since the updater finds installed skills from those files. [Environment variables](/reference/environment-variables) lists `NANOCLAW_SETUP_COMMIT=0`, which turns those commits off for dev clones.
 </Update>
