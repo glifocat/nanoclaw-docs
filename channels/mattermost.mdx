@@ -1,19 +1,19 @@
 ---
 title: "Mattermost"
-description: "Connect NanoClaw to a self-hosted or cloud Mattermost server: server discovery, bot account, authenticated card callbacks, and an optional local evaluation server."
+description: "Connect NanoClaw to a self-hosted or cloud Mattermost server: server discovery, bot account, and authenticated card callbacks."
 keywords: ["mattermost", "add-mattermost", "self-hosted", "bot account", "websocket", "site url", "mmctl", "callback", "chat sdk", "threads"]
 ---
 
-{/* verified-against: .claude/skills/add-mattermost/{SKILL,LOCAL_SERVER}.md, setup/channels/initial-setup.ts @ 294ef2ae; channels branch src/channels/mattermost.ts, src/channels/mattermost-adapter/{adapter,websocket}.ts @ 4a263658 */}
+{/* verified-against: .claude/skills/add-mattermost/{SKILL.md,SERVER_SETUP.md,REMOVE.md}, .claude/skills/add-mattermost/scripts/{configure.ts,verify-runtime.ts,discover-server.mjs,select-server.mjs,read-response.mjs}, setup/channels/initial-setup.ts, setup/channels/fixtures/mattermost/README.md @ 7203e00d (v2026.10.0); channels branch src/channels/mattermost.ts, src/channels/mattermost-adapter/{adapter,websocket,index}.ts @ d73e8f44 */}
 
-The Mattermost adapter connects NanoClaw to a Mattermost server you control: self-hosted, cloud, or a local evaluation server the skill can create for you. It supports DMs, channels, threads, files, reactions, and interactive approval cards. Messages arrive over Mattermost's WebSocket, so no public URL is needed for inbound chat; card clicks return to NanoClaw over an authenticated HTTP callback.
+The Mattermost adapter connects NanoClaw to a Mattermost server you control, self-hosted or cloud. NanoClaw connects to a server; it does not install or manage one. It supports DMs, channels, threads, files, reactions, and interactive approval cards. Messages arrive over Mattermost's WebSocket, so no public URL is needed for inbound chat; card clicks return to NanoClaw over an authenticated HTTP callback.
 
 Unlike most Chat SDK channels, the adapter is not an npm package: `/add-mattermost` copies a vendored adapter (`src/channels/mattermost-adapter/`) from the `channels` branch and pins only its WebSocket dependencies (`ws`, `@types/ws`).
 
 ## Prerequisites
 
 - A working NanoClaw install ([quickstart](/quickstart))
-- A Mattermost server, or Docker plus Docker Compose if you want the skill to create a local evaluation server
+- A running Mattermost server (the skill links Mattermost's own evaluation and deployment guides if you do not have one)
 - System Admin access to that server, to enable bot account creation and to set `SiteURL` if it is wrong
 - For approval cards: a URL for NanoClaw that is reachable **from the Mattermost server** (not from your browser)
 
@@ -23,10 +23,10 @@ Mattermost is offered in the first-run setup wizard, or add it later by running 
 
 <Steps>
   <Step title="Discover or create the server">
-    The skill first looks for a Mattermost you already have: a configured `MATTERMOST_BASE_URL`, a healthy server on `localhost:8065` / `127.0.0.1:8065` (probed with `/api/v4/system/ping`), or a Mattermost Docker container it can offer to start. A found server is only a suggestion: you pick it, enter a different URL, or ask for a **local evaluation server** (Mattermost Team Edition plus PostgreSQL in containers, bound to `127.0.0.1:8065`, with config under `.nanoclaw/mattermost/`). Nothing is installed without showing you what will be created and getting approval.
+    The skill first looks for a Mattermost you already have: a configured `MATTERMOST_BASE_URL`, a healthy server on `localhost:8065` / `127.0.0.1:8065` (probed with `/api/v4/system/ping`), or a Mattermost Docker container it can offer to start. A found server is only a suggestion: you pick it or enter a different URL. If none is found, the skill points you to Mattermost's Quick Start Evaluation and deployment guide, and asks for the server URL once yours is running. The skill never installs a server.
   </Step>
   <Step title="Set the server SiteURL">
-    Mattermost Desktop sends its configured server URL as the WebSocket `Origin`, so `ServiceSettings.SiteURL` must match the base URL you chose, and `ServiceSettings.WebsocketURL` must stay blank. The skill sets this via `mmctl` (host-local or inside the container) when it can, or gives you the exact commands; the evaluation server's Compose template sets it for you. It then verifies both values through the public `/api/v4/config/client?format=old` endpoint.
+    Mattermost Desktop sends its configured server URL as the WebSocket `Origin`, so `ServiceSettings.SiteURL` must match the base URL you chose, and `ServiceSettings.WebsocketURL` must stay blank. The skill sets this via `mmctl` (host-local or inside the container) when it can, or gives you the exact commands. It then verifies both values through the public `/api/v4/config/client?format=old` endpoint, and refuses to save settings if `SiteURL` differs from your base URL or `WebsocketURL` is not blank.
   </Step>
   <Step title="Copy and register the adapter">
     The skill copies the vendored adapter and its tests from the `channels` branch, appends `import './mattermost.js';` to `src/channels/index.ts`, and pins the WebSocket dependencies. It also removes the unscoped `chat-adapter-mattermost` npm package if present: nothing in NanoClaw imports it, and it is typosquat-shaped against the scoped `@chat-adapter` family.
@@ -35,13 +35,13 @@ Mattermost is offered in the first-run setup wizard, or add it later by running 
     Two different places in Mattermost: first, as a System Admin, turn on **System Console → Integrations → Bot Accounts → Enable Bot Account Creation** (this only permits creation). Then, back in the workspace, create the bot under **Product menu → Integrations → Bot Accounts → Add Bot Account** and copy its access token. Add the bot to each team and channel it should hear. Mattermost never adds bots to teams or channels automatically. The skill verifies the token against `/api/v4/users/me`.
   </Step>
   <Step title="Configure authenticated card callbacks">
-    Approval cards require the Mattermost **server** to reach NanoClaw. You provide a callback URL routable from the server (NanoClaw's base URL or the full `/webhook/mattermost` route; the adapter normalizes either). Mattermost does not sign action callbacks, so the skill generates a random shared secret; a callback without it is refused with `401` before anything is dispatched. For a private callback host, add it under **System Console → Environment → Developer → Allow untrusted internal connections**.
+    Approval cards require the Mattermost **server** to reach NanoClaw. You provide a callback URL routable from the server (NanoClaw's base URL or the full `/webhook/mattermost` route; the adapter normalizes either). Mattermost does not sign action callbacks, so the skill generates a random shared secret (kept across re-runs so existing cards keep working); a callback without it is refused with `401` before anything is dispatched. If `MATTERMOST_CALLBACK_SECRET` is ever blank, the adapter derives a secret from the bot token instead, and cards posted before the token changes stop working. For a private callback host, add it under **System Console → Environment → Developer → Allow untrusted internal connections**.
   </Step>
   <Step title="Resolve the owner's DM">
-    The skill asks for your Mattermost username (without `@`), resolves it against `/api/v4/users/username/<name>`, and opens the DM between you and the bot, capturing the `mattermost:<channel-id>` platform ID that `/init-first-agent` wires as your first chat.
+    The skill asks for your Mattermost username (without `@`), resolves it against `/api/v4/users/username/<name>`, checks the user ID the server returns before using it, and opens the DM between you and the bot, capturing the `mattermost:<channel-id>` platform ID that `/init-first-agent` wires as your first chat.
   </Step>
   <Step title="Build, test, restart">
-    `pnpm run build`, the registration and adapter regression tests, then a service restart so the channel and credentials load. For a first channel, continue with `/init-first-agent`; otherwise `/manage-channels`.
+    `pnpm run build`, the registration and adapter regression tests, then a service restart so the channel and credentials load. A runtime check then confirms the running service loaded your bot and settings: it posts a temporary diagnostic card in the owner's DM, triggers its button through Mattermost, requires this host to receive the callback, and deletes the card. For a first channel, continue with `/init-first-agent`; otherwise `/manage-channels`.
   </Step>
 </Steps>
 
