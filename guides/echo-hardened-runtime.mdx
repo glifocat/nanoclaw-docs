@@ -6,6 +6,7 @@ keywords: ["echo", "hardened runtime", "security", "sandbox", "container image",
 ---
 
 {/* verified-against: setup/auto.ts, setup/registry-login.ts, setup/registry-login.sh, setup/registry.ts, setup/lib/registry-state.ts, container/Dockerfile, container/build.sh, docs/hardened-image.md @ 639577c3 (main, #3150 merge); pins, pull checks, sign-in verification, and the pin gate: versions.json, container/pull.sh, setup/registry-login.ts, setup/registry.ts, setup/lib/registry-state.ts, setup/set-env.ts, setup/channels/slack-auto.ts, .github/workflows/verify-agent-image.yml @ 294ef2ae. Auth screenshots are production captures (authenticate.nanoclaw.dev, 2026-07-29); wizard default and pull checks: setup/auto.ts, container/pull.sh @ b76fcb3d */}
+{/* verified-against (scoped correction): pin gate workflow: .github/workflows/verify-agent-image.yml @ 7203e00d (v2026.10.0) */}
 
 <Note>
   The hardened runtime is free and opt-in. Your existing local-build setup keeps working exactly as it does today. Choosing the hardened runtime is additive, not a replacement.
@@ -143,9 +144,9 @@ Provenance also rides in the image itself: the `dev.nanoclaw.image-source` label
 
 ## How a pin bump is gated
 
-A repin is not merged on trust. A CI workflow re-checks the new digest on every pull request that moves the pin, before the change can reach you.
+A repin is not merged on trust. A CI workflow re-checks the new digest on every pull request, and the checks finish at once when the pin has not changed, before the change can reach you.
 
-Four checks block the merge:
+Four checks block the merge. They run on every pull request, and finish at once when the pin has not changed:
 
 1. The reference must be digest-pinned. A mutable tag fails.
 2. The image must be a multi-architecture index covering `linux/amd64` and `linux/arm64`.
@@ -154,7 +155,7 @@ Four checks block the merge:
 
 A manifest whose size moves by more than threefold in either direction raises a warning rather than blocking.
 
-One more check gates automation only: a keyless Sigstore signature is verified against the digest with `cosign verify`. An image with no signature does not fail the pull request. It only means auto-merge stays off and a human merges the repin.
+One more check is reported but does not block: a keyless Sigstore signature is verified against the digest with `cosign verify`. The result goes to the job summary for the person who merges. An image with no verified signature does not fail the pull request. Nothing in the workflow merges anything; a person merges every repin.
 
 <Note>
   No attestation or SBOM is checked, because the publisher attaches none. The workflow verifies the image's shape and, when present, its signature.

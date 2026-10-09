@@ -5,6 +5,7 @@ keywords: ["multi-agent", "create_agent", "agent-to-agent", "agent destinations"
 ---
 
 {/* verified-against: src/modules/agent-to-agent/{create-agent,agent-route,write-destinations,index,message-gate}.ts, src/modules/agent-to-agent/db/{agent-destinations,agent-message-policies}.ts, src/modules/approvals/primitive.ts, container/agent-runner/src/mcp-tools/agents.ts + agents.instructions.md, container/agent-runner/src/destinations.ts, src/cli/resources/{destinations,groups,policies,wirings}.ts, src/group-init.ts, src/db/messaging-groups.ts @ 639577c3; runtime names, creation notification, sibling context and folder reuse: src/drivers/docker-driver.ts, src/modules/agent-to-agent/create-agent.ts, src/modules/cross-session-context/index.ts, src/modules/cross-session-context/fan.ts, src/cli/resources/groups.ts @ b76fcb3d */}
+{/* verified-against (scoped correction): group deletion and failure-notice loop guard: src/cli/resources/groups.ts, src/container-runner.ts, src/host-sweep.ts, container/agent-runner/src/poll-loop.ts, container/agent-runner/src/formatter.ts @ 7203e00d (v2026.10.0) */}
 
 The [introduction](/introduction) promises real teams: a worker per task, a manager that tracks what's in flight, a supervisor that pings you. This tutorial builds the smallest working version — one agent spawning and delegating to another — then scales the same three primitives into that trio. It continues from [your first agent](/guides/first-agent); you'll reuse Scout to see the approval gate.
 
@@ -151,7 +152,7 @@ Return to free flow with `ncl policies remove --from <source-agent-id> --to <tar
 
 ## Limits
 
-- **No loop protection.** There is no throttle, hop limit, or cycle detection on agent-to-agent messages — two agents told to "always reply" will ping-pong indefinitely, burning API calls. Give every agent's instructions an explicit stop condition ("report back once, then wait"). A [message policy](#gate-a-connection) on the edge also breaks a runaway loop, since every hop then waits for a human tap.
+- **No general loop protection.** There is no throttle, hop limit, or cycle detection on agent-to-agent messages — two agents told to "always reply" will ping-pong indefinitely, burning API calls. The one loop the runner breaks for you is failure notices: a turn woken only by failure notices (the "The agent run failed" message or a provider error notice) sends no notice of its own, so two agents can no longer trade failure notices forever. Give every agent's instructions an explicit stop condition ("report back once, then wait"). A [message policy](#gate-a-connection) on the edge also breaks a runaway loop, since every hop then waits for a human tap.
 - **No broadcast.** Each message targets one destination. Fan-out means one `<message>` block (or `send_message` call) per recipient — the parent orchestrates, the queue doesn't.
 - **No concurrency cap.** There's no environment variable that limits simultaneous agent containers — the old `MAX_CONCURRENT_CONTAINERS` was removed from the code entirely, not just left unenforced. A wide team really does run one container per active agent, so size the host accordingly.
 - **Edits to destinations outside `ncl` don't propagate live.** A running container serves a projection of its destinations, refreshed on every wake and by `ncl destinations add`/`remove` and `ncl wirings create` — but direct DB writes leave it stale until the next wake.
@@ -162,7 +163,7 @@ Return to free flow with `ncl policies remove --from <source-agent-id> --to <tar
 ncl groups delete --id <agent-id>
 ```
 
-This cascades through the central DB in one transaction: sessions, destination rows in **both directions** (its own and every edge pointing at it), pending approvals, wirings, memberships, and the container config. It does **not** kill a running container or delete `groups/<folder>/` and `data/v2-sessions/<group-id>/` — stop the container and remove those by hand if you want the workspace gone. A later bare create refuses to reuse a leftover group folder without an owning database row, so move it or choose a different folder name.
+This cascades through the central DB in one transaction: sessions, destination rows in **both directions** (its own and every edge pointing at it), pending approvals, wirings, memberships, and the container config. The host sweep then stops the group's running container within about a minute. It does **not** delete `groups/<folder>/` and `data/v2-sessions/<group-id>/` — remove those by hand if you want the workspace gone. A later bare create refuses to reuse a leftover group folder without an owning database row, so move it or choose a different folder name.
 
 ## Next steps
 
