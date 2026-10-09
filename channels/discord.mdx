@@ -53,7 +53,7 @@ To wire server channels or more DMs later, run `/manage-channels`. Server channe
 
 ## Troubleshooting
 
-- **The token paste is rejected, or `applications/@me` returns 401** — the token must be at least 50 characters of letters, digits, dots, underscores and hyphens. Tokens are only shown once in the Developer Portal; click **Reset Token** and copy the fresh one (the old one stops working). The Application ID and OAuth2 Client Secret are different values and won't pass. The check runs before the restart on purpose.
+- **The token is rejected** — the token must be at least 50 characters of letters, digits, dots, underscores and hyphens, and Discord must accept it at `/oauth2/applications/@me`. Tokens are shown once in the Developer Portal; click **Reset Token** and copy the fresh one (the old one stops working). The Application ID and the OAuth2 Client Secret are different values and will not pass.
 - **Bot connects but never responds to text** — **Message Content Intent** isn't enabled. Developer Portal → your app → **Bot** → **Privileged Gateway Intents** → enable it, then restart the service.
 - **No welcome message, or Discord refuses to open the DM** — the bot and your account don't share a server yet. Open the invite URL, add the bot to any server you're in, then retry with `/manage-channels`.
 - **`Gateway listener error, retrying` repeating in logs** — the listener is in its backoff loop (the log line includes `consecutiveFailures` and the next `delayMs`). Growing delays usually mean an unrecoverable cause like an invalid token — fix the credential rather than waiting out the retry.

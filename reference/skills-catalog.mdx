@@ -103,11 +103,11 @@ Setup, maintenance, migration, and day-to-day administration of your install.
 | `/manage-mounts` | Configures which host directories agent containers can access — view, add, or remove mount allowlist entries |
 | `/migrate-from-openclaw` | Migrates from OpenClaw to NanoClaw v2 — detects an existing install, extracts identity, credentials, and tasks, then guides interactive migration |
 | `/migrate-from-v1` | Finishes migrating a NanoClaw v1 install into v2 after `migrate-v2.sh` — seeds the owner, reconciles container configs, helps port custom v1 code |
-| `/migrate-memory` | Migrates legacy NanoClaw and Claude-native memory into the shared memory tree and provider-neutral standing instructions — run after an update reports the shared-memory breaking change, or when a group still has `.seed.md`, legacy `CLAUDE.md`/`CLAUDE.local.md`, Claude auto-memory, or an unindexed `imported-agent-memory.md` |
+| `/migrate-memory` | Moves older memory files (`.seed.md`, legacy `CLAUDE.md`/`CLAUDE.local.md`, Claude auto-memory, an unindexed `imported-agent-memory.md`) into the shared `memory/` tree and standing instructions — run when an update tells you to, or when a group still has those files |
 | `/migrate-slack-agents` | Migrates a classic single-bot Slack install to one provisioned Slack app per agent group, preserving identities, workspaces, memory, and wiring — or records the choice to stay on classic |
 | `/migrate-nanoclaw` | Extracts your customizations from a fork, generates a replayable migration guide, and upgrades to upstream by reapplying them on a clean base |
 | `/setup` | Runs initial NanoClaw setup — install, configure, first-time setup |
-| `/update-nanoclaw` | Transactionally updates a customized checkout from official upstream without exposing live mounted source — fork-safe skill refresh, mutable-state snapshots, migration gates, service restart, health verification, and automatic local rollback |
+| `/update-nanoclaw` | Updates a customized install to the newest release (or `main` on the `edge` channel): snapshots your data, refreshes skills, runs migrations, restarts the service, checks health, and rolls back locally if a step fails |
 | `/update-skills` | Refreshes installed channel/provider payloads and dependency pins from upstream without repeating credential prompts or channel wiring |
 
 ## Container skills
