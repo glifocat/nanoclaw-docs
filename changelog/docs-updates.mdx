@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Setup commits its own files" description="2026-10-04" tags={["Updated"]}>
+  [Upgrading](/operate/upgrading) now explains that setup commits the files skill installs add, as local `setup: apply <skill>` commits. For a dirty tree before an update, commit what is left as a local customization instead of stashing it, since the updater finds installed skills from those files. [Environment variables](/reference/environment-variables) lists `NANOCLAW_SETUP_COMMIT=0`, which turns those commits off for dev clones.
+</Update>
+
 <Update label="Upgrading: gateway refresh during validation" description="2026-10-04" tags={["Updated"]}>
   [Upgrading](/operate/upgrading) now says that validation also refreshes your selected gateway when an update changes its skill, what the `gateway payload refresh skipped` check means, and that a moved gateway version pin still needs the gateway skill's setup step. This behavior ships in v2026.10.0.
 </Update>

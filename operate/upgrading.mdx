@@ -26,7 +26,7 @@ Run `/update-nanoclaw` in a Claude Code session at your project root. The skill 
 
 <Steps>
   <Step title="Prepare">
-    The controller refuses to start unless your working tree is clean and your checkout is on a named branch. It records the current HEAD, creates a backup branch named `backup/pre-update-<hash>-<timestamp>-<unique>` and a backup tag named `pre-update-<hash>-<timestamp>-<unique>`, then creates a stage worktree on branch `update-nanoclaw/<id>`. Pick one strategy for it to apply there:
+    The controller refuses to start unless your working tree is clean and your checkout is on a named branch. Setup commits the files that skill installs add, as local `setup: apply <skill>` commits. A library template you picked during setup is copied into `templates/` and is not committed for you, so check `git status` before your first update. The controller then records the current HEAD, creates a backup branch named `backup/pre-update-<hash>-<timestamp>-<unique>` and a backup tag named `pre-update-<hash>-<timestamp>-<unique>`, then creates a stage worktree on branch `update-nanoclaw/<id>`. Pick one strategy for it to apply there:
 
     - **Merge**, the default.
     - **Rebase**.
@@ -117,7 +117,7 @@ If you have diverged far from upstream, with many local commits or deep changes 
 
 ## When not to update
 
-- **Dirty working tree.** The controller stops. Commit or stash first. The same applies before `/update-skills`.
+- **Dirty working tree.** The controller stops. Run `git status` and commit what is left as a local customization, including any files setup warned it couldn't commit. Don't stash installed skill files, because the updater finds your installed skills from them. The same applies before `/update-skills`.
 - **Detached HEAD.** Prepare requires a named branch.
 - **NanoClaw started by hand.** Cutover aborts on an unmanaged process. Stop it first.
 - **Locally modified adapters or upstream skills.** Re-applying a channel skill overwrites its files. Commit your edits so you can recover them.

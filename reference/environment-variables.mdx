@@ -80,6 +80,7 @@ Consumed by the setup wizard (`pnpm run setup:auto`) and migration scripts, not 
 | `NANOCLAW_SETUP_ASSIST_MODE` | `false` | `setup/lib/setup-config.ts:136` | Use non-interactive Claude assist on step failure instead of interactive handoff. |
 | `NANOCLAW_SKIP_CLAUDE_ASSIST` | — | `setup/lib/claude-assist.ts:97` | Set `1` to disable assisted failure recovery entirely (CI/scripted runs). On a non-Claude install, the picked provider’s own failure assist runs first, with Claude as a guarded fallback. |
 | `NANOCLAW_NO_DIAGNOSTICS` | — | `setup/lib/diagnostics.ts:54` | Set `1` to disable setup diagnostics reporting. |
+| `NANOCLAW_SETUP_COMMIT` | on | `setup/lib/setup-commit.ts:160` | Set `0` to stop setup committing the files a skill apply adds (`setup: apply <skill>` commits). Meant for contributors running setup in a dev clone. Without those commits, commit the files yourself before `/update-nanoclaw`. |
 | `SIGNAL_CLI_PATH` | `signal-cli` (on `PATH`) | `setup/signal-auth.ts:51` | Path to the `signal-cli` binary for the Signal channel flow. |
 
 <Note>
