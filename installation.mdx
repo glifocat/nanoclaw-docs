@@ -6,6 +6,7 @@ keywords: ["requirements", "docker", "node", "pnpm", "bun", "wsl", "launchd", "s
 ---
 
 {/* verified-against: nanoclaw.sh, setup.sh, setup/probe.sh, setup/auto.ts, setup/index.ts, setup/install-node.sh, setup/install-docker.sh, setup/container.ts, setup/service.ts, setup/set-env.ts, container/Dockerfile, container/pull.sh, versions.json, src/container-runtime.ts, src/container-runner.ts, src/claude-md-compose.ts, src/group-init.ts, src/config.ts, src/install-slug.ts, src/session-manager.ts, src/index.ts, package.json @ dce271c6 (main); runtime selection, identity, and state layout: src/drivers/index.ts, src/install-slug.ts, src/container-config.ts, src/project-doc-compose.ts, src/cli/resources/tasks.ts, src/mailbox/sqlite/schema.ts @ b76fcb3d */}
+{/* verified-against (scoped correction): setup steps, skip flags, env vars, service proxy, OneCLI pin, Bun pin: setup/index.ts, setup/auto.ts, setup/service.ts, setup/gateways/install.ts, container/Dockerfile, .claude/skills/add-onecli/versions.json, .claude/skills/add-onecli/scripts/setup.ts, scripts/skill-directives.ts @ 7203e00d (v2026.10.0) */}
 
 This page is the depth companion to [Quick start](/quickstart): what the installer actually does, how to install by hand, how the background service works, and where everything lands on disk. If you just want a running assistant, run `bash nanoclaw.sh` and follow the wizard — quick start covers that flow end to end.
 
@@ -34,8 +35,8 @@ Two hosts the installer explicitly flags in pre-flight:
 | Node 22 | Host | `uvx nodeenv -n lts` if `uvx` is present; otherwise `brew install node@22` (macOS) or NodeSource + `apt-get` (Linux). Skipped if you already have Node 22+. |
 | pnpm 10 | Host | `corepack enable`, falling back to `npm install -g pnpm@<pinned>` at the version from `packageManager`. |
 | Docker | Host | `brew install --cask docker` (macOS) or `get.docker.com` + `usermod -aG docker` (Linux/WSL). Setup also starts the daemon and works around stale group membership (`sg docker` re-exec, or a temporary ACL on the socket) so you don't have to log out and back in. |
-| OneCLI vault | Host | Installed by the wizard, or reuses an existing healthy OneCLI instance if it finds one. |
-| Bun 1.3.12 | Container | Baked into the agent container image. Never touches the host. |
+| OneCLI vault | Host | Installed by the wizard at the pinned gateway version (1.42.0), or reuses an existing healthy OneCLI instance if it finds one. A reused instance is not version-checked; see [upgrading](/operate/upgrading). OneCLI 1.43 and later are not supported yet. |
+| Bun 1.4.0 | Container | Baked into the agent container image. Never touches the host. |
 
 Build tools (Xcode Command Line Tools on macOS, `gcc`/`make` on Linux) are checked and reported but not installed. They only matter if `better-sqlite3` has to compile from source — setup verifies the native binding loads and fails loudly if it doesn't.
 
@@ -62,7 +63,7 @@ Every run writes two logs: a progression log at `logs/setup.log` (one entry per 
 NanoClaw deliberately splits runtimes:
 
 - **Host**: Node 22+ and pnpm. The wizard compiles TypeScript with `tsc` and the service runs `node dist/index.js`.
-- **Agent container**: Bun 1.3.12 runs the agent-runner TypeScript directly — no build step. The image (from `container/Dockerfile`) is based on `node:22-slim` with Chromium for browser automation and globally installed CLIs — `@anthropic-ai/claude-code` and `agent-browser`, each pinned to an exact version for reproducibility (the Vercel CLI is opt-in via `/add-vercel`). The versions live in `container/cli-tools.json` (installed by `install-cli-tools.sh`).
+- **Agent container**: Bun 1.4.0 runs the agent-runner TypeScript directly — no build step. The image (from `container/Dockerfile`) is based on `node:22-slim` with Chromium for browser automation and globally installed CLIs — `@anthropic-ai/claude-code` and `agent-browser`, each pinned to an exact version for reproducibility (the Vercel CLI is opt-in via `/add-vercel`). The versions live in `container/cli-tools.json` (installed by `install-cli-tools.sh`).
 
 Two consequences worth knowing:
 
@@ -103,7 +104,7 @@ pnpm run setup -- --step service     # rebuild TypeScript and reinstall the serv
 pnpm run setup -- --step verify      # end-to-end health check
 ```
 
-Available steps: `timezone`, `set-env`, `environment`, `container`, `register`, `pair-telegram`, `pair-dial`, `groups`, `whatsapp-auth`, `signal-auth`, `mounts`, `service`, `verify`, `onecli`, `auth`, `provider-auth`, `cli-agent`, `registry`, `registry-reconcile`.
+Available steps: `timezone`, `set-env`, `environment`, `container`, `register`, `pair-telegram`, `pair-dial`, `groups`, `whatsapp-auth`, `signal-auth`, `mounts`, `service`, `verify`, `provider-auth`, `cli-agent`, `registry`, `portal`, `registry-reconcile`, `gateway`, `gateway-auth`.
 
 ### Scripting the wizard
 
@@ -111,11 +112,13 @@ Available steps: `timezone`, `set-env`, `environment`, `container`, `register`, 
 
 | Env var | Use |
 |---|---|
-| `NANOCLAW_SKIP` | Comma-separated wizard steps to skip: `environment`, `container`, `onecli`, `auth`, `mounts`, `service`, `cli-agent`, `first-chat`, `timezone`, `channel`, `verify` |
+| `NANOCLAW_SKIP` | Comma-separated wizard steps to skip: `environment`, `container`, `gateway`, `auth`, `mounts`, `service`, `cli-agent`, `first-chat`, `timezone`, `channel`, `verify` |
 | `NANOCLAW_DISPLAY_NAME` | Skip the "what should the assistant call you" prompt |
 | `NANOCLAW_AGENT_NAME` | Set the messaging-channel agent name |
 | `SECRET_NAME` | OneCLI secret name (default: `Anthropic`) |
 | `HOST_PATTERN` | OneCLI host pattern (default: `api.anthropic.com`) |
+| `NANOCLAW_AGENT_PROVIDER` | Preselect the agent runtime (for example `claude`) and skip the provider question |
+| `NANOCLAW_GATEWAY_PROVIDER` | Select the credential gateway (`onecli` by default, or `iron-proxy`) without asking |
 
 For Anthropic-compatible custom endpoints, set `ANTHROPIC_BASE_URL` in `.env` — the host passes it through to the agent SDK inside the container.
 
@@ -158,6 +161,8 @@ For help, [open an issue](https://github.com/nanocoai/nanoclaw/issues/new/choose
 ## Running as a service
 
 The wizard's service step compiles TypeScript (`pnpm run build`), writes a service definition that runs `node dist/index.js` from the project root, starts it, and symlinks `bin/ncl` into `~/.local/bin` so the [ncl CLI](/operate/ncl-cli) works from anywhere. Service names embed the per-checkout slug, so look yours up rather than guessing.
+
+If you reach the internet through an outbound proxy, the service step reads `HTTPS_PROXY` and `HTTP_PROXY` (`ALL_PROXY` is used as a fallback for either) and `NO_PROXY` from your setup shell or `.env` and passes them to the service. Loopback addresses are always added to `NO_PROXY`. This needs Node 22.21+, 24.5+ or 25+: on an older Node the wizard warns that the proxy is ignored and NanoClaw connects directly. Only `http://` and `https://` proxy URLs are used. The values are kept in an owner-only `data/service-proxy.env` file (launchd keeps them in the owner-only plist), because a proxy URL can contain a password.
 
 <Tabs>
   <Tab title="macOS (launchd)">
@@ -244,9 +249,6 @@ Most application state lives inside the checkout. Security allowlists and regist
           </Tree.Folder>
           <Tree.Folder name=".claude-shared" />
         </Tree.Folder>
-      </Tree.Folder>
-      <Tree.Folder name="env">
-        <Tree.File name="env" />
       </Tree.Folder>
       <Tree.Folder name="ipc" />
       <Tree.File name="cli.sock" />
