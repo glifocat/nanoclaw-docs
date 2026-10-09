@@ -1,10 +1,10 @@
 ---
 title: "Container configuration"
 description: "Every per-group container config field — storage, defaults, spawn-time consumption, and when changes take effect."
-keywords: ["container config", "container_configs", "container.json", "provider", "model", "effort", "image_tag", "mcp_servers", "additional_mounts", "cli_scope", "skills", "packages", "timezone", "runtime_tier", "runtime tier", "isolation tier"]
+keywords: ["container config", "container_configs", "container.json", "provider", "model", "effort", "image_tag", "mcp_servers", "additional_mounts", "cli_scope", "skills", "packages", "timezone", "speed", "runtime_tier", "runtime tier", "isolation tier"]
 ---
 
-{/* verified-against: src/db/container-configs.ts, src/container-config.ts, src/container-runner.ts, src/cli/resources/{groups,tasks}.ts, src/cli/dispatch.ts, src/modules/mount-security/index.ts, src/modules/scheduling/recurrence.ts, src/db/migrations/{014-container-configs,015-cli-scope}.ts, container/agent-runner/src/{config.ts,index.ts,db/messages-in.ts,providers/types.ts} @ 639577c3; runtime tier and MCP instructions: src/container-config.ts, src/container-runner.ts, src/types.ts, src/drivers/{types,docker-driver,index}.ts, src/db/container-configs.ts, src/cli/resources/groups.ts, src/db/migrations/{014-container-configs,020-container-config-timezone}.ts, src/project-doc-compose.ts @ 294ef2ae; install-default model and fast mode: src/config.ts, src/container-config.ts, container/agent-runner/src/config.ts, container/agent-runner/src/index.ts, container/agent-runner/src/providers/{types,claude}.ts @ b76fcb3d */}
+{/* verified-against: src/container-config.ts, src/config.ts, src/types.ts, src/db/container-configs.ts, src/db/migrations/{014,015,020,025}-*.ts, src/cli/resources/groups.ts, src/cli/guard.ts, src/cli/registry.ts, src/providers/provider-name.ts, src/container-runner.ts, src/drivers/types.ts, src/drivers/index.ts, container/agent-runner/src/config.ts, container/agent-runner/src/providers/{types,claude-config}.ts @ 7203e00d (v2026.10.0) */}
 
 Each agent group has one row in the `container_configs` table in the central SQLite database — the source of truth for how that group's containers spawn. You change it with the [`ncl groups config` subcommands](/reference/ncl-cli#groups); the row is created automatically with defaults when the group is created.
 
@@ -35,6 +35,7 @@ Config edits write to the database only — a **running container keeps its old 
 | `packages_npm` | JSON | `[]` | Per-group image build (not spawn) |
 | `additional_mounts` | JSON | `[]` | Mount validation + `-v` args |
 | `timezone` | string | `NULL` (falls back to the install global) | `container-runner.ts` `TZ` env; `resolveGroupTimezone` for scheduling |
+| `speed` | string | `NULL` (falls back to `NANOCLAW_FAST_MODE`, then the provider default) | Agent runner → provider options (`container.json` `speed`) |
 | `runtime_tier` | string | absent (not a trunk column; falls back to `container`) | Session spec composition; checked against the driver's isolation tiers |
 
 ### provider
@@ -51,7 +52,7 @@ The result is lowercased and looked up in the provider registry, which may contr
 
 Passed through `container.json` to the agent runner, which hands them to the provider unchanged. For Claude, `model` is an alias (`sonnet`, `opus`, `haiku`) or a full model ID, and `effort` is one of `low`, `medium`, `high`, `xhigh`, `max`. An unset (`NULL`) group model uses `NANOCLAW_DEFAULT_MODEL`, then the provider default if that setting is empty. A group-specific model takes precedence. `effort` still falls back to the provider default.
 
-`NANOCLAW_FAST_MODE=1` or `true` enables the install-wide Claude fast serving tier, passed as `settings.fastMode` to its SDK. It is off by default and is not a `container_configs` column or per-group CLI flag. These environment settings are read when the host starts; restart the host and the affected sessions after changing them. A host restart alone can adopt existing containers, which retain their previous settings.
+`NANOCLAW_FAST_MODE=1` or `true` sets the install-wide default speed to `fast` for groups with no `speed` of their own. It is off by default. A group's own [`speed`](#speed) takes precedence over it, so a group set to `standard` stays standard. For Claude, `fast` is passed as `settings.fastMode` to its SDK. The environment settings are read when the host starts; restart the host and the affected sessions after changing them. A host restart alone can adopt existing containers, which retain their previous settings.
 
 ### image_tag
 
@@ -123,6 +124,10 @@ Extra host directories mounted into the container:
 An IANA timezone id (e.g. `Europe/Lisbon`) that overrides the install-global timezone for this group alone. Unset, or an invalid id, falls back to the global default rather than silently running in UTC. Set it with `ncl groups create --timezone <id>` or `ncl groups config update --timezone <id>`; pass `--timezone ""` on `config update` to clear it back to the install default.
 
 It reaches two places: the container's `TZ` env var (spawn-time only), and [scheduled-task](/guides/scheduled-tasks) recurrence, which resolves the group's timezone fresh from the database at every trigger check — so a change to this field changes when a group's schedules fire immediately, ahead of the container-level effects in [When changes take effect](#when-changes-take-effect) above.
+
+### speed
+
+A provider-declared serving tier. Claude declares `standard` and `fast`. Set it with `ncl groups config update --id <group-id> --speed fast`; pass `--speed ""` to clear it back to the install default. The value must be a tier the group's provider declares, and a provider that declares none accepts only `""`. A stored value overrides `NANOCLAW_FAST_MODE`. `container.json` carries it as `speed`; `fast` also writes the older `fastMode: true` key so images built before `speed` existed keep working. Like `model` and `effort`, it applies to the next container.
 
 ### runtime_tier
 

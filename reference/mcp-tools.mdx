@@ -5,7 +5,7 @@ keywords: ["mcp tools", "send_message", "send_file", "ask_user_question", "creat
 tag: "UPDATED"
 ---
 
-{/* verified-against: container/agent-runner/src/mcp-tools/{index,server,types,core,interactive,agents,self-mod}.ts, container/agent-runner/src/mcp-tools/{core,interactive,agents,self-mod,cli}.instructions.md, src/modules/agent-to-agent/create-agent.ts, src/group-init.ts @ 639577c3; send_card link-action contract: container/agent-runner/src/mcp-tools/interactive.ts, container/agent-runner/src/mcp-tools/interactive.instructions.md @ b76fcb3d */}
+{/* verified-against: container/agent-runner/src/mcp-tools/{index,server,core,interactive,agents,self-mod}.ts, src/modules/self-mod/apply.ts, src/modules/agent-to-agent/{create-agent,guard}.ts, src/group-init.ts, src/cli/guard.ts, src/cli/registry.ts, src/cli/resources/wirings.ts, container/Dockerfile @ 7203e00d (v2026.10.0) */}
 
 These are the tools the agent can call from inside its container. They're exposed by the built-in `nanoclaw` MCP server (`container/agent-runner/src/mcp-tools/`), so the agent sees them with the `mcp__nanoclaw__` prefix — e.g. `mcp__nanoclaw__send_message`. As an operator you never call them directly; you see their effects: messages arriving in chats, schedule changes, and approval cards.
 
@@ -120,7 +120,7 @@ Both tools are **always approval-gated** and fire-and-forget: the request is sub
 | `args` | array | no | Command arguments (`command` form only) |
 | `env` | object | no | Environment variables for the server (`command` form only) |
 
-Exactly one of `command` or `url` is required. A `url` must be HTTPS — plain HTTP passes only for `localhost`, `127.0.0.1`, `[::1]`, and `host.docker.internal` — and URLs that embed credentials (userinfo, fragments, or credential-looking query parameters) are rejected with a pointer to OneCLI for authentication. On approval the server is added to the group's [container config](/reference/container-config) and the container restarts (no image rebuild needed). The agent is instructed to use `"onecli-managed"` as the placeholder for credential env vars rather than asking you for keys.
+Exactly one of `command` or `url` is required. A `url` must be HTTPS — plain HTTP passes only for `localhost`, `127.0.0.1`, `[::1]`, and `host.docker.internal` — and URLs that embed credentials (userinfo, fragments, or credential-looking query parameters) are rejected with a pointer to the credential gateway for authentication. On approval the server is added to the group's [container config](/reference/container-config) and the container restarts (no image rebuild needed). When the selected gateway is OneCLI, its agent guidance tells the agent to use `"onecli-managed"` as the placeholder for credential env vars rather than asking you for keys.
 
 ## The `ncl` CLI
 
