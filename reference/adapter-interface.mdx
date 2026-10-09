@@ -5,6 +5,7 @@ keywords: ["channel adapter", "ChannelAdapter", "adapter interface", "custom cha
 ---
 
 {/* verified-against: src/webhook-server.ts @ 639577c3; src/channels/{adapter,channel-registry,chat-sdk-bridge,index}.ts, src/router.ts + src/delivery.ts hook seams, container/agent-runner/src/mcp-tools/server.ts, setup/channels/companions.ts @ 294ef2ae; channels branch src/channels/telegram.ts @ 6ee516ad; raw-text recovery and conversation metadata: src/channels/adapter.ts, src/channels/chat-sdk-bridge.ts @ b76fcb3d */}
+{/* verified-against (scoped correction): isConnected and onAction signatures; Telegram worked example: src/channels/adapter.ts, src/channels/chat-sdk-bridge.ts, src/cli/commands/status.ts @ 7203e00d (v2026.10.0); channels branch src/channels/telegram.ts @ d73e8f44 */}
 
 A channel adapter bridges NanoClaw with a messaging platform. There are two ways to build one:
 
@@ -132,7 +133,7 @@ How the host calls each member:
 | `supportsThreads` | Yes | `true`: the platform supports threads; effective thread handling and session identity depend on the wiring and context. `false`: thread handling cannot be enabled, and the router strips thread ids. This shapes [session identity](/concepts/entity-model). |
 | `setup(config)` | Yes | Called once at startup by `initChannelAdapters()`. Connect to the platform here and hold on to `config` — its callbacks are how you hand messages to the host. |
 | `teardown()` | Yes | Called on shutdown by `teardownChannelAdapters()`. Close connections; errors are logged, not fatal. |
-| `isConnected()` | Yes | Part of the contract, but not currently called by the host outside tests. The bridge always returns `true`; native adapters should still report real connection state. |
+| `isConnected()` | Yes | Called by the host's `status` command, which reports each active adapter's `connected` state. The bridge reports the wrapped Chat SDK adapter's own `isConnected()` when it exposes one, and `true` otherwise; native adapters should report real connection state. |
 | `deliver(platformId, threadId, message)` | Yes | Called by the delivery module for every outbound message in a wired group. `message.content` is parsed JSON from the session outbox (`messages_out`), `message.files` carries attachments. Return the platform message id so later edits and reactions can target it. |
 | `setTyping?` | No | Called by the typing module while an agent is working, and re-fired on an interval to keep platforms' short-lived typing indicators alive. The optional `status` text and `statusKind` (`'auto'` host-generated, `'agent'` agent-authored) let a platform render a working-status line; they are plumbed through the registry and delivery seams but nothing passes them yet. |
 | `setThreadTitle?` | No | Titles a conversation thread. Nothing on trunk calls it: a channel-side module fires it from the session-created hook (Slack's onboarding module titles brand-new per-thread DM sessions after the first user message); adapters without a thread-title concept omit it and callers no-op. |
@@ -163,7 +164,17 @@ export interface ChannelSetup {
   onMetadata(platformId: string, name?: string, isGroup?: boolean): void;
 
   /** Called when a user clicks a button/action in a card (e.g., ask_user_question response). */
-  onAction(questionId: string, selectedOption: string, userId: string): void;
+  onAction(
+    questionId: string,
+    selectedOption: string,
+    userId: string,
+    address?: {
+      instance?: string;
+      messageId?: string;
+      platformId?: string;
+      threadId?: string | null;
+    },
+  ): void;
 }
 ```
 
@@ -249,26 +260,37 @@ You declare `supportsThreads` yourself — it's a product decision, not somethin
 
 ### Worked example: Telegram
 
-The core of the Telegram adapter on the `channels` branch (`src/channels/telegram.ts`) is a factory this short:
+The core of the Telegram adapter on the `channels` branch (`src/channels/telegram.ts`) is a bridge builder this short; the registration just calls it:
 
 ```ts
+export function createTelegramBridge(options: TelegramBridgeOptions = {}): ChannelAdapter | null {
+  const tokenKey = `TELEGRAM_BOT_TOKEN${options.envKeySuffix ? `_${options.envKeySuffix}` : ''}`;
+  const token = readEnvFile([tokenKey])[tokenKey];
+  if (!token) return null;
+  ...
+  const telegramAdapter = createTelegramAdapter({
+    botToken: token,
+    mode: 'polling',
+  });
+  const bridge = createChatSdkBridge({
+    adapter: telegramAdapter,
+    instance: options.instanceKey, // undefined ⇒ default instance (keyed by channelType)
+    concurrency: 'concurrent',
+    extractReplyContext,
+    supportsThreads: false,
+    defaults: TELEGRAM_DEFAULTS,
+    maxTextLength: 4000,
+  });
+  ...
+}
+
 registerChannelAdapter('telegram', {
-  factory: () => {
-    const env = readEnvFile(['TELEGRAM_BOT_TOKEN']);
-    if (!env.TELEGRAM_BOT_TOKEN) return null;
-    const token = env.TELEGRAM_BOT_TOKEN;
-    const telegramAdapter = createTelegramAdapter({
-      botToken: token,
-      mode: 'polling',
-    });
-    const bridge = createChatSdkBridge({
-      adapter: telegramAdapter,
-      concurrency: 'concurrent',
-      extractReplyContext,
-      supportsThreads: false,
-      maxTextLength: 4000,
-    });
+  factory: () => createTelegramBridge(),
+  defaults: TELEGRAM_DEFAULTS,
+});
 ```
+
+Named bots listed in `TELEGRAM_INSTANCES` register the same builder under `telegram-<name>`.
 
 The rest of the file wraps the bridge with Telegram-specific extras — a `resolveChannelName` implementation against the Bot API, retry-wrapped setup, and a pairing interceptor around `onInbound`. None of that is required by the contract; the bridge alone is a working channel.
 

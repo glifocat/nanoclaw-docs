@@ -4,7 +4,7 @@ description: "Connect NanoClaw to a Discord bot via the Chat SDK adapter — Dev
 keywords: ["discord", "bot token", "add-discord", "gateway", "message content intent", "chat sdk", "threads", "developer portal"]
 ---
 
-{/* verified-against: src/channels/chat-sdk-bridge.ts, src/router.ts, src/channels/channel-defaults.ts, setup/channels/run-channel-skill.ts, .claude/skills/add-discord/SKILL.md @ 639577c3; channels branch src/channels/discord.ts @ 6ee516ad */}
+{/* verified-against: src/channels/chat-sdk-bridge.ts, src/router.ts, src/channels/channel-defaults.ts, setup/channels/run-channel-skill.ts, setup/channels/initial-setup.ts, .claude/skills/add-discord/SKILL.md @ 7203e00d (v2026.10.0); channels branch src/channels/discord.ts @ d73e8f44 */}
 
 The Discord adapter connects NanoClaw to a bot you create in the Discord Developer Portal. It's built on the Chat SDK bridge (`@chat-adapter/discord` 4.29.0, pinned — the `/add-discord` skill may pin a slightly newer adapter version) and connects over Discord's **Gateway** — a WebSocket NanoClaw opens outbound, with events forwarded to a local loopback server. No public URL, webhook, or open port needed; works behind NAT and on a laptop.
 
@@ -26,10 +26,10 @@ Discord is offered in the first-run setup wizard, or add it later by running `/a
     The wizard opens the Developer Portal: click **New Application**, then in the **Bot** tab click **Reset Token**, copy the token, and enable **Message Content Intent**.
   </Step>
   <Step title="Paste the token">
-    The wizard format-validates it, calls `/users/@me` to confirm Discord accepts it and resolve the bot's username, then calls `/oauth2/applications/@me` to derive the application ID, the public key, and your Discord identity (the app owner). If a `DISCORD_BOT_TOKEN` already exists in `.env`, it offers to reuse it.
+    The skill checks the token's shape (at least 50 characters of letters, digits, dots, underscores and hyphens), then calls `/oauth2/applications/@me` to derive the application ID, the public key, and your Discord identity (the app owner). A bad token fails at that call, before the restart. If a `DISCORD_BOT_TOKEN` already exists in `.env`, it offers to reuse it.
   </Step>
   <Step title="Invite the bot to a server">
-    The bot can't DM you until you share a server. The wizard generates and opens the OAuth invite URL (scope `bot`, permissions `100416`: Send Messages, Read Message History, Add Reactions, Attach Files) — pick any server, a personal one is fine.
+    The bot can't DM you until you share a server. The skill gives you the OAuth invite URL (scope `bot`, permissions `2147584064`: Send Messages, Read Message History, Add Reactions, Attach Files, Use Slash Commands) — pick any server, a personal one is fine.
   </Step>
   <Step title="Adapter install">
     The skill copies `src/channels/discord.ts` from the `channels` branch, registers it in the channel barrel, installs the pinned `@chat-adapter/discord` package, builds and tests, writes `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID`, and `DISCORD_PUBLIC_KEY` to `.env`, and restarts the service.
@@ -53,9 +53,9 @@ To wire server channels or more DMs later, run `/manage-channels`. Server channe
 
 ## Troubleshooting
 
-- **"Discord didn't accept that token"** — `/users/@me` rejected it. Tokens are only shown once in the Developer Portal; click **Reset Token** and copy the fresh one (the old one stops working). "Couldn't reach Discord" instead means a network problem — check connectivity and retry setup.
+- **The token is rejected** — the token must be at least 50 characters of letters, digits, dots, underscores and hyphens, and Discord must accept it at `/oauth2/applications/@me`. Tokens are shown once in the Developer Portal; click **Reset Token** and copy the fresh one (the old one stops working). The Application ID and the OAuth2 Client Secret are different values and will not pass.
 - **Bot connects but never responds to text** — **Message Content Intent** isn't enabled. Developer Portal → your app → **Bot** → **Privileged Gateway Intents** → enable it, then restart the service.
-- **"Couldn't open a DM channel with you" / no welcome message** — the bot and your account don't share a server yet. Open the invite URL, add the bot to any server you're in, then retry with `/manage-channels`.
+- **No welcome message, or Discord refuses to open the DM** — the bot and your account don't share a server yet. Open the invite URL, add the bot to any server you're in, then retry with `/manage-channels`.
 - **`Gateway listener error, retrying` repeating in logs** — the listener is in its backoff loop (the log line includes `consecutiveFailures` and the next `delayMs`). Growing delays usually mean an unrecoverable cause like an invalid token — fix the credential rather than waiting out the retry.
 
 For service-level checks (logs, restarts, wiring queries), see [troubleshooting](/operate/troubleshooting).

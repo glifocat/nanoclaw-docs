@@ -8,6 +8,7 @@ keywords: ["skills", "catalog", "reference", "add-channel", "providers", "tools"
 {/* verified-against: main .claude/skills/ and container/skills/ listings + each skill's SKILL.md frontmatter @ 294ef2ae; channels .claude/skills/{add-slack,slack-a2a-rooms,slack-agent-flow,slack-multi-instance}/SKILL.md @ d69c9c5d; current main setup/channels/slack-auto-register.ts @ 001dfa02 */}
 
 {/* verified-against (scoped correction): .claude/skills/ listings, .claude/skills/{add-codex,add-opencode,add-ollama-provider,update-skills}/SKILL.md, setup/channels/{slack-auto-register,run-channel-skill}.ts @ b76fcb3d */}
+{/* verified-against (scoped correction): migrate-memory, update-nanoclaw, add-mattermost and add-dial-number descriptions: .claude/skills/{migrate-memory,update-nanoclaw,add-mattermost,add-dial-number}/SKILL.md @ 7203e00d (v2026.10.0) */}
 
 NanoClaw ships two kinds of skills:
 
@@ -27,7 +28,7 @@ Each skill wires up one messaging channel. See [Channels](/channels/overview) fo
 | Skill | What it does |
 | --- | --- |
 | `/add-dial` | Adds the [Dial](/channels/dial) channel — a real phone number for SMS and AI voice calls through the `dial` CLI; native adapter, email sign-in, 6-digit SMS pairing, owner-only or public line |
-| `/add-dial-number` | Adds another phone number to an installed [Dial](/channels/dial) channel — a second owner-only or public line, wired to the same agent or a different one |
+| `/add-dial-number` | Adds another phone number to an installed [Dial](/channels/dial) channel — a second line that admits known users only (`strict`) or anyone (`public`), answered by the agent group you choose |
 | `/add-deltachat` | Adds the [Delta Chat](/channels/more-channels#delta-chat) channel via `@deltachat/stdio-rpc-server` — native adapter, email-based messaging with end-to-end encryption |
 | `/add-discord` | Adds the [Discord](/channels/discord) bot channel via Chat SDK |
 | `/add-emacs` | Adds [Emacs](/channels/more-channels#emacs) as a channel — interactive chat buffer and org-mode integration over a local HTTP bridge, no bot token needed |
@@ -36,7 +37,7 @@ Each skill wires up one messaging channel. See [Channels](/channels/overview) fo
 | `/add-imessage` | Adds the [iMessage](/channels/imessage) channel — local backend (this Mac's `chat.db`, macOS only) or hosted backend (a native iMessage line via [photon.codes](https://photon.codes)) |
 | `/add-linear` | Adds the [Linear](/channels/more-channels#linear) channel via Chat SDK — issue comment threads as conversations |
 | `/add-matrix` | Adds the [Matrix](/channels/more-channels#matrix) channel via Chat SDK — works with any homeserver |
-| `/add-mattermost` | Adds the [Mattermost](/channels/mattermost) bot channel via Chat SDK. Copies a vendored adapter rather than an npm package, offers to reuse a local server when one is running, and can create an evaluation server when none exists |
+| `/add-mattermost` | Adds the [Mattermost](/channels/mattermost) bot channel via Chat SDK. Copies a vendored adapter rather than an npm package, offers to reuse a healthy Mattermost server when one is found, and otherwise links to Mattermost's official setup guides; it does not install or operate a server |
 | `/add-resend` | Adds the [Resend](/channels/more-channels#resend-email) email channel via Chat SDK |
 | `/add-signal` | Adds the [Signal](/channels/signal) channel via signal-cli TCP daemon — native adapter, no Chat SDK bridge |
 | `/add-slack` | Adds the base [Slack](/channels/slack) channel via Chat SDK — one bot, direct messages, and channel chat |
@@ -102,11 +103,11 @@ Setup, maintenance, migration, and day-to-day administration of your install.
 | `/manage-mounts` | Configures which host directories agent containers can access — view, add, or remove mount allowlist entries |
 | `/migrate-from-openclaw` | Migrates from OpenClaw to NanoClaw v2 — detects an existing install, extracts identity, credentials, and tasks, then guides interactive migration |
 | `/migrate-from-v1` | Finishes migrating a NanoClaw v1 install into v2 after `migrate-v2.sh` — seeds the owner, reconciles container configs, helps port custom v1 code |
-| `/migrate-memory` | Carries an agent group's memory across a provider switch (e.g. Claude ↔ Codex) — run after `ncl groups config update --provider`; reads the source provider's memory store, distills it into the target's, and restarts the group |
+| `/migrate-memory` | Moves older memory files (`.seed.md`, legacy `CLAUDE.md`/`CLAUDE.local.md`, Claude auto-memory, an unindexed `imported-agent-memory.md`) into the shared `memory/` tree and standing instructions — run when an update tells you to, or when a group still has those files |
 | `/migrate-slack-agents` | Migrates a classic single-bot Slack install to one provisioned Slack app per agent group, preserving identities, workspaces, memory, and wiring — or records the choice to stay on classic |
 | `/migrate-nanoclaw` | Extracts your customizations from a fork, generates a replayable migration guide, and upgrades to upstream by reapplying them on a clean base |
 | `/setup` | Runs initial NanoClaw setup — install, configure, first-time setup |
-| `/update-nanoclaw` | Brings upstream updates into a customized install with preview, selective cherry-pick, and low token usage |
+| `/update-nanoclaw` | Updates a customized install to the newest release (or `main` on the `edge` channel): snapshots your data, refreshes skills, runs migrations, restarts the service, checks health, and rolls back locally if a step fails |
 | `/update-skills` | Refreshes installed channel/provider payloads and dependency pins from upstream without repeating credential prompts or channel wiring |
 
 ## Container skills

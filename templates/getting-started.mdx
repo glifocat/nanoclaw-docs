@@ -6,6 +6,7 @@ tag: "UPDATED"
 ---
 
 {/* verified-against: nanoclaw.sh, setup/{auto,templates}.ts, setup/channels/{initial-setup,run-channel-skill}.ts, scripts/{init-first-agent,delete-cli-agent,chat}.ts, .claude/skills/init-first-agent/SKILL.md, src/templates/create-agent.ts, src/cli/resources/{groups,wirings,tasks}.ts, src/cli/format-tasks.ts, src/channels/cli.ts, src/mailbox/sqlite/tasks.ts @ b76fcb3d. Catalog examples: nanocoai/nanoclaw-templates index.json and lifestyle/family-assistant, product/competitor-analysis, sales/sdr instructions @ fe904545. */}
+{/* verified-against (scoped correction): Claude subscription sign-in label: setup/providers/claude.ts, .claude/skills/add-onecli/scripts/auth.ts, .claude/skills/add-iron-proxy/scripts/auth.ts @ 7203e00d (v2026.10.0) */}
 
 A **template** gives your assistant a starting set of instructions and tools for a particular job. You choose what you need help with, then tell the assistant about your own situation.
 
@@ -91,7 +92,7 @@ On Linux, use a regular user account. If you're installing on a server, read the
 
     Leave Terminal open while the download or local build finishes. Setup then installs **OneCLI**, the vault that stores account credentials.
 
-    Choose your AI option and follow its sign-in prompts. For a Claude subscription, select **Claude**, then **Sign in with my Claude subscription**. This connects the AI account, not the NanoClaw download account. See [the illustrated sign-in walkthrough](/quickstart#prepare-workspace) if you need help recognizing the browser steps.
+    Choose your AI option and follow its sign-in prompts. For a Claude subscription, select **Claude**, then **Claude subscription**. This connects the AI account, not the NanoClaw download account. See [the illustrated sign-in walkthrough](/quickstart#prepare-workspace) if you need help recognizing the browser steps.
 
     Let setup finish the access rules and background service. Enter your name when asked. It sends a test message to check the AI connection.
 

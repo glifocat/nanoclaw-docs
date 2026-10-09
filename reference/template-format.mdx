@@ -4,7 +4,7 @@ description: "Field-level reference for the Agent Plugins 1.0.0 template format:
 keywords: ["template format", "plugin.json", "mcp.json schema", "agent plugins 1.0.0", "PLUGIN_ROOT", "PLUGIN_DATA", "secret lint", "templateReport"]
 ---
 
-{/* verified-against: src/templates/{parse,manifest,extension,mcp,skills,tasks,plugin-dir,create-agent,local-dir}.ts, src/container-config.ts, src/modules/self-mod/request.ts, container/agent-runner/src/plugin-mcp.ts @ 20d61af */}
+{/* verified-against: src/templates/{parse,manifest,extension,mcp,skills,tasks,plugin-dir,local-dir,create-agent}.ts, src/container-config.ts, src/modules/self-mod/request.ts, src/modules/scheduling/create.ts, container/agent-runner/src/plugin-mcp.ts, container/agent-runner/src/providers/claude-config.ts @ 7203e00d (v2026.10.0); nanocoai/nanoclaw-templates scripts/check-templates.mjs @ 7d3cb404; providers branch container/agent-runner/src/providers/cwd-shim.ts @ 3959d1f0 */}
 
 The precise rules a [template](/templates/overview) is validated against. For a walkthrough of building one, see [Building a template](/templates/building).
 
@@ -88,7 +88,7 @@ Allowed fields: `type`, `command`, `args`, `env`, `cwd`.
 | `command` | A single token — no whitespace, no shell strings |
 | `command` form | A bare executable name, or a `./`-relative path that stays inside the plugin root |
 | `command` expansion | None. `${…}` in a command is rejected. |
-| `env` keys | May not define `PLUGIN_ROOT` or `PLUGIN_DATA` — the client always sets them |
+| `env` keys | Must be valid environment variable names (`[A-Za-z_][A-Za-z0-9_]*`). May not define `PLUGIN_ROOT` or `PLUGIN_DATA` — the client always sets them |
 | `cwd` | Fixed forms only: `./path`, `${PLUGIN_ROOT}[/path]`, `${PLUGIN_DATA}[/path]`. No `..` escapes. |
 | `cwd` default | Omitted `cwd` becomes `${PLUGIN_ROOT}` at stamp time — the spec default |
 

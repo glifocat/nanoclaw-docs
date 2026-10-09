@@ -4,7 +4,7 @@ description: "Administer a running NanoClaw host from the terminal — inspect a
 keywords: ["ncl", "cli", "admin", "unix socket", "cli_scope", "groups", "wirings", "sessions", "approvals"]
 ---
 
-{/* verified-against: src/cli/client.ts, src/cli/dispatch.ts, src/cli/socket-server.ts, src/cli/crud.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,policies,roles,sessions,tasks,user-dms,users,wirings}.ts, src/db/container-configs.ts, bin/ncl, setup/service.ts @ 639577c3; template behavior @ 20d61af; mailbox scope and MCP edits: src/cli/resources/tasks.ts, src/cli/resources/sessions.ts, src/cli/resources/groups.ts, src/container-config.ts @ b76fcb3d */}
+{/* verified-against: src/cli/{dispatch,guard,registry,crud,args,parse-argv,client,format,frame,transport-errors,stdin-json,socket-server,help-render}.ts, src/cli/commands/{help,index,status}.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,policies,roles,sessions,tasks,user-dms,users,wirings,index}.ts, src/channels/channel-defaults.ts, src/types.ts, src/container-config.ts, src/host-sweep.ts, src/templates/{create-agent,local-dir}.ts, src/modules/cross-session-context/history.ts, src/modules/scheduling/create.ts, setup/service.ts, bin/ncl @ 7203e00d (v2026.10.0) */}
 
 `ncl` is the admin CLI for a running NanoClaw host. It sends one request frame over a Unix socket at `data/ncl.sock` and prints the response — commands inspect and manage the running host's state, including central configuration and per-session mailboxes. The socket is `chmod 0600`, so only the user that started the host can connect.
 
@@ -24,7 +24,7 @@ pnpm ncl groups list   # equivalent, from the checkout
 The general shape is:
 
 ```bash
-ncl <resource> <verb> [target] [--key value ...] [--json]
+ncl <resource> <verb> [target] [--key value ...] [--stdin-json] [--json]
 ```
 
 Positional words join into the command name: the dispatcher matches the longest registered command, and everything after it is the target ID — dashes intact, so `ncl groups get abc123` and dashed ids like `ncl tasks cancel task-374f-…` both resolve. `--id <uuid>` works everywhere too. Flags map to columns; hyphens and underscores are interchangeable (`--agent-group-id` = `--agent_group_id`). Run `ncl help` to list every resource, `ncl <resource> help` for its verbs, columns, and enums, and `ncl <resource> help <verb>` (or `--help` on any command) for a single verb's flags.
@@ -84,7 +84,7 @@ ncl groups config add-package --id <group-id> --apt ffmpeg
 ncl groups config add-mount --id <group-id> --host ~/projects/site --container /workspace/extra/site --ro
 ```
 
-`config update` accepts `--provider`, `--model`, `--effort`, `--image-tag`, `--assistant-name`, `--max-messages-per-prompt`, `--cli-scope`, and `--timezone`. `add-mcp-server` also takes `--url` in place of `--command`/`--args` for a remote Streamable HTTP server, with optional `--headers` as a JSON object. Plugin-owned MCP servers cannot be replaced or removed through these config commands: edit the plugin and [restamp it](/templates/updating) instead. `config add-mount` and `remove-mount` are operator-only — they run from the host socket, never from inside a container — and mounts still pass the [allowlist check](/operate/hardening#gate-additional-mounts) at spawn.
+`config update` accepts `--provider`, `--model`, `--effort`, `--speed`, `--image-tag`, `--assistant-name`, `--max-messages-per-prompt`, `--cli-scope`, and `--timezone`. `--speed` must be a speed tier the group's provider declares (Claude: `standard`, `fast`), or an empty string to follow the install default. `add-mcp-server` also takes `--url` in place of `--command`/`--args` for a remote Streamable HTTP server, with optional `--headers` as a JSON object. Plugin-owned MCP servers cannot be replaced or removed through these config commands: edit the plugin and [restamp it](/templates/updating) instead. `config add-mount` and `remove-mount` are operator-only — they run from the host socket, never from inside a container — and mounts still pass the [allowlist check](/operate/hardening#gate-additional-mounts) at spawn.
 
 ### messaging-groups and wirings
 

@@ -4,7 +4,7 @@ description: "Give NanoClaw a real phone number via Dial — SMS and AI-handled 
 keywords: ["dial", "getdial", "phone number", "sms", "voice calls", "add-dial", "add-dial-number", "add-dial-tool", "pairing code", "10dlc", "dial cli", "native adapter"]
 ---
 
-{/* verified-against: .claude/skills/{add-dial,add-dial-number,add-dial-tool}/SKILL.md, .claude/skills/add-dial/apply-fixtures.json, setup/pair-dial.ts, setup/channels/initial-setup.ts, setup/lib/skill-driver.ts @ 294ef2ae; channels branch src/channels/dial.ts + dial-pairing.ts @ a45fab71 */}
+{/* verified-against: .claude/skills/{add-dial,add-dial-number,add-dial-tool}/SKILL.md, .claude/skills/add-dial-tool/scripts/dial-policy.ts, setup/pair-dial.ts, setup/channels/initial-setup.ts, setup/lib/skill-driver.ts, src/cli/resources/messaging-groups.ts @ 7203e00d (v2026.10.0); channels branch src/channels/dial.ts, src/channels/dial-pairing.ts @ d73e8f44 */}
 
 The Dial adapter gives your agent a **real phone number** through [Dial](https://getdial.ai): people text or call it, and the agent answers over SMS; the agent can also place outbound calls that Dial's AI voice agent handles. It's a **native adapter** — no Chat SDK bridge — and both directions go through the `dial` CLI: outbound SMS is `dial message --json`, inbound events arrive through the `dial listen` daemon, which runs a small handler script that spools each event into `data/dial/inbound/` for the adapter to pick up. No public URL, webhook, or open port.
 
@@ -62,8 +62,9 @@ To wire more lines or move the line between agents later, run `/manage-channels`
 
 - Pins `@getdial/cli` (0.37.0) in `container/cli-tools.json` and rebuilds the image, and mounts a sandbox-aware `dial-cli` skill so the agent knows the CLI runs keyless in there.
 - Stores the account's API key in the [OneCLI vault](/operate/credentials) for `api.getdial.ai`, so requests from the container are authenticated at the gateway — the key never enters the sandbox.
-- Asks **which agents may use Dial** and enforces the answer with a per-agent OneCLI block rule. Answer `all`, `none`, or a list of `ag-…` ids separated by commas with no spaces. If you run it from `/add-dial`, the parent asks this question instead and passes your answer down. An agent you left out sees `403 blocked_by_policy`; a `401` means the vault secret needs refreshing. Agents created *after* the run have Dial until you re-run the skill, which is also how you change the list.
+- Asks **which agents may use Dial** and enforces the answer with one OneCLI policy rule, `Dial: blocked agents`, that blocks `api.getdial.ai` for every agent you did not choose (`all` means no rule). Answer `all`, `none`, or a list of `ag-…` ids separated by commas with no spaces. If you run it from `/add-dial`, the parent asks this question instead and passes your answer down. An agent you left out sees `403 blocked_by_policy`; a `401` means the vault secret needs refreshing. Agents created *after* the run have Dial until you re-run the skill, which is also how you change the list.
 - Replaces the OneCLI secret on every run rather than updating it. `onecli secrets update` accepts a new value only on the command line, and the key must never sit there. The skill deletes the stale secret and creates a fresh one from a temporary file, then merges the new secret id into the chosen selective-mode agents further down, so re-onboarding and key rotation both work.
+- Needs OneCLI gateway 1.42. Before anything is written it reads the gateway version and stops, with a message naming 1.42.0, if the gateway is older or newer. The block rule is published before the Dial key is stored. Gateways on 1.43 or later are not supported by this skill yet.
 
 <Warning>
 An agent with the tool can text and call **any** number and buy more numbers, billed to your Dial account. Grant it deliberately, and remember that on a `public` line every stranger who reaches that agent gets a turn with it.

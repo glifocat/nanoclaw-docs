@@ -5,6 +5,17 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Docs checked against v2026.10.0" description="2026-10-09" tags={["Updated", "Fixed"]}>
+  Pages across the portal were rechecked against NanoClaw v2026.10.0 and corrected where they had drifted.
+
+  - [Releases](/changelog) adds v2026.10.0.
+  - [Environment variables](/reference/environment-variables) adds the outbound proxy settings and `NANOCLAW_GATEWAY_UNCREDENTIALED_READS`; its source line numbers now point at v2026.10.0.
+  - [Configuration](/operate/configuration), [Container config](/reference/container-config) and the [ncl reference](/reference/ncl-cli) add `CONTAINER_PIDS_LIMIT` and the per-group `speed` setting.
+  - [Installation](/installation) and the [Quickstart](/quickstart) match the current setup prompts; Installation names the OneCLI 1.42.0 pin.
+  - [Agent providers](/extend/providers) covers the OpenCode skill's own files and current pins.
+  - Smaller corrections on [Uninstall](/operate/uninstall), [Upgrading](/operate/upgrading), [Slack](/channels/slack), [WhatsApp](/channels/whatsapp), [Mattermost](/channels/mattermost), [Dial](/channels/dial), [Credentials](/operate/credentials), [Hardening](/operate/hardening), the templates pages, and several concept and reference pages.
+</Update>
+
 <Update label="Auto-compact window can be set on the host" description="2026-10-04" tags={["Fixed"]}>
   [Environment variables](/reference/environment-variables) now says `CLAUDE_CODE_AUTO_COMPACT_WINDOW` can be set in `.env` or the host process environment from v2026.10.0, which passes it into Claude agent containers. It must be a positive integer, and affected sessions need a restart. In v2.4.0 and earlier, a host value is ignored.
 </Update>

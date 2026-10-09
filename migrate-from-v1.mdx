@@ -5,7 +5,7 @@ icon: "route"
 keywords: ["migration", "v1", "v2", "upgrade", "OpenClaw", "migrate-v2.sh", "migrate-from-v1", "migrate-from-openclaw", "handoff"]
 ---
 
-{/* verified-against: migrate-v2.sh, migrate-v2-reset.sh, setup/migrate-v2/*.ts, .claude/skills/migrate-from-v1/SKILL.md, .claude/skills/migrate-from-openclaw/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md, .claude/skills/migrate-memory/SKILL.md @ 4e83a0a0 (main) */}
+{/* verified-against: migrate-v2.sh, migrate-v2-reset.sh, setup/migrate-v2/{env,db,groups,sessions,tasks,channel-auth,select-channels}.ts, setup/gateways/{catalog,selection,install,step,auth-step}.ts, .claude/skills/add-onecli/scripts/auth.ts, .claude/skills/add-onecli/gateway.json, src/config.ts, src/install-slug.ts, setup/install-*.sh, .claude/skills/migrate-from-v1/SKILL.md, .claude/skills/migrate-from-openclaw/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md @ 7203e00d (v2026.10.0); channels branch setup/ tree @ d73e8f44 */}
 
 NanoClaw v2 is a ground-up rewrite — you don't upgrade in place, you migrate into a fresh v2 checkout. There are two supported paths:
 
@@ -90,11 +90,11 @@ The script is idempotent — re-running it skips what's already done, so a faile
   </Step>
 
   <Step title="Phase 2: channels">
-    An interactive multiselect asks which channels to bring over (Telegram, Discord, Slack, WhatsApp, Teams, Matrix, iMessage, and more). For each selection the script copies the channel's auth state and runs its installer. To skip the prompt — for unattended runs — set `NANOCLAW_CHANNELS=telegram,discord` before running.
+    An interactive multiselect asks which channels to bring over (Telegram, Discord, Slack, WhatsApp, Teams, Matrix, iMessage, and more). For each selection the script copies the channel's auth state, then runs `setup/install-<name>.sh` if that script exists. Only GitHub ships one, so for every other channel the step prints "no install script" and is recorded as failed in `handoff.json`. Install those adapters afterwards with `/add-<name>`. To skip the prompt — for unattended runs — set `NANOCLAW_CHANNELS=telegram,discord` before running.
   </Step>
 
   <Step title="Phase 3: infrastructure">
-    Installs Docker if missing, sets up the OneCLI credential vault, registers your Anthropic credential (skipped if `.env` already has `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`), copies v1 container skills v2 doesn't have, and acquires the agent container image — it builds one unless `NANOCLAW_HARDENED_IMAGE` is already set in `.env`, in which case it fetches the pinned image instead (see [Get started with the Echo hardened runtime](/guides/echo-hardened-runtime)).
+    Installs Docker if missing, sets up the credential gateway (the one already installed, otherwise the default, OneCLI), and registers your Anthropic credential through it. With OneCLI, a key or token already in `.env` (`ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN`) is moved into the vault and removed from `.env`, not skipped. The step then copies v1 container skills v2 doesn't have and acquires the agent container image — it builds one unless `.env` has `NANOCLAW_HARDENED_IMAGE=true`, in which case it fetches the pinned image instead (see [Get started with the Echo hardened runtime](/guides/echo-hardened-runtime)).
   </Step>
 
   <Step title="Service switchover">

@@ -9,6 +9,7 @@ tag: "UPDATED"
 import { TerminalMenu, SetupCheck } from "/snippets/setup-visuals.jsx";
 
 {/* verified-against: setup sequence, exact prompt labels, fresh terminal agent creation, channel handoff, and final checks: setup/auto.ts, setup/channels/initial-setup.ts, setup/lib/bright-select.ts, scripts/chat.ts @ b76fcb3d; prerequisites and bootstrap: nanoclaw.sh, setup.sh @ b76fcb3d. Synthetic menu illustrations: setup/auto.ts, setup/providers/registry.ts, setup/lib/bright-select.ts @ b76fcb3d, inspected 2026-09-05; simplified presentation with exact questions/options, omitted hints/output, and the guide's choice highlighted (not necessarily the default). These are not installation captures. Existing NanoClaw browser screenshots are reused from the hardened-runtime guide; they are reference captures, not a recording of this verification. */}
+{/* verified-against (scoped correction): sandbox image prompt, provider picker, Claude sign-in labels, final check: setup/auto.ts, setup/portal.ts, .claude/skills/add-onecli/scripts/auth.ts, .claude/skills/add-onecli/scripts/register-claude-token.sh, .claude/skills/add-codex/SKILL.md, .claude/skills/add-opencode/SKILL.md @ 7203e00d (v2026.10.0) */}
 
 {/* Scoped verification, 2026-09-05: access-rule defaults/preservation in setup/auto.ts and setup/mounts.ts; channel preparation in executable .claude/skills/add-{telegram,whatsapp}/SKILL.md and setup/channels/slack-auto.ts @ b76fcb3d. Time allowance is editorial planning guidance, not a timed installation result. */}
 
@@ -46,7 +47,7 @@ NanoClaw installs the other software it needs. If you choose the recommended dow
     First follow [Microsoft's WSL installation guide](https://learn.microsoft.com/en-us/windows/wsl/install). WSL lets you run Linux on Windows. Once it is ready, open your Linux app (for example, Ubuntu) and follow this guide there. Allow extra time for that preparation.
   </Accordion>
   <Accordion title="Using ChatGPT or an API key?" id="other-ai-accounts">
-    Setup also offers **Codex**, which connects through a ChatGPT subscription or an OpenAI API key. Choose **Build it here** at the sandbox step, then **Codex** at the AI service step. The prebuilt sandbox currently supports Claude.
+    Setup also offers **Codex**, which connects through a ChatGPT subscription or an OpenAI API key. Choose **Codex** at the AI service step. The prebuilt sandbox currently supports Claude only, so if you already chose it, setup asks whether to stop using it and builds a sandbox on your computer instead.
 
     If you use an Anthropic API key, choose **Claude**, then **Paste an Anthropic API key**. API keys use your provider's usage-based billing. See [AI providers](/extend/providers) for the other options.
   </Accordion>
@@ -107,15 +108,11 @@ NanoClaw installs the other software it needs. If you choose the recommended dow
   <Step title="Prepare your assistant's workspace" id="prepare-workspace">
     Setup calls this workspace a **sandbox**. It keeps the assistant's working files separate from the rest of your computer.
 
-    Choose **Fetch the hardened image, built by Echo** to download the prepared software.
-
-    <TerminalMenu screens={[
-      { question: "Where should your assistant's sandbox image come from?", options: ["Fetch the hardened image, built by Echo", "Build it here"], selected: 0 }
-    ]} />
+    Setup asks **Enable Echo’s hardened agent image? Open the perks dashboard in your browser?** Press **Enter** to accept. This is how you get the prepared software.
 
     <span id="prefer-to-skip-the-nanoclaw-account" />
 
-    **Using Codex or skipping the download account?** Choose **Build it here** instead. Wait for the local build to finish, then continue to the AI account step. This can take several minutes. See [other AI accounts](#other-ai-accounts).
+    **Using Codex or skipping the download account?** Answer no to the browser question. Wait for the local build to finish, then continue to the AI account step. This can take several minutes. See [other AI accounts](#other-ai-accounts).
 
     For the download option, sign in to NanoClaw in the browser window that opens. You can create an account there. If no browser opens, open the link shown in Terminal.
 
@@ -140,16 +137,16 @@ NanoClaw installs the other software it needs. If you choose the recommended dow
   <Step title="Connect your AI account" id="connect-ai">
     Setup first installs **OneCLI**, the vault that stores your AI sign-in securely.
 
-    For this walkthrough, choose **Claude**, then **Sign in with my Claude subscription**. Follow the browser prompts to connect your AI account. This is separate from the NanoClaw download account.
+    For this walkthrough, choose **Claude**, then **Claude subscription**. Follow the browser prompts to connect your AI account. This is separate from the NanoClaw download account.
 
     If you chose the Codex path, select **Codex** instead and follow its sign-in prompts. See [other AI accounts](#other-ai-accounts).
 
     <TerminalMenu screens={[
-      { question: "Which agent runtime should power your assistant?", options: ["Claude", "Codex"], selected: 0 },
-      { question: "How would you like to connect to Claude?", options: ["Sign in with my Claude subscription", "Paste an OAuth token I already have", "Paste an Anthropic API key", "Skip — I'll connect later"], selected: 0 }
+      { question: "Which agent runtime should power your assistant?", options: ["Claude", "Codex", "OpenCode"], selected: 0 },
+      { question: "How would you like to connect to Claude?", options: ["Claude subscription", "Paste an OAuth token", "Paste an Anthropic API key", "Skip for now"], selected: 0 }
     ]} />
 
-    <SetupCheck>For the Claude path, Terminal says <strong>Claude account connected.</strong> Return to Terminal if you're still in the browser.</SetupCheck>
+    <SetupCheck>When the browser sign-in finishes, Terminal shows <strong>Done.</strong> after saving your sign-in to the vault. Return to Terminal if you're still in the browser.</SetupCheck>
 
     When Terminal says **Setting your assistant's access rules…**, setup is configuring which extra folders on your computer can be shared with your assistant. On a fresh installation, that list starts empty. Your assistant still has its own workspace; you do not need to share personal folders to complete this guide. If you already have access rules, setup keeps them.
 
@@ -193,7 +190,7 @@ NanoClaw installs the other software it needs. If you choose the recommended dow
       Follow the final instructions for that app: some require you to send the first message. A messaging app can connect to a different assistant from the one you met in Terminal.
     </Accordion>
 
-    <SetupCheck>Terminal says <strong>Everything's connected.</strong> If setup reports a problem instead, follow its recovery instructions before continuing.</SetupCheck>
+    <SetupCheck>If you skipped the channel question, Terminal ends with <strong>You're ready! Chat with <code>pnpm run chat hi</code>.</strong> If you connected a messaging app, it ends with <strong>You're set.</strong> and tells you to look for a welcome message in that app. If setup reports a problem instead, follow its recovery instructions before continuing.</SetupCheck>
 
     To send another message later, run this from the same Terminal window, still in the `nanoclaw` folder:
 

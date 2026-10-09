@@ -6,6 +6,7 @@ keywords: ["entity model", "agent groups", "messaging groups", "wirings", "messa
 
 {/* verified-against: src/db/schema.ts, src/db/migrations/{010-engage-modes,011-pending-sender-approvals,012-channel-registration,016-messaging-group-instance,019-wiring-threads}.ts, src/types.ts, src/router.ts, src/channels/channel-defaults.ts, src/session-manager.ts, src/modules/permissions/{index.ts,access.ts}, src/command-gate.ts @ 639577c3 */}
 {/* verified-against (scoped correction) — adapter sender/session defaults and thread-policy validation: src/router.ts, src/channels/{channel-defaults,channel-registry}.ts, src/cli/resources/wirings.ts @ b76fcb3d */}
+{/* verified-against (scoped correction): command gate list: src/command-gate.ts, src/provider-contracts/claude.ts @ 7203e00d (v2026.10.0) */}
 
 Everything NanoClaw does reduces to five entities in `data/v2.db`: **agent groups** (where agents run), **messaging groups** (where people talk), **wirings** (the edge connecting them, which holds all the behavior), **users** (who is allowed to do what), and **sessions** (the conversation state in between). This page is the mental model; for column-level detail see the [database schema](/reference/db-schema).
 
@@ -103,7 +104,7 @@ A user is a namespaced platform identifier: `channel_type:handle` — `discord:1
 Privilege is user-level, granted in `user_roles`:
 
 - **Owner** — always global. Full access to every agent group, and the last-resort approver for channel registrations (cards go to group admins first, then global admins, then owners).
-- **Admin** — global, or scoped to one agent group. Admins pass the command gate (`/clear`, `/compact`, `/context`, `/cost`, `/files`, `/upload-trace` require owner or admin), approve unknown senders within their scope, and are implicitly members of the groups they administer.
+- **Admin** — global, or scoped to one agent group. Admins pass the command gate (`/clear`, `/upload-trace`, and the Claude commands `/compact`, `/context`, `/cost`, `/usage`, `/stats`, `/files`, `/reset`, `/new` require owner or admin), approve unknown senders within their scope, and are implicitly members of the groups they administer.
 - **Member** — a row in `agent_group_members`. Being "known" in an agent group is what lets an unprivileged user interact with it at all.
 
 Access checks walk exactly this chain: owner → global admin → admin of this group → member → denied.

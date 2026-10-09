@@ -5,7 +5,7 @@ keywords: ["database", "schema", "sqlite", "v2.db", "inbound.db", "outbound.db",
 tag: "UPDATED"
 ---
 
-{/* verified-against: src/db/schema.ts, src/db/connection.ts, src/db/session-db.ts, src/session-manager.ts, src/db/migrations/{001-initial,002-chat-sdk-state,module-approvals-pending-approvals,module-agent-to-agent-destinations,module-approvals-title-options,008-dropped-messages,009-drop-pending-credentials,010-engage-modes,011-pending-sender-approvals,012-channel-registration,013-approval-render-metadata,014-container-configs,015-cli-scope,016-messaging-group-instance,017-agent-message-policies,018-approvals-approver-user-id,019-wiring-threads,020-container-config-timezone,021-approval-question,022-messaging-group-detached,023-approvals-instance,index}.ts, src/modules/agent-to-agent/db/agent-message-policies.ts, container/agent-runner/src/db/messages-out.ts, src/modules/scheduling/db.ts @ dce271c6; durable host tables and instance-aware DM resolution: src/db/migrations/024-host-coordination.ts, src/db/coordination.ts, src/host-instance.ts, src/container-runner.ts, src/delivery.ts, src/modules/permissions/user-dm.ts @ b76fcb3d */}
+{/* verified-against: src/db/schema.ts, src/db/migrations/index.ts, src/db/migrations/{001..025 incl. module-*}.ts, src/db/connection.ts, src/db/compose.ts, src/db/coordination.ts, src/delivery.ts, src/request-wake.ts, src/types.ts, src/mailbox/sqlite/schema.ts, src/mailbox/sqlite/session-db.ts, src/mailbox/sqlite/index.ts, src/db/container-configs.ts @ 7203e00d (v2026.10.0) */}
 
 {/* verified-against (scoped correction): src/request-wake.ts, src/db/coordination.ts @ b76fcb3d */}
 
@@ -274,7 +274,7 @@ Primary key: `(from_agent_group_id, to_agent_group_id)`.
 
 ### container_configs
 
-One row per agent group: how its containers spawn (migration 014; `cli_scope` added in 015, `timezone` in 020). See [Container configuration](/reference/container-config) for full field semantics and the [`ncl groups config`](/reference/ncl-cli#groups) commands that edit it.
+One row per agent group: how its containers spawn (migration 014; `cli_scope` added in 015, `timezone` in 020, `speed` in 025). See [Container configuration](/reference/container-config) for full field semantics and the [`ncl groups config`](/reference/ncl-cli#groups) commands that edit it.
 
 | Column | Type | Default | Meaning |
 |---|---|---|---|
@@ -291,6 +291,7 @@ One row per agent group: how its containers spawn (migration 014; `cli_scope` ad
 | `additional_mounts` | TEXT (JSON) | `'[]'` | Extra bind mounts |
 | `cli_scope` | TEXT | `'group'` | `ncl` CLI visibility scope (migration 015) |
 | `timezone` | TEXT | `NULL` | Validated IANA timezone id; `NULL` follows the install-global timezone. Grounds host-side scheduling immediately and the container's `TZ` on the next respawn (migration 020) |
+| `speed` | TEXT | `NULL` | Provider-declared speed tier (`standard` or `fast` for Claude); `NULL` follows the install default. No backfill (migration 025) |
 | `updated_at` | TEXT | — | ISO timestamp |
 
 ### unregistered_senders
@@ -317,7 +318,7 @@ Migration bookkeeping: `version` (applied-order number, auto-assigned), `name` (
 
 ## Session databases
 
-One pair per session at `data/v2-sessions/<agent_group_id>/<session_id>/`. Schemas come from `INBOUND_SCHEMA` / `OUTBOUND_SCHEMA` in `src/db/schema.ts`; columns added after the initial release (`series_id`, `trigger`, `source_session_id`, `on_wake`, `delivered.platform_message_id`, `delivered.status`) are retrofitted onto pre-existing session DBs by `migrateMessagesInTable()` / `migrateDeliveredTable()` at open time.
+One pair per session at `data/v2-sessions/<agent_group_id>/<session_id>/`. Schemas come from `INBOUND_SCHEMA` / `OUTBOUND_SCHEMA` in `src/mailbox/sqlite/schema.ts`; columns added after the initial release (`series_id`, `trigger`, `source_session_id`, `on_wake`, `delivered.platform_message_id`, `delivered.status`) are retrofitted onto pre-existing session DBs by `migrateMessagesInTable()` / `migrateDeliveredTable()` (`src/mailbox/sqlite/session-db.ts`) at open time.
 
 The `seq` column is the agent-facing message ID, globally ordered across both files: the **host writes even** seq numbers into `messages_in`, the **container writes odd** into `messages_out`, so an ID is unambiguous across both tables.
 
