@@ -13,9 +13,9 @@ rss: true
 
   **Before you update**
 
-  - **Breaking: OneCLI installs must upgrade the OneCLI gateway to exactly 1.42.0.** `/update-nanoclaw` never upgrades a running gateway. Follow `docs/onecli-upgrades.md` in your install, which also tells you when it does not apply. Do not go past 1.42.0: later gateway versions are not supported yet. New installs already get 1.42.0.
+  - **Breaking: if you use the OneCLI gateway, move it to exactly 1.42.0 before you rely on the update.** On an older gateway every vault call fails, and setup stops with "OneCLI gateway lacks the /v1 API required by the installed SDK". `/update-nanoclaw` does not upgrade a running gateway for you; follow `docs/onecli-upgrades.md` in your NanoClaw folder, which also says when the step does not apply. Do not go past 1.42.0: 1.43 and later are not supported yet. New installs already get 1.42.0.
   - **`/update-nanoclaw` now installs the newest release, not the tip of `main`.** `NANOCLAW_UPDATE_CHANNEL` in `.env` picks the channel: `stable` (the default) follows releases, `beta` takes release candidates, and `edge` follows `main`. To keep following `main`, run `pnpm exec tsx scripts/update-nanoclaw.ts set-channel --channel edge` in your NanoClaw folder.
-  - **Iron Proxy installs: rerun the Iron setup once after updating** with `pnpm exec tsx .claude/skills/add-iron-proxy/scripts/setup.ts`. Add `--with-control` if you use the Iron Control console.
+  - **Iron Proxy installs: rerun the Iron setup once after updating** so the approval front is rebuilt with this release's checks: `pnpm exec tsx .claude/skills/add-iron-proxy/scripts/setup.ts` from your NanoClaw folder. Add `--with-control` if you use the Iron Control console.
 
   **New**
 
@@ -29,7 +29,7 @@ rss: true
   - **`/update-nanoclaw` and rollback are more dependable.** A rollback swaps your `data/` snapshot back in by rename instead of deleting it first.
   - **New Claude groups no longer default to the `Concise` output style.** A group that already has an output style keeps it.
   - **`/add-dial-tool` works again on OneCLI gateway 1.42.0.**
-  - **Security:** WhatsApp moves to Baileys 7.0.0-rc14, agents can no longer redirect host file operations outside their own folders, and only admins can run `/clear` and `/upload-trace`. On Linux, if your outbound proxy has a password, rerun `pnpm exec tsx setup/index.ts --step service` to move it out of your service file into a private file. See the [release notes](https://github.com/nanocoai/nanoclaw/releases/tag/v2026.10.0) for the full list.
+  - **Security:** WhatsApp moves to Baileys 7.0.0-rc14, agents can no longer redirect host file operations outside their own folders, and the other names the Claude SDK accepts for admin commands (such as `/reset` for `/clear`) are now admin-only too. On Linux, if your outbound proxy has a password, rerun `pnpm exec tsx setup/index.ts --step service` to move it out of your service file into a private file. See the [release notes](https://github.com/nanocoai/nanoclaw/releases/tag/v2026.10.0) for the full list.
 </Update>
 
 <Update label="v2.4.0" description="2026-09-23" tags={["Breaking", "Feature", "Fix", "Skill"]}>
