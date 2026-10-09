@@ -5,7 +5,7 @@ icon: "trash"
 keywords: ["uninstall", "remove", "delete", "cleanup", "nanoclaw.sh --uninstall", "dry run", "install slug"]
 ---
 
-{/* verified-against: setup/uninstall/{flow,scan,plan,remove,onecli-agents}.ts, setup/lib/setup-config.ts, setup/auto.ts, uninstall.sh, nanoclaw.sh, src/install-slug.ts @ 639577c3; identity and orphan deletion: src/install-slug.ts, setup/uninstall/flow.ts, setup/uninstall/remove.ts, src/mailbox/sqlite/schema.ts @ b76fcb3d */}
+{/* verified-against: setup/uninstall/flow.ts, setup/uninstall/scan.ts, setup/uninstall/plan.ts, setup/uninstall/remove.ts, setup/lib/setup-config.ts, setup/auto.ts, uninstall.sh, nanoclaw.sh, src/install-slug.ts, .claude/skills/add-iron-proxy/REMOVE.md @ 7203e00d (v2026.10.0) */}
 
 NanoClaw ships an interactive uninstaller that removes a single install — its service, containers, image, data, and the credential agents it registered. Runtime artifacts are scoped by an **install slug**, defaulting to the first 8 hex characters of `sha1(projectRoot)`. `NANOCLAW_INSTALL_ID` overrides that default; each install needs a distinct ID to keep its runtime artifacts separate. Review the preview before removal, particularly if you assigned an ID explicitly.
 
@@ -31,12 +31,12 @@ Start with `bash nanoclaw.sh --uninstall --dry-run` to see exactly what would be
 
 ## What gets removed
 
-The uninstaller groups everything it finds into four confirmation groups. Each group is shown as a what/where table and asks a separate, default-**No** question — you opt into each one.
+The uninstaller groups everything it finds into three confirmation groups. Each group is shown as a what/where table and asks a separate, default-**No** question — you opt into each one.
 
 | Group | Contains |
 |---|---|
 | **1) App & background service** | The background service (launchd/systemd), any running NanoClaw process, this install's Docker containers and image (matched by the install slug), and the `ncl` command symlink. |
-| **2) App data, logs & secrets** | Runtime data, including the central database and per-session message history, logs, build files (`dist/`, `node_modules/`), and the active `.env`. Removing this erases stored conversations; the `.env` is backed up first. |
+| **2) App data, logs & secrets** | Runtime data, including the central database and per-session message history, logs, build files (`dist/`, `node_modules/`), the active `.env`, and this install's update rollback snapshots (`<parent-of-project>/.nanoclaw-updates/<slug>`). It also removes this copy's service containers, data volumes and networks (for example a gateway's database), even if you keep group 1. Those volumes cannot be read without the keys in `data/`, which this group deletes. Removing this erases stored conversations; the `.env` is backed up first. |
 | **3) Agents' memory & files** | Notes and memory your agents created (`groups/`) and any migrated data (`store/`). Content you made — unrecoverable after deletion. |
 | **4) OneCLI credential agents** | The per-agent entries this copy registered in the OneCLI vault. |
 
@@ -46,9 +46,9 @@ Your `.env` is never deleted outright — it's copied to `.env.bak` first (a tim
 
 The uninstaller is deliberately narrow. It does **not** touch:
 
-- **The OneCLI app, your credentials, and the gateway** — the vault is a shared, out-of-band component, so removing one NanoClaw copy never tears it down.
+- **The shared gateway application and your credentials** — the OneCLI vault is a shared, out-of-band component, so removing one NanoClaw copy never tears it down. Only this copy's labeled containers and the volumes and networks of their Compose projects are removed (see group 2).
 - **Other install identities on the machine** — the install slug scopes runtime cleanup. Keep explicit `NANOCLAW_INSTALL_ID` values distinct.
-- **Unattributed OneCLI agents by default** — entries not linked to this copy are labeled "orphans". `--yes` keeps them. The interactive flow offers a separate, default-No **Delete them too?** prompt; accept it only for agents you intend to remove.
+- **Host-wide config** — `~/.config/nanoclaw/` (mount and sender allowlists) and the PATH line in `~/.bashrc` and `~/.zshrc`.
 
 A final summary prints what was left alone and any step that couldn't complete, with a manual command to finish the job.
 

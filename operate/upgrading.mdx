@@ -7,6 +7,7 @@ keywords: ["upgrade", "update", "update-nanoclaw", "update-skills", "migrate-nan
 {/* verified-against (scoped correction) — validate gateway refresh: scripts/update/transaction.ts (validateUpdate) @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — cutover container stop: scripts/update/service.ts (drainContainers, CUTOVER_STOP_GRACE_SECONDS) @ 143db6c9 (v2.4.0) */}
 {/* verified-against: scripts/update-nanoclaw.ts, scripts/update/transaction.ts, scripts/update/service.ts, scripts/update-skills.ts, scripts/upgrade-state.ts, src/upgrade-state.ts, src/index.ts, src/install-slug.ts, setup/service.ts, .claude/skills/update-nanoclaw/SKILL.md, .claude/skills/update-skills/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md, docs/upgrade-recovery.md @ 294ef2ae; install identity override: src/install-slug.ts @ b76fcb3d */}
+{/* verified-against (scoped correction): rollback restore order: scripts/update/transaction.ts, scripts/update/service.ts @ 7203e00d (v2026.10.0) */}
 
 Do not update with a raw `git pull`. NanoClaw records each sanctioned upgrade in `data/upgrade-state.json`, and the marker carries three values: the version, the commit, and the tree hash. A startup tripwire compares all three against the running code and refuses to boot when they disagree. A commit that leaves the version alone trips it too. The supported path is the `/update-nanoclaw` skill.
 
@@ -82,7 +83,9 @@ Before cutover the controller copies `.env`, `data`, `groups`, `store`, `start-n
 pnpm exec tsx scripts/update-nanoclaw.ts rollback --id "$id"
 ```
 
-Rollback stops the service, resets your checkout to the recorded HEAD, restores the snapshot, reinstalls and rebuilds, restarts the previous service, and health-verifies it.
+Rollback stops the service and this install's agent containers, resets your checkout to the recorded HEAD, and restores the snapshot. It then restarts the gateway's own containers so they pick up the restored `data/`, reinstalls and rebuilds, restarts the previous service, and health-verifies it.
+
+The restore never deletes first. It copies each snapshot item next to its live path, swaps it in by rename, and only then deletes what it replaced. If a swap fails, everything is renamed back. If part of a replaced folder cannot be deleted (usually a root-owned folder Docker created), the controller prints a `sudo rm -rf` command for the leftover. Rollback checks that the snapshot exists, and that any symlinked state path still points where it did, before it stops anything.
 
 <Warning>
   The backup tag is not a full rollback. `git reset --hard pre-update-…` restores your code and leaves your databases, `.env`, and group state on the new layout. Use the controller's rollback command instead.
