@@ -4,7 +4,7 @@ description: "How NanoClaw stores durable facts in a provider-neutral Markdown t
 keywords: ["agent memory", "persistent memory", "Core Memory", "memory tree", "OKF", "Open Knowledge Format", "provider-neutral", "instructions.prepend.md", "migrate-memory"]
 ---
 
-{/* verified-against: docs/memory.md, container/agent-runner/src/{index.ts,memory/{scaffold.ts,context.ts,session-hook.ts,templates/index.md,templates/system/{index.md,definition.md}},providers/{types.ts,claude.ts}}, container/skills/self-customize/SKILL.md, .claude/skills/migrate-memory/SKILL.md @ 4e83a0a0 */}
+{/* verified-against: container/agent-runner/src/memory/{scaffold.ts,context.ts,session-hook.ts,templates/index.md,templates/system/definition.md}, container/agent-runner/src/index.ts, src/project-doc-compose.ts, src/group-persona.ts, src/group-init.ts, .claude/skills/migrate-memory/SKILL.md, container/skills/self-customize/SKILL.md, .claude/skills/add-opencode/payload/container/agent-runner/src/providers/{opencode-memory.ts,opencode.ts} @ 7203e00d (v2026.10.0) */}
 
 Every agent group has persistent, file-based memory: plain Markdown files that survive container restarts, session ends, context compaction, and provider switches. There is no memory database or embedding store. The agent reads and edits the same files you can inspect on the host.
 
@@ -46,7 +46,7 @@ Whenever a provider creates a fresh context window, NanoClaw injects `memory/ind
 | Context compacts | Yes | Durable facts must survive the discarded conversation detail |
 | An existing provider session resumes | No | That context already contains the injected memory |
 
-Resume happens often — usually on each new inbound message — so injecting again would duplicate the same block throughout the conversation.
+Resume happens often — usually on each new inbound message — so injecting again would duplicate the same block throughout the conversation. OpenCode is the exception: it has no native session-start hook, so before every turn it runs the shared memory hook itself and rewrites the result, together with its other instructions, into its instructions file. A host-side edit to the memory files shows up on the next turn.
 
 Each loaded file has a 16,000-character limit. If either file grows past that limit, the injected copy ends with a truncation notice. Keep both files lean: headlines and pointers in the indexes, detail in linked concept files. The agent can follow those links and read deeper files with ordinary filesystem tools when they become relevant.
 

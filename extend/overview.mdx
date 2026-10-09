@@ -5,6 +5,7 @@ keywords: ["skills", "extend", "SKILL.md", "registry branches", "channels branch
 ---
 
 {/* verified-against: CONTRIBUTING.md, docs/skills-model.md, docs/skill-guidelines.md, .claude/skills/{add-telegram,add-codex,add-tavily-tool,manage-mounts}/SKILL.md, .claude/skills/add-telegram/REMOVE.md, container/skills/, src/container-runner.ts, setup/providers/index.ts, setup/channels/run-channel-skill.ts @ 639577c3 */}
+{/* verified-against (scoped correction): provider registry branches and provider barrels: .claude/skills/{add-codex,add-opencode}/SKILL.md, src/providers/index.ts, src/provider-contracts/index.ts, container/agent-runner/src/{providers,provider-contracts}/index.ts, setup/providers/index.ts @ 7203e00d (v2026.10.0) */}
 
 A NanoClaw skill is a **SKILL.md instruction workflow** in `.claude/skills/` that a coding harness (Claude Code, Codex, OpenCode) executes in your checkout. When you invoke `add-telegram` or `manage-mounts`, the coding harness reads the skill's instructions and performs them: copying files, appending an import, installing a dependency, running a test. There is no manifest.yaml and no skill state file. The skill *is* the markdown — the mechanical steps in trunk install skills also carry `nc:` directive fences, so the setup wizard can apply the same document a coding harness would read, and anything it can't apply mechanically falls back to the prose beside it. Two readers, one document.
 
@@ -16,7 +17,7 @@ This is how the trunk stays small: it ships channel and provider *infrastructure
 
 ## How a code-carrying skill installs
 
-Channel and provider adapters live on two long-lived **registry branches** (`channels` and `providers`) that upstream keeps in sync with `main`. The install skill fetches files from the branch and copies them in — it never merges the branch. Using `/add-telegram` as the canonical example:
+Channel adapters live on the long-lived `channels` **registry branch**, and provider payloads live on the `providers` branch or inside the provider skill itself (`/add-opencode` carries its payload in its own `payload/` folder on `main`). The install skill fetches or copies the files in — it never merges a branch. Using `/add-telegram` as the canonical example:
 
 <Steps>
   <Step title="Fetch the registry branch">
@@ -53,7 +54,7 @@ The `/name` form below is Claude Code's. Codex invokes the same skill as `$add-t
 | Category | Example | What installing looks like |
 | --- | --- | --- |
 | **Channel installs** | `/add-telegram` | The flow above: copy the adapter from the `channels` branch, append the barrel import, pin the dependency, run the registration test. See [Channels overview](/channels/overview). |
-| **Provider installs** | `/add-codex` | Same pattern against the `providers` branch, but multi-point: a provider spans three trees — the host, the container's agent-runner, and setup — so the skill appends an import to each of the three provider barrels and runs a registration guard per tree. See [Providers](/extend/providers). |
+| **Provider installs** | `/add-codex` | Same fetch-and-copy pattern, but multi-point: a provider spans the host, the container's agent-runner, and setup, plus a provider contract on the host and container sides. `/add-codex` copies its files from the `providers` branch; `/add-opencode` ships its files inside the skill. Either skill appends one import to each of the five provider and contract barrels, pins its CLI in `container/cli-tools.json`, and runs registration guards. See [Providers](/extend/providers). |
 | **Tool installs** | `/add-tavily-tool` | Wires an MCP server into selected agent groups: pins the `mcp-remote` bridge in the container manifest and registers the server per group with `ncl groups config add-mcp-server`, giving the agent `tavily_search` and `tavily_extract` with no API key. See [Tools](/extend/tools). |
 | **Operational skills** | `/manage-mounts` | Pure instruction workflows — no code copied, nothing fetched. The SKILL.md walks the coding harness through a task, like editing the mount allowlist through the setup CLI and restarting the service. |
 
