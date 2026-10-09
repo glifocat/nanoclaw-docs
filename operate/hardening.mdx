@@ -4,21 +4,21 @@ description: "Lock down a NanoClaw install — egress lockdown, the mount allowl
 keywords: ["hardening", "security", "egress lockdown", "NANOCLAW_EGRESS_LOCKDOWN", "mount allowlist", "unknown_sender_policy", "command gate", "container limits"]
 ---
 
-{/* verified-against: src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/modules/permissions/{index.ts,access.ts,sender-approval.ts}, src/command-gate.ts, src/router.ts, src/db/schema.ts, src/config.ts, src/container-runner.ts, container/Dockerfile, src/host-sweep.ts, config-examples/mount-allowlist.json, .claude/skills/manage-mounts/SKILL.md, setup/mounts.ts, src/cli/resources/groups.ts, setup/lib/registry-state.ts @ 639577c3; Docker posture and image checks: src/drivers/docker-driver.ts, src/drivers/types.ts, setup/auto.ts, container/pull.sh @ b76fcb3d */}
+{/* verified-against: src/egress-lockdown.ts, src/config.ts, src/modules/mount-security/index.ts, src/command-gate.ts, src/slash-command.ts, src/provider-contracts/claude.ts, src/router.ts, src/modules/permissions/{index,guard,sender-approval}.ts, src/modules/approvals/primitive.ts, src/drivers/docker-driver.ts, src/container-runner.ts, container/Dockerfile, container/pull.sh, setup/mounts.ts, setup/index.ts, src/cli/resources/groups.ts, src/cli/guard.ts, src/host-sweep.ts, setup/lib/registry-state.ts, .claude/skills/add-onecli/payload/src/gateway-providers/onecli.ts, .claude/skills/add-iron-proxy/payload/src/gateway-providers/iron-proxy.ts @ 7203e00d (v2026.10.0); channels branch: src/channels/{slack,signal,imessage,cli,local-web,dial,emacs,telegram}.ts @ d73e8f44 */}
 
 NanoClaw's isolation boundary is the Docker container: each agent runs in its own container with a scoped workspace mount (see [Container lifecycle](/concepts/container-lifecycle)). There is no micro-VM or alternative sandbox runtime — hardening means tightening what those containers can reach. This page walks the defense-in-depth controls from network to filesystem to people.
 
 ## Lock down network egress
 
-By default, agent containers have normal outbound internet access. Set `NANOCLAW_EGRESS_LOCKDOWN=true` to force all agent traffic through the OneCLI gateway instead:
+By default, agent containers have normal outbound internet access. Set `NANOCLAW_EGRESS_LOCKDOWN=true` to force all agent traffic through the selected credential gateway instead:
 
 - Agent containers are placed on an `--internal` Docker network (default name `nanoclaw-egress`, override with `NANOCLAW_EGRESS_NETWORK`). Internal networks have no route to the internet.
-- The OneCLI gateway container (default name `onecli`, override with `ONECLI_GATEWAY_CONTAINER`) is attached to that network with the alias `host.docker.internal`, so the injected proxy is the only reachable hop.
+- The selected gateway's container is attached to that network, so the injected proxy is the only reachable hop. For OneCLI that is the container named `onecli` (override with `ONECLI_GATEWAY_CONTAINER`), attached with the alias `host.docker.internal`. For Iron Proxy it is this install's Iron Proxy container, attached with the alias `iron-proxy`.
 - Agents run non-root without `NET_ADMIN`, so they can't reconfigure the network from inside.
 
 The setup is idempotent and self-healing — NanoClaw creates the network and re-attaches the gateway on every spawn if needed. It also **fails fast**: if lockdown is enabled but the network can't be created or the gateway container can't be attached, NanoClaw throws an `EgressLockdownError` and refuses to spawn the agent rather than silently running it with open egress. If you see that error, start the gateway container (or set `NANOCLAW_EGRESS_LOCKDOWN=false` to opt out).
 
-All three variables can be set in `.env` or the process environment (`src/config.ts:92-95`) — `.env` is the simpler path for a plain "edit and restart" flow; the service definition (launchd plist or systemd unit) still works too, as described in [Configuration](/operate/configuration#applying-changes):
+All three variables can be set in `.env` or the process environment (`NANOCLAW_EGRESS_LOCKDOWN` and `NANOCLAW_EGRESS_NETWORK` in `src/config.ts:106-108`; `ONECLI_GATEWAY_CONTAINER` in the OneCLI gateway provider) — `.env` is the simpler path for a plain "edit and restart" flow; the service definition (launchd plist or systemd unit) still works too, as described in [Configuration](/operate/configuration#applying-changes):
 
 ```bash
 # Linux (systemd unit)
@@ -61,7 +61,7 @@ pnpm exec tsx setup/index.ts --step mounts --force -- --json '{"allowedRoots":[{
 The validator accepts either key: `allowReadWrite` (native) or `readOnly` (written by the `/manage-mounts` skill and setup). If both are absent it defaults to read-only. `readOnly: true` means read-only, `readOnly: false` means read-write — the validator translates it to `allowReadWrite = !readOnly` and logs a warning when it does (`src/modules/mount-security/index.ts`, `normalizeRoot`). Likewise, a top-level `nonMainReadOnly` field may appear in configs written by setup, but the mount validator doesn't read it.
 </Note>
 
-The allowlist is cached in memory, so restart the service after changes.
+The allowlist is re-read whenever its file changes (the host compares the file's modification time on each mount check), so edits apply to the next container start without a service restart. A broken edit blocks additional mounts until you fix the file.
 
 ## Restrict who can talk to your agents
 
@@ -74,7 +74,7 @@ Each messaging group carries an `unknown_sender_policy` that decides what happen
 | `decline_notify` | For an unknown DM sender, the bot sends a short polite decline and sends an owner or admin a one-line FYI. Repeated attempts are deduplicated for 24 hours. On a group chat this behaves as `strict`, with no public decline or FYI. |
 | `public` | Anyone can talk to the agent — the access check is skipped entirely. |
 
-Channels auto-created by the router (someone @mentions or DMs the bot in an unwired chat) get `request_approval`. To harden a chat to silent-drop:
+Channels auto-created by the router (someone @mentions or DMs the bot in an unwired chat) get the `unknown_sender_policy` their adapter declares for a DM or a group chat. Most adapters declare `request_approval`; a few differ (for example Slack DMs use `decline_notify`, Signal and iMessage use `strict`, the CLI and local web channels use `public`), and an adapter that declares nothing gets `request_approval`. To harden a chat to silent-drop:
 
 ```bash
 ncl messaging-groups update --id <mg-id> --unknown-sender-policy strict
@@ -86,11 +86,9 @@ Sender approvals are handled entirely through the DM card — there's no `ncl` r
 
 Slash commands are classified on the host before they ever reach a container:
 
-- **Filtered commands** (`/start`, `/help`, `/login`, `/logout`, `/doctor`, `/config`, `/remote-control`) are dropped silently — they manipulate host-side CLI state and never reach the agent.
-- **Admin commands** (`/clear`, `/compact`, `/context`, `/cost`, `/files`, `/upload-trace`) require the sender to hold an `owner` or `admin` role in `user_roles`; everyone else gets a "Permission denied" reply.
+- **Filtered commands** (`/start`, `/help`, `/login`, `/logout`, `/doctor`, `/config`, `/remote-control`, and their aliases `/checkup`, `/settings`, `/rc`) are dropped silently — they manipulate host-side CLI state and never reach the agent.
+- **Admin commands** (`/clear`, `/compact`, `/context`, `/cost`, `/files`, `/upload-trace`, and the aliases the Claude SDK accepts for them: `/usage`, `/stats`, `/reset`, `/new`) require the sender to hold an `owner` or `admin` role in `user_roles`; everyone else gets a "Permission denied" reply. A command is recognised the same way however it is typed, for example with the `@botname` that Telegram appends in group chats.
 - Everything else passes through unchanged.
-
-If the permissions module isn't installed (no `user_roles` table), admin commands are allowed for everyone — install the module to get the role check.
 
 ## Cap container resources
 
@@ -114,19 +112,19 @@ Some of the container's posture isn't configurable at all. Every spawn gets the 
 - **`--init`** — Docker's own init runs as PID 1 and forwards signals to the agent runner. Not optional: the spawn's `--entrypoint bash` override defeats the image's tini, and Linux discards default-action signals sent to PID 1, so without it SIGTERM would be ignored and every `docker stop` would end in SIGKILL after the full grace period.
 - **`--shm-size=1g`** — Docker defaults `/dev/shm` to 64 MB, which silently short-writes past that size. `agent-browser` passes `--disable-dev-shm-usage`, but a third-party Puppeteer or Playwright launcher inside the container may not.
 
-The agent image adds one more that isn't a flag: the build strips the setuid-root bit from every binary Debian ships (`mount`, `su`, `passwd`, and friends), none of which an unprivileged agent needs (`container/Dockerfile:125`).
+The agent image adds one more that isn't a flag: the build strips the setuid-root bit from every binary Debian ships (`mount`, `su`, `passwd`, and friends), none of which an unprivileged agent needs (`container/Dockerfile:139`).
 
 ## Hardened image option
 
 The fresh-install wizard recommends the pre-built, patched image when available for the selected provider. Building locally remains an explicit choice and a fallback — see [Get started with the Echo hardened runtime](/guides/echo-hardened-runtime).
 
-Every agent image carries a `dev.nanoclaw.image-source` label recording where it actually came from (`container/Dockerfile:148-151`, `setup/lib/registry-state.ts`):
+Every agent image carries a `dev.nanoclaw.image-source` label recording where it actually came from (`container/Dockerfile:164-165`, `setup/lib/registry-state.ts`):
 
 | Value | Meaning |
 |---|---|
 | `local` | Built on this machine from the public base. |
 | `hardened` | Pulled from the gated registry — the vendor's scanned bytes, unmodified. |
-| `derived` | A per-group image built on top of a pulled `hardened` image (a group's `install_packages` adding apt or npm packages). The label is overwritten to `derived` because the added bytes were never scanned by the vendor — a derived image can't keep claiming `hardened` (`src/container-runner.ts:593-600`). |
+| `derived` | A per-group image built on top of a pulled `hardened` image (a group's `install_packages` adding apt or npm packages). The label is overwritten to `derived` because the added bytes were never scanned by the vendor — a derived image can't keep claiming `hardened` (`src/container-runner.ts:1513-1514`). |
 
 A second label, `dev.nanoclaw.agent-runner-lock-sha256`, records which `container/agent-runner/bun.lock` the baked `node_modules` was built from. `container/pull.sh` checks it before retagging. A missing label fails unless `NANOCLAW_ALLOW_UNLABELED_IMAGE=true`; a mismatched label currently prints a warning and continues. Upstream marks that mismatch allowance temporary. A wrong image architecture still fails. See the [hardened runtime guide](/guides/echo-hardened-runtime) for the exact warning and local-build fallback.
 
