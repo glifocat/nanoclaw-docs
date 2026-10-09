@@ -4,7 +4,7 @@ description: "Every ncl resource, verb, flag, enum, and default — extracted fr
 keywords: ["ncl", "cli", "reference", "commands", "flags", "groups", "wirings", "sessions", "roles", "members", "destinations", "approvals", "cli_scope"]
 ---
 
-{/* verified-against: src/cli/dispatch.ts, src/cli/crud.ts, src/cli/client.ts, src/cli/format.ts, src/cli/transport-errors.ts, src/cli/registry.ts, src/cli/frame.ts, src/cli/commands/help.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,policies,roles,sessions,tasks,user-dms,users,wirings}.ts, src/channels/channel-defaults.ts, src/modules/cross-session-context/{index,history}.ts, bin/ncl @ dce271c6; template behavior @ 20d61af */}
+{/* verified-against: src/cli/{dispatch,guard,registry,crud,args,parse-argv,client,format,frame,transport-errors,stdin-json,socket-server,help-render}.ts, src/cli/commands/{help,index,status}.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,policies,roles,sessions,tasks,user-dms,users,wirings,index}.ts, src/channels/channel-defaults.ts, src/types.ts, src/container-config.ts, src/host-sweep.ts, src/templates/{create-agent,local-dir}.ts, src/modules/cross-session-context/history.ts, src/modules/scheduling/create.ts, setup/service.ts, bin/ncl @ 7203e00d (v2026.10.0) */}
 
 {/* verified-against (scoped correction): src/cli/resources/{tasks,groups}.ts, src/modules/permissions/user-dm.ts, src/channels/chat-sdk-bridge.ts @ b76fcb3d */}
 {/* verified-against (scoped correction) — tasks synopsis flags: src/cli/resources/tasks.ts @ 143db6c9 (v2.4.0) */}
@@ -14,7 +14,7 @@ Exhaustive reference for the `ncl` admin CLI. For a task-oriented walkthrough, s
 ## Invocation
 
 ```bash
-ncl <resource> <verb> [target] [--key value ...] [--json]
+ncl <resource> <verb> [target] [--key value ...] [--stdin-json] [--json]
 ```
 
 `bin/ncl` resolves the project root and execs the client via `tsx` — symlink it onto your `PATH` (`ln -s "$(pwd)/bin/ncl" /usr/local/bin/ncl`) or run `pnpm ncl ...` from the checkout. The client sends one request frame over the Unix socket at `data/ncl.sock` and exits.
@@ -22,14 +22,15 @@ ncl <resource> <verb> [target] [--key value ...] [--json]
 Conventions that apply to every command:
 
 - **Positional IDs keep their dashes.** The dispatcher matches the longest registered command that prefixes the words, and everything after it is the target ID — dashes intact. `ncl groups get abc123` and `ncl tasks cancel task-374f-…-442` both resolve; `--id <uuid>` still works everywhere.
-- **Kebab and snake case are interchangeable.** `--agent-group-id` and `--agent_group_id` are the same flag; hyphens normalize to underscores.
+- **Kebab and snake case are interchangeable.** `--agent-group-id` and `--agent_group_id` are the same flag; hyphens normalize to underscores. Passing both spellings with different values is an error.
+- **`--stdin-json`** reads one JSON object (up to 64 KiB) from piped stdin and merges it with the flags. Keys can come from only one source; a key given on both argv and stdin is an error.
 - **`list` accepts column filters and `--limit`.** Any non-generated column is a filter (`ncl sessions list --container-status running`), except a column literally named `id` — the list handler always skips the `id` arg, so `ncl users list --id ...` is silently ignored (affects users). Filters combine with AND. Default `--limit` is 200 (minimum 1). No ordering or offset flags.
 - **`get`, `update`, `delete` require `--id`** — the value of the resource's ID column.
 - **`create` validates enums, applies defaults, auto-generates** the UUID primary key and `*_at` timestamps.
 - **`update` requires at least one updatable column flag**, validates enums, and returns the full updated row.
 - **`--json`** prints the raw response frame; default output is an aligned table for lists, pretty JSON otherwise, `error (<code>): <message>` on failure.
 - **Exit codes:** `0` success, `1` command error, `2` transport error (host unreachable, missing command).
-- **Error codes** in response frames: `unknown-command`, `invalid-args`, `forbidden`, `approval-pending`, `handler-error`, `transport-error` (plus reserved `permission-denied`, `not-found`).
+- **Error codes** in response frames: `unknown-command`, `invalid-args`, `forbidden`, `approval-pending`, `handler-error`, `transport-error`.
 - **Help is introspected:** `ncl help` lists resources and verbs; `ncl <resource> help` shows its fields, enums, and defaults.
 
 ## Access control
@@ -53,7 +54,7 @@ In-flight approval cards waiting for an admin response. Read-only; rows are dele
 | list | `ncl approvals list [--<column> <value>] [--limit N]` | open |
 | get | `ncl approvals get --id <approval-id>` | open |
 
-Columns (all usable as list filters): `approval_id`, `session_id`, `request_id`, `action` (e.g. `install_packages`, `add_mcp_server`, `onecli_credential`), `payload` (JSON), `created_at`, `agent_group_id`, `channel_type`, `platform_id`, `platform_message_id`, `expires_at`, `status` (`pending` | `approved` | `rejected` | `expired` | `awaiting_reason`), `approver_user_id`, `title`, `options_json`.
+Columns (all usable as list filters): `approval_id`, `session_id`, `request_id`, `action` (e.g. `install_packages`, `add_mcp_server`, `cli_command`, `gateway_request`), `payload` (JSON), `created_at`, `agent_group_id`, `channel_type`, `platform_id`, `platform_message_id`, `expires_at`, `status` (`pending` | `approved` | `rejected` | `expired` | `awaiting_reason`), `approver_user_id`, `title`, `options_json`.
 
 ## destinations
 
@@ -61,7 +62,7 @@ Per-agent routing entries and ACL — each row lets an agent send to a target (c
 
 | Operation | Invocation | Access |
 | --- | --- | --- |
-| list | `ncl destinations list [--agent-group-id <id>] [...]` | open |
+| list | `ncl destinations list [--agent-group-id <id>]` | open |
 | add | `ncl destinations add --agent-group-id <id> --local-name <name> --target-type <channel\|agent> --target-id <id>` | approval |
 | remove | `ncl destinations remove --agent-group-id <id> --local-name <name>` | approval |
 
@@ -87,16 +88,17 @@ Agent groups — logical agent identities with their own workspace folder, histo
 | get | `ncl groups get --id <id>` | open | |
 | create | `ncl groups create --folder <folder> [--name <name>] [--timezone <iana-id>]` or `ncl groups create --template <ref> [--name <name>] [--timezone <iana-id>] [--id <id>] [--new] [--yes]` | approval | **Without `--template`:** `--folder` required and immutable, `--name` defaults to the folder, idempotent on `--folder` (creating an existing folder returns the existing row), and new ids are prefixed `ag-<uuid>`. **With `--template <ref>`:** stamps from a local [template](/templates/overview) under `templates/`. Combining it with `--folder` is **rejected** — a bare group *is* its folder, a templated group *is* its plugin. The display name is `--name`, else the manifest's `agentName`, else the template ref's leaf folder; the group folder derives from that name, with a random `-XXXXXXXX` suffix on collision. Always creates a new agent, except when updating one this template already made: a group can only be targeted if its workspace holds that plugin's manifest, so a hand-built group or one stamped from another template is rejected. Convergent rather than folder-idempotent: if a group already carries that plugin, the command returns an in-place [update plan](/templates/updating) instead of creating anything — `--yes` applies it, `--id` picks the target when several groups carry it, and `--new` forces a fresh stamp. `--name` and `--timezone` apply only when a group is created; both are ignored on an in-place update. Reader notices come back as `templateReport` on a create, and as `report` on an update. |
 | update | `ncl groups update --id <id> --name <name>` | approval | `name` is the only updatable column. |
-| delete | `ncl groups delete --id <id>` | approval | Custom cascading handler (not the generic single-table delete): removes sessions, destinations, approvals, role grants, memberships, and wirings in one FK-ordered transaction. Does **not** kill running containers or clean up `groups/<folder>/` and `data/v2-sessions/<id>/` on disk. |
+| delete | `ncl groups delete --id <id>` | approval | Custom cascading handler (not the generic single-table delete): removes sessions, destinations, approvals, role grants, memberships, and wirings in one FK-ordered transaction. The host sweep stops the group's running containers within about a minute. It does **not** clean up `groups/<folder>/` and `data/v2-sessions/<id>/` on disk, and the leftover `groups/<folder>/` blocks creating a new group with the same `--folder` until you move or remove it. |
 | restart | `ncl groups restart --id <id> [--rebuild] [--message <text>]` | approval | Host caller: restarts all running containers in the group. Agent caller: `--id` auto-filled, only the calling session restarts. `--rebuild` rebuilds the image first (required after package changes). `--message` queues an on-wake instruction so the fresh container starts and acts on it; without it the container stays stopped until the next user message. |
-| config get | `ncl groups config get --id <id>` | open | Shows `agent_group_id`, `provider`, `model`, `effort`, `image_tag`, `assistant_name`, `max_messages_per_prompt`, `skills`, `mcp_servers`, `packages_apt`, `packages_npm`, `additional_mounts`, `cli_scope`, `timezone`, `updated_at`. |
-| config update | `ncl groups config update --id <id> [--provider] [--model] [--effort] [--image-tag] [--assistant-name] [--max-messages-per-prompt] [--cli-scope <disabled\|group\|global>] [--timezone <iana-id>]` | approval | At least one flag required. Most changes take effect after `ncl groups restart`; `--timezone` grounds task scheduling immediately (empty string clears it back to the install default). |
+| config get | `ncl groups config get --id <id>` | open | Shows `agent_group_id`, `provider`, `model`, `effort`, `speed`, `image_tag`, `assistant_name`, `max_messages_per_prompt`, `skills`, `mcp_servers`, `packages_apt`, `packages_npm`, `additional_mounts`, `cli_scope`, `timezone`, `updated_at`. |
+| config update | `ncl groups config update --id <id> [--provider] [--model] [--effort] [--speed <tier>] [--image-tag] [--assistant-name] [--max-messages-per-prompt] [--cli-scope <disabled\|group\|global>] [--timezone <iana-id>]` | approval | At least one flag required. Most changes take effect after `ncl groups restart`; `--timezone` grounds task scheduling immediately (empty string clears it back to the install default). `--speed` must be a speed tier the group's provider declares (Claude: `standard`, `fast`); an empty string clears it back to the install default, and a provider that declares no tiers accepts only the empty string. |
 | config add-mcp-server | `ncl groups config add-mcp-server --id <id> --name <server> --command <cmd> [--args <json-array>] [--env <json-object>]` or `--url <url> [--headers <json-object>]` | approval | Exactly one of `--command`/`--url`. Server name: 1-64 chars of `[A-Za-z0-9_-]`. `--url` is a remote Streamable HTTP endpoint — HTTPS required (plain HTTP only for localhost / `host.docker.internal`), and URLs with embedded credentials, fragments, or secret-looking query params are rejected. Restart required to take effect. |
 | config remove-mcp-server | `ncl groups config remove-mcp-server --id <id> --name <server>` | approval | Restart required to take effect. |
 | config add-package | `ncl groups config add-package --id <id> --apt <pkg> \| --npm <pkg>` | approval | At least one of `--apt`/`--npm`. Requires `ncl groups restart --rebuild`. |
 | config remove-package | `ncl groups config remove-package --id <id> --apt <pkg> \| --npm <pkg>` | approval | Requires `ncl groups restart --rebuild`. |
 | config add-mount | `ncl groups config add-mount --id <id> --host <host-path> --container <container-path> [--ro]` | approval | **Host-only** — never runnable from inside a container (mounting host paths is a filesystem-access boundary). Adds a bind mount to `additional_mounts`; `--ro` makes it read-only. Restart required to take effect. |
 | config remove-mount | `ncl groups config remove-mount --id <id> --host <host-path> --container <container-path>` | approval | Host-only. Removes the matching mount. Restart required to take effect. |
+| connect | `ncl groups connect [--id <id>] --host <host>` | open | Returns the selected gateway's account-connection step for the given host. It does not grant credentials or change policy. Inside a container `--id` is always the caller's own group; on the host `--id` is required. |
 
 `add-mcp-server` and `remove-mcp-server` refuse to touch a server owned by a stamped [template](/templates/overview) — update the template and [restamp](/templates/updating) instead. A plugin-owned server removed by hand reappears on the next restamp.
 
@@ -192,7 +194,7 @@ Scheduled tasks — the CLI home for what used to be the agent's `schedule_task`
 | `--process-after` | First/next run time — ISO 8601, offset, or naive-local in the group timezone (falling back to the install timezone). Required for one-shots; with `--recurrence` the first run is derived from the cron grid. |
 | `--recurrence` | Cron expression, evaluated in the group timezone (falling back to the install timezone). On `update`, `"null"`/`"none"` clears it (back to one-shot). Recurrences over 4 fires/day are refused unless the task has a `--script` gate or you pass `--dangerously-override-recurrence-limit`. |
 | `--name` | Short label folded into a readable series id (`<slug>-<hex>`). |
-| `--script` | Pre-task gate bash script — runs first; the agent only wakes if the script's last stdout line is JSON with `"wakeAgent": true`. |
+| `--script` | Pre-task gate bash script — runs first; the agent only wakes if the script's last stdout line is JSON with `"wakeAgent": true`. A script that errors repeatedly delays the series' next fire to at least 2, 4, 8, ... up to 60 minutes after the failure (a later cron time still wins), each errored fire counting as a failed run; after 8 consecutive failed runs the series is paused with a note in its run log. Fix the script, then `ncl tasks resume <id>`. A deliberate `wakeAgent: false` is a normal run and never backs off. |
 | `--group` | Agent group id (host callers). Auto-filled to the caller's own group inside a container. |
 | `--all` | On `cancel`, the kill switch — cancels every live task in scope. |
 | `--msg` | On `append-log`, the note to add. Inside a task run, `--id` is auto-derived from the caller's session. |
@@ -247,5 +249,5 @@ Connects a messaging group to an agent group — which agent handles which chat.
 | `--engage-pattern` | string | Updatable. Regex, required when `engage_mode=pattern`; use `.` for always-on. Ignored in mention modes. |
 | `--sender-scope` | enum | Updatable, default `all`. `all` — any sender (subject to `unknown_sender_policy`). `known` — only users with a role or membership in the agent group. |
 | `--ignored-message-policy` | enum | Updatable, default `drop`. `drop` — agent never sees non-engaging messages. `accumulate` — stored as background context so the agent has prior context when triggered. |
-| `--session-mode` | enum | Updatable, default `shared`. `shared` — one session per (agent, messaging group). `per-thread` — one per thread/topic. `agent-shared` — one across all messaging groups wired to the agent. Threaded adapters in group chats force per-thread regardless, unless `--threads false` disables threads for the wiring. |
+| `--session-mode` | enum | Updatable, default `shared`. `shared` — one session per (agent, messaging group). `per-thread` — one per thread/topic; rejected when the wiring's thread policy resolves off (an explicit `--threads false`, or a channel context that does not honor threads), so pair it with `--threads true` where needed. `agent-shared` — one across all messaging groups wired to the agent. Threaded adapters in group chats force per-thread regardless, unless `--threads false` disables threads for the wiring. |
 | `--threads` | boolean | Updatable. Per-wiring thread override: `true`/`false` (or `1`/`0`). Omitted (`NULL`) inherits the channel adapter's declared thread default for the context. Hard-ANDed with the adapter's raw capability at router fanout — it can disable threads on a threaded platform, but never enable them on a non-threaded one. Disabling also lifts the per-thread session-mode forcing above. |

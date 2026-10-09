@@ -5,6 +5,7 @@ keywords: ["troubleshooting", "debugging", "dropped messages", "container spawn"
 ---
 
 {/* verified-against (scoped correction) — webhook port source and listen failure: src/config.ts, src/webhook-server.ts @ 143db6c9 (v2.4.0) */}
+{/* verified-against (scoped correction): session end logs, wakeContainer retry message, egress lockdown errors: src/container-runner.ts, src/drivers/docker-driver.ts, src/host-sweep.ts, src/egress-lockdown.ts, src/gateway-approval-coordinator.ts, .claude/skills/add-onecli/payload/src/gateway-providers/onecli.ts @ 7203e00d (v2026.10.0) */}
 {/* verified-against: .claude/skills/debug/SKILL.md, src/container-runtime.ts, src/container-runner.ts, src/host-sweep.ts, src/upgrade-state.ts, src/log.ts, src/cli/resources/dropped-messages.ts, src/cli/resources/sessions.ts, src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/webhook-server.ts, src/circuit-breaker.ts, setup/service.ts @ 4e83a0a0; template behavior @ 20d61af; driver diagnostics and reconciliation: src/container-runner.ts, src/drivers/docker-driver.ts, src/host-sweep.ts, src/reconcile-session.ts, src/cli/resources/groups.ts, src/db/coordination.ts @ b76fcb3d */}
 
 ## Start here
@@ -79,7 +80,7 @@ Trace the message through the pipeline, in order:
     `stopped` is normal between messages — the sweep restarts the container when due messages arrive. If nothing spawns at all, see [Container won't spawn](#container-wont-spawn) below.
   </Step>
   <Step title="Did the agent produce a reply?">
-    Inspect the session DBs (`inbound.db` / `outbound.db` under `data/v2-sessions/<group>/<session>/`). The `/debug` skill walks you through the exact queries. A `Container exited non-zero` warning in the host log carries the exit `code` and a `stderrTail` — the last ~10 lines of container stderr — which is where a boot failure usually shows. A clean or signal-killed exit logs `Container exited` at info level instead.
+    Inspect the session DBs (`inbound.db` / `outbound.db` under `data/v2-sessions/<group>/<session>/`). The `/debug` skill walks you through the exact queries. A `Container exited non-zero` warning in the host log carries the exit `code` and a `stderrTail` — the last ~10 lines of container stderr — which is where a boot failure usually shows. A session that ends without a failure, or whose container died after starting, logs `Session ended` at info level (with the `exitCode` when it is known); any other failure logs `Session failed` at error level with a `kind` and whether it is `retryable`.
   </Step>
 </Steps>
 
@@ -87,8 +88,8 @@ Trace the message through the pipeline, in order:
 
 The first two of these abort the spawn; a rejected mount only degrades it (the container starts without that mount). All three appear in `logs/nanoclaw.error.log`:
 
-- **`OneCLI gateway not applied — refusing to spawn container without credentials`** — the host can't wire the credential vault, so it refuses to launch the agent. The message stays pending and the sweep retries every minute; fix the vault connection (is OneCLI reachable at the URL in `ONECLI_URL` in `.env`? on installs where containers reach the gateway it binds the Docker-bridge IP, not `127.0.0.1`) and the spawn recovers on its own. See [Credentials](/operate/credentials).
-- **Egress lockdown errors** — with lockdown enabled, the spawn fails fast rather than run with open egress: `the "<network>" internal network could not be created` or `the OneCLI gateway "<container>" could not be attached to "<network>"`. Check `docker network inspect` for the egress network and see [Hardening](/operate/hardening#lock-down-network-egress).
+- **`wakeContainer failed — host-sweep will retry`** — the host couldn't set up the credential gateway session (or another spawn step failed), so it didn't launch the agent. The `err` field in the log line says why, for example `Gateway session admission is closed: ...` when the gateway is unavailable. The message stays pending and the sweep retries every minute; fix the gateway connection (is OneCLI reachable at the URL in `ONECLI_URL` in `.env`?) and the spawn recovers on its own. See [Credentials](/operate/credentials).
+- **Egress lockdown errors** — with lockdown enabled, the spawn fails fast rather than run with open egress: `the "<network>" internal network could not be created` or `gateway target "<container>" could not be attached to "<network>"`. Check `docker network inspect` for the egress network and see [Hardening](/operate/hardening#lock-down-network-egress).
 - **`Additional mount REJECTED`** — a mount from your group's container config failed allowlist validation. The log line includes the `requestedPath` and `reason`. Fix the allowlist — see [Hardening](/operate/hardening#gate-additional-mounts).
 
 ## Replies are slow
