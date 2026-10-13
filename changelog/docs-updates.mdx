@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Wrap nudge after send_message" description="2026-10-13" tags={["Updated"]}>
+  [Architecture](/concepts/architecture) now describes the current wrap-nudge rule: a `send_message` send or a reaction no longer settles a chat turn, bare final text after one gets a nudge that quotes what already went out, a retry that repeats an earlier send is not sent twice, and a block back to the agent that woke the turn counts as the reply (nanoclaw #3918).
+</Update>
+
 <Update label="Docs checked against v2026.10.0" description="2026-10-09" tags={["Updated", "Fixed"]}>
   Pages across the portal were rechecked against NanoClaw v2026.10.0 and corrected where they had drifted.
 
