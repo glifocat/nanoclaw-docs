@@ -5,6 +5,7 @@ keywords: ["hardening", "security", "egress lockdown", "NANOCLAW_EGRESS_LOCKDOWN
 ---
 
 {/* verified-against: src/egress-lockdown.ts, src/config.ts, src/modules/mount-security/index.ts, src/command-gate.ts, src/slash-command.ts, src/provider-contracts/claude.ts, src/router.ts, src/modules/permissions/{index,guard,sender-approval}.ts, src/modules/approvals/primitive.ts, src/drivers/docker-driver.ts, src/container-runner.ts, container/Dockerfile, container/pull.sh, setup/mounts.ts, setup/index.ts, src/cli/resources/groups.ts, src/cli/guard.ts, src/host-sweep.ts, setup/lib/registry-state.ts, .claude/skills/add-onecli/payload/src/gateway-providers/onecli.ts, .claude/skills/add-iron-proxy/payload/src/gateway-providers/iron-proxy.ts @ 7203e00d (v2026.10.0); channels branch: src/channels/{slack,signal,imessage,cli,local-web,dial,emacs,telegram}.ts @ d73e8f44 */}
+{/* verified-against (scoped correction) — channels-only Slack bot under decline_notify: src/modules/permissions/sender-approval.ts @ 15c6124f; channels branch src/modules/slack-room-membership/membership.ts @ d2407fe3 */}
 
 NanoClaw's isolation boundary is the Docker container: each agent runs in its own container with a scoped workspace mount (see [Container lifecycle](/concepts/container-lifecycle)). There is no micro-VM or alternative sandbox runtime — hardening means tightening what those containers can reach. This page walks the defense-in-depth controls from network to filesystem to people.
 
@@ -71,7 +72,7 @@ Each messaging group carries an `unknown_sender_policy` that decides what happen
 |---|---|
 | `strict` | Message dropped silently and recorded in the dropped-messages log (`ncl dropped-messages list`). |
 | `request_approval` | Message dropped, and an Allow / Deny card is DM'd to an owner or admin. On approve, the sender becomes a group member and the original message is re-routed. Duplicate requests from the same sender are deduplicated while a card is pending. |
-| `decline_notify` | For an unknown DM sender, the bot sends a short polite decline and sends an owner or admin a one-line FYI. Repeated attempts are deduplicated for 24 hours. On a group chat this behaves as `strict`, with no public decline or FYI. |
+| `decline_notify` | For an unknown DM sender, the bot sends a short polite decline and sends an owner or admin a one-line FYI. Repeated attempts are deduplicated for 24 hours. On a group chat this behaves as `strict`, with no public decline or FYI. A Slack bot that is wired only to channels replies with a pointer to those channels instead, once every 24 hours per sender, and sends no FYI; see [Slack](/channels/slack#direct-messages-to-a-channels-only-bot). |
 | `public` | Anyone can talk to the agent — the access check is skipped entirely. |
 
 Channels auto-created by the router (someone @mentions or DMs the bot in an unwired chat) get the `unknown_sender_policy` their adapter declares for a DM or a group chat. Most adapters declare `request_approval`; a few differ (for example Slack DMs use `decline_notify`, Signal and iMessage use `strict`, the CLI and local web channels use `public`), and an adapter that declares nothing gets `request_approval`. To harden a chat to silent-drop:

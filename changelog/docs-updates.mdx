@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Slack: DMs sent through an app, and channels-only bots" description="2026-10-13" tags={["Updated"]}>
+  [Slack](/channels/slack#rooms-and-membership) now covers two direct-message behaviors. A direct message a person sends through an app with their own Slack user token reaches their agent as that person; bot accounts stay blocked (nanoclaw #4072). A bot wired only to channels answers a direct message from its own workspace with a pointer to those channels, once every 24 hours per sender, and sends no owner FYI (nanoclaw #4071). [Hardening](/operate/hardening#restrict-who-can-talk-to-your-agents) notes the channels-only case under `decline_notify`.
+</Update>
+
 <Update label="Wrap nudge after send_message" description="2026-10-13" tags={["Updated"]}>
   [Architecture](/concepts/architecture) now describes the current wrap-nudge rule: a `send_message` send or a reaction no longer settles a chat turn, bare final text after one gets a nudge that quotes what already went out, a retry that repeats an earlier send is not sent twice, and a block back to the agent that woke the turn counts as the reply (nanoclaw #3918).
 </Update>

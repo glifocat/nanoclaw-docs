@@ -8,6 +8,7 @@ tag: "UPDATED"
 
 {/* verified-against: setup/channels/slack-auto.ts, setup/channels/slack-auto-register.ts, setup/channels/run-channel-skill.ts, setup/channels/companions.ts, setup/portal.ts, setup/slack-worker.ts, setup/auto.ts, src/community-portal/slack-job.ts, .claude/skills/slack-agent-flow/scripts/slack-agent-flow-finish.ts, .claude/skills/slack-agent-flow/src/modules/slack-agent-flow/provision.ts, .claude/skills/add-slack/SKILL.md @ 7203e00d (v2026.10.0); channels branch src/channels/{slack,slack-a2a-guard}.ts, src/provisioning/slack-app.ts, .claude/skills/slack-a2a-rooms/src/channels/slack-a2a.ts, .claude/skills/add-slack/SKILL.md, .claude/skills/slack-agent-flow/container/agent-runner/src/mcp-tools/rooms.ts @ d73e8f44 */}
 {/* verified-against (pasted tables, not re-checked in this sweep): channels branch src/channels/{slack,slack-raw-text}.ts @ 6d5c1d08 */}
+{/* verified-against (scoped correction) — direct messages sent through an app, channels-only bot DM reply: channels branch src/channels/{slack,slack-a2a-guard,chat-sdk-bridge}.ts, src/modules/slack-room-membership/membership.ts, src/modules/permissions/sender-approval.ts, src/provisioning/slack-app.ts, .claude/skills/{add-slack,slack-agent-flow}/SKILL.md @ d2407fe3 */}
 
 Give each NanoClaw agent its own identity in Slack. You can talk to an agent in a direct message, bring several agents into one shared room, and use a room canvas as shared working context.
 
@@ -207,6 +208,25 @@ The bot responds automatically in a direct message. In channels and shared rooms
 ### Rooms and membership
 
 The agents feature adds room membership handling. When a Slack user invites an agent bot into a room, NanoClaw can adopt the room and create the required messaging group. The current Chat SDK does not dispatch bot-departure events, so removing a bot does not reliably update its NanoClaw wiring automatically. Shared agent rooms admit bot-authored messages only when the room is on the `SLACK_A2A_ROOMS` allowlist; bot messages remain blocked everywhere else.
+
+One kind of message looks bot-authored but is not. When a person sends a direct message through an app that posts with that person's own Slack user token, Slack adds the app's bot ID to the message. In a direct message, NanoClaw asks Slack whether the author's account is a bot. A person's account passes, and the message is delivered as that person, so the usual access rules for them still apply. A bot account, or an author Slack cannot identify, is still treated as bot-authored. The lookup uses the `users:read` scope, which managed setup and the manual checklist both include. In channels and rooms, these messages are still treated as bot-authored.
+
+### Direct messages to a channels-only bot
+
+With the agents feature, a bot's direct message belongs to the user it was paired with. Anyone else who messages a personal agent gets a short decline, and an owner or admin gets a one-line FYI.
+
+A bot that is wired only to channels, all for one agent group, has no paired user. When someone in the bot's own Slack workspace sends it a direct message, it points them to its channels instead:
+
+```text
+I'm <name>. I answer in <#channel>, ask me there.
+```
+
+`<name>` is the agent's assistant name, or the agent group name when none is set. Slack shows each `<#channel>` as a channel link. The reply lists every wired channel the bot is still in. If it has left them all, it says `I'm <name>. I only answer in channels, and I'm not in any right now.`
+
+- Each sender gets this reply at most once every 24 hours.
+- No FYI is sent to an owner or admin.
+- A sender from outside the bot's workspace gets no reply. The same applies when Slack cannot confirm the sender's workspace.
+- The message is not routed to the agent. It is recorded in `ncl dropped-messages list` with the reason `unknown_sender_decline_notify`.
 
 ### Canvases
 
