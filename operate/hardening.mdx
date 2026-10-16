@@ -6,6 +6,7 @@ keywords: ["hardening", "security", "egress lockdown", "NANOCLAW_EGRESS_LOCKDOWN
 
 {/* verified-against: src/egress-lockdown.ts, src/config.ts, src/modules/mount-security/index.ts, src/command-gate.ts, src/slash-command.ts, src/provider-contracts/claude.ts, src/router.ts, src/modules/permissions/{index,guard,sender-approval}.ts, src/modules/approvals/primitive.ts, src/drivers/docker-driver.ts, src/container-runner.ts, container/Dockerfile, container/pull.sh, setup/mounts.ts, setup/index.ts, src/cli/resources/groups.ts, src/cli/guard.ts, src/host-sweep.ts, setup/lib/registry-state.ts, .claude/skills/add-onecli/payload/src/gateway-providers/onecli.ts, .claude/skills/add-iron-proxy/payload/src/gateway-providers/iron-proxy.ts @ 7203e00d (v2026.10.0); channels branch: src/channels/{slack,signal,imessage,cli,local-web,dial,emacs,telegram}.ts @ d73e8f44 */}
 {/* verified-against (scoped correction) — channels-only Slack bot under decline_notify: src/modules/permissions/sender-approval.ts @ 15c6124f; channels branch src/modules/slack-room-membership/membership.ts @ d2407fe3 */}
+{/* verified-against (scoped correction) — sweep timer env overrides NANOCLAW_ABSOLUTE_CEILING_MS / NANOCLAW_CLAIM_STUCK_MS: src/{config,reconcile-session}.ts @ 2105169d */}
 
 NanoClaw's isolation boundary is the Docker container: each agent runs in its own container with a scoped workspace mount (see [Container lifecycle](/concepts/container-lifecycle)). There is no micro-VM or alternative sandbox runtime — hardening means tightening what those containers can reach. This page walks the defense-in-depth controls from network to filesystem to people.
 
@@ -102,7 +103,7 @@ These limits bound what a runaway agent can consume. All three can be set in `.e
 | `CONTAINER_PIDS_LIMIT` | `2048` | Process/thread cap per container, passed to `docker create --pids-limit`. Unlike the other two this one is **on by default**, as a fork-bomb backstop. cgroups v2 counts threads rather than processes and a browsing agent with several tabs open runs into the high hundreds, so the default sits well clear of normal use. Set it to `0` (or any non-numeric value) to drop the cap. |
 
 <Note>
-There is no env var for a container-count or output-size cap, and no concurrency-cap env var — `CONTAINER_TIMEOUT`, `IDLE_TIMEOUT`, `CONTAINER_MAX_OUTPUT_SIZE`, and `MAX_CONCURRENT_CONTAINERS` were removed from the code. Idle/stuck containers are now caught by the periodic host-sweep loop (`src/host-sweep.ts`) — see [Container killed mid-task](/operate/troubleshooting#container-killed-mid-task).
+There is no env var for a container-count or output-size cap, and no concurrency-cap env var — `CONTAINER_TIMEOUT`, `IDLE_TIMEOUT`, `CONTAINER_MAX_OUTPUT_SIZE`, and `MAX_CONCURRENT_CONTAINERS` were removed from the code. Idle/stuck containers are now caught by the periodic host-sweep loop (`src/host-sweep.ts`), whose two kill timers can be raised with `NANOCLAW_ABSOLUTE_CEILING_MS` and `NANOCLAW_CLAIM_STUCK_MS` — see [Container killed mid-task](/operate/troubleshooting#container-killed-mid-task).
 </Note>
 
 ## Always-on container hardening

@@ -8,6 +8,7 @@ keywords: ["architecture", "host process", "router", "delivery", "host sweep", "
 {/* verified-against (scoped correction) — wrap nudge after tool sends, retry repeat guard, agent-reply rule: container/agent-runner/src/poll-loop.ts @ 15c6124f */}
 {/* verified-against (scoped correction) — mailbox and central-store seams, instance lookup, reconciliation, claims and heartbeat fallback: src/{index,router,host-sweep,reconcile-session,container-runner}.ts, src/mailbox/{compose,sqlite/session-db}.ts, src/db/compose.ts @ b76fcb3d */}
 {/* verified-against (scoped correction): startup order, gateway selection, orphan sweep: src/index.ts, src/host-sweep.ts, src/container-runner.ts, src/gateway-providers/index.ts @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction) — sweep timer env overrides NANOCLAW_ABSOLUTE_CEILING_MS / NANOCLAW_CLAIM_STUCK_MS: src/{config,reconcile-session}.ts @ 2105169d */}
 
 NanoClaw is one Node.js host process plus one Docker container per active session. The host owns the channels, the routing, and the container lifecycle; the agent runs inside the container and never touches the messaging platforms — that traffic is all host. (The agent's own network egress is a separate matter: open by default, [lockable](/operate/hardening#lock-down-network-egress).) Between them sits the core idea: **every message is a row in SQLite**. The shipped mailbox uses a SQLite pair: the host writes rows the container reads, and the container writes rows the host reads. Mailbox storage, the central database, and the session runtime each sit behind a separate implementation seam. Host-side message writes and runtime exit events also enqueue reconciliation; periodic polling and resync recover when those hints are lost.
 
@@ -120,11 +121,11 @@ The host sweep (`src/host-sweep.ts`) feeds a keyed workqueue: message writes and
 
 1. **Syncs `processing_ack`** from `outbound.db` into `messages_in` status, so completed work is recorded on the host side.
 2. **Wakes containers for due work** — rows whose `process_after` has elapsed (scheduled tasks, retries) with no container running.
-3. **Enforces the running-container SLA** — kills a container whose heartbeat is older than max(30 minutes, its declared Bash timeout), or one that claimed a message and showed no heartbeat for over max(60 seconds, its declared Bash timeout) since the claim. If no heartbeat file exists yet, the ceiling uses the tracked spawn or adoption time.
+3. **Enforces the running-container SLA** — kills a container whose heartbeat is older than max(30 minutes, its declared Bash timeout), or one that claimed a message and showed no heartbeat for over max(60 seconds, its declared Bash timeout) since the claim. If no heartbeat file exists yet, the ceiling uses the tracked spawn or adoption time. `NANOCLAW_ABSOLUTE_CEILING_MS` and `NANOCLAW_CLAIM_STUCK_MS` change the 30-minute and 60-second values install-wide, each on its own; a longer declared Bash timeout still wins over either.
 4. **Cleans up after crashes** — `processing` rows left by a dead container are reset to pending with exponential backoff (5s × 2^tries); after 5 tries a message is marked failed.
 5. **Advances recurring tasks** — completed recurring rows are cloned into their next occurrence (see [Scheduled tasks](/guides/scheduled-tasks)).
 
-There is deliberately no wall-clock idle timeout: liveness is judged from the heartbeat file and claim age, so long-running legitimate work is never killed on a timer.
+There is deliberately no limit on total run time: liveness is judged from the heartbeat file and claim age, so long-running work that keeps reporting events is not killed. A model that stays silent for longer than the ceiling is killed; `NANOCLAW_ABSOLUTE_CEILING_MS` raises that limit.
 
 ## The two database layers
 

@@ -6,6 +6,7 @@ tag: "UPDATED"
 ---
 
 {/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/install-slug.ts, src/drivers/index.ts, src/gateway-providers/index.ts, src/gateway-read-policy.ts, src/egress-lockdown.ts, src/container-config.ts, src/db/container-configs.ts, src/db/migrations/015-cli-scope.ts, src/providers/claude.ts, setup/service.ts, setup/container.ts, setup/lib/registry-state.ts, container/pull.sh, .claude/skills/add-onecli/payload/src/gateway-providers/onecli.ts @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction) — sweep timer env overrides NANOCLAW_ABSOLUTE_CEILING_MS / NANOCLAW_CLAIM_STUCK_MS: src/{config,reconcile-session}.ts @ 2105169d */}
 
 NanoClaw has two configuration layers:
 
@@ -41,6 +42,8 @@ Variables come from two sources, and the distinction matters:
 | `NANOCLAW_EGRESS_LOCKDOWN` | `false` | Set `true` to force all agent traffic through the selected credential gateway (OneCLI or Iron Proxy) on an internal Docker network. Fails fast if the gateway isn't running. Can be set in `.env` or the process environment. See [Hardening](/operate/hardening). |
 | `NANOCLAW_EGRESS_NETWORK` | `nanoclaw-egress` | Name of the locked-down Docker network. Can be set in `.env` or the process environment. |
 | `ONECLI_GATEWAY_CONTAINER` | `onecli` | Name of the gateway container attached as the only egress hop. Can be set in `.env` or the process environment. |
+| `NANOCLAW_ABSOLUTE_CEILING_MS` | `1800000` (30 minutes) | Milliseconds a running container can go without a heartbeat before the host sweep kills it. A whole number from `60000` (1 minute) to `86400000` (24 hours); any other value is logged and ignored, and the default applies. Raise it when a slow model, often a local one, stays silent for a long time inside one turn. Process environment first, then `.env`. Read when the host starts. Added after v2026.10.0. See [Container killed mid-task](/operate/troubleshooting#container-killed-mid-task). |
+| `NANOCLAW_CLAIM_STUCK_MS` | `60000` (60 seconds) | Milliseconds a container can hold a message it picked up, with no heartbeat since, before the host sweep kills it. A whole number from `10000` (10 seconds) to `86400000` (24 hours); any other value is logged and ignored, and the default applies. Raise it only when the agent takes longer than this to report its first event after picking up a message. Independent of `NANOCLAW_ABSOLUTE_CEILING_MS`. Process environment first, then `.env`. Read when the host starts. Added after v2026.10.0. |
 | `ANTHROPIC_BASE_URL` | — | Custom Anthropic-compatible endpoint for the Claude provider. Only active when setup has configured a custom endpoint; the real auth token stays on the host and is injected by the OneCLI proxy. |
 
 ### Host and setup settings
@@ -60,7 +63,7 @@ Host-only settings need the service environment or an exported value in your dev
 See the [environment variables reference](/reference/environment-variables) for the full list.
 
 <Note>
-`CONTAINER_TIMEOUT`, `IDLE_TIMEOUT`, `MAX_CONCURRENT_CONTAINERS`, `CONTAINER_MAX_OUTPUT_SIZE`, and `MAX_MESSAGES_PER_PROMPT` were removed from the code and are no longer read — setting any of them has no effect. Container idle/stuck detection is now handled by the periodic host-sweep loop (`src/host-sweep.ts`), not a per-container timeout env var.
+`CONTAINER_TIMEOUT`, `IDLE_TIMEOUT`, `MAX_CONCURRENT_CONTAINERS`, `CONTAINER_MAX_OUTPUT_SIZE`, and `MAX_MESSAGES_PER_PROMPT` were removed from the code and are no longer read — setting any of them has no effect. Container idle/stuck detection is now handled by the periodic host-sweep loop (`src/host-sweep.ts`), not a per-container timeout env var. The sweep's two kill timers are set install-wide with `NANOCLAW_ABSOLUTE_CEILING_MS` and `NANOCLAW_CLAIM_STUCK_MS` (above).
 </Note>
 
 **Network and logging**
