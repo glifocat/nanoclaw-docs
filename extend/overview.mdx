@@ -1,11 +1,12 @@
 ---
 title: "Skills: how NanoClaw extends itself"
-description: "What a NanoClaw skill is in v2 — SKILL.md workflows that a coding harness executes in your checkout, fetching code additively from registry branches. Never a git merge."
-keywords: ["skills", "extend", "SKILL.md", "registry branches", "channels branch", "providers branch", "REMOVE.md", "container skills", "additive fetch"]
+description: "What a NanoClaw skill is in v2 — SKILL.md workflows that a coding harness executes in your checkout, copying code in additively from a registry branch or the skill's own folder. Never a git merge."
+keywords: ["skills", "extend", "SKILL.md", "registry branch", "channels branch", "skill payload", "REMOVE.md", "container skills", "additive fetch"]
 ---
 
 {/* verified-against: CONTRIBUTING.md, docs/skills-model.md, docs/skill-guidelines.md, .claude/skills/{add-telegram,add-codex,add-tavily-tool,manage-mounts}/SKILL.md, .claude/skills/add-telegram/REMOVE.md, container/skills/, src/container-runner.ts, setup/providers/index.ts, setup/channels/run-channel-skill.ts @ 639577c3 */}
 {/* verified-against (scoped correction): provider registry branches and provider barrels: .claude/skills/{add-codex,add-opencode}/SKILL.md, src/providers/index.ts, src/provider-contracts/index.ts, container/agent-runner/src/{providers,provider-contracts}/index.ts, setup/providers/index.ts @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction): provider payloads on main: .claude/skills/{add-codex,add-opencode}/SKILL.md, .claude/skills/add-codex/payload/**, scripts/update-skills.ts @ 5878d9e7 (nanocoai/nanoclaw#4104) */}
 
 A NanoClaw skill is a **SKILL.md instruction workflow** in `.claude/skills/` that a coding harness (Claude Code, Codex, OpenCode) executes in your checkout. When you invoke `add-telegram` or `manage-mounts`, the coding harness reads the skill's instructions and performs them: copying files, appending an import, installing a dependency, running a test. There is no manifest.yaml and no skill state file. The skill *is* the markdown — the mechanical steps in trunk install skills also carry `nc:` directive fences, so the setup wizard can apply the same document a coding harness would read, and anything it can't apply mechanically falls back to the prose beside it. Two readers, one document.
 
@@ -17,7 +18,7 @@ This is how the trunk stays small: it ships channel and provider *infrastructure
 
 ## How a code-carrying skill installs
 
-Channel adapters live on the long-lived `channels` **registry branch**, and provider payloads live on the `providers` branch or inside the provider skill itself (`/add-opencode` carries its payload in its own `payload/` folder on `main`). The install skill fetches or copies the files in — it never merges a branch. Using `/add-telegram` as the canonical example:
+Channel adapters live on the long-lived `channels` **registry branch**. Provider code lives inside each provider skill, in its own `payload/` folder on `main`. The install skill fetches or copies the files in — it never merges a branch. Using `/add-telegram` as the canonical example:
 
 <Steps>
   <Step title="Fetch the registry branch">
@@ -39,7 +40,7 @@ Channel adapters live on the long-lived `channels` **registry branch**, and prov
 
 Three properties hold across every install skill:
 
-- **Additive fetch, never a merge.** Merging a registry branch into a customized install is exactly the conflict fight this model exists to avoid. The skill copies in only the files it needs.
+- **Additive, never a merge.** Merging a registry branch into a customized install is exactly the conflict fight this model exists to avoid. The skill copies in only the files it needs.
 - **Idempotent.** Every step guards itself, and the `nc:` directives are idempotent by construction (`copy` overwrites, `append` skips-if-present). Re-running a half-applied install completes it instead of breaking it.
 - **Reversible via REMOVE.md.** Skills that leave anything behind ship a `REMOVE.md` alongside the `SKILL.md` that reverses every change — delete the copied files, remove the barrel import, uninstall the package, rebuild. No `git revert` involved.
 
@@ -54,12 +55,12 @@ The `/name` form below is Claude Code's. Codex invokes the same skill as `$add-t
 | Category | Example | What installing looks like |
 | --- | --- | --- |
 | **Channel installs** | `/add-telegram` | The flow above: copy the adapter from the `channels` branch, append the barrel import, pin the dependency, run the registration test. See [Channels overview](/channels/overview). |
-| **Provider installs** | `/add-codex` | Same fetch-and-copy pattern, but multi-point: a provider spans the host, the container's agent-runner, and setup, plus a provider contract on the host and container sides. `/add-codex` copies its files from the `providers` branch; `/add-opencode` ships its files inside the skill. Either skill appends one import to each of the five provider and contract barrels, pins its CLI in `container/cli-tools.json`, and runs registration guards. See [Providers](/extend/providers). |
+| **Provider installs** | `/add-codex` | Same copy-in pattern, but multi-point: a provider spans the host, the container's agent-runner, and setup, plus a provider contract on the host and container sides. `/add-codex` and `/add-opencode` copy their files from the skill's own `payload/` folder (in v2026.10.0 and earlier, `/add-codex` copies from the locked `providers` branch). Either skill appends one import to each of the five provider and contract barrels, pins its CLI in `container/cli-tools.json`, and runs registration guards. See [Providers](/extend/providers). |
 | **Tool installs** | `/add-tavily-tool` | Wires an MCP server into selected agent groups: pins the `mcp-remote` bridge in the container manifest and registers the server per group with `ncl groups config add-mcp-server`, giving the agent `tavily_search` and `tavily_extract` with no API key. See [Tools](/extend/tools). |
 | **Operational skills** | `/manage-mounts` | Pure instruction workflows — no code copied, nothing fetched. The SKILL.md walks the coding harness through a task, like editing the mount allowlist through the setup CLI and restarting the service. |
 
 <Note>
-Upstream's CONTRIBUTING.md folds these into a slightly different taxonomy (channel/provider, utility, operational, container), but the install mechanics are what matter: registry-branch fetch for channels and providers, self-contained files for tools, instructions only for operational skills.
+Upstream's CONTRIBUTING.md folds these into a slightly different taxonomy (channel/provider, utility, operational, container), but the install mechanics are what matter: registry-branch fetch for channels, payload copies for providers, self-contained files for tools, instructions only for operational skills.
 </Note>
 
 ## Container skills: the fifth thing
@@ -70,11 +71,11 @@ Which container skills a group gets is controlled by the `skills` column in its 
 
 ## Contributing a skill upstream
 
-You don't push to `channels` or `providers` directly. You PR your adapter against `main` — a self-registering module, one appended barrel import, a registration test, a SKILL.md with the fetch-and-copy steps, and a REMOVE.md that reverses every change — and maintainers land the code on the registry branch from your work. Full flow in [Contributing](/concepts/contributing).
+You don't push to `channels` directly. You PR your adapter or provider against `main` — a self-registering module, one appended barrel import, a registration test, a SKILL.md with the copy steps, and a REMOVE.md that reverses every change. A provider's code ships in the skill's `payload/` in that same PR; for a channel, maintainers land the code on the `channels` branch from your work. Full flow in [Contributing](/concepts/contributing).
 
 ## Updating skills
 
-Run `/update-skills` (or let `/update-nanoclaw` trigger it after a core update) to re-fetch installed adapters from their registry branches — see [Upgrading](/operate/upgrading).
+Run `/update-skills` (or let `/update-nanoclaw` trigger it after a core update) to refresh installed channel and provider code: channels from the `channels` branch, providers from their skill's `payload/`. See [Upgrading](/operate/upgrading).
 
 ## Next steps
 

@@ -8,6 +8,7 @@ keywords: ["upgrade", "update", "update-nanoclaw", "update-skills", "migrate-nan
 {/* verified-against (scoped correction) — cutover container stop: scripts/update/service.ts (drainContainers, CUTOVER_STOP_GRACE_SECONDS) @ 143db6c9 (v2.4.0) */}
 {/* verified-against: scripts/update-nanoclaw.ts, scripts/update/transaction.ts, scripts/update/service.ts, scripts/update-skills.ts, scripts/upgrade-state.ts, src/upgrade-state.ts, src/index.ts, src/install-slug.ts, setup/service.ts, .claude/skills/update-nanoclaw/SKILL.md, .claude/skills/update-skills/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md, docs/upgrade-recovery.md @ 294ef2ae; install identity override: src/install-slug.ts @ b76fcb3d */}
 {/* verified-against (scoped correction): rollback restore order: scripts/update/transaction.ts, scripts/update/service.ts @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction) — provider refresh from skill payloads: scripts/update-skills.ts, scripts/skill-apply.ts, .claude/skills/{add-codex,add-opencode}/SKILL.md @ 5878d9e7 (nanocoai/nanoclaw#4104) */}
 
 Do not update with a raw `git pull`. NanoClaw records each sanctioned upgrade in `data/upgrade-state.json`, and the marker carries three values: the version, the commit, and the tree hash. A startup tripwire compares all three against the running code and refuses to boot when they disagree. A commit that leaves the version alone trips it too. The supported path is the `/update-nanoclaw` skill.
 
@@ -93,15 +94,15 @@ The restore never deletes first. It copies each snapshot item next to its live p
 
 ## What happens to installed channels
 
-Channel and provider adapters are files copied into your tree from the long-lived `channels` and `providers` branches. They are not part of the `main` merge, so an upstream merge does not refresh them on its own. Validation refreshes every installed skill inside the stage worktree instead, and a skill that fails to refresh fails the whole validation.
+Channel and provider adapters are files copied into your tree: channels from the long-lived `channels` branch, providers from their skill's `payload/` folder. They are not part of the `main` merge, so an upstream merge does not refresh them on its own. Validation refreshes every installed skill inside the stage worktree instead, and a skill that fails to refresh fails the whole validation.
 
-Re-applying is safe and idempotent. It re-fetches the latest adapter files from upstream and overwrites only that skill's own code. Your credentials in `.env`, your barrel wiring, and your database state are untouched. The flip side is that it overwrites an adapter file you edited by hand. Commit your edits first so you can recover them, or update that channel yourself.
+Re-applying is safe and idempotent. It copies the latest adapter files in again (fetched from upstream for a channel, from the updated skill payload for a provider) and overwrites only that skill's own code. Your credentials in `.env`, your barrel wiring, and your database state are untouched. The flip side is that it overwrites an adapter file you edited by hand. Commit your edits first so you can recover them, or update that channel yourself.
 
 ## Updating skills
 
-To refresh skills without a full upstream update, run `/update-skills`. Its flow:
+To refresh skills without a full upstream update, run `/update-skills`. A channel refresh fetches the newest adapter from the `channels` branch. A provider refresh copies from the skill's `payload/` in your checkout, so newer provider code arrives only with `/update-nanoclaw`. In v2026.10.0 and earlier, `/add-codex` copies from the locked `providers` branch instead, so its refresh still needs a remote that carries that branch. Its flow:
 
-1. **Preflight.** Your working tree must be clean. The script resolves the registry remote rather than assuming `origin`: it tries each configured remote, origin first, and keeps the one that answers `git ls-remote --heads` for the registry branches. Set `NANOCLAW_REGISTRY_REMOTE`, or `NANOCLAW_CHANNELS_REMOTE`, to name it yourself.
+1. **Preflight.** Your working tree must be clean. The script resolves the registry remote rather than assuming `origin`: it tries each configured remote, origin first, and keeps the one that answers `git ls-remote --heads` for the `channels` registry branch. Provider skills that copy from their own payload need no remote. Set `NANOCLAW_REGISTRY_REMOTE`, or `NANOCLAW_CHANNELS_REMOTE`, to name it yourself.
 2. **Detection.** The script reads the channel and provider barrels to list which code-carrying skills you have installed. Operational skills copy no code into your tree, so they have nothing to refresh.
 3. **Selection.** Refresh everything with `--skills all`, or name a subset such as `--skills slack,opencode`. A name you do not have installed is an error, not a skip.
 4. **Re-apply.** The refresh is headless. `scripts/update-skills.ts` reads the apply directives out of each skill's `SKILL.md` and runs them. A skill that declares no apply directives fails rather than being skipped quietly.

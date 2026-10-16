@@ -55,7 +55,7 @@ Each removal step is itself idempotent ("skip if already gone").
 
 ## Testing your skill
 
-Every reach-in with a functional consequence gets a test that goes red if the wiring is deleted or drifts. Tests targeting host code use vitest; container code uses `bun:test` under `container/agent-runner/`. Tests **travel with the skill** — they ship in the skill's directory (or on the registry branch) and apply copies them into the project tree, so they run against the composed system via `pnpm test`. There's also a dedicated config, `vitest.skills.config.ts`, that picks up tests under `.claude/skills/**/tests/` — run it with `pnpm exec vitest run --config vitest.skills.config.ts`.
+Every reach-in with a functional consequence gets a test that goes red if the wiring is deleted or drifts. Tests targeting host code use vitest; container code uses `bun:test` under `container/agent-runner/`. Tests **travel with the skill** — they ship in the skill's directory (or, for channels, on the registry branch) and apply copies them into the project tree, so they run against the composed system via `pnpm test`. There's also a dedicated config, `vitest.skills.config.ts`, that picks up tests under `.claude/skills/**/tests/` — run it with `pnpm exec vitest run --config vitest.skills.config.ts`.
 
 The most common shape is the **registration test**: import the real barrel, assert the registry contains your entry. `add-telegram`'s `telegram-registration.test.ts` imports `src/channels/index.ts` and asserts `telegram` is registered — it goes red if the import line is deleted, if the barrel fails to evaluate, *or* if the adapter package isn't installed (the unmocked import throws), so it guards the dependency for free. Don't test your function directly instead: calling your own code bypasses the wiring and stays green when the barrel line is deleted.
 
@@ -106,7 +106,7 @@ both paths to the user.
 
 **For your own install**, just create the directory: drop `.claude/skills/<name>/SKILL.md` into your checkout and Claude Code picks it up as `/<name>` — no registration, no build step. This is the right home for anything specific to your setup, and where every skill should start.
 
-**To contribute upstream**, your skill needs to be useful beyond your own setup and meet the guidelines bar above. Upstream recognizes four types — channel/provider skills (code on the registry branches), utility skills (code files in the skill directory), operational skills (instructions only), and container skills (`container/skills/`, loaded by the agent inside the container) — each with its own PR path. See [Contributing](/concepts/contributing) for the flow, and note that for channel and provider skills you PR against `main` and maintainers land the code on the registry branch from your work.
+**To contribute upstream**, your skill needs to be useful beyond your own setup and meet the guidelines bar above. Upstream recognizes four types — channel/provider skills (channel code on the `channels` registry branch, provider code in the skill's `payload/`), utility skills (code files in the skill directory), operational skills (instructions only), and container skills (`container/skills/`, loaded by the agent inside the container) — each with its own PR path. See [Contributing](/concepts/contributing) for the flow, and note that channel and provider skills are PRed against `main`: a provider's code goes in the skill's `payload/` in the same PR, and maintainers land a channel's code on the `channels` branch from your work.
 
 <Warning>
 Skills are not sandboxed. Unlike agent containers, a skill runs in your Claude Code session on the host, with whatever permissions that session has — read untrusted skills before running them.
@@ -114,6 +114,6 @@ Skills are not sandboxed. Unlike agent containers, a skill runs in your Claude C
 
 ## Related pages
 
-- [Skills: how NanoClaw extends itself](/extend/overview) — the model: additive fetch, registry branches, the skill categories
+- [Skills: how NanoClaw extends itself](/extend/overview) — the model: additive installs, the `channels` registry branch, provider payloads, the skill categories
 - [Contributing](/concepts/contributing) — repo layout, test configs, and the upstream PR flow
 - [Skills catalog](/reference/skills-catalog) — every skill that ships with NanoClaw, for more worked examples
