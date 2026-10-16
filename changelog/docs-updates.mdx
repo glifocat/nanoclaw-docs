@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Sweep kill timers can be raised" description="2026-10-16" tags={["Updated"]}>
+  [Configuration](/operate/configuration#read-from-env) and [Environment variables](/reference/environment-variables) add `NANOCLAW_ABSOLUTE_CEILING_MS` (default 30 minutes) and `NANOCLAW_CLAIM_STUCK_MS` (default 60 seconds), which change how long the host sweep waits before it kills a silent container (nanoclaw #3646, added after v2026.10.0). [Container killed mid-task](/operate/troubleshooting#container-killed-mid-task) explains which timer a slow model hits, that raising one does not raise the other, and which messages are retried after a kill. [Architecture](/concepts/architecture), [Container lifecycle](/concepts/container-lifecycle) and [Hardening](/operate/hardening) mention the two settings, and the concept pages no longer say a silent container is never killed on a timer.
+</Update>
+
 <Update label="Signal: signal-cli install note" description="2026-10-16" tags={["Fixed"]}>
   [Signal](/channels/signal#prerequisites) no longer names a signal-cli version or exact download size for the Linux install, since the pin moves with NanoClaw releases. It now says the wizard checks the download against a pinned checksum before installing it (nanoclaw #4093).
 </Update>
