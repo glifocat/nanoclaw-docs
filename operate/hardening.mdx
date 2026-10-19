@@ -7,6 +7,7 @@ keywords: ["hardening", "security", "egress lockdown", "NANOCLAW_EGRESS_LOCKDOWN
 {/* verified-against: src/egress-lockdown.ts, src/config.ts, src/modules/mount-security/index.ts, src/command-gate.ts, src/slash-command.ts, src/provider-contracts/claude.ts, src/router.ts, src/modules/permissions/{index,guard,sender-approval}.ts, src/modules/approvals/primitive.ts, src/drivers/docker-driver.ts, src/container-runner.ts, container/Dockerfile, container/pull.sh, setup/mounts.ts, setup/index.ts, src/cli/resources/groups.ts, src/cli/guard.ts, src/host-sweep.ts, setup/lib/registry-state.ts, .claude/skills/add-onecli/payload/src/gateway-providers/onecli.ts, .claude/skills/add-iron-proxy/payload/src/gateway-providers/iron-proxy.ts @ 7203e00d (v2026.10.0); channels branch: src/channels/{slack,signal,imessage,cli,local-web,dial,emacs,telegram}.ts @ d73e8f44 */}
 {/* verified-against (scoped correction) — channels-only Slack bot under decline_notify: src/modules/permissions/sender-approval.ts @ 15c6124f; channels branch src/modules/slack-room-membership/membership.ts @ d2407fe3 */}
 {/* verified-against (scoped correction) — sweep timer env overrides NANOCLAW_ABSOLUTE_CEILING_MS / NANOCLAW_CLAIM_STUCK_MS: src/{config,reconcile-session}.ts @ 2105169d */}
+{/* verified-against (scoped correction) — src/config.ts line anchor re-pointed @ f2224a2f */}
 
 NanoClaw's isolation boundary is the Docker container: each agent runs in its own container with a scoped workspace mount (see [Container lifecycle](/concepts/container-lifecycle)). There is no micro-VM or alternative sandbox runtime — hardening means tightening what those containers can reach. This page walks the defense-in-depth controls from network to filesystem to people.
 
@@ -20,7 +21,7 @@ By default, agent containers have normal outbound internet access. Set `NANOCLAW
 
 The setup is idempotent and self-healing — NanoClaw creates the network and re-attaches the gateway on every spawn if needed. It also **fails fast**: if lockdown is enabled but the network can't be created or the gateway container can't be attached, NanoClaw throws an `EgressLockdownError` and refuses to spawn the agent rather than silently running it with open egress. If you see that error, start the gateway container (or set `NANOCLAW_EGRESS_LOCKDOWN=false` to opt out).
 
-All three variables can be set in `.env` or the process environment (`NANOCLAW_EGRESS_LOCKDOWN` and `NANOCLAW_EGRESS_NETWORK` in `src/config.ts:106-108`; `ONECLI_GATEWAY_CONTAINER` in the OneCLI gateway provider) — `.env` is the simpler path for a plain "edit and restart" flow; the service definition (launchd plist or systemd unit) still works too, as described in [Configuration](/operate/configuration#applying-changes):
+All three variables can be set in `.env` or the process environment (`NANOCLAW_EGRESS_LOCKDOWN` and `NANOCLAW_EGRESS_NETWORK` in `src/config.ts:108-110`; `ONECLI_GATEWAY_CONTAINER` in the OneCLI gateway provider) — `.env` is the simpler path for a plain "edit and restart" flow; the service definition (launchd plist or systemd unit) still works too, as described in [Configuration](/operate/configuration#applying-changes):
 
 ```bash
 # Linux (systemd unit)

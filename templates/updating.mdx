@@ -5,6 +5,7 @@ keywords: ["restamp", "template update", "ncl groups create --template --yes", "
 ---
 
 {/* verified-against: src/templates/restamp.ts, src/cli/resources/groups.ts, src/container-config.ts @ 20d61af; docs/templates.md @ 20d61af */}
+{/* verified-against (scoped correction) — create_agent keeps an existing local copy: src/templates/library.ts @ f2224a2f */}
 
 When a template gains a skill, fixes a persona, or changes a task schedule, you don't have to rebuild the agent. Restamping updates an already-stamped agent in place.
 
@@ -19,7 +20,7 @@ ncl groups restart --id <agent-group-id>        # skill and MCP changes take eff
 The dry run is the default and has no side effects. Nothing changes until you pass `--yes`.
 
 <Warning>
-**First, get the new version into your local `templates/`.** Restamping reads only your local copy — there is no built-in refresh from the registry, and the setup wizard deliberately keeps an existing local copy rather than overwriting it. If you skip this step the dry run lists every surface as `unchanged`, and applying with `--yes` reports `Nothing to apply — the group already matches the template.` — both read as a no-op rather than a stale copy.
+**First, get the new version into your local `templates/`.** Restamping reads only your local copy — there is no built-in refresh from the registry, and the setup wizard and `create_agent` both deliberately keep an existing local copy rather than overwriting it. If you skip this step the dry run lists every surface as `unchanged`, and applying with `--yes` reports `Nothing to apply — the group already matches the template.` — both read as a no-op rather than a stale copy.
 
 - **You authored the template** — edit it in place and re-run.
 - **It came from the registry** — clone or download the registry again and replace the local folder by hand.

@@ -1,10 +1,11 @@
 ---
 title: "Templates"
 description: "A template is an Agent Plugins 1.0.0 directory you stamp into a working NanoClaw agent — persona, skills, MCP servers, and paused recurring tasks, with no secrets and no provider."
-keywords: ["templates", "agent plugins", "plugin.json", "stamp", "ncl groups create", "template library", "agent template"]
+keywords: ["templates", "agent plugins", "plugin.json", "stamp", "ncl groups create", "ncl templates list", "create_agent", "template library", "agent template"]
 ---
 
 {/* verified-against: src/templates/{parse,manifest,extension,mcp,skills,tasks,plugin-dir,create-agent,restamp,local-dir}.ts, src/config.ts, src/cli/resources/{groups,wirings}.ts, setup/templates.ts, setup/auto.ts, templates/README.md @ 7203e00d (v2026.10.0); nanocoai/nanoclaw-templates index.json @ 7d3cb404 */}
+{/* verified-against (scoped correction) — where templates come from: src/templates/library.ts, src/modules/agent-to-agent/create-agent.ts, src/cli/resources/templates.ts, src/config.ts, .gitignore, templates/README.md @ 3a68cc7c; setup/auto.ts @ f2224a2f */}
 
 A **template** is a reusable directory you stamp into a working agent. It carries the agent's standing instructions, its MCP tool servers, its skills, and optional recurring tasks — but **no secrets and no provider**. Point `ncl` at one and you get a configured agent group in seconds.
 
@@ -63,7 +64,7 @@ Only `plugin.json` is required — it is the manifest and the discovery marker. 
 
 | Not in a template | Where it lives instead |
 | --- | --- |
-| Provider, model, effort | Set on the agent afterward with `ncl groups config update`. The runtime defaults to the install's configured provider. |
+| Provider, model, effort | Set on the agent afterward with `ncl groups config update`. The runtime defaults to the install's configured provider; an agent created in chat with `create_agent` takes its creator's provider instead. |
 | API keys and tokens | The [OneCLI Agent Vault](/operate/credentials) injects them into outbound calls at request time. Credential-shaped values in a template are rejected at stamp time. |
 | Channel wiring | Stamping creates the agent group only. Wire it with `/manage-channels` or `ncl wirings create`, exactly as for a hand-built group. |
 | apt/npm packages | `ncl groups config add-package --id <agent-group-id> --apt <pkg>` (or `--npm`), followed by `ncl groups restart --id <agent-group-id> --rebuild`. |
@@ -87,12 +88,15 @@ If you have an existing agent and want what a template offers, stamp a new agent
 
 ## Where templates come from
 
-Templates resolve **only from a local directory** — `templates/` at the project root by default (committed, and ships with just a README), or whatever `NANOCLAW_TEMPLATES_DIR` points at. There is no git URL, no `--source`, and no remote fetch at `ncl` time.
+Templates are stamped **only from a local directory** — `templates/` at the project root by default, or whatever `NANOCLAW_TEMPLATES_DIR` points at. The project's `templates/` ships with just a README; everything else in it is gitignored, so a template copied in never blocks an update. There is no git URL and no `--source`, and `ncl groups create --template` never downloads anything.
 
-The public catalog is [`nanocoai/nanoclaw-templates`](https://github.com/nanocoai/nanoclaw-templates). Get a template from it into your local `templates/` one of two ways:
+The public catalog is [`nanocoai/nanoclaw-templates`](https://github.com/nanocoai/nanoclaw-templates). Get a template from it into your local `templates/` one of three ways:
 
-- **The setup wizard's library picker** clones the registry and copies your pick into `templates/` for you.
+- **The setup wizard's library picker** clones the registry, shows each template with its description, and copies your pick into `templates/` for you.
+- **An agent's `create_agent`** downloads the template you picked in chat, once the request is allowed (added after v2026.10.0). See [From chat](/templates/using-templates#from-chat).
 - **By hand** — clone or download the repo and copy the template folder across.
+
+`ncl templates list` shows the templates on this machine, and `ncl templates list --registry` shows the library's.
 
 Then stamp it with its bare ref. See [Using a template](/templates/using-templates), or [Getting started with a template](/templates/getting-started) for the guided path from a fresh machine.
 
@@ -105,7 +109,7 @@ Then stamp it with its bare ref. See [Using a template](/templates/using-templat
 | Data analyst | `data/analyst` | Pipeline checks, query writing, and recurring report integrity. |
 | Journalist | `media/journalist` | Beat monitoring, pitch evaluation, source finding, and interview prep. |
 
-Templates live under a `<category>/<template>/` folder, and that path is exactly the ref you pass to `--template`. The catalog moves faster than these docs — check the repo for the current list.
+Templates live under a `<category>/<template>/` folder, and that path is exactly the ref you pass to `--template`. The catalog moves faster than these docs — check the repo or `ncl templates list --registry` for the current list.
 
 ## Next steps
 

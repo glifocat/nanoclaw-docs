@@ -9,6 +9,7 @@ keywords: ["architecture", "host process", "router", "delivery", "host sweep", "
 {/* verified-against (scoped correction) — mailbox and central-store seams, instance lookup, reconciliation, claims and heartbeat fallback: src/{index,router,host-sweep,reconcile-session,container-runner}.ts, src/mailbox/{compose,sqlite/session-db}.ts, src/db/compose.ts @ b76fcb3d */}
 {/* verified-against (scoped correction): startup order, gateway selection, orphan sweep: src/index.ts, src/host-sweep.ts, src/container-runner.ts, src/gateway-providers/index.ts @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — sweep timer env overrides NANOCLAW_ABSOLUTE_CEILING_MS / NANOCLAW_CLAIM_STUCK_MS: src/{config,reconcile-session}.ts @ 2105169d */}
+{/* verified-against (scoped correction) — command-gate denial sent through the delivery adapter; the host's only outbound.db write is orphan-claim cleanup: src/{router,command-gate,session-manager,reconcile-session}.ts, src/mailbox/sqlite/{index,session-db}.ts @ 7be8d7f6 */}
 
 NanoClaw is one Node.js host process plus one Docker container per active session. The host owns the channels, the routing, and the container lifecycle; the agent runs inside the container and never touches the messaging platforms — that traffic is all host. (The agent's own network egress is a separate matter: open by default, [lockable](/operate/hardening#lock-down-network-egress).) Between them sits the core idea: **every message is a row in SQLite**. The shipped mailbox uses a SQLite pair: the host writes rows the container reads, and the container writes rows the host reads. Mailbox storage, the central database, and the session runtime each sit behind a separate implementation seam. Host-side message writes and runtime exit events also enqueue reconciliation; periodic polling and resync recover when those hints are lost.
 
@@ -17,7 +18,7 @@ Each session owns a pair of database files in its session folder:
 - `inbound.db` — host writes, container reads. Inbound messages, scheduled tasks, routing defaults.
 - `outbound.db` — container writes, host reads. Agent replies, processing acknowledgements, session state.
 
-One writer per file, opposite directions — so a crashed container can never corrupt the host's queue. (Two narrow host-side writes to `outbound.db` bend the rule deliberately; the invariants section below explains why they're safe.)
+One writer per file, opposite directions — so a crashed container can never corrupt the host's queue. (One narrow host-side write to `outbound.db` bends the rule deliberately; the invariants section below explains why it's safe.)
 
 ## A message, end to end
 
@@ -138,7 +139,7 @@ The shipped SQLite mailbox uses the session pair for host-container message tran
 
 1. **`journal_mode=DELETE`, not WAL** — WAL's memory-mapped `-shm` file doesn't refresh across the host-to-container mount, so a WAL-mode container would silently miss every new message.
 2. **The host opens, writes, and closes per operation** — a long-lived host connection would freeze the container's view of the file at first read.
-3. **One writer per file** — DELETE-mode journal unlinking isn't atomic across the mount, so concurrent writers would corrupt the database. Hence the split into two files with opposite ownership. The host itself writes rows into `outbound.db` in just two deliberate cases — command-gate denials, answered without waking the container, and clearing a killed container's orphaned processing claims after the container is already gone — both opened with the same DELETE journal and `busy_timeout` discipline.
+3. **One writer per file** — DELETE-mode journal unlinking isn't atomic across the mount, so concurrent writers would corrupt the database. Hence the split into two files with opposite ownership. The host itself writes to `outbound.db` in just one deliberate case: clearing a container's orphaned processing claims right after the host sweep kills it, opened with the same DELETE journal and `busy_timeout` discipline. A command-gate denial does not go through the file: the router sends the "Permission denied" reply straight to the chat through the channel adapter, without waking the container. That reply is sent once; a failed send is logged, not retried. (Changed after v2026.10.0, which wrote the denial into `outbound.db`.)
 
 ## Related pages
 

@@ -6,6 +6,7 @@ tag: "UPDATED"
 ---
 
 {/* verified-against: container/agent-runner/src/mcp-tools/{index,server,core,interactive,agents,self-mod}.ts, src/modules/self-mod/apply.ts, src/modules/agent-to-agent/{create-agent,guard}.ts, src/group-init.ts, src/cli/guard.ts, src/cli/registry.ts, src/cli/resources/wirings.ts, container/Dockerfile @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction) — create_agent template param, fetch, approval card: container/agent-runner/src/mcp-tools/{agents.ts,agents.instructions.md}, src/modules/agent-to-agent/{create-agent,guard}.ts, src/templates/{library,local-dir}.ts @ 3a68cc7c */}
 
 These are the tools the agent can call from inside its container. They're exposed by the built-in `nanoclaw` MCP server (`container/agent-runner/src/mcp-tools/`), so the agent sees them with the `mcp__nanoclaw__` prefix — e.g. `mcp__nanoclaw__send_message`. As an operator you never call them directly; you see their effects: messages arriving in chats, schedule changes, and approval cards.
 
@@ -90,11 +91,14 @@ Non-blocking — renders the card and returns immediately, with no response coll
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | yes | Agent name — also becomes the caller's destination name for it |
-| `instructions` | string | no | Seeds the new agent's starting role and personality. The host stages it to the group's `instructions.prepend.md` (standing instructions, composed into the agent's `CLAUDE.md` at spawn) — not the composed `CLAUDE.md` itself. |
+| `instructions` | string | no | Seeds the new agent's starting role and personality. The host stages it to the group's `instructions.prepend.md` (standing instructions, composed into the agent's `CLAUDE.md` at spawn) — not the composed `CLAUDE.md` itself. Ignored when `template` is set. |
+| `template` | string | no | A [template](/templates/using-templates#from-chat) ref the user picked, such as `sales/sdr`, from `ncl templates list`. The template supplies the persona. Each `/`-separated part starts with a letter or digit and holds only letters, digits, `.`, `_`, and `-`, up to 128 characters in all. An empty value counts as no template; any other value that breaks these rules is refused before an approval card is created. Added after v2026.10.0. |
 
 Provisions a long-lived companion agent: its own group, container, and persistent workspace under `groups/<folder>/`, wired bidirectionally as a destination on both sides. Fire-and-forget — the call returns immediately and messages queue until the agent is up.
 
-**Approval-gated by CLI scope:** groups with `cli_scope: global` create directly; everything else (including the default `group` scope) requires admin approval. There is no `send_to_agent` tool — messaging an agent is just `send_message` with `to` set to its name. See [Agent swarms](/guides/multi-agent-swarm).
+With `template`, the agent is stamped from that template instead: persona, skills, MCP servers, and paused tasks. A template that is not in the install's templates directory is downloaded from the public template library first; a local copy always wins and is never overwritten. The download runs only once the request is allowed and before anything is written, so a failed download creates nothing. Either way, the new agent runs on its creator's provider.
+
+**Approval-gated by CLI scope:** groups with `cli_scope: global` create directly; everything else (including the default `group` scope) requires admin approval. For a template request, the card names the template and says whether approving downloads it, and the approval covers only that name and template. There is no `send_to_agent` tool — messaging an agent is just `send_message` with `to` set to its name. See [Agent swarms](/guides/multi-agent-swarm).
 
 ## Self-modification
 

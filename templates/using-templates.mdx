@@ -1,7 +1,7 @@
 ---
 title: "Using a template"
-description: "Stamp an agent from a template during install or anytime with ncl, then wire it to a channel, connect credentials, and activate its recurring tasks."
-keywords: ["ncl groups create --template", "stamp agent", "template ref", "NANOCLAW_TEMPLATES_DIR", "NANOCLAW_TEMPLATE_PATH", "templateReport", "paused tasks"]
+description: "Stamp an agent from a template during install, anytime with ncl, or by asking an agent in chat, then wire it to a channel, connect credentials, and activate its recurring tasks."
+keywords: ["ncl groups create --template", "ncl templates list", "create_agent template", "stamp agent", "template ref", "NANOCLAW_TEMPLATES_DIR", "NANOCLAW_TEMPLATE_PATH", "templateReport", "paused tasks"]
 tag: "UPDATED"
 ---
 
@@ -9,7 +9,9 @@ tag: "UPDATED"
 
 {/* verified-against (scoped correction): setup/{auto,templates}.ts, src/cli/resources/groups.ts @ b76fcb3d */}
 
-There are two ways to stamp an agent from a [template](/templates/overview): during installation, or anytime with `ncl`.
+{/* verified-against (scoped correction) — create from chat, library fetch, gitignored templates/: container/agent-runner/src/mcp-tools/{agents.ts,agents.instructions.md}, src/modules/agent-to-agent/{create-agent,guard}.ts, src/cli/resources/templates.ts, src/templates/{library,local-dir}.ts, .gitignore, templates/README.md @ 3a68cc7c; library picker: setup/auto.ts, src/templates/library.ts @ f2224a2f */}
+
+There are three ways to stamp an agent from a [template](/templates/overview): during installation, anytime with `ncl`, or by asking an agent in chat.
 
 ## During installation
 
@@ -24,8 +26,10 @@ At the prompt **"How should we create your first agent?"** you get three choices
 | Choice | What it does |
 | --- | --- |
 | **Fresh agent** | The default. No template — shape the agent by chatting with it. |
-| **From the NanoClaw template library** | Clones [`nanocoai/nanoclaw-templates`](https://github.com/nanocoai/nanoclaw-templates), lists what's in it, and copies your pick into your local `templates/` before stamping. |
+| **From the NanoClaw template library** | Clones [`nanocoai/nanoclaw-templates`](https://github.com/nanocoai/nanoclaw-templates), lists each template's name and description from the library's `index.json`, and copies your pick into your local `templates/` before stamping. |
 | **From local templates** | Lists the templates already in your `templates/` directory. |
+
+If the library can't be cloned or its index can't be read, setup shows **Could not load the template library.** with the reason and returns to this choice.
 
 Setup then stamps the agent through the same `ncl groups create --template` command described below. The agent is created even when channel setup is skipped or can't finish wiring — when a channel is ready later, setup wires that existing agent and sends the welcome message.
 
@@ -66,13 +70,15 @@ With no existing carrier of the template, this creates an agent. If one agent al
 
 `--template <ref>` is a path **relative to your local templates directory** — `templates/` by default, or `NANOCLAW_TEMPLATES_DIR`. Refs are multi-segment, so `<category>/<template>` resolves to `templates/<category>/<template>`. The plugin root is the leaf folder, and its manifest `name` is independent of the path.
 
-The ref must stay inside the templates directory. Absolute paths, a leading `~`, and `../` escapes are all rejected.
+The ref must stay inside the templates directory. Absolute paths, a leading `~`, and `../` escapes are all rejected. `ncl groups create --template` reads only this directory and never downloads a template.
 
 ```bash
 ncl groups create --template <category>/<template>   # templates/<category>/<template>
 ncl groups create --template /etc/passwd        # rejected: absolute path
 ncl groups create --template ../../secrets      # rejected: escapes the templates dir
 ```
+
+Everything in the project's `templates/` except its README is gitignored, so a template that setup or `create_agent` copied in never blocks an update.
 
 To point the library somewhere else, set `NANOCLAW_TEMPLATES_DIR` to another **local** path. It is never a URL and never changes at runtime.
 
@@ -100,6 +106,17 @@ If the reader skipped or ignored anything — a non-conforming skill, an unsuppo
 Components are never silently stripped. A missing `templateReport` means everything loaded. Fatal problems — an invalid manifest, a symlink, a smuggled credential — reject the whole template instead, and no group is created.
 
 `templateReport` is specific to the create response. When the same command [updates an existing agent](/templates/updating), reader notices come back under `report` instead.
+
+## From chat
+
+Ask an agent for a new one in plain language, for example "I need an SDR agent." The agent looks up what exists with `ncl templates list` (templates on this machine, no network) and `ncl templates list --registry` (the public library), offers a match, and once you pick one calls [`create_agent`](/reference/mcp-tools#create_agent) with that ref. Added after v2026.10.0.
+
+- **Download.** A template that isn't on this machine is downloaded from the public library into `templates/` first. A local copy always wins and is never overwritten.
+- **Approval.** `create_agent` keeps its usual rule: an agent with `cli_scope: global` creates directly, and any other agent's request waits for an admin. The approval card names the template and says whether approving downloads it. Approving covers only that template.
+- **Nothing half-made.** Nothing is downloaded until the request is allowed, and a failed download creates nothing.
+- **What you get.** The new agent runs on its creator's provider and is wired to its creator as a destination, like any agent `create_agent` makes. It isn't wired to a chat. When you ask from Slack with `/slack-agent-flow` installed, it also gets [its own bot](/channels/slack#create-agents-from-slack).
+
+The agent needs `ncl` to list templates, so a group whose `cli_scope` is `disabled` can't browse them.
 
 ## After stamping
 
