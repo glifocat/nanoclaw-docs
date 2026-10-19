@@ -5,6 +5,7 @@ keywords: ["build template", "author template", "plugin.json", "mcp.json", "ai.n
 ---
 
 {/* verified-against: src/templates/{parse,manifest,extension,mcp,skills,tasks,plugin-dir,create-agent,restamp}.ts, src/container-config.ts, src/modules/self-mod/request.ts, src/modules/scheduling/create.ts, src/cli/resources/{groups,tasks}.ts, container/agent-runner/src/plugin-mcp.ts @ 7203e00d (v2026.10.0); nanocoai/nanoclaw-templates scripts/check-templates.mjs @ 7d3cb404; providers branch container/agent-runner/src/providers/codex-app-server.ts @ 3959d1f0 */}
+{/* verified-against (scoped correction) — where description is shown: src/cli/resources/templates.ts, src/templates/library.ts @ f2224a2f; setup/auto.ts @ f2224a2f; nanocoai/nanoclaw-templates scripts/build-index.mjs @ 7d3cb404; create_agent child takes its creator's provider: src/modules/agent-to-agent/create-agent.ts @ 3a68cc7c */}
 
 A template is an [Agent Plugins 1.0.0](https://agent-plugins.org) directory. This page covers what goes in each part and how to test it.
 
@@ -52,7 +53,7 @@ For the exact rules the engine validates against, see [the template format refer
 The portable surface — `skills/` and `mcp.json` — follows the Agent Plugins spec exactly. Everything NanoClaw-specific rides in the `ai.nanoco.nanoclaw/` extension directory and manifest key, which other spec-compatible clients skip by rule.
 
 <Note>
-**No provider, model, effort, or packages in a template.** Those are set on the agent afterward with `ncl groups config update`. The runtime defaults to the install's configured provider, which is what makes one template work everywhere.
+**No provider, model, effort, or packages in a template.** Those are set on the agent afterward with `ncl groups config update`. The runtime defaults to the install's configured provider (an agent created in chat with `create_agent` takes its creator's), which is what makes one template work everywhere.
 </Note>
 
 ## The manifest
@@ -72,6 +73,8 @@ The portable surface — `skills/` and `mcp.json` — follows the Agent Plugins 
 ```
 
 `$schema` must be exactly that URL. `name` is 1–64 characters of lowercase alphanumerics, hyphens, and periods; it must start and end alphanumeric and may not contain a `--` or `..` run. It is the plugin's machine name, independent of the folder path — a template at `<category>/<template>/` can carry any valid `name` — and it is the folder the plugin is stamped under, at `groups/<folder>/plugins/<name>/`.
+
+`description` is the line people see beside the template: `ncl templates list` reads it from your manifest, and for a registry template, setup's library picker and `ncl templates list --registry` show the copy in the registry's `index.json`, which is built from this field.
 
 `extensions["ai.nanoco.nanoclaw"].agentName` sets the display name of the stamped agent. Without it the agent is named after the template folder; an explicit `--name` beats both.
 

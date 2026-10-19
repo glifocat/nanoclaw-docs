@@ -5,8 +5,18 @@ icon: "file-pen"
 rss: true
 ---
 
-<Update label="Provider code lives in skill payloads" description="2026-10-16" tags={["Updated"]}>
+<Update label="Provider code lives in skill payloads" description="2026-10-20" tags={["Updated"]}>
   [Skills](/extend/overview), [Agent providers](/extend/providers), [Writing skills](/extend/writing-skills), [Contributing](/concepts/contributing) and [Upgrading](/operate/upgrading) now say that `/add-codex`, like `/add-opencode` and `/add-cursor`, copies its files from the skill's own `payload/` folder on `main`. Only channel adapters still come from a registry branch (`channels`). The `providers` branch is locked; releases from before nanoclaw #4104 still copy Codex from it.
+</Update>
+
+<Update label="Create agents from templates in chat" description="2026-10-19" tags={["Updated"]}>
+  [Using a template](/templates/using-templates#from-chat) adds a third way to stamp an agent: ask an agent in chat. It finds templates with the new `ncl templates list` and `ncl templates list --registry`, then calls `create_agent` with a `template` ref, which downloads a template that isn't on this machine after any approval the request needs (nanoclaw #4112, added after v2026.10.0). [Agent MCP tools](/reference/mcp-tools#create_agent) documents the `template` parameter and what the approval card says, the [ncl reference](/reference/ncl-cli#templates) and [ncl CLI](/operate/ncl-cli#templates) add the `templates` resource, and `templates` joins the resources a `group`-scoped agent can use. [Templates](/templates/overview), [Template format](/reference/template-format) and [Updating](/templates/updating) say where downloaded templates land, that the project's `templates/` is now gitignored, and that `ncl groups create --template` still never downloads. [Slack](/channels/slack#create-agents-from-slack) covers template-built agents in the Slack flow.
+
+  Setup's library picker now lists each template's name and description from the library's `index.json`, and shows **Could not load the template library.** when it can't (nanoclaw #4113). [Getting started](/templates/getting-started#choose-template), [Submitting](/templates/submitting) and [Building](/templates/building#the-manifest) say what the picker shows and that a template missing from `index.json` is not listed. [Environment variables](/reference/environment-variables) re-points its source line numbers, which had drifted after v2026.10.0.
+</Update>
+
+<Update label="Architecture: command-gate denials skip outbound.db" description="2026-10-19" tags={["Updated"]}>
+  [Architecture](/concepts/architecture) now says the host writes to `outbound.db` in one case only, clearing a killed container's orphaned processing claims. The "Permission denied" reply to a non-admin's admin command goes straight to the chat through the channel adapter and is not retried (nanoclaw #4119, changed after v2026.10.0).
 </Update>
 
 <Update label="Sweep kill timers can be raised" description="2026-10-16" tags={["Updated"]}>

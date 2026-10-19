@@ -8,6 +8,7 @@ keywords: ["troubleshooting", "debugging", "dropped messages", "container spawn"
 {/* verified-against (scoped correction): session end logs, wakeContainer retry message, egress lockdown errors: src/container-runner.ts, src/drivers/docker-driver.ts, src/host-sweep.ts, src/egress-lockdown.ts, src/gateway-approval-coordinator.ts, .claude/skills/add-onecli/payload/src/gateway-providers/onecli.ts @ 7203e00d (v2026.10.0) */}
 {/* verified-against: .claude/skills/debug/SKILL.md, src/container-runtime.ts, src/container-runner.ts, src/host-sweep.ts, src/upgrade-state.ts, src/log.ts, src/cli/resources/dropped-messages.ts, src/cli/resources/sessions.ts, src/egress-lockdown.ts, src/modules/mount-security/index.ts, src/webhook-server.ts, src/circuit-breaker.ts, setup/service.ts @ 4e83a0a0; template behavior @ 20d61af; driver diagnostics and reconciliation: src/container-runner.ts, src/drivers/docker-driver.ts, src/host-sweep.ts, src/reconcile-session.ts, src/cli/resources/groups.ts, src/db/coordination.ts @ b76fcb3d */}
 {/* verified-against (scoped correction) — sweep timer env overrides NANOCLAW_ABSOLUTE_CEILING_MS / NANOCLAW_CLAIM_STUCK_MS: src/{config,reconcile-session,container-runner}.ts, container/agent-runner/src/poll-loop.ts @ 2105169d */}
+{/* verified-against (scoped correction) — src/config.ts line anchor re-pointed @ f2224a2f */}
 
 ## Start here
 
@@ -124,7 +125,7 @@ grep 'Webhook server started' logs/nanoclaw.log   # shows port + registered adap
 curl -i http://localhost:3000/webhook/slack       # 404 "Unknown adapter" = not registered
 ```
 
-The server listens on `WEBHOOK_PORT` (default `3000`). If another process already holds that port, the listen fails, the host logs `Webhook server error` and keeps running without a webhook listener, so webhook channels stay silent while everything else works. `WEBHOOK_PORT` is read from the process environment first, then from `.env` (`src/config.ts:112`), so set it in `.env` or in the service definition, then restart. A value that is not an integer from 1 to 65535 is rejected at startup. Channel-specific failures (tokens, tunnel/public URL, platform-side config) are covered on each channel page: [Slack](/channels/slack), [Teams](/channels/teams), [Channels overview](/channels/overview).
+The server listens on `WEBHOOK_PORT` (default `3000`). If another process already holds that port, the listen fails, the host logs `Webhook server error` and keeps running without a webhook listener, so webhook channels stay silent while everything else works. `WEBHOOK_PORT` is read from the process environment first, then from `.env` (`src/config.ts:121`), so set it in `.env` or in the service definition, then restart. A value that is not an integer from 1 to 65535 is rejected at startup. Channel-specific failures (tokens, tunnel/public URL, platform-side config) are covered on each channel page: [Slack](/channels/slack), [Teams](/channels/teams), [Channels overview](/channels/overview).
 
 ## Credential request stuck
 
