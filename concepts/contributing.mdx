@@ -7,6 +7,7 @@ keywords: ["contributing", "development", "pnpm", "vitest", "bun", "channels bra
 {/* verified-against: package.json, CONTRIBUTING.md, RELEASING.md, vitest.config.ts, vitest.skills.config.ts, eslint.config.js, .github/workflows/{ci.yml,label-pr.yml}, repo-tokens/README.md, CLAUDE.md @ 639577c3 */}
 {/* verified-against (scoped correction): image tag, CI, test commands, release channel: container/build.sh, src/install-slug.ts, .github/workflows/{ci,release}.yml, container/agent-runner/package.json, vitest.config.ts, scripts/release.mjs @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction): provider code in skill payloads: .claude/skills/{add-codex,add-opencode}/SKILL.md, .claude/skills/{add-codex,add-opencode}/payload/** @ 5878d9e7 (nanocoai/nanoclaw#4104) */}
+{/* verified-against (scoped correction): Cursor as a payload provider: .claude/skills/add-cursor/SKILL.md, .claude/skills/add-cursor/payload/** @ fd3b1750 */}
 
 This page is for contributing to [nanocoai/nanoclaw](https://github.com/nanocoai/nanoclaw) itself — fixing bugs, simplifying code, or adding a skill to the upstream repo. If you just want to extend your own installation, you don't need any of this: see [Extending NanoClaw](/extend/overview).
 
@@ -71,14 +72,14 @@ Tests are split across three configs because the two runtimes can't share one:
 Trunk (`main`) ships no specific channel adapter and no non-default provider. Channel adapters live on a long-lived registry branch, kept in sync with `main`; provider code ships inside each provider skill:
 
 - **`channels`** — Discord, Slack, Telegram, WhatsApp, Teams, and the other channel adapters, plus their tests and setup steps. Installed via `/add-<channel>` skills.
-- **Provider skill payloads** — non-default agent providers like OpenCode and Codex keep their code in the skill's own `payload/` folder on `main`. Installed via `/add-opencode` and `/add-codex`. The old `providers` branch is locked and kept only for older releases.
+- **Provider skill payloads** — non-default agent providers like OpenCode, Codex and Cursor keep their code in the skill's own `payload/` folder on `main`. Installed via `/add-opencode`, `/add-codex` and `/add-cursor`. The old `providers` branch is locked; it stays for older releases and for the upstream CI jobs that test refreshing their installs.
 
-Install is an additive copy (`git show origin/channels:<path> > <path>` for a channel, a plain file copy from `payload/` for a provider), never a `git merge` — [docs/skills-model.md](https://github.com/nanocoai/nanoclaw/blob/main/docs/skills-model.md) explains why.
+Install is an additive copy (`git show origin/channels:<path> > <path>` for a channel, a plain file copy from `payload/` for a provider), never a `git merge` — [Skills: how NanoClaw extends itself](/extend/overview) explains why (upstream source: `docs/skills-model.md`).
 
 Where your PR goes depends on what you're contributing:
 
 - **Bug fix or simplification** → ordinary PR against `main`.
-- **Channel or provider adapter** → fork, branch from `main`, build the adapter per [docs/skill-guidelines.md](https://github.com/nanocoai/nanoclaw/blob/main/docs/skill-guidelines.md) (self-registering module, one appended barrel import, a registration test against the real barrel), add a SKILL.md with the copy steps and a REMOVE.md that reverses every change, then open a PR against `main`. A provider's code and tests go in the skill's `payload/` in that PR. For a channel, maintainers land the code on the `channels` branch from your work — you don't push to `channels` directly.
+- **Channel or provider adapter** → fork, branch from `main`, build the adapter per [Writing skills](/extend/writing-skills) (upstream bar: `docs/skill-guidelines.md`; self-registering module, one appended barrel import, a registration test against the real barrel), add a SKILL.md with the copy steps and a REMOVE.md that reverses every change, then open a PR against `main`. A provider's code and tests go in the skill's `payload/` in that PR. For a channel, maintainers land the code on the `channels` branch from your work — you don't push to `channels` directly.
 - **Utility, operational, or container skill** → PR against `main`; the skill lives in `.claude/skills/` (or `container/skills/` for container skills). [CONTRIBUTING.md](https://github.com/nanocoai/nanoclaw/blob/main/CONTRIBUTING.md) describes all four skill types.
 
 ## Releases

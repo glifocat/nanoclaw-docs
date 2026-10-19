@@ -100,7 +100,7 @@ Re-applying is safe and idempotent. It copies the latest adapter files in again 
 
 ## Updating skills
 
-To refresh skills without a full upstream update, run `/update-skills`. A channel refresh fetches the newest adapter from the `channels` branch. A provider refresh copies from the skill's `payload/` in your checkout, so newer provider code arrives only with `/update-nanoclaw`. In v2026.10.0 and earlier, `/add-codex` copies from the locked `providers` branch instead, so its refresh still needs a remote that carries that branch. Its flow:
+To refresh skills without a full upstream update, run `/update-skills`. A channel refresh fetches the newest adapter from the `channels` branch. A provider refresh copies from the skill's `payload/` in your checkout, so newer provider code arrives only with `/update-nanoclaw`. In v2026.10.0 and earlier, `/add-codex` copies from the locked `providers` branch instead, so its refresh still needs a remote that carries that branch. After you update to a release that carries the payload, the next `/update-skills` rewrites those files from `payload/` and needs no remote for it. Its flow:
 
 1. **Preflight.** Your working tree must be clean. The script resolves the registry remote rather than assuming `origin`: it tries each configured remote, origin first, and keeps the one that answers `git ls-remote --heads` for the `channels` registry branch. Provider skills that copy from their own payload need no remote. Set `NANOCLAW_REGISTRY_REMOTE`, or `NANOCLAW_CHANNELS_REMOTE`, to name it yourself.
 2. **Detection.** The script reads the channel and provider barrels to list which code-carrying skills you have installed. Operational skills copy no code into your tree, so they have nothing to refresh.

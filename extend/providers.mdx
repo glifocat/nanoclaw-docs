@@ -9,6 +9,7 @@ tag: "UPDATED"
 {/* verified-against (scoped correction) — OpenCode workspace, instructions, effort and empty-resume recovery: container/agent-runner/src/providers/opencode.ts @ providers branch f503f23c */}
 {/* verified-against (scoped correction) — session history, OpenCode manifest installation, legacy Ollama configuration and Claude fast mode: src/cli/resources/sessions.ts, .claude/skills/{add-opencode,add-ollama-provider}/SKILL.md, src/{config,container-config}.ts, container/agent-runner/src/{config,providers/claude}.ts @ b76fcb3d */}
 {/* verified-against (scoped correction) — Codex and OpenCode copy from their skill payloads; slash-command and rotation claims: .claude/skills/{add-codex,add-opencode}/SKILL.md, .claude/skills/{add-codex,add-opencode}/payload/**, container/agent-runner/src/providers/claude.ts @ 5878d9e7 (nanocoai/nanoclaw#4104) */}
+{/* verified-against (scoped correction): Cursor as a payload provider: .claude/skills/add-cursor/SKILL.md, .claude/skills/add-cursor/payload/** @ fd3b1750 */}
 
 A **provider** is the agent CLI that runs inside a group's container — the thing that actually plans, calls tools, and writes replies. By default that's Claude Code via the Claude Agent SDK. The provider is pluggable: the agent runner selects an implementation from an open registry at startup, and the trunk ships only `claude` (plus a `mock` provider for tests).
 
@@ -38,9 +39,9 @@ To point it at any Anthropic-compatible endpoint, set `ANTHROPIC_BASE_URL` in `.
 
 ## Two ways to run a different brain
 
-The three provider skills split into two mechanisms:
+The four provider skills split into two mechanisms:
 
-- **Real provider implementations** — OpenCode and Codex are TypeScript providers. `/add-opencode` and `/add-codex` carry their files in the skill's own `payload/` folder and [copy them in](/extend/overview#how-a-code-carrying-skill-installs). Both wire them into the host, container and setup barrels and rebuild the image.
+- **Real provider implementations** — OpenCode, Codex and Cursor are TypeScript providers. `/add-opencode`, `/add-codex` and `/add-cursor` carry their files in the skill's own `payload/` folder and [copy them in](/extend/overview#how-a-code-carrying-skill-installs). Each wires them into the host, container and setup barrels and rebuilds the image.
 - **Legacy local-model workflow** — `/add-ollama-provider` redirects the Claude provider, but its source/config edits need reconciliation with the current runtime; see the limitations below.
 
 ### OpenCode (`/add-opencode`)
