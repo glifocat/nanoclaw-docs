@@ -8,6 +8,7 @@ keywords: ["ncl", "cli", "reference", "commands", "flags", "groups", "wirings", 
 
 {/* verified-against (scoped correction): src/cli/resources/{tasks,groups}.ts, src/modules/permissions/user-dm.ts, src/channels/chat-sdk-bridge.ts @ b76fcb3d */}
 {/* verified-against (scoped correction) — tasks synopsis flags: src/cli/resources/tasks.ts @ 143db6c9 (v2.4.0) */}
+{/* verified-against (scoped correction) — templates resource, group-scope list: src/cli/resources/templates.ts, src/cli/registry.ts, src/templates/{library,local-dir}.ts @ 3a68cc7c */}
 
 Exhaustive reference for the `ncl` admin CLI. For a task-oriented walkthrough, see [The ncl admin CLI](/operate/ncl-cli).
 
@@ -42,7 +43,7 @@ Agent callers are also subject to the group's `cli_scope` (set via `ncl groups c
 | `cli_scope` | Effect on agent callers |
 | --- | --- |
 | `disabled` | All CLI access rejected (`forbidden`). |
-| `group` (default) | Only `groups`, `sessions`, `destinations`, `members`, `tasks` (plus `help`), and two wiring commands: `wirings get`/`wirings update`, always targeted at the current conversation's wiring — the id is force-filled from the (messaging group, agent group) pair, and updates may only change `engage_mode`/`engage_pattern` (still approval-gated). Group args (`--agent-group-id`, `--group`, and `--id` on groups/destinations) are auto-filled to the caller's group and rejected if they point elsewhere. `list`/`get` results are filtered to the caller's group. Changing `cli_scope` is blocked. |
+| `group` (default) | Only `groups`, `sessions`, `destinations`, `members`, `tasks`, `templates` (plus `help`), and two wiring commands: `wirings get`/`wirings update`, always targeted at the current conversation's wiring — the id is force-filled from the (messaging group, agent group) pair, and updates may only change `engage_mode`/`engage_pattern` (still approval-gated). Group args (`--agent-group-id`, `--group`, and `--id` on groups/destinations) are auto-filled to the caller's group and rejected if they point elsewhere. `list`/`get` results are filtered to the caller's group, except `templates list`, which shows every group the same install-wide templates. Changing `cli_scope` is blocked. |
 | `global` | Full resource access; mutations still require approval. |
 
 ## approvals
@@ -86,7 +87,7 @@ Agent groups — logical agent identities with their own workspace folder, histo
 | --- | --- | --- | --- |
 | list | `ncl groups list` | open | |
 | get | `ncl groups get --id <id>` | open | |
-| create | `ncl groups create --folder <folder> [--name <name>] [--timezone <iana-id>]` or `ncl groups create --template <ref> [--name <name>] [--timezone <iana-id>] [--id <id>] [--new] [--yes]` | approval | **Without `--template`:** `--folder` required and immutable, `--name` defaults to the folder, idempotent on `--folder` (creating an existing folder returns the existing row), and new ids are prefixed `ag-<uuid>`. **With `--template <ref>`:** stamps from a local [template](/templates/overview) under `templates/`. Combining it with `--folder` is **rejected** — a bare group *is* its folder, a templated group *is* its plugin. The display name is `--name`, else the manifest's `agentName`, else the template ref's leaf folder; the group folder derives from that name, with a random `-XXXXXXXX` suffix on collision. Always creates a new agent, except when updating one this template already made: a group can only be targeted if its workspace holds that plugin's manifest, so a hand-built group or one stamped from another template is rejected. Convergent rather than folder-idempotent: if a group already carries that plugin, the command returns an in-place [update plan](/templates/updating) instead of creating anything — `--yes` applies it, `--id` picks the target when several groups carry it, and `--new` forces a fresh stamp. `--name` and `--timezone` apply only when a group is created; both are ignored on an in-place update. Reader notices come back as `templateReport` on a create, and as `report` on an update. |
+| create | `ncl groups create --folder <folder> [--name <name>] [--timezone <iana-id>]` or `ncl groups create --template <ref> [--name <name>] [--timezone <iana-id>] [--id <id>] [--new] [--yes]` | approval | **Without `--template`:** `--folder` required and immutable, `--name` defaults to the folder, idempotent on `--folder` (creating an existing folder returns the existing row), and new ids are prefixed `ag-<uuid>`. **With `--template <ref>`:** stamps from a local [template](/templates/overview) under `templates/`; it never downloads one. Combining it with `--folder` is **rejected** — a bare group *is* its folder, a templated group *is* its plugin. The display name is `--name`, else the manifest's `agentName`, else the template ref's leaf folder; the group folder derives from that name, with a random `-XXXXXXXX` suffix on collision. Always creates a new agent, except when updating one this template already made: a group can only be targeted if its workspace holds that plugin's manifest, so a hand-built group or one stamped from another template is rejected. Convergent rather than folder-idempotent: if a group already carries that plugin, the command returns an in-place [update plan](/templates/updating) instead of creating anything — `--yes` applies it, `--id` picks the target when several groups carry it, and `--new` forces a fresh stamp. `--name` and `--timezone` apply only when a group is created; both are ignored on an in-place update. Reader notices come back as `templateReport` on a create, and as `report` on an update. |
 | update | `ncl groups update --id <id> --name <name>` | approval | `name` is the only updatable column. |
 | delete | `ncl groups delete --id <id>` | approval | Custom cascading handler (not the generic single-table delete): removes sessions, destinations, approvals, role grants, memberships, and wirings in one FK-ordered transaction. The host sweep stops the group's running containers within about a minute. It does **not** clean up `groups/<folder>/` and `data/v2-sessions/<id>/` on disk, and the leftover `groups/<folder>/` blocks creating a new group with the same `--folder` until you move or remove it. |
 | restart | `ncl groups restart --id <id> [--rebuild] [--message <text>]` | approval | Host caller: restarts all running containers in the group. Agent caller: `--id` auto-filled, only the calling session restarts. `--rebuild` rebuilds the image first (required after package changes). `--message` queues an on-wake instruction so the fresh container starts and acts on it; without it the container stays stopped until the next user message. |
@@ -202,6 +203,16 @@ Scheduled tasks — the CLI home for what used to be the agent's `schedule_task`
 `run` fires a task now without changing its schedule (a safe test that neither consumes a one-shot nor advances a recurring series — unlike `update --process-after now`). `append-log` adds a note to a task's run log (`tasks/<id>.md`); every run already auto-logs its final text, so it's for additive mid-run notes only.
 
 `delete` refuses a running task session. For an isolated task it removes the session mailbox, history, attachments, heartbeat, session directory and row, and run log. For legacy tasks in a shared session it removes only the series rows and run log.
+
+## templates
+
+The agent templates an agent can be created from, for `create_agent` and `groups create --template`. There is no templates table; `list` is the only verb. Added after v2026.10.0.
+
+| Operation | Invocation | Access |
+| --- | --- | --- |
+| list | `ncl templates list [--registry]` | open |
+
+Without flags it lists the templates in the local templates directory and makes no network call. Only refs that `create_agent` accepts are listed. With `--registry` it lists the public template library from the library's `index.json`, and marks each template already on this machine. The library answer, or the failure to get one, is reused for 5 minutes. Rows carry `ref`, `name`, and `description`, plus `local` with `--registry`. Human output is one line per template: `<ref> [on this machine] - <description>`.
 
 ## user-dms
 

@@ -5,6 +5,7 @@ keywords: ["ncl", "cli", "admin", "unix socket", "cli_scope", "groups", "wirings
 ---
 
 {/* verified-against: src/cli/{dispatch,guard,registry,crud,args,parse-argv,client,format,frame,transport-errors,stdin-json,socket-server,help-render}.ts, src/cli/commands/{help,index,status}.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,policies,roles,sessions,tasks,user-dms,users,wirings,index}.ts, src/channels/channel-defaults.ts, src/types.ts, src/container-config.ts, src/host-sweep.ts, src/templates/{create-agent,local-dir}.ts, src/modules/cross-session-context/history.ts, src/modules/scheduling/create.ts, setup/service.ts, bin/ncl @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction) — templates resource, group-scope list: src/cli/resources/templates.ts, src/cli/registry.ts @ 3a68cc7c */}
 
 `ncl` is the admin CLI for a running NanoClaw host. It sends one request frame over a Unix socket at `data/ncl.sock` and prints the response — commands inspect and manage the running host's state, including central configuration and per-session mailboxes. The socket is `chmod 0600`, so only the user that started the host can connect.
 
@@ -48,7 +49,7 @@ Or, if installed as a service:
 The same command surface is exposed to agents inside containers. What an agent may do is controlled per group by `cli_scope` in its container config:
 
 - **`disabled`** — all `ncl` commands are rejected.
-- **`group`** (default) — the agent only sees the `groups`, `sessions`, `destinations`, `members`, and `tasks` resources, pinned to its own group: IDs are auto-filled, rows from other groups are filtered out, and it cannot change its own `cli_scope`. It also gets `wirings get`/`wirings update` for the current conversation's wiring only — the id is force-filled, and updates may only change `engage_mode`/`engage_pattern`.
+- **`group`** (default) — the agent only sees the `groups`, `sessions`, `destinations`, `members`, and `tasks` resources, pinned to its own group: IDs are auto-filled, rows from other groups are filtered out, and it cannot change its own `cli_scope`. It can also run `templates list`, which shows every group the same install-wide templates. It also gets `wirings get`/`wirings update` for the current conversation's wiring only — the id is force-filled, and updates may only change `engage_mode`/`engage_pattern`.
 - **`global`** — full access to every resource.
 
 Across most resources, mutating verbs (`create`, `update`, `delete`, `grant`, `restart`, ...) are approval-gated for agents: the agent gets `approval-pending` and an admin receives a card showing the exact command. The exception is `tasks` — every tasks verb, including `create` and `cancel`, is open to agents, since a task is scoped to the agent's own group. From the host socket, the same verbs run immediately — the socket file permissions are the auth boundary. Change the scope with:
@@ -70,7 +71,7 @@ ncl groups create --name "Research" --folder research
 ncl groups restart --id <group-id> --rebuild
 ```
 
-`create` also takes `--template <ref>` to stamp the new group from a [template](/templates/overview) — a ref relative to your local `templates/` directory, e.g. `<category>/<template>`. When a group already carries that template's plugin, the same command shows an in-place [update plan](/templates/updating) instead; `--yes` applies it and `--new` forces a second agent.
+`create` also takes `--template <ref>` to stamp the new group from a [template](/templates/overview) — a ref relative to your local `templates/` directory, e.g. `<category>/<template>`. It never downloads a template; see [templates](#templates) for what is available. When a group already carries that template's plugin, the same command shows an in-place [update plan](/templates/updating) instead; `--yes` applies it and `--new` forces a second agent.
 
 `restart` kills and respawns the group's containers (`--rebuild` rebuilds the image first — required after package changes; `--message <text>` leaves an on-wake instruction). `delete` cascades through sessions, wirings, roles, memberships, and destinations in one transaction.
 
@@ -138,6 +139,17 @@ ncl tasks pause --id <task-id>
 ```
 
 `create` needs `--group` and `--prompt`; `--recurrence` takes a cron expression, one-shot tasks use `--process-after`, and `--script` adds a pre-run bash gate. The full verb set (`run`, `resume`, `update`, `cancel`, `delete`, `append-log`) is in the [reference](/reference/ncl-cli#tasks); the workflow tour is in [Scheduled tasks](/guides/scheduled-tasks).
+
+### templates
+
+What an agent can be created from. Agents use this before they call `create_agent` with a template:
+
+```bash
+ncl templates list              # templates on this machine, no network
+ncl templates list --registry   # the public template library
+```
+
+`--registry` reads the library's index, marks the templates already on this machine, and reuses the answer for 5 minutes. Added after v2026.10.0. See [Using a template](/templates/using-templates#from-chat).
 
 ### dropped-messages
 

@@ -5,6 +5,7 @@ keywords: ["container config", "container_configs", "container.json", "provider"
 ---
 
 {/* verified-against: src/container-config.ts, src/config.ts, src/types.ts, src/db/container-configs.ts, src/db/migrations/{014,015,020,025}-*.ts, src/cli/resources/groups.ts, src/cli/guard.ts, src/cli/registry.ts, src/providers/provider-name.ts, src/container-runner.ts, src/drivers/types.ts, src/drivers/index.ts, container/agent-runner/src/config.ts, container/agent-runner/src/providers/{types,claude-config}.ts @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction) — templates resource, group-scope list: src/cli/resources/templates.ts, src/cli/registry.ts @ 3a68cc7c */}
 
 Each agent group has one row in the `container_configs` table in the central SQLite database — the source of truth for how that group's containers spawn. You change it with the [`ncl groups config` subcommands](/reference/ncl-cli#groups); the row is created automatically with defaults when the group is created.
 
@@ -71,7 +72,7 @@ Cap on how many pending messages are batched into a single prompt. The runner de
 Host-side enforcement of what the agent can do through the in-container `ncl` CLI. One of:
 
 - `disabled` — all CLI requests rejected; the CLI instructions fragment is also dropped from the composed CLAUDE.md (that part applies at next spawn)
-- `group` (default) — only `groups`, `sessions`, `destinations`, `members`, and `tasks` resources plus `wirings get`/`update` for the current conversation's wiring, auto-scoped to the agent's own group; the agent cannot change `cli_scope` itself
+- `group` (default) — only `groups`, `sessions`, `destinations`, `members`, and `tasks` resources plus `wirings get`/`update` for the current conversation's wiring, auto-scoped to the agent's own group, and `templates list`, which shows every group the same templates; the agent cannot change `cli_scope` itself
 - `global` — full resource access; mutations still require approval
 
 This is the only field **not** written to `container.json` — the host checks the database on every request. See [ncl CLI reference](/reference/ncl-cli#access-control) for the full enforcement rules.

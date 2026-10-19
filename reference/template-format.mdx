@@ -5,6 +5,7 @@ keywords: ["template format", "plugin.json", "mcp.json schema", "agent plugins 1
 ---
 
 {/* verified-against: src/templates/{parse,manifest,extension,mcp,skills,tasks,plugin-dir,local-dir,create-agent}.ts, src/container-config.ts, src/modules/self-mod/request.ts, src/modules/scheduling/create.ts, container/agent-runner/src/plugin-mcp.ts, container/agent-runner/src/providers/claude-config.ts @ 7203e00d (v2026.10.0); nanocoai/nanoclaw-templates scripts/check-templates.mjs @ 7d3cb404; providers branch container/agent-runner/src/providers/cwd-shim.ts @ 3959d1f0 */}
+{/* verified-against (scoped correction) — create_agent ref grammar and library fetch: src/templates/{local-dir,library}.ts, src/modules/agent-to-agent/create-agent.ts, src/cli/resources/templates.ts @ 3a68cc7c */}
 
 The precise rules a [template](/templates/overview) is validated against. For a walkthrough of building one, see [Building a template](/templates/building).
 
@@ -15,10 +16,10 @@ Templates are [Agent Plugins 1.0.0](https://agent-plugins.org) directories. Nano
 | Rule | Value |
 | --- | --- |
 | Base directory | `templates/` at the project root, or `NANOCLAW_TEMPLATES_DIR` |
-| Ref form | Relative path, resolved under the base directory. Single-segment refs resolve; the registry's own layout is `<category>/<template>` |
+| Ref form | Relative path, resolved under the base directory. Single-segment refs resolve; the registry's own layout is `<category>/<template>`. `create_agent` and `ncl templates list` take only refs whose `/`-separated parts start with a letter or digit and hold only letters, digits, `.`, `_`, and `-`, up to 128 characters in all |
 | Plugin root | The leaf folder of the ref |
 | Rejected | Absolute paths, a leading `~`, and any ref resolving outside the base directory |
-| Remote refs | Not supported. No git URLs, no `--source`, no fetch at `ncl` time |
+| Remote refs | Not supported. No git URLs and no `--source`; `ncl groups create --template` never fetches. `create_agent` can download a ref from the public template library into the base directory first (added after v2026.10.0) |
 
 `NANOCLAW_TEMPLATES_DIR` is a local path only, resolved once at load — never a URL, and never changed at runtime.
 

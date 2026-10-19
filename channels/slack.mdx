@@ -9,6 +9,7 @@ tag: "UPDATED"
 {/* verified-against: setup/channels/slack-auto.ts, setup/channels/slack-auto-register.ts, setup/channels/run-channel-skill.ts, setup/channels/companions.ts, setup/portal.ts, setup/slack-worker.ts, setup/auto.ts, src/community-portal/slack-job.ts, .claude/skills/slack-agent-flow/scripts/slack-agent-flow-finish.ts, .claude/skills/slack-agent-flow/src/modules/slack-agent-flow/provision.ts, .claude/skills/add-slack/SKILL.md @ 7203e00d (v2026.10.0); channels branch src/channels/{slack,slack-a2a-guard}.ts, src/provisioning/slack-app.ts, .claude/skills/slack-a2a-rooms/src/channels/slack-a2a.ts, .claude/skills/add-slack/SKILL.md, .claude/skills/slack-agent-flow/container/agent-runner/src/mcp-tools/rooms.ts @ d73e8f44 */}
 {/* verified-against (pasted tables, not re-checked in this sweep): channels branch src/channels/{slack,slack-raw-text}.ts @ 6d5c1d08 */}
 {/* verified-against (scoped correction) — direct messages sent through an app, channels-only bot DM reply: channels branch src/channels/{slack,slack-a2a-guard,chat-sdk-bridge}.ts, src/modules/slack-room-membership/membership.ts, src/modules/permissions/sender-approval.ts, src/provisioning/slack-app.ts, .claude/skills/{add-slack,slack-agent-flow}/SKILL.md @ d2407fe3 */}
+{/* verified-against (scoped correction) — template-built agents in the Slack flow: .claude/skills/slack-agent-flow/src/modules/slack-agent-flow/{index,orchestrate}.ts @ 3a68cc7c */}
 
 Give each NanoClaw agent its own identity in Slack. You can talk to an agent in a direct message, bring several agents into one shared room, and use a room canvas as shared working context.
 
@@ -152,6 +153,8 @@ Slack workspace policy still applies. A workspace that turns on Slack's Admin Ap
 The `slack-agent-flow` skill extends `create_agent` for sessions that start in Slack. Ask an existing Slack agent in plain language:
 
 > Create an agent called Research to compare the three deployment options.
+
+You can also ask for one [from a template](/templates/using-templates#from-chat). The flow carries the template through any approval and names it in its success message. With managed setup (a NanoClaw account sign-in), the new bot's avatar is generated from the template's description.
 
 <Steps>
   <Step title="Resolve the operator">
