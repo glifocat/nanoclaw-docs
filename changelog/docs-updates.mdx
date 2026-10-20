@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Provider code lives in skill payloads" description="2026-10-20" tags={["Updated"]}>
+  [Skills](/extend/overview), [Agent providers](/extend/providers), [Writing skills](/extend/writing-skills), [Contributing](/concepts/contributing) and [Upgrading](/operate/upgrading) now say that `/add-codex`, like `/add-opencode` and `/add-cursor`, copies its files from the skill's own `payload/` folder on `main`. Only channel adapters still come from a registry branch (`channels`). The `providers` branch is locked; releases from before nanoclaw #4104 still copy Codex from it.
+</Update>
+
 <Update label="Create agents from templates in chat" description="2026-10-19" tags={["Updated"]}>
   [Using a template](/templates/using-templates#from-chat) adds a third way to stamp an agent: ask an agent in chat. It finds templates with the new `ncl templates list` and `ncl templates list --registry`, then calls `create_agent` with a `template` ref, which downloads a template that isn't on this machine after any approval the request needs (nanoclaw #4112, added after v2026.10.0). [Agent MCP tools](/reference/mcp-tools#create_agent) documents the `template` parameter and what the approval card says, the [ncl reference](/reference/ncl-cli#templates) and [ncl CLI](/operate/ncl-cli#templates) add the `templates` resource, and `templates` joins the resources a `group`-scoped agent can use. [Templates](/templates/overview), [Template format](/reference/template-format) and [Updating](/templates/updating) say where downloaded templates land, that the project's `templates/` is now gitignored, and that `ncl groups create --template` still never downloads. [Slack](/channels/slack#create-agents-from-slack) covers template-built agents in the Slack flow.
 
