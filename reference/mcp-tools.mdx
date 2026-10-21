@@ -98,7 +98,7 @@ Provisions a long-lived companion agent: its own group, container, and persisten
 
 With `template`, the agent is stamped from that template instead: persona, skills, MCP servers, and paused tasks. A template that is not in the install's templates directory is downloaded from the public template library first; a local copy always wins and is never overwritten. The download runs only once the request is allowed and before anything is written, so a failed download creates nothing. Either way, the new agent runs on its creator's provider.
 
-**Approval-gated by CLI scope:** groups with `cli_scope: global` create directly; everything else (including the default `group` scope) requires admin approval. For a template request, the card names the template and says whether approving downloads it, and the approval covers only that name and template. There is no `send_to_agent` tool — messaging an agent is just `send_message` with `to` set to its name. See [Agent swarms](/guides/multi-agent-swarm).
+**Approval-gated by CLI scope:** groups with `cli_scope: global` create directly; everything else (including the default `group` scope) requires admin approval. For a template request, the card names the template and says whether approving downloads it, and the approval covers only that name and template ref. There is no `send_to_agent` tool — messaging an agent is just `send_message` with `to` set to its name. See [Agent swarms](/guides/multi-agent-swarm).
 
 ## Self-modification
 
