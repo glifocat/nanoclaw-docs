@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Multi-agent teams: the create-agent card quotes the name" description="2026-10-22" tags={["Updated"]}>
+  [Multi-agent teams](/guides/multi-agent-swarm) now shows the approval card for an agent's create-agent request with the new agent's name in quotes in the title, as the card an admin sees does (nanoclaw #4136, added after v2026.10.0).
+</Update>
+
 <Update label="Over-long questions and ncl approvals are refused, not cut" description="2026-10-22" tags={["Updated"]}>
   [Agent MCP tools](/reference/mcp-tools#ask_user_question) says that an `ask_user_question` whose title and question together run past 2,000 characters is refused with an error the agent can act on, and the [ncl reference](/reference/ncl-cli#access-control) says the same for an approval-gated command whose card would run past that length: it returns `invalid-args` and no card is sent. [Adapter interface](/reference/adapter-interface#the-chat-sdk-path) covers how the Chat SDK bridge splits long question text into blocks and the optional `maxCardTextLength` setting for platforms that cap a whole card (nanoclaw #4135, added after v2026.10.0).
 </Update>
