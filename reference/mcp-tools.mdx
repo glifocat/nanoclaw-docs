@@ -67,7 +67,7 @@ Scheduling is no longer an MCP tool. The `schedule_task`, `list_tasks`, `update_
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `title` | string | yes | Short card title |
-| `question` | string | yes | The question text |
+| `question` | string | yes | The question text. Title and question together can be at most 2,000 characters; a longer card is refused with an error so the agent can shorten it |
 | `options` | array | yes | Choices: plain strings or `{ label, selectedLabel?, value? }` objects |
 | `timeout` | number | no | Seconds to wait (default: 300) |
 
