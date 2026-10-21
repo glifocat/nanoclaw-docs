@@ -5,6 +5,7 @@ keywords: ["channels", "add-gchat", "add-github", "add-linear", "add-matrix", "a
 ---
 
 {/* verified-against: .claude/skills/add-{deltachat,emacs,github,gchat,linear,matrix,resend,webex,wechat,whatsapp-cloud}/SKILL.md, src/webhook-server.ts @ 7203e00d (v2026.10.0); channels branch src/channels/{deltachat,emacs,github,gchat,linear,matrix,resend,webex,wechat,whatsapp-cloud}.ts @ d73e8f44 */}
+{/* verified-against (scoped correction): Google Chat: .claude/skills/add-gchat/SKILL.md @ 09fcbb0b; channels branch src/channels/gchat.ts @ a9ecc371 */}
 
 These ten channels don't have a guided flow in the first-run setup wizard. Instead, each one is installed by running its `/add-<channel>` skill in Claude Code — Claude copies the adapter in from the `channels` branch, wires it into the registry, then walks you through credentials conversationally. The install pattern (fetch branch, copy adapter, wire barrel, pin package, build, collect credentials) is the same for every channel — see [Channels overview](/channels/overview) for the full model.
 
@@ -39,12 +40,16 @@ The agent participates in PR and issue comment threads as conversations. Require
 
 ## Google Chat
 
-Connects NanoClaw to Google Chat spaces through a Google Cloud Chat app backed by a service account.
+Connects NanoClaw to Google Chat spaces and direct messages through a Google Cloud Chat app backed by a service account. Build the Chat app as a Google Workspace add-on: the adapter ignores events from other Chat apps. An older app needs Google's [Convert to add-on](https://developers.google.com/workspace/chat/convert) steps first, and that conversion can't be undone.
 
-- **Transport:** Chat SDK bridge; point the Chat app's HTTP endpoint at `/webhook/gchat`
-- **Credentials:** `GCHAT_CREDENTIALS` — the service account JSON as a single-line string
+- **Transport:** Chat SDK bridge; in the Chat app's connection settings, choose **HTTP endpoint URL** and use one common URL for all triggers: `https://<your-public-host>/webhook/gchat`
+- **Credentials** (Google Chat won't start without the first three):
+  - `GCHAT_CREDENTIALS`: the service account JSON key on one line. The account needs no IAM roles.
+  - `GOOGLE_CHAT_ENDPOINT_URL`: the trigger URL, exactly as entered in the Chat app configuration
+  - `GOOGLE_CHAT_PROJECT_NUMBER`: your Google Cloud project number, digits only. The Chat app's Configuration page shows it inside the service account email `service-<digits>@gcp-sa-gsuiteaddons.iam.gserviceaccount.com`.
+  - Optional `GOOGLE_CHAT_BOT_USER_ID` (`users/<digits>`): needed only for @mentions in spaces
 - **Threads:** yes
-- **Install:** `/add-gchat`
+- **Install:** `/add-gchat`, which walks you through the Google Cloud setup
 
 ## Linear
 
