@@ -59,7 +59,7 @@ No container starts yet — like any agent, researcher's container spawns on its
 
 Why did that just work without asking you? Authorization depends on the calling group's `cli_scope` in its [container config](/reference/container-config). The wizard's first agent is trusted (`cli_scope: global`), so it creates directly. Every other group — including Scout, since `ncl groups create` leaves the default `group` scope — is a potential prompt-injection victim, so the host queues an approval instead. Ask Scout to create an agent and an approval card lands in an admin DM:
 
-> **Create agent: researcher**
+> **Create agent: "researcher"**
 >
 > Agent "Scout" wants to create a new sub-agent "researcher" (a new agent group with its own workspace and container). Approve?
 >
