@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Channel pages name the current Chat SDK adapter version" description="2026-10-22" tags={["Updated"]}>
+  The [Telegram](/channels/telegram), [Discord](/channels/discord) and [Teams](/channels/teams) pages now say their adapter is `@chat-adapter/<channel>` 4.41.1, the version the `/add-telegram`, `/add-discord` and `/add-teams` skills pin (nanoclaw #3570, added after v2026.10.0). The Discord and Teams pages no longer say the skill may pin a newer adapter than the page names.
+</Update>
+
 <Update label="Provider code lives in skill payloads" description="2026-10-20" tags={["Updated"]}>
   [Skills](/extend/overview), [Agent providers](/extend/providers), [Writing skills](/extend/writing-skills), [Contributing](/concepts/contributing) and [Upgrading](/operate/upgrading) now say that `/add-codex`, like `/add-opencode` and `/add-cursor`, copies its files from the skill's own `payload/` folder on `main`. Only channel adapters still come from a registry branch (`channels`). The `providers` branch is locked; releases from before nanoclaw #4104 still copy Codex from it.
 </Update>

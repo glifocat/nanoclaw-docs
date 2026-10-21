@@ -7,7 +7,7 @@ keywords: ["telegram", "botfather", "bot token", "add-telegram", "pairing code",
 {/* verified-against: .claude/skills/add-telegram/SKILL.md, setup/pair-telegram.ts, setup/channels/telegram-pre-step.ts @ 294ef2ae; channels branch src/channels/telegram.ts + telegram-pairing.ts @ 4a263658 */}
 {/* verified-against (scoped correction): token validation: .claude/skills/add-telegram/SKILL.md @ 7203e00d (v2026.10.0) */}
 
-The Telegram adapter connects NanoClaw to a bot you create through @BotFather. It's built on the Chat SDK bridge (`@chat-adapter/telegram` 4.29.0, pinned) and runs in **polling mode** — NanoClaw polls Telegram's Bot API for updates, so you don't need a public URL, webhook, or open port. Works behind NAT and on a laptop.
+The Telegram adapter connects NanoClaw to a bot you create through @BotFather. It's built on the Chat SDK bridge (`@chat-adapter/telegram` 4.41.1, pinned) and runs in **polling mode** — NanoClaw polls Telegram's Bot API for updates, so you don't need a public URL, webhook, or open port. Works behind NAT and on a laptop.
 
 Because a bot token carries no user binding (anyone who finds the bot's username can DM it), registration uses **pairing**: setup prints a one-time 6-digit code, and you prove you own a chat by sending the code from it.
 
