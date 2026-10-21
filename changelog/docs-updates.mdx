@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Adapter interface: escaping approval card text" description="2026-10-22" tags={["Updated"]}>
+  [Adapter interface](/reference/adapter-interface#the-chat-sdk-path) now lists the optional `escapeCardText` bridge setting. An adapter whose platform reads card text as its own markup passes it so that a sender or agent name inside an approval card cannot form markup; the card title and an agent's own questions are left as written (nanoclaw #4090, added after v2026.10.0).
+</Update>
+
 <Update label="Channel pages name the current Chat SDK adapter version" description="2026-10-22" tags={["Updated"]}>
   The [Telegram](/channels/telegram), [Discord](/channels/discord) and [Teams](/channels/teams) pages now say their adapter is `@chat-adapter/<channel>` 4.41.1, the version the `/add-telegram`, `/add-discord` and `/add-teams` skills pin (nanoclaw #3570, added after v2026.10.0). The Discord and Teams pages no longer say the skill may pin a newer adapter than the page names.
 </Update>

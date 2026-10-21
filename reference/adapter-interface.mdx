@@ -254,6 +254,7 @@ These feed the wiring defaults an operator gets when they don't pass explicit `-
 - **Raw-text recovery** — pass `extractRawText(raw)` to recover readable text that the SDK adapter leaves only in `message.raw`. Non-empty recovered text is appended to the serialized message body with a blank-line separator before the raw payload is discarded. Without an extractor, the body is unchanged.
 - **Attachments** — inbound attachments are downloaded and base64-embedded before serialization; outbound `message.files` are posted as uploads.
 - **Cards and actions** — `ask_user_question` renders as a card with buttons; clicks are decoded and dispatched to `onAction`, and the card is edited to show the selected answer.
+- **Card text escaping** — pass `escapeCardText(text)` if your platform reads card text as its own markup. The bridge runs the question text of host-built cards, open and resolved, through it, so a sender or agent name inside an approval card cannot form markup. The card title is left alone, and a question an agent asks for itself keeps its markup.
 - **Typing, subscribe, openDM** — `setTyping` maps to the SDK's typing indicator, `subscribe` to the SDK state adapter, and `openDM` is exposed when the underlying adapter implements it.
 
 You declare `supportsThreads` yourself — it's a product decision, not something the bridge infers.
