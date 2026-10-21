@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Google Chat: Workspace add-on and webhook keys" description="2026-10-21" tags={["Updated"]}>
+  [Google Chat](/channels/more-channels#google-chat) now says the Chat app must be built as a Google Workspace add-on, and lists every `.env` key `/add-gchat` sets. `GOOGLE_CHAT_ENDPOINT_URL` and `GOOGLE_CHAT_PROJECT_NUMBER` are required, since Google Chat checks each webhook against them and won't start without them. `GOOGLE_CHAT_BOT_USER_ID` is optional and only needed for @mentions in spaces (nanoclaw #4132, #4100).
+</Update>
+
 <Update label="Provider code lives in skill payloads" description="2026-10-20" tags={["Updated"]}>
   [Skills](/extend/overview), [Agent providers](/extend/providers), [Writing skills](/extend/writing-skills), [Contributing](/concepts/contributing) and [Upgrading](/operate/upgrading) now say that `/add-codex`, like `/add-opencode` and `/add-cursor`, copies its files from the skill's own `payload/` folder on `main`. Only channel adapters still come from a registry branch (`channels`). The `providers` branch is locked; releases from before nanoclaw #4104 still copy Codex from it.
 </Update>
