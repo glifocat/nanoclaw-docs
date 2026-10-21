@@ -36,7 +36,7 @@ Conventions that apply to every command:
 
 ## Access control
 
-Each operation has an access level: `open` or `approval`. **Host callers (your terminal) bypass approval entirely** — every command runs inline. When a containerized agent calls an `approval` operation, the command is not executed; an approval card goes to an admin, the call returns `approval-pending`, and on approval the host executes it and notifies the agent. Across the resources the rule is near-uniform: reads (`list`, `get`, `config get`) are `open` and mutations are `approval` — except `tasks`, where every verb is `open`: an agent scheduling its own future work is scoped to its own group and doesn't gate on an admin.
+Each operation has an access level: `open` or `approval`. **Host callers (your terminal) bypass approval entirely** — every command runs inline. When a containerized agent calls an `approval` operation, the command is not executed; an approval card goes to an admin, the call returns `approval-pending`, and on approval the host executes it and notifies the agent. The card shows the whole command line, so a command whose card would run past 2,000 characters (title plus text) is refused with `invalid-args` and no card is sent; the agent shortens the arguments and tries again. Across the resources the rule is near-uniform: reads (`list`, `get`, `config get`) are `open` and mutations are `approval` — except `tasks`, where every verb is `open`: an agent scheduling its own future work is scoped to its own group and doesn't gate on an admin.
 
 Agent callers are also subject to the group's `cli_scope` (set via `ncl groups config update --cli-scope`):
 

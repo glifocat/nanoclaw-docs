@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Over-long questions and ncl approvals are refused, not cut" description="2026-10-22" tags={["Updated"]}>
+  [Agent MCP tools](/reference/mcp-tools#ask_user_question) says that an `ask_user_question` whose title and question together run past 2,000 characters is refused with an error the agent can act on, and the [ncl reference](/reference/ncl-cli#access-control) says the same for an approval-gated command whose card would run past that length: it returns `invalid-args` and no card is sent. [Adapter interface](/reference/adapter-interface#the-chat-sdk-path) covers how the Chat SDK bridge splits long question text into blocks and the optional `maxCardTextLength` setting for platforms that cap a whole card (nanoclaw #4135, added after v2026.10.0).
+</Update>
+
 <Update label="Adapter interface: escaping approval card text" description="2026-10-22" tags={["Updated"]}>
   [Adapter interface](/reference/adapter-interface#the-chat-sdk-path) now lists the optional `escapeCardText` bridge setting. An adapter whose platform reads card text as its own markup passes it so that a sender or agent name inside an approval card cannot form markup; the card title and an agent's own questions are left as written (nanoclaw #4090, added after v2026.10.0).
 </Update>
