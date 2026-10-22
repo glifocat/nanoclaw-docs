@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Setup accepts Anthropic's newer API key types" description="2026-10-22" tags={["Updated"]}>
+  [Installation](/installation) and [Credentials](/operate/credentials#anthropic-credentials) now list the newer Anthropic Console API keys, user (`sk-ant-usr…`) and service-account (`sk-ant-svc…`), next to `sk-ant-api…`; setup's paste prompt used to refuse them. A user or service-account key must be scoped to one workspace, because NanoClaw sends no `anthropic-workspace-id` header. An OAuth token pasted at the API-key prompt is stored as an OAuth token (nanoclaw #4161, added after v2026.10.0).
+</Update>
+
 <Update label="Codex: the container's stand-in login carries the workspace id" description="2026-10-22" tags={["Updated"]}>
   [Agent providers](/extend/providers) no longer says the container sees only a placeholder `auth.json`. A ChatGPT login's stand-in now carries your ChatGPT workspace id, which Codex 0.156.0 and later look up before any model request. The id is not a credential; the tokens stay placeholders. The page says to refresh the gateway and `/add-codex` together, names the two host-log warnings that mean the id is missing or ambiguous, and gives the fix for each gateway: sign in again on Iron, and on OneCLI delete the extra or stale login, sign in again and grant the new login, then restart the agent's container so it gets the new stand-in (nanoclaw #4133, added after v2026.10.0).
 </Update>

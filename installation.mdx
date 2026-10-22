@@ -6,6 +6,7 @@ keywords: ["requirements", "docker", "node", "pnpm", "bun", "wsl", "launchd", "s
 ---
 
 {/* verified-against: nanoclaw.sh, setup.sh, setup/probe.sh, setup/auto.ts, setup/index.ts, setup/install-node.sh, setup/install-docker.sh, setup/container.ts, setup/service.ts, setup/set-env.ts, container/Dockerfile, container/pull.sh, versions.json, src/container-runtime.ts, src/container-runner.ts, src/claude-md-compose.ts, src/group-init.ts, src/config.ts, src/install-slug.ts, src/session-manager.ts, src/index.ts, package.json @ dce271c6 (main); runtime selection, identity, and state layout: src/drivers/index.ts, src/install-slug.ts, src/container-config.ts, src/project-doc-compose.ts, src/cli/resources/tasks.ts, src/mailbox/sqlite/schema.ts @ b76fcb3d */}
+{/* verified-against (scoped correction): accepted Anthropic API key types: setup/lib/anthropic-credential.ts @ 38beea0d (nanoclaw #4161) */}
 {/* verified-against (scoped correction): setup steps, skip flags, env vars, service proxy, OneCLI pin, Bun pin: setup/index.ts, setup/auto.ts, setup/service.ts, setup/gateways/install.ts, container/Dockerfile, .claude/skills/add-onecli/versions.json, .claude/skills/add-onecli/scripts/setup.ts, scripts/skill-directives.ts @ 7203e00d (v2026.10.0) */}
 
 This page is the depth companion to [Quick start](/quickstart): what the installer actually does, how to install by hand, how the background service works, and where everything lands on disk. If you just want a running assistant, run `bash nanoclaw.sh` and follow the wizard — quick start covers that flow end to end.
@@ -18,7 +19,7 @@ This page is the depth companion to [Quick start](/quickstart): what the install
 | RAM | 4 GB+. The installer warns below 3,700 MB (a "4 GB" VM typically reports 3,700–3,900 MB after kernel reserves) and lets you override. |
 | Node.js | 22 or newer on the host (`engines` in `package.json`). Installed or upgraded for you if needed. |
 | git | To clone the repository. Not auto-installed. |
-| Agent credential | A credential for the provider you pick at setup. Default **Claude**: a subscription (browser sign-in), an OAuth token (`sk-ant-oat…`), or an Anthropic API key (`sk-ant-api…`). Pick **Codex** instead and it's a ChatGPT subscription or an OpenAI API key. Either way it lands in the OneCLI vault, never the container. |
+| Agent credential | A credential for the provider you pick at setup. Default **Claude**: a subscription (browser sign-in), an OAuth token (`sk-ant-oat…`), or an Anthropic API key (`sk-ant-api…`, or a `sk-ant-usr…` or `sk-ant-svc…` key scoped to one workspace). Pick **Codex** instead and it's a ChatGPT subscription or an OpenAI API key. Either way it lands in the OneCLI vault, never the container. |
 
 Two hosts the installer explicitly flags in pre-flight:
 
