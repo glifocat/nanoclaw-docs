@@ -1,0 +1,114 @@
+---
+title: "Issue triage"
+description: "What happens after you open a NanoClaw issue: the four issue forms, the label lifecycle from kind to area to priority, and what every label means."
+keywords: ["triage", "issues", "labels", "issue forms", "kind", "area", "priority", "triage/unresolved", "triage/needs-repro", "delivery/skill", "contributing"]
+tag: "NEW"
+---
+
+{/* verified-against: .github/ISSUE_TEMPLATE/{bug-report,capability-request,documentation,security-hardening,config}.yml @ addadf1e (PR #3644); live label inventory via `gh label list` on nanocoai/nanoclaw, 2026-08-29 */}
+
+Every NanoClaw issue moves through the same small lifecycle, and labels tell you exactly where it is. This page explains that lifecycle and what each label means. The short version: **you never pick taxonomy labels yourself**. The issue form stamps the first ones, and maintainers do the rest.
+
+## Four ways in
+
+Pick the issue form that matches what you have. Each form asks only for what maintainers actually need, and each one stamps its own labels on submission:
+
+| Form | Use it when | Labels it applies |
+|---|---|---|
+| Bug report | Something is not working as expected | `kind/bug`, `triage/unresolved` |
+| Capability or skill request | You want NanoClaw to do something new (capabilities usually ship as [skills](/extend/overview)) | `kind/feature`, `delivery/skill`, `triage/unresolved` |
+| Documentation correction | A docs page is wrong, missing, or unclear | `kind/documentation`, `triage/unresolved` |
+| Security hardening | A public defense-in-depth idea that is not an exploitable vulnerability | `kind/hardening`, `triage/unresolved` |
+
+Two things never go through a public form:
+
+1. **Exploitable vulnerabilities.** [Report them privately](https://github.com/nanocoai/nanoclaw/security/advisories/new). A maintainer applies `kind/security` only when disclosure is safe.
+2. **Usage questions.** Ask in [GitHub Discussions](https://github.com/nanocoai/nanoclaw/discussions). Questions filed as issues get `kind/question` and a redirect.
+
+## The label lifecycle
+
+<Steps>
+  <Step title="The form stamps the starting labels">
+    Your issue arrives with one `kind/*` label and `triage/unresolved`; the capability form also adds `delivery/skill`. The `triage/unresolved` label means one thing: no maintainer has read this yet. It is applied by the form, not by a person.
+  </Step>
+  <Step title="A triager files it under exactly one area">
+    A maintainer reads the issue and applies exactly one `area/*` label: the primary subsystem the issue lives in. One area per issue, always. If an issue spans two subsystems, the triager picks the one where the fix will land. `triage/unresolved` comes off at this point; the issue is now triaged.
+  </Step>
+  <Step title="Priority is a maintainer call">
+    `priority/*` labels are maintainer-only. They reflect the maintainers' plan, not the reporter's urgency, so there is no need to ask for one. A well-written reproduction moves an issue faster than any priority request.
+  </Step>
+  <Step title="Some issues need one more thing from you">
+    `triage/needs-repro` means the issue is waiting on a minimal reproduction against a correctly configured deployment. It is the one label that hands the ball back to you: post the smallest setup that shows the problem, and triage continues from there.
+  </Step>
+</Steps>
+
+Nobody infers labels from keywords. `kind/security`, every priority, and every triage change after the starting stamp are applied by a human reading the issue.
+
+## What every label means
+
+### Kind: what the issue is
+
+Exactly one per issue. The first four come from the forms; the last three are maintainer-applied.
+
+| Label | Meaning |
+|---|---|
+| `kind/bug` | Something is not working as expected |
+| `kind/feature` | New capability or improvement |
+| `kind/documentation` | Documentation is wrong, missing, or unclear |
+| `kind/hardening` | Defense-in-depth improvement; not exploitable across a trust boundary |
+| `kind/question` | Usage or design question (belongs in Discussions) |
+| `kind/security` | Exploitable vulnerability crossing a trust boundary; report privately first |
+| `kind/cleanup` | Refactor or cleanup with no behavior change |
+
+### Area: where the issue lives
+
+Exactly one per triaged item, applied by the triager. The 16 areas mirror how this documentation portal is organized:
+
+| Label | Covers |
+|---|---|
+| `area/agent-memory` | The per-group `memory/` tree and standing instructions |
+| `area/agent-runner` | The in-container runtime: poll loop, formatting, delivery doors |
+| `area/channels` | Channel adapters, the registry, and the Chat SDK bridge |
+| `area/configuration` | Environment variables, config parsing, per-group settings |
+| `area/containers` | Container lifecycle, drivers, images, and host compatibility |
+| `area/core` | Cross-cutting host plumbing: router, delivery, message path |
+| `area/credentials` | The credential gateway, vault wiring, and secret handling |
+| `area/ncl-cli` | The `ncl` admin CLI (not the CLI channel; that is a channel) |
+| `area/providers` | Agent providers: Claude, Codex, OpenCode, Ollama, and the provider seam |
+| `area/repository-maintenance` | CI, workflows, templates, and repo tooling |
+| `area/scheduled-tasks` | Task scheduling, series, and run logs |
+| `area/security` | Trust boundaries, approvals, permissions, and guards |
+| `area/sessions` | Session identity, session modes, and the session DB pair |
+| `area/setup-installation` | The setup wizard, installers, and upgrade paths |
+| `area/skills` | Skill format, installers, and skill infrastructure |
+| `area/tools` | MCP tools and tool installers |
+
+### Triage: where the issue stands
+
+Human-owned, except the starting stamp.
+
+| Label | Meaning |
+|---|---|
+| `triage/unresolved` | Awaiting maintainer triage; applied by the issue forms |
+| `triage/needs-repro` | Waiting for a minimal reproduction against a correctly configured deployment |
+
+### Delivery: how the change ships
+
+| Label | Meaning |
+|---|---|
+| `delivery/skill` | Delivered as a skill; independent of kind |
+
+### Priority: when maintainers plan to act
+
+All four priority labels are maintainer-set, and they express relative scheduling order only: `priority/critical` (urgent) ahead of `priority/high`, then `priority/medium`, then `priority/low`. A priority label is not a promise about acceptance or timing.
+
+## How to help your issue move
+
+1. Use the matching form and fill the required fields; they exist because triage stalls without them.
+2. If you get `triage/needs-repro`, post the smallest reproduction you can.
+3. Skip the priority request; a crisp reproduction is the fastest accelerant there is.
+
+## Related pages
+
+- [Contributing to NanoClaw](/concepts/contributing) covers the repo layout, dev loop, and what changes get accepted.
+- The upstream [CONTRIBUTING.md](https://github.com/nanocoai/nanoclaw/blob/main/CONTRIBUTING.md) is canonical for process, PR templates included.
