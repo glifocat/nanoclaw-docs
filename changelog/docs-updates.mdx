@@ -5,6 +5,16 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Pages brought in line with current nanoclaw main" description="2026-11-08" tags={["Updated"]}>
+  Checked against nanoclaw `main` at 5356b6c3, 38 commits after 2026.10.1-rc.2, so some of these changes are not in a release yet. [Installation](/installation), [Quickstart](/quickstart) and [Introduction](/introduction) now give the current Node minimums (22.23.4, 24.22.1 or 26.12.1), Bun 1.4.4, the digest-pinned `node:22.23.4-slim` base, OneCLI 1.45.0 as the only supported gateway version, and Cursor next to Codex and OpenCode in the provider picker (nanoclaw #4183, #4193, #4094, #4107). The `SECRET_NAME` and `HOST_PATTERN` rows are gone.
+
+  The webhook server now listens on `WEBHOOK_HOST`, `127.0.0.1` by default, and answers unknown paths with a plain 404. [Configuration](/operate/configuration), [Environment variables](/reference/environment-variables), [Troubleshooting](/operate/troubleshooting), [Architecture](/concepts/architecture) and the Slack, Teams, Mattermost and other channel pages say so (nanoclaw #4185). Environment variables re-points every source line number.
+
+  [Credentials](/operate/credentials), [Dial](/channels/dial), [Tools](/extend/tools) and the [skills catalog](/reference/skills-catalog) describe OneCLI agent grants: a new agent gets only its model credential, any other secret must be granted to it, and a missing grant shows up as `access_restricted`. Secrets reach the vault through a 0600 file, never the command line (nanoclaw #4094, #4095, #4189, #4187). Pages that named OneCLI as the only gateway now say "credential gateway", OneCLI by default.
+
+  Smaller fixes: the skills catalog counts 54 skills and lists `/add-cursor`; OpenCode's removed attachment variables are gone from [Agent providers](/extend/providers) (nanoclaw #4172); [Container lifecycle](/concepts/container-lifecycle) gives the image reference order and the `poppler-utils` package (nanoclaw #4139, #4174); egress lockdown stops adopted containers that are not on the locked network (nanoclaw #4160); [Contributing](/concepts/contributing) matches the sharded CI; and the [CLI](/channels/cli), [ncl](/reference/ncl-cli), [Upgrading](/operate/upgrading), [Your first agent](/guides/first-agent), [WhatsApp](/channels/whatsapp), [Discord](/channels/discord) and [database schema](/reference/db-schema) pages fix details that had changed in the code.
+</Update>
+
 <Update label="Setup accepts Anthropic's newer API key types" description="2026-10-22" tags={["Updated"]}>
   [Installation](/installation) and [Credentials](/operate/credentials#anthropic-credentials) now list the newer Anthropic Console API keys, user (`sk-ant-usr…`) and service-account (`sk-ant-svc…`), next to `sk-ant-api…`; setup's paste prompt used to refuse them. A user or service-account key must be scoped to one workspace, because NanoClaw sends no `anthropic-workspace-id` header. An OAuth token pasted at the API-key prompt is stored as an OAuth token (nanoclaw #4161, added after v2026.10.0).
 </Update>
