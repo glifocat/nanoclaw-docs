@@ -6,12 +6,13 @@ keywords: ["ncl", "cli", "admin", "unix socket", "cli_scope", "groups", "wirings
 
 {/* verified-against: src/cli/{dispatch,guard,registry,crud,args,parse-argv,client,format,frame,transport-errors,stdin-json,socket-server,help-render}.ts, src/cli/commands/{help,index,status}.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,policies,roles,sessions,tasks,user-dms,users,wirings,index}.ts, src/channels/channel-defaults.ts, src/types.ts, src/container-config.ts, src/host-sweep.ts, src/templates/{create-agent,local-dir}.ts, src/modules/cross-session-context/history.ts, src/modules/scheduling/create.ts, setup/service.ts, bin/ncl @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — templates resource, group-scope list: src/cli/resources/templates.ts, src/cli/registry.ts @ 3a68cc7c */}
+{/* verified-against (scoped correction): resource count, no-systemd restart line: src/cli/resources/index.ts, src/cli/transport-errors.ts @ 5356b6c3 (nanoclaw #4206) */}
 
 `ncl` is the admin CLI for a running NanoClaw host. It sends one request frame over a Unix socket at `data/ncl.sock` and prints the response — commands inspect and manage the running host's state, including central configuration and per-session mailboxes. The socket is `chmod 0600`, so only the user that started the host can connect.
 
 Don't confuse it with the [CLI channel](/channels/cli), which is a chat adapter for talking *to an agent* from the terminal — `ncl` is for operating the host itself.
 
-This page is the working tour. The [ncl CLI reference](/reference/ncl-cli) has every operation, flag, and enum for all thirteen resources — including the operator-only [`policies`](/reference/ncl-cli#policies) gate for agent-to-agent messages.
+This page is the working tour. The [ncl CLI reference](/reference/ncl-cli) has every operation, flag, and enum for all fourteen resources — including the operator-only [`policies`](/reference/ncl-cli#policies) gate for agent-to-agent messages.
 
 ## Invoking ncl
 
@@ -42,6 +43,7 @@ Is the host running? Start it with: pnpm run dev
 Or, if installed as a service:
   macOS:  launchctl kickstart -k gui/$(id -u)/com.nanoclaw-v2-<slug>
   Linux:  systemctl --user restart nanoclaw-v2-<slug>
+  Linux without systemd (e.g. WSL):  bash start-nanoclaw.sh (from /path/to/nanoclaw)
 ```
 
 ## Agents can run ncl too
