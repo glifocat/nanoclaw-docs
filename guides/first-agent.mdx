@@ -5,6 +5,7 @@ keywords: ["tutorial", "first agent", "ncl groups create", "wirings", "messaging
 ---
 
 {/* verified-against: src/cli/resources/{groups,wirings,messaging-groups,sessions}.ts, src/cli/crud.ts, src/router.ts, src/channels/cli.ts, scripts/chat.ts, scripts/init-cli-agent.ts, src/group-init.ts, src/container-runner.ts, setup/auto.ts @ 639577c3; template behavior @ 20d61af; folder reuse and runtime names: src/cli/resources/groups.ts, src/drivers/docker-driver.ts @ b76fcb3d */}
+{/* verified-against (scoped correction): ncl human output shows install-timezone stamps and agent_provider, group folder contents after first spawn: src/cli/format.ts, src/cli/resources/groups.ts, src/types.ts, src/group-init.ts, container/agent-runner/src/memory/scaffold.ts, container/agent-runner/src/index.ts @ 5356b6c3 */}
 
 If you followed the [quickstart](/quickstart), the setup wizard already built your first agent. This tutorial builds a **second** one by hand, so you see every part the wizard hides: an **agent group** (the identity), a **messaging group** (the chat), and a **wiring** (the routing rule connecting them). We'll use the [CLI channel](/channels/cli) — it ships on trunk and needs zero platform credentials.
 
@@ -30,7 +31,8 @@ ncl groups create --name "Scout" --folder scout
   "id": "ag-3f2c9a1e-8b4d-4f6a-9c2e-d51b7a0e6f33",
   "name": "Scout",
   "folder": "scout",
-  "created_at": "2026-06-10T09:14:02.511Z"
+  "agent_provider": null,
+  "created_at": "2026-06-10 09:14"
 }
 ```
 
@@ -91,11 +93,11 @@ A `no_agent_engaged` drop row only appears when no wiring on the chat matched at
 </Step>
 <Step title="Inspect what was created">
 
-That first message triggered the first container spawn, which composed the one file creation left out:
+That first message triggered the first container spawn, which composed `CLAUDE.md` and scaffolded the `memory/` tree (`plugins/` was made at create time):
 
 ```bash
 ls groups/scout/
-# CLAUDE.md
+# CLAUDE.md  memory  plugins
 ```
 
 `CLAUDE.md` is the composed instructions file the host regenerates on every spawn — don't edit it. The agent's editable standing instructions live in `instructions.prepend.md`, composed into the top of `CLAUDE.md` at every spawn. Groups created via `ncl` don't have that file yet — create it to give Scout a personality and standing instructions (see [customize an agent](/guides/customize-an-agent)). Durable facts the agent accumulates over time live in its `memory/` tree.
