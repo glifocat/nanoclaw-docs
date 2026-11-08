@@ -6,6 +6,7 @@ keywords: ["migration", "v1", "v2", "upgrade", "OpenClaw", "migrate-v2.sh", "mig
 ---
 
 {/* verified-against: migrate-v2.sh, migrate-v2-reset.sh, setup/migrate-v2/{env,db,groups,sessions,tasks,channel-auth,select-channels}.ts, setup/gateways/{catalog,selection,install,step,auth-step}.ts, .claude/skills/add-onecli/scripts/auth.ts, .claude/skills/add-onecli/gateway.json, src/config.ts, src/install-slug.ts, setup/install-*.sh, .claude/skills/migrate-from-v1/SKILL.md, .claude/skills/migrate-from-openclaw/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md @ 7203e00d (v2026.10.0); channels branch setup/ tree @ d73e8f44 */}
+{/* verified-against (scoped correction): hardened image source in Phase 3: migrate-v2.sh, container/pull.sh, container/release-image.sh @ 5356b6c3 (nanoclaw #4139) */}
 
 NanoClaw v2 is a ground-up rewrite — you don't upgrade in place, you migrate into a fresh v2 checkout. There are two supported paths:
 
@@ -94,7 +95,7 @@ The script is idempotent — re-running it skips what's already done, so a faile
   </Step>
 
   <Step title="Phase 3: infrastructure">
-    Installs Docker if missing, sets up the credential gateway (the one already installed, otherwise the default, OneCLI), and registers your Anthropic credential through it. With OneCLI, a key or token already in `.env` (`ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN`) is moved into the vault and removed from `.env`, not skipped. The step then copies v1 container skills v2 doesn't have and acquires the agent container image — it builds one unless `.env` has `NANOCLAW_HARDENED_IMAGE=true`, in which case it fetches the pinned image instead (see [Get started with the Echo hardened runtime](/guides/echo-hardened-runtime)).
+    Installs Docker if missing, sets up the credential gateway (the one already installed, otherwise the default, OneCLI), and registers your Anthropic credential through it. With OneCLI, a key or token already in `.env` (`ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_AUTH_TOKEN`) is moved into the vault and removed from `.env`, not skipped. The step then copies v1 container skills v2 doesn't have and acquires the agent container image — it builds one unless `.env` has `NANOCLAW_HARDENED_IMAGE=true`, in which case it fetches the pre-built image instead: the one published for your checkout's release, or the `agent-image` pin in `versions.json` when none is listed (see [Get started with the Echo hardened runtime](/guides/echo-hardened-runtime)).
   </Step>
 
   <Step title="Service switchover">

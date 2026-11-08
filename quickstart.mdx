@@ -10,6 +10,7 @@ import { TerminalMenu, SetupCheck } from "/snippets/setup-visuals.jsx";
 
 {/* verified-against: setup sequence, exact prompt labels, fresh terminal agent creation, channel handoff, and final checks: setup/auto.ts, setup/channels/initial-setup.ts, setup/lib/bright-select.ts, scripts/chat.ts @ b76fcb3d; prerequisites and bootstrap: nanoclaw.sh, setup.sh @ b76fcb3d. Synthetic menu illustrations: setup/auto.ts, setup/providers/registry.ts, setup/lib/bright-select.ts @ b76fcb3d, inspected 2026-09-05; simplified presentation with exact questions/options, omitted hints/output, and the guide's choice highlighted (not necessarily the default). These are not installation captures. Existing NanoClaw browser screenshots are reused from the hardened-runtime guide; they are reference captures, not a recording of this verification. */}
 {/* verified-against (scoped correction): sandbox image prompt, provider picker, Claude sign-in labels, final check: setup/auto.ts, setup/portal.ts, .claude/skills/add-onecli/scripts/auth.ts, .claude/skills/add-onecli/scripts/register-claude-token.sh, .claude/skills/add-codex/SKILL.md, .claude/skills/add-opencode/SKILL.md @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction): provider picker options, Claude sign-in success line: setup/auto.ts, setup/providers/skill-descriptor.ts, .claude/skills/add-cursor/SKILL.md, .claude/skills/add-onecli/scripts/{auth.ts,register-claude-token.sh} @ 5356b6c3 (nanoclaw #4107, #4094, #4187) */}
 
 {/* Scoped verification, 2026-09-05: access-rule defaults/preservation in setup/auto.ts and setup/mounts.ts; channel preparation in executable .claude/skills/add-{telegram,whatsapp}/SKILL.md and setup/channels/slack-auto.ts @ b76fcb3d. Time allowance is editorial planning guidance, not a timed installation result. */}
 
@@ -142,11 +143,11 @@ NanoClaw installs the other software it needs. If you choose the recommended dow
     If you chose the Codex path, select **Codex** instead and follow its sign-in prompts. See [other AI accounts](#other-ai-accounts).
 
     <TerminalMenu screens={[
-      { question: "Which agent runtime should power your assistant?", options: ["Claude", "Codex", "OpenCode"], selected: 0 },
+      { question: "Which agent runtime should power your assistant?", options: ["Claude", "Codex", "Cursor", "OpenCode"], selected: 0 },
       { question: "How would you like to connect to Claude?", options: ["Claude subscription", "Paste an OAuth token", "Paste an Anthropic API key", "Skip for now"], selected: 0 }
     ]} />
 
-    <SetupCheck>When the browser sign-in finishes, Terminal shows <strong>Done.</strong> after saving your sign-in to the vault. Return to Terminal if you're still in the browser.</SetupCheck>
+    <SetupCheck>When the browser sign-in finishes, Terminal shows <strong>Claude account connected.</strong> after saving your sign-in to the vault. Return to Terminal if you're still in the browser.</SetupCheck>
 
     When Terminal says **Setting your assistant's access rules…**, setup is configuring which extra folders on your computer can be shared with your assistant. On a fresh installation, that list starts empty. Your assistant still has its own workspace; you do not need to share personal folders to complete this guide. If you already have access rules, setup keeps them.
 
