@@ -5,6 +5,7 @@ keywords: ["channels", "adapters", "channel registry", "chat sdk", "webhook", "a
 ---
 
 {/* verified-against: src/channels/{adapter,channel-registry,channel-defaults,index,chat-sdk-bridge,cli}.ts, src/webhook-server.ts, setup/auto.ts, setup/channels/{run-channel-skill,slack-auto-register,slack-auto}.ts, .claude/skills/{manage-channels,add-telegram}/SKILL.md @ 53ea1e8b; channels branch src/channels/, src/modules/{slack-room-membership,canvas-actions,slack-onboarding,slack-agent-flow}/, .claude/skills/{add-slack,slack-agent-flow,slack-a2a-rooms}/SKILL.md @ d69c9c5d; Dial: .claude/skills/add-dial/SKILL.md, setup/auto.ts picker @ 475ba766, channels branch src/channels/dial.ts @ a45fab71; Mattermost: .claude/skills/add-mattermost/SKILL.md, setup/channels/initial-setup.ts @ 294ef2ae, channels branch src/channels/mattermost.ts @ 4a263658; rerun behavior and Slack companion location: .claude/skills/{add-telegram,add-whatsapp,add-slack}/SKILL.md, setup/channels/{slack-auto-register,run-channel-skill}.ts @ b76fcb3d; registry browser channel: channels branch src/channels/{index,local-web}.ts @ 6d5c1d08 */}
+{/* verified-against (scoped correction): webhook listen host; /add-mattermost never installs a server: src/config.ts, src/webhook-server.ts, .claude/skills/add-mattermost/SKILL.md, setup/channels/initial-setup.ts @ 5356b6c3 (nanoclaw #4185, #3777) */}
 
 NanoClaw trunk ships channel **infrastructure** — the adapter interface, the registry, the Chat SDK bridge, the webhook server — plus one built-in channel: `cli`, an always-on local-terminal channel that needs no credentials. Every platform adapter (Telegram, Discord, Slack, WhatsApp, …) lives on the `channels` branch of the repo and is installed on demand with an `/add-<channel>` skill. Your fork only contains the channels you actually use.
 
@@ -57,7 +58,7 @@ Messaging platforms with install skills. "Setup wizard" means the first-run setu
 | Telegram | Yes | `/add-telegram` | Chat SDK; BotFather token, pair-code chat registration |
 | Discord | Yes | `/add-discord` | Chat SDK; Gateway listener — no public URL needed; thread-based |
 | Slack | Yes | `/add-slack` | Managed or manual app setup; Socket Mode or webhook delivery. Per-agent bot identities, shared rooms, and canvases come from the separate `/slack-a2a-rooms` and `/slack-agent-flow` skills |
-| Mattermost | Yes | `/add-mattermost` | Vendored Chat SDK adapter; WebSocket inbound (no public URL for chat); reuses your server or creates a local evaluation server; authenticated card callbacks |
+| Mattermost | Yes | `/add-mattermost` | Vendored Chat SDK adapter; WebSocket inbound (no public URL for chat); reuses your server or links Mattermost's own setup guides (never installs a server); authenticated card callbacks |
 | Signal | Yes | `/add-signal` | Native; requires signal-cli with a linked account |
 | iMessage | Yes | `/add-imessage` | Local backend: Chat SDK on this Mac (Full Disk Access); hosted backend: native adapter via photon.codes (`spectrum-ts`) |
 | Microsoft Teams | Yes | `/add-teams` | Chat SDK; webhook-based; thread-based |
@@ -87,7 +88,7 @@ Chat SDK channels that receive platform events over HTTP (Slack, Teams, GitHub, 
 
 The routing path defaults to the adapter name, so single-instance routes are unchanged; a second adapter of the same platform passes an `instance` and listens on `/webhook/{instance}` with its own signing secret. Modules that need a non–Chat SDK endpoint (a custom GitHub webhook, a payment provider, a health check) register a raw handler on the same server with `registerWebhookHandler(path, handler)` instead of opening a second port — raw routes take priority over adapter routes.
 
-The port comes from the `WEBHOOK_PORT` environment variable, default `3000`. Point the platform's event subscription URL at `https://<your-public-host>/webhook/<channel>` (e.g. `/webhook/slack`); you'll need a public URL or a tunnel for these channels. Discord is the exception: it uses a persistent Gateway listener instead of inbound webhooks, so no public URL is required. Telegram (long polling), WhatsApp, Signal, Dial, and WeChat hold their own outbound connections, so they don't need one either. Mattermost is a hybrid: chat arrives over its own outbound WebSocket (no public URL), but approval-card clicks come back on `/webhook/mattermost`; that route only needs to be reachable from the Mattermost server, not from the public internet. Slack needs a public URL only in webhook mode: in Socket Mode (the setup default) it holds an outbound WebSocket like Discord, so no public URL is required.
+The server listens on `WEBHOOK_HOST` (default `127.0.0.1`) and `WEBHOOK_PORT` (default `3000`). A tunnel or reverse proxy on the same machine reaches the loopback default as is; when the proxy, or a Mattermost server that calls NanoClaw directly, runs on another machine or in Docker on Linux, set `WEBHOOK_HOST=0.0.0.0` in `.env` (it must be an IP address) and restart. Point the platform's event subscription URL at `https://<your-public-host>/webhook/<channel>` (e.g. `/webhook/slack`); you'll need a public URL or a tunnel for these channels. Discord is the exception: it uses a persistent Gateway listener instead of inbound webhooks, so no public URL is required. Telegram (long polling), WhatsApp, Signal, Dial, and WeChat hold their own outbound connections, so they don't need one either. Mattermost is a hybrid: chat arrives over its own outbound WebSocket (no public URL), but approval-card clicks come back on `/webhook/mattermost`; that route only needs to be reachable from the Mattermost server, not from the public internet. Slack needs a public URL only in webhook mode: in Socket Mode (the setup default) it holds an outbound WebSocket like Discord, so no public URL is required.
 
 ## Wiring channels to agents
 
@@ -120,7 +121,7 @@ If you're setting up your very first channel, `/init-first-agent` handles the wh
     Managed apps, agent rooms, canvases
   </Card>
   <Card title="Mattermost" icon="server" href="/channels/mattermost">
-    Your server or a local evaluation stack
+    Connect your own server
   </Card>
   <Card title="Signal" icon="message-circle" href="/channels/signal">
     signal-cli linked device

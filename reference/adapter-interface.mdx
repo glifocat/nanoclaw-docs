@@ -6,6 +6,7 @@ keywords: ["channel adapter", "ChannelAdapter", "adapter interface", "custom cha
 
 {/* verified-against: src/webhook-server.ts @ 639577c3; src/channels/{adapter,channel-registry,chat-sdk-bridge,index}.ts, src/router.ts + src/delivery.ts hook seams, container/agent-runner/src/mcp-tools/server.ts, setup/channels/companions.ts @ 294ef2ae; channels branch src/channels/telegram.ts @ 6ee516ad; raw-text recovery and conversation metadata: src/channels/adapter.ts, src/channels/chat-sdk-bridge.ts @ b76fcb3d */}
 {/* verified-against (scoped correction): isConnected and onAction signatures; Telegram worked example: src/channels/adapter.ts, src/channels/chat-sdk-bridge.ts, src/cli/commands/status.ts @ 7203e00d (v2026.10.0); channels branch src/channels/telegram.ts @ d73e8f44 */}
+{/* verified-against (scoped correction): webhook listen host; Telegram worked example keeps commands as messages: src/config.ts, src/webhook-server.ts @ 5356b6c3 (nanoclaw #4185); channels branch src/channels/telegram.ts @ f766e990 */}
 
 A channel adapter bridges NanoClaw with a messaging platform. There are two ways to build one:
 
@@ -248,7 +249,7 @@ These feed the wiring defaults an operator gets when they don't pass explicit `-
 `createChatSdkBridge(config)` from `src/channels/chat-sdk-bridge.ts` wraps a Chat SDK `Adapter` into a complete `ChannelAdapter`. What it handles for you:
 
 - **Inbound dispatch** — wires all four SDK paths (subscribed threads, new mentions, DMs, plain messages) into `onInbound`, with the platform-confirmed `isMention` flag set correctly for each.
-- **Webhook or gateway registration** — gateway-capable adapters (Discord) get a supervised gateway listener with exponential backoff; non-gateway adapters are registered on the shared webhook server unless their runtime mode is `polling` at `/webhook/{routingPath}` (port `WEBHOOK_PORT`, default 3000). The routing path defaults to the adapter name, so single-instance routes are unchanged; a second instance of the same platform passes an `instance` and registers on `/webhook/{instance}` with its own signing secret and Chat SDK state namespace. Modules can also claim a raw `/webhook/{path}` for non–Chat SDK webhooks via `registerWebhookHandler()` — raw routes take priority over adapter routes.
+- **Webhook or gateway registration** — gateway-capable adapters (Discord) get a supervised gateway listener with exponential backoff; non-gateway adapters are registered on the shared webhook server unless their runtime mode is `polling` at `/webhook/{routingPath}` (host `WEBHOOK_HOST`, default `127.0.0.1`; port `WEBHOOK_PORT`, default 3000). The routing path defaults to the adapter name, so single-instance routes are unchanged; a second instance of the same platform passes an `instance` and registers on `/webhook/{instance}` with its own signing secret and Chat SDK state namespace. Modules can also claim a raw `/webhook/{path}` for non–Chat SDK webhooks via `registerWebhookHandler()` — raw routes take priority over adapter routes.
 - **Chunking** — set `maxTextLength` and outbound text longer than the platform limit is split on paragraph → line → word (space) → hard-character boundaries into multiple messages. Files ride on the first chunk, and the first chunk's id is returned so edits and reactions still target the head of the reply. Without it, platforms like Discord (2000) and Telegram (4096) truncate silently.
 - **Reply context** — pass `extractReplyContext` to pull quoted-reply text and sender out of the platform's raw message.
 - **Raw-text recovery** — pass `extractRawText(raw)` to recover readable text that the SDK adapter leaves only in `message.raw`. Non-empty recovered text is appended to the serialized message body with a blank-line separator before the raw payload is discarded. Without an extractor, the body is unchanged.
@@ -273,6 +274,7 @@ export function createTelegramBridge(options: TelegramBridgeOptions = {}): Chann
     botToken: token,
     mode: 'polling',
   });
+  keepCommandsAsMessages(telegramAdapter);
   const bridge = createChatSdkBridge({
     adapter: telegramAdapter,
     instance: options.instanceKey, // undefined ⇒ default instance (keyed by channelType)

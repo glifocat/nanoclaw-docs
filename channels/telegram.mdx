@@ -6,6 +6,7 @@ keywords: ["telegram", "botfather", "bot token", "add-telegram", "pairing code",
 
 {/* verified-against: .claude/skills/add-telegram/SKILL.md, setup/pair-telegram.ts, setup/channels/telegram-pre-step.ts @ 294ef2ae; channels branch src/channels/telegram.ts + telegram-pairing.ts @ 4a263658 */}
 {/* verified-against (scoped correction): token validation: .claude/skills/add-telegram/SKILL.md @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction): example token length, adapter formatting version: .claude/skills/add-telegram/SKILL.md @ 5356b6c3; channels branch src/channels/telegram.ts @ f766e990 */}
 
 The Telegram adapter connects NanoClaw to a bot you create through @BotFather. It's built on the Chat SDK bridge (`@chat-adapter/telegram` 4.41.1, pinned) and runs in **polling mode** — NanoClaw polls Telegram's Bot API for updates, so you don't need a public URL, webhook, or open port. Works behind NAT and on a laptop.
 
@@ -15,7 +16,7 @@ Because a bot token carries no user binding (anyone who finds the bot's username
 
 - A Telegram account (any device) to create the bot and chat with it
 - A working NanoClaw install ([quickstart](/quickstart))
-- A bot token from @BotFather — format `<digits>:<chars>` (e.g. `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`). The wizard walks you through creating one if you don't have it yet.
+- A bot token from @BotFather — format `<digits>:<chars>` (e.g. `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11a`). The wizard walks you through creating one if you don't have it yet.
 
 ## Install
 
@@ -53,7 +54,7 @@ If the picker is unavailable, add the bot to the group manually and post `/start
 - **The service must be running to pair** — the polling adapter is what observes the code. If pairing waits forever, check that NanoClaw is up.
 - **Group privacy**: by default Telegram bots only see @mentions and `/commands` in groups. To let the bot see all messages: @BotFather → `/mybots` → your bot → **Bot Settings** → **Group Privacy** → **Turn off** (then remove and re-add the bot to existing groups). With privacy ON you can still pair by prefixing the code: `@<botname> 123456`.
 - **No threads** — the adapter sets `supportsThreads: false`; every inbound message has a null thread ID. Wirings with `per-thread` session mode behave like `shared` here — see the [entity model](/concepts/entity-model).
-- **Formatting**: `@chat-adapter/telegram` 4.29 parses outbound text as CommonMark and renders escaped MarkdownV2 itself, so `**bold**`, lists, and links come out correctly with no NanoClaw-side rewriting. The legacy-Markdown sanitizer earlier versions shipped is gone.
+- **Formatting**: `@chat-adapter/telegram` 4.29 and later parse outbound text as CommonMark and renders escaped MarkdownV2 itself, so `**bold**`, lists, and links come out correctly with no NanoClaw-side rewriting. The legacy-Markdown sanitizer earlier versions shipped is gone.
 - **Long replies** — outbound messages are split at 4,000 characters (paragraph breaks preferred), staying under Telegram's 4,096 limit. Attachments ride on the first chunk.
 - **Replies and IDs** — replying to a message passes the quoted text and sender to the agent as context. Chats are identified as `telegram:<chatId>`; negative chat IDs are groups.
 - **Startup resilience** — adapter setup retries transient network failures with exponential backoff (up to 5 attempts) before surfacing the error.

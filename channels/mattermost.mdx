@@ -5,6 +5,7 @@ keywords: ["mattermost", "add-mattermost", "self-hosted", "bot account", "websoc
 ---
 
 {/* verified-against: .claude/skills/add-mattermost/{SKILL.md,SERVER_SETUP.md,REMOVE.md}, .claude/skills/add-mattermost/scripts/{configure.ts,verify-runtime.ts,discover-server.mjs,select-server.mjs,read-response.mjs}, setup/channels/initial-setup.ts, setup/channels/fixtures/mattermost/README.md @ 7203e00d (v2026.10.0); channels branch src/channels/mattermost.ts, src/channels/mattermost-adapter/{adapter,websocket,index}.ts @ d73e8f44 */}
+{/* verified-against (scoped correction): webhook listen host for card callbacks: src/config.ts, .claude/skills/add-mattermost/SKILL.md, setup/channels/fixtures/mattermost/README.md @ 5356b6c3 (nanoclaw #4185) */}
 
 The Mattermost adapter connects NanoClaw to a Mattermost server you control, self-hosted or cloud. NanoClaw connects to a server; it does not install or manage one. It supports DMs, channels, threads, files, reactions, and interactive approval cards. Messages arrive over Mattermost's WebSocket, so no public URL is needed for inbound chat; card clicks return to NanoClaw over an authenticated HTTP callback.
 
@@ -15,7 +16,7 @@ Unlike most Chat SDK channels, the adapter is not an npm package: `/add-mattermo
 - A working NanoClaw install ([quickstart](/quickstart))
 - A running Mattermost server (the skill links Mattermost's own evaluation and deployment guides if you do not have one)
 - System Admin access to that server, to enable bot account creation and to set `SiteURL` if it is wrong
-- For approval cards: a URL for NanoClaw that is reachable **from the Mattermost server** (not from your browser)
+- For approval cards: a URL for NanoClaw that is reachable **from the Mattermost server** (not from your browser); if Mattermost runs on another machine or in Docker on Linux, that also means setting `WEBHOOK_HOST=0.0.0.0`, because the webhook server listens on `127.0.0.1` by default
 
 ## Install
 
@@ -35,7 +36,7 @@ Mattermost is offered in the first-run setup wizard, or add it later by running 
     Two different places in Mattermost: first, as a System Admin, turn on **System Console → Integrations → Bot Accounts → Enable Bot Account Creation** (this only permits creation). Then, back in the workspace, create the bot under **Product menu → Integrations → Bot Accounts → Add Bot Account** and copy its access token. Add the bot to each team and channel it should hear. Mattermost never adds bots to teams or channels automatically. The skill verifies the token against `/api/v4/users/me`.
   </Step>
   <Step title="Configure authenticated card callbacks">
-    Approval cards require the Mattermost **server** to reach NanoClaw. You provide a callback URL routable from the server (NanoClaw's base URL or the full `/webhook/mattermost` route; the adapter normalizes either). Mattermost does not sign action callbacks, so the skill generates a random shared secret (kept across re-runs so existing cards keep working); a callback without it is refused with `401` before anything is dispatched. If `MATTERMOST_CALLBACK_SECRET` is ever blank, the adapter derives a secret from the bot token instead, and cards posted before the token changes stop working. For a private callback host, add it under **System Console → Environment → Developer → Allow untrusted internal connections**.
+    Approval cards require the Mattermost **server** to reach NanoClaw. You provide a callback URL routable from the server (NanoClaw's base URL or the full `/webhook/mattermost` route; the adapter normalizes either). NanoClaw's webhook server listens on `127.0.0.1` by default, so a URL served by a tunnel or proxy on this machine works as is; if Mattermost calls NanoClaw directly from another machine or from Docker on Linux (for example `http://host.docker.internal:3000/webhook/mattermost`), add `WEBHOOK_HOST=0.0.0.0` to `.env` first. Mattermost does not sign action callbacks, so the skill generates a random shared secret (kept across re-runs so existing cards keep working); a callback without it is refused with `401` before anything is dispatched. If `MATTERMOST_CALLBACK_SECRET` is ever blank, the adapter derives a secret from the bot token instead, and cards posted before the token changes stop working. For a private callback host, add it under **System Console → Environment → Developer → Allow untrusted internal connections**.
   </Step>
   <Step title="Resolve the owner's DM">
     The skill asks for your Mattermost username (without `@`), resolves it against `/api/v4/users/username/<name>`, checks the user ID the server returns before using it, and opens the DM between you and the bot, capturing the `mattermost:<channel-id>` platform ID that `/init-first-agent` wires as your first chat.
@@ -62,7 +63,7 @@ The `/add-mattermost` skill carries the full troubleshooting list; the high poin
 - **The token check returns 401**: the token is stale, mistyped, or belongs to a deactivated bot. Create a replacement token, then deactivate the old one after the replacement works.
 - **The bot ignores a channel**: add it to that team *and* channel. Membership changes are observed, but restarting NanoClaw forces a fresh subscription.
 - **Desktop messages appear only after a manual refresh**: the server is rejecting the WebSocket `Origin`. Use the same host name in the Desktop server URL, `MATTERMOST_BASE_URL`, and `ServiceSettings.SiteURL`; keep `WebsocketURL` blank; check server logs for `request origin not allowed`. Do not "fix" this by changing `ServiceSettings.AllowCorsFrom`.
-- **Cards render but clicks do nothing**: from the Mattermost server, POST to the callback URL. A `401` proves the path reaches NanoClaw; a timeout or refusal means routing or firewall failure.
+- **Cards render but clicks do nothing**: from the Mattermost server, POST to the callback URL. A `401` proves the path reaches NanoClaw; a timeout or refusal means routing or firewall failure, or that the webhook server is still on its `127.0.0.1` default (add `WEBHOOK_HOST=0.0.0.0` to `.env` and restart).
 - **Messages arrive but no agent runs**: inspect `ncl dropped-messages list` and `ncl wirings list`. `no_agent_wired` means approval is pending or no wiring exists; it is not an adapter failure.
 
 For service-level checks (logs, restarts, wiring queries), see [troubleshooting](/operate/troubleshooting).
