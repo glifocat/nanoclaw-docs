@@ -8,6 +8,7 @@ keywords: ["hardening", "security", "egress lockdown", "NANOCLAW_EGRESS_LOCKDOWN
 {/* verified-against (scoped correction) — channels-only Slack bot under decline_notify: src/modules/permissions/sender-approval.ts @ 15c6124f; channels branch src/modules/slack-room-membership/membership.ts @ d2407fe3 */}
 {/* verified-against (scoped correction) — sweep timer env overrides NANOCLAW_ABSOLUTE_CEILING_MS / NANOCLAW_CLAIM_STUCK_MS: src/{config,reconcile-session}.ts @ 2105169d */}
 {/* verified-against (scoped correction) — src/config.ts line anchor re-pointed @ f2224a2f */}
+{/* verified-against (scoped correction): non-internal egress network refusal, gateway-neutral injection, line anchors re-pointed: src/egress-lockdown.ts, src/config.ts, container/Dockerfile, src/container-runner.ts, src/gateway-providers/index.ts @ 5356b6c3 (nanoclaw #4160) */}
 
 NanoClaw's isolation boundary is the Docker container: each agent runs in its own container with a scoped workspace mount (see [Container lifecycle](/concepts/container-lifecycle)). There is no micro-VM or alternative sandbox runtime — hardening means tightening what those containers can reach. This page walks the defense-in-depth controls from network to filesystem to people.
 
@@ -19,9 +20,9 @@ By default, agent containers have normal outbound internet access. Set `NANOCLAW
 - The selected gateway's container is attached to that network, so the injected proxy is the only reachable hop. For OneCLI that is the container named `onecli` (override with `ONECLI_GATEWAY_CONTAINER`), attached with the alias `host.docker.internal`. For Iron Proxy it is this install's Iron Proxy container, attached with the alias `iron-proxy`.
 - Agents run non-root without `NET_ADMIN`, so they can't reconfigure the network from inside.
 
-The setup is idempotent and self-healing — NanoClaw creates the network and re-attaches the gateway on every spawn if needed. It also **fails fast**: if lockdown is enabled but the network can't be created or the gateway container can't be attached, NanoClaw throws an `EgressLockdownError` and refuses to spawn the agent rather than silently running it with open egress. If you see that error, start the gateway container (or set `NANOCLAW_EGRESS_LOCKDOWN=false` to opt out).
+The setup is idempotent and self-healing — NanoClaw creates the network and re-attaches the gateway on every spawn if needed. It also **fails fast**: if lockdown is enabled but the network can't be created, a network with that name exists but isn't internal, or the gateway container can't be attached, NanoClaw throws an `EgressLockdownError` and refuses to spawn the agent rather than silently running it with open egress. If you see that error, start the gateway container (or set `NANOCLAW_EGRESS_LOCKDOWN=false` to opt out).
 
-All three variables can be set in `.env` or the process environment (`NANOCLAW_EGRESS_LOCKDOWN` and `NANOCLAW_EGRESS_NETWORK` in `src/config.ts:108-110`; `ONECLI_GATEWAY_CONTAINER` in the OneCLI gateway provider) — `.env` is the simpler path for a plain "edit and restart" flow; the service definition (launchd plist or systemd unit) still works too, as described in [Configuration](/operate/configuration#applying-changes):
+All three variables can be set in `.env` or the process environment (`NANOCLAW_EGRESS_LOCKDOWN` and `NANOCLAW_EGRESS_NETWORK` in `src/config.ts:110-112`; `ONECLI_GATEWAY_CONTAINER` in the OneCLI gateway provider) — `.env` is the simpler path for a plain "edit and restart" flow; the service definition (launchd plist or systemd unit) still works too, as described in [Configuration](/operate/configuration#applying-changes):
 
 ```bash
 # Linux (systemd unit)
@@ -115,22 +116,22 @@ Some of the container's posture isn't configurable at all. Every spawn gets the 
 - **`--init`** — Docker's own init runs as PID 1 and forwards signals to the agent runner. Not optional: the spawn's `--entrypoint bash` override defeats the image's tini, and Linux discards default-action signals sent to PID 1, so without it SIGTERM would be ignored and every `docker stop` would end in SIGKILL after the full grace period.
 - **`--shm-size=1g`** — Docker defaults `/dev/shm` to 64 MB, which silently short-writes past that size. `agent-browser` passes `--disable-dev-shm-usage`, but a third-party Puppeteer or Playwright launcher inside the container may not.
 
-The agent image adds one more that isn't a flag: the build strips the setuid-root bit from every binary Debian ships (`mount`, `su`, `passwd`, and friends), none of which an unprivileged agent needs (`container/Dockerfile:139`).
+The agent image adds one more that isn't a flag: the build strips the setuid-root bit from every binary Debian ships (`mount`, `su`, `passwd`, and friends), none of which an unprivileged agent needs (`container/Dockerfile:138`).
 
 ## Hardened image option
 
 The fresh-install wizard recommends the pre-built, patched image when available for the selected provider. Building locally remains an explicit choice and a fallback — see [Get started with the Echo hardened runtime](/guides/echo-hardened-runtime).
 
-Every agent image carries a `dev.nanoclaw.image-source` label recording where it actually came from (`container/Dockerfile:164-165`, `setup/lib/registry-state.ts`):
+Every agent image carries a `dev.nanoclaw.image-source` label recording where it actually came from (`container/Dockerfile:163-164`, `setup/lib/registry-state.ts`):
 
 | Value | Meaning |
 |---|---|
 | `local` | Built on this machine from the public base. |
 | `hardened` | Pulled from the gated registry — the vendor's scanned bytes, unmodified. |
-| `derived` | A per-group image built on top of a pulled `hardened` image (a group's `install_packages` adding apt or npm packages). The label is overwritten to `derived` because the added bytes were never scanned by the vendor — a derived image can't keep claiming `hardened` (`src/container-runner.ts:1513-1514`). |
+| `derived` | A per-group image built on top of a pulled `hardened` image (a group's `install_packages` adding apt or npm packages). The label is overwritten to `derived` because the added bytes were never scanned by the vendor — a derived image can't keep claiming `hardened` (`src/container-runner.ts:1647-1648`). |
 
 A second label, `dev.nanoclaw.agent-runner-lock-sha256`, records which `container/agent-runner/bun.lock` the baked `node_modules` was built from. `container/pull.sh` checks it before retagging. A missing label fails unless `NANOCLAW_ALLOW_UNLABELED_IMAGE=true`; a mismatched label currently prints a warning and continues. Upstream marks that mismatch allowance temporary. A wrong image architecture still fails. See the [hardened runtime guide](/guides/echo-hardened-runtime) for the exact warning and local-build fallback.
 
 ## Credentials
 
-Keep API keys and OAuth tokens out of agent containers entirely — the OneCLI Agent Vault injects them at the proxy layer so agents never see raw secrets. See [Credentials](/operate/credentials).
+Keep API keys and OAuth tokens out of agent containers entirely — the selected credential gateway (OneCLI by default, or Iron Proxy) injects them at the proxy layer so agents never see raw secrets. See [Credentials](/operate/credentials).
