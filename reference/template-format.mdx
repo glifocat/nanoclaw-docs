@@ -6,6 +6,7 @@ keywords: ["template format", "plugin.json", "mcp.json schema", "agent plugins 1
 
 {/* verified-against: src/templates/{parse,manifest,extension,mcp,skills,tasks,plugin-dir,local-dir,create-agent}.ts, src/container-config.ts, src/modules/self-mod/request.ts, src/modules/scheduling/create.ts, container/agent-runner/src/plugin-mcp.ts, container/agent-runner/src/providers/claude-config.ts @ 7203e00d (v2026.10.0); nanocoai/nanoclaw-templates scripts/check-templates.mjs @ 7d3cb404; providers branch container/agent-runner/src/providers/cwd-shim.ts @ 3959d1f0 */}
 {/* verified-against (scoped correction) — create_agent ref grammar and library fetch: src/templates/{local-dir,library}.ts, src/modules/agent-to-agent/create-agent.ts, src/cli/resources/templates.ts @ 3a68cc7c */}
+{/* verified-against (scoped correction): setup template picker fetch, Cursor native cwd: setup/auto.ts, src/templates/library.ts, .claude/skills/add-cursor/payload/container/agent-runner/src/providers/cursor.ts @ 5356b6c3 (nanoclaw #4113, #4107) */}
 
 The precise rules a [template](/templates/overview) is validated against. For a walkthrough of building one, see [Building a template](/templates/building).
 
@@ -19,7 +20,7 @@ Templates are [Agent Plugins 1.0.0](https://agent-plugins.org) directories. Nano
 | Ref form | Relative path, resolved under the base directory. Single-segment refs resolve; the registry's own layout is `<category>/<template>`. `create_agent` and `ncl templates list` take only refs whose `/`-separated parts start with a letter or digit and hold only letters, digits, `.`, `_`, and `-`, up to 128 characters in all |
 | Plugin root | The leaf folder of the ref |
 | Rejected | Absolute paths, a leading `~`, and any ref resolving outside the base directory |
-| Remote refs | Not supported. No git URLs and no `--source`; `ncl groups create --template` never fetches. `create_agent` can download a ref from the public template library into the base directory first (added after v2026.10.0) |
+| Remote refs | Not supported. No git URLs and no `--source`; `ncl groups create --template` never fetches. `create_agent` and setup's template picker can download a ref from the public template library into the base directory first (added after v2026.10.0) |
 
 `NANOCLAW_TEMPLATES_DIR` is a local path only, resolved once at load — never a URL, and never changed at runtime.
 
@@ -205,7 +206,7 @@ stdio servers that shipped inside a plugin get the Agent Plugins runtime contrac
 | Expansion | `${PLUGIN_ROOT}` and `${PLUGIN_DATA}` expand once, non-recursively, in `args` elements, `env` values, and `cwd` |
 | Not expanded | The `command`, and `env` keys |
 | `./` resolution | A `./`-relative `command` or `cwd` resolves against the plugin root, so a plugin-shipped binary only ever runs inside the container |
-| `cwd` delivery | Codex sets it natively; providers whose runtime cannot (claude, opencode) launch through a `cd`-then-`exec` shim |
+| `cwd` delivery | Codex and Cursor set it natively; providers whose runtime cannot (claude, opencode) launch through a `cd`-then-`exec` shim |
 
 Servers added by `ncl` or through an approval carry no plugin marker and pass through untouched.
 
