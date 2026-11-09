@@ -14,7 +14,7 @@ rss: true
   **Before you update**
 
   - **Breaking: if you use the OneCLI gateway, move it to exactly 1.42.0 before you rely on the update.** On an older gateway every vault call fails, and setup stops with "OneCLI gateway lacks the /v1 API required by the installed SDK". `/update-nanoclaw` does not upgrade a running gateway for you; follow `docs/onecli-upgrades.md` in your NanoClaw folder, which also says when the step does not apply. Do not go past 1.42.0: 1.43 and later are not supported yet. New installs already get 1.42.0.
-  - **`/update-nanoclaw` now installs the newest release, not the tip of `main`.** `NANOCLAW_UPDATE_CHANNEL` in `.env` picks the channel: `stable` (the default) follows releases, `beta` takes release candidates, and `edge` follows `main`. To keep following `main`, run `pnpm exec tsx scripts/update-nanoclaw.ts set-channel --channel edge` in your NanoClaw folder.
+  - **`/update-nanoclaw` now installs the newest release, not the tip of `main`.** `NANOCLAW_UPDATE_CHANNEL` in `.env` picks the channel: `stable` (the default) follows releases, `beta` takes pre-releases (betas and release candidates), and `edge` follows `main`. To keep following `main`, run `pnpm exec tsx scripts/update-nanoclaw.ts set-channel --channel edge` in your NanoClaw folder.
   - **Iron Proxy installs: rerun the Iron setup once after updating** so the approval front is rebuilt with this release's checks: `pnpm exec tsx .claude/skills/add-iron-proxy/scripts/setup.ts` from your NanoClaw folder. Add `--with-control` if you use the Iron Control console.
 
   **New**

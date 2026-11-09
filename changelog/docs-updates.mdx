@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Pre-releases are called betas" description="2026-11-09" tags={["Updated"]}>
+  [Contributing](/concepts/contributing#releases) and the v2026.10.0 entry in [Releases](/changelog) now say that early test builds are tagged `vX.Y.Z-beta.N`, and `-rc.N` (release candidate) is kept for the last build or two before a release. The `beta` update channel takes the newest of either when it is newer than the newest stable release (nanoclaw #4313, added after v2026.10.0).
+</Update>
+
 <Update label="Pages brought in line with current nanoclaw main" description="2026-11-08" tags={["Updated"]}>
   Checked against nanoclaw `main` at 5356b6c3, 38 commits after 2026.10.1-rc.2, so some of these changes are not in a release yet. [Installation](/installation), [Quickstart](/quickstart) and [Introduction](/introduction) now give the current Node minimums (22.23.4, 24.22.1 or 26.12.1), Bun 1.4.4, the digest-pinned `node:22.23.4-slim` base, OneCLI 1.45.0 as the only supported gateway version, and Cursor next to Codex and OpenCode in the provider picker (nanoclaw #4183, #4193, #4094, #4107). The `SECRET_NAME` and `HOST_PATTERN` rows are gone.
 

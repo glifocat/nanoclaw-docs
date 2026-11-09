@@ -9,6 +9,7 @@ keywords: ["contributing", "development", "pnpm", "vitest", "bun", "channels bra
 {/* verified-against (scoped correction): provider code in skill payloads: .claude/skills/{add-codex,add-opencode}/SKILL.md, .claude/skills/{add-codex,add-opencode}/payload/** @ 5878d9e7 (nanocoai/nanoclaw#4104) */}
 {/* verified-against (scoped correction): Cursor as a payload provider: .claude/skills/add-cursor/SKILL.md, .claude/skills/add-cursor/payload/** @ fd3b1750 */}
 {/* verified-against (scoped correction): CI job layout: .github/workflows/ci.yml @ 5356b6c3 (nanoclaw #4191, #4208, #4096) */}
+{/* verified-against (scoped correction): beta pre-releases: scripts/release.mjs, scripts/update/channel.ts, .github/workflows/release.yml, RELEASING.md @ 3d027f50 (nanocoai/nanoclaw#4313) */}
 
 This page is for contributing to [nanocoai/nanoclaw](https://github.com/nanocoai/nanoclaw) itself — fixing bugs, simplifying code, or adding a skill to the upstream repo. If you just want to extend your own installation, you don't need any of this: see [Extending NanoClaw](/extend/overview).
 
@@ -85,7 +86,7 @@ Where your PR goes depends on what you're contributing:
 
 ## Releases
 
-Maintainers cut a GitHub Release for `package.json` version bumps that land on `main`, published through a gated release workflow with a protected environment and required approvers: a `vX.Y.Z` tag, a `CHANGELOG.md` entry, and a release body that mirrors it. A version with an `-rc.N` suffix is published as a GitHub pre-release through a separate protected `prerelease` environment and never becomes the latest release; every other version is a stable release. Published tags are annotated, immutable and never moved, so pinning a tag is the reproducible choice for forks. Details in [RELEASING.md](https://github.com/nanocoai/nanoclaw/blob/main/RELEASING.md).
+Maintainers cut a GitHub Release for `package.json` version bumps that land on `main`, published through a gated release workflow with a protected environment and required approvers: a `vX.Y.Z` tag, a `CHANGELOG.md` entry, and a release body that mirrors it. A version with a `-beta.N` or `-rc.N` suffix is published as a GitHub pre-release through a separate protected `prerelease` environment and never becomes the latest release; every other version is a stable release. Early test builds are betas (`-beta.N`); `-rc.N` (release candidate) is kept for the last build or two before a release, and within one version every beta comes before every release candidate. Published tags are annotated, immutable and never moved, so pinning a tag is the reproducible choice for forks. Details in [RELEASING.md](https://github.com/nanocoai/nanoclaw/blob/main/RELEASING.md).
 
 ## Where to go
 
