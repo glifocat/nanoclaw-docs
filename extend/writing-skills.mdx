@@ -6,6 +6,7 @@ keywords: ["writing skills", "SKILL.md", "REMOVE.md", "skill authoring", "idempo
 
 {/* verified-against: docs/skill-guidelines.md, docs/skill-directives.md, CONTRIBUTING.md, vitest.skills.config.ts, .claude/skills/{add-telegram,manage-mounts,update-skills,add-ollama-tool}/SKILL.md, .claude/skills/add-telegram/REMOVE.md @ 639577c3 */}
 {/* verified-against (scoped correction) — structured skill refresh boundaries: .claude/skills/update-skills/SKILL.md, scripts/update-skills.ts @ b76fcb3d */}
+{/* verified-against (scoped correction): data/env mirror retired: .claude/skills/add-telegram/REMOVE.md @ 5356b6c3 (nanoclaw 872259158) */}
 
 A skill is a markdown file that Claude Code executes — there's no engine you must integrate with, so writing one is mostly writing good instructions. The bar upstream holds skills to is [docs/skill-guidelines.md](https://github.com/nanocoai/nanoclaw/blob/main/docs/skill-guidelines.md), and it boils down to three principles: **single responsibility** (one independently useful customization with one cohesive reason to change), **open for extension, closed for modification** (mostly add files; keep reach-ins into existing code to a line or two that calls your own code), and **a test for every functional integration point** (one that goes red if the wiring is deleted or drifts). This page covers the conventions; [the overview](/extend/overview) explains the model.
 
@@ -47,7 +48,7 @@ Apply must be **idempotent**: a repeated or interrupted install must complete sa
 
 1. Delete the barrel import line from `src/channels/index.ts` (delete, never comment out), then `rm` every copied file — adapter, helpers, setup step, *and tests*
 2. Delete the `STEPS` map entry from `setup/index.ts`
-3. Remove the skill's env vars from `.env` and re-sync to the container
+3. Remove the skill's env vars from `.env`
 4. `pnpm uninstall` the dependency
 5. Rebuild and restart the service
 

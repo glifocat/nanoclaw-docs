@@ -6,6 +6,7 @@ keywords: ["self-modification", "install_packages", "add_mcp_server", "memory", 
 
 {/* verified-against: src/modules/self-mod/{request.ts,apply.ts,index.ts}, src/modules/approvals/{primitive.ts,finalize.ts,reason-capture.ts}, src/cli/resources/{groups.ts,approvals.ts}, container/agent-runner/src/mcp-tools/{self-mod.ts,self-mod.instructions.md}, container/skills/self-customize/SKILL.md, src/container-runner.ts (nested read-only mounts, `/app/src`), src/container-config.ts (URL rule), src/project-doc-compose.ts, src/group-persona.ts, setup/verify.ts, container/build.sh @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — plugin ownership and cwd limits, immutable plugin content: src/modules/self-mod/{request,apply}.ts, src/container-runner.ts @ b76fcb3d */}
+{/* verified-against (scoped correction): add_mcp_server URL rejection text: container/agent-runner/src/mcp-tools/self-mod.ts, src/container-config.ts @ 5356b6c3 */}
 
 Agents can change their own environment — but every change that touches the container goes through you. The self-mod module exposes exactly two operations, `install_packages` and `add_mcp_server`, and **both are always approval-gated**: the agent submits a request, an admin gets a card, and nothing changes until someone taps Approve. What an agent can change freely is its own memory and standing instructions.
 
@@ -44,7 +45,7 @@ On a [hardened-runtime](/guides/echo-hardened-runtime) install, this rebuild lay
 
 ## `add_mcp_server`: new tools
 
-The agent calls [`add_mcp_server`](/reference/mcp-tools#add_mcp_server) with a `name` and exactly one of `command` (plus optional `args` and `env`) or a remote Streamable HTTP `url`. Remote URLs must be HTTPS — plain HTTP passes only for `localhost`, `127.0.0.1`, `[::1]`, and `host.docker.internal` — and a URL that carries credentials (userinfo, a fragment, or a credential-looking query parameter) is rejected with a pointer to OneCLI for authentication. The container validates the request and the host re-validates it, the same dual-layer check packages get. On approval, the host adds the server to the group's `mcp_servers` config and restarts the container — no image rebuild, since bun runs TypeScript directly and the new server is wired on the next start.
+The agent calls [`add_mcp_server`](/reference/mcp-tools#add_mcp_server) with a `name` and exactly one of `command` (plus optional `args` and `env`) or a remote Streamable HTTP `url`. Remote URLs must be HTTPS — plain HTTP passes only for `localhost`, `127.0.0.1`, `[::1]`, and `host.docker.internal` — and a URL that carries credentials (userinfo, a fragment, or a credential-looking query parameter) is rejected with a pointer to the credential gateway for authentication. The container validates the request and the host re-validates it, the same dual-layer check packages get. On approval, the host adds the server to the group's `mcp_servers` config and restarts the container — no image rebuild, since bun runs TypeScript directly and the new server is wired on the next start.
 
 This path cannot replace a plugin-owned MCP server: the host rejects that request before approval and checks ownership again when applying an approved request. Change the plugin and re-stamp it instead. A working-directory (`cwd`) setting is also rejected here; it is supported only for plugin-shipped servers.
 

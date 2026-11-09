@@ -10,6 +10,7 @@ tag: "UPDATED"
 {/* verified-against (pasted tables, not re-checked in this sweep): channels branch src/channels/{slack,slack-raw-text}.ts @ 6d5c1d08 */}
 {/* verified-against (scoped correction) — direct messages sent through an app, channels-only bot DM reply: channels branch src/channels/{slack,slack-a2a-guard,chat-sdk-bridge}.ts, src/modules/slack-room-membership/membership.ts, src/modules/permissions/sender-approval.ts, src/provisioning/slack-app.ts, .claude/skills/{add-slack,slack-agent-flow}/SKILL.md @ d2407fe3 */}
 {/* verified-against (scoped correction) — template-built agents in the Slack flow: .claude/skills/slack-agent-flow/src/modules/slack-agent-flow/{index,orchestrate}.ts @ 3a68cc7c */}
+{/* verified-against (scoped correction): webhook listen host: src/config.ts, .claude/skills/add-slack/SKILL.md @ 5356b6c3 (nanoclaw #4185) */}
 
 Give each NanoClaw agent its own identity in Slack. You can talk to an agent in a direct message, bring several agents into one shared room, and use a room canvas as shared working context.
 
@@ -135,7 +136,7 @@ Slack workspace policy still applies. A workspace that turns on Slack's Admin Ap
       <Step title="Choose event delivery">
         For Socket Mode, create an App-Level Token with `connections:write`, enable Socket Mode, and subscribe to `message.channels`, `message.groups`, `message.im`, and `app_mention`. Socket Mode needs no public URL.
 
-        For webhook delivery, keep the Signing Secret and point Event Subscriptions and Interactivity to `https://<your-public-host>/webhook/slack`. Your public HTTPS endpoint must reach NanoClaw's webhook port, which defaults to `3000`.
+        For webhook delivery, keep the Signing Secret and point Event Subscriptions and Interactivity to `https://<your-public-host>/webhook/slack`. Your public HTTPS endpoint must reach NanoClaw's webhook port, which defaults to `3000`. The webhook server listens on `127.0.0.1`, so a tunnel or proxy on this machine works as is; if yours runs on another machine or in Docker on Linux, add `WEBHOOK_HOST=0.0.0.0` to `.env` and restart.
       </Step>
       <Step title="Install and connect">
         Install the app to the workspace. Run `/add-slack` from Claude Code, `$add-slack` from Codex, or load `add-slack` with your harness's skill tool. Choose the same delivery mode and paste the credentials when prompted.
@@ -260,7 +261,7 @@ After editing instance tokens by hand, restart NanoClaw so the adapter registers
 ## Troubleshooting
 
 - **Slack asks for admin approval** — ask a workspace admin to approve the app. Setup finishes in the background once the approval lands (it waits up to 7 days), and the agent then DMs you in Slack. If the saved install shows as failed, check its progress in the portal and resume with `pnpm exec tsx setup/portal.ts --stage slack`. If it shows as expired, review the existing app in the portal before restarting Slack setup. Provisioning does not bypass the workspace policy.
-- **The welcome DM arrives, but replies disappear** — for Socket Mode, confirm `SLACK_APP_TOKEN` is set, Socket Mode is enabled, and the four bot events are subscribed. For webhook mode, confirm the public URL is reachable and uses the matching Signing Secret.
+- **The welcome DM arrives, but replies disappear** — for Socket Mode, confirm `SLACK_APP_TOKEN` is set, Socket Mode is enabled, and the four bot events are subscribed. For webhook mode, confirm the public URL is reachable and uses the matching Signing Secret. A proxy or tunnel on another machine, or in Docker on Linux, also needs `WEBHOOK_HOST=0.0.0.0` in `.env` (the webhook server listens on `127.0.0.1` by default).
 - **The token is rejected** — use the Bot User OAuth Token from **OAuth & Permissions**, not a user token. A bot token starts with `xoxb-`; an App-Level Token starts with `xapp-`.
 - **A new agent exists but has no Slack bot** — follow the finish command in the failure message. The agent group remains usable while the Slack provisioning leg is retried.
 - **Agents do not answer each other in a room** — confirm the room ID is in `SLACK_A2A_ROOMS`, mention the next bot explicitly, and verify that the sender is permitted by the room's access policy.

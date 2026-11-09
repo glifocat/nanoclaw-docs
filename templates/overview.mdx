@@ -6,6 +6,7 @@ keywords: ["templates", "agent plugins", "plugin.json", "stamp", "ncl groups cre
 
 {/* verified-against: src/templates/{parse,manifest,extension,mcp,skills,tasks,plugin-dir,create-agent,restamp,local-dir}.ts, src/config.ts, src/cli/resources/{groups,wirings}.ts, setup/templates.ts, setup/auto.ts, templates/README.md @ 7203e00d (v2026.10.0); nanocoai/nanoclaw-templates index.json @ 7d3cb404 */}
 {/* verified-against (scoped correction) — where templates come from: src/templates/library.ts, src/modules/agent-to-agent/create-agent.ts, src/cli/resources/templates.ts, src/config.ts, .gitignore, templates/README.md @ 3a68cc7c; setup/auto.ts @ f2224a2f */}
+{/* verified-against (scoped correction): gateway-neutral credential wording: setup/gateways/catalog.ts, .claude/skills/{add-onecli,add-iron-proxy}/gateway.json @ 5356b6c3 */}
 
 A **template** is a reusable directory you stamp into a working agent. It carries the agent's standing instructions, its MCP tool servers, its skills, and optional recurring tasks — but **no secrets and no provider**. Point `ncl` at one and you get a configured agent group in seconds.
 
@@ -65,7 +66,7 @@ Only `plugin.json` is required — it is the manifest and the discovery marker. 
 | Not in a template | Where it lives instead |
 | --- | --- |
 | Provider, model, effort | Set on the agent afterward with `ncl groups config update`. The runtime defaults to the install's configured provider; an agent created in chat with `create_agent` takes its creator's provider instead. |
-| API keys and tokens | The [OneCLI Agent Vault](/operate/credentials) injects them into outbound calls at request time. Credential-shaped values in a template are rejected at stamp time. |
+| API keys and tokens | Your credential gateway ([OneCLI Agent Vault](/operate/credentials) by default) injects them into outbound calls at request time. Credential-shaped values in a template are rejected at stamp time. |
 | Channel wiring | Stamping creates the agent group only. Wire it with `/manage-channels` or `ncl wirings create`, exactly as for a hand-built group. |
 | apt/npm packages | `ncl groups config add-package --id <agent-group-id> --apt <pkg>` (or `--npm`), followed by `ncl groups restart --id <agent-group-id> --rebuild`. |
 

@@ -6,8 +6,9 @@ keywords: ["whatsapp", "baileys", "qr code", "pairing code", "add-whatsapp", "AS
 
 {/* verified-against: .claude/skills/add-whatsapp/SKILL.md, setup/channels/run-channel-skill.ts @ 4e83a0a0; channels branch src/channels/whatsapp.ts @ 6ee516ad */}
 {/* verified-against (scoped correction): DM handling, link timeout, version lookup, mode choice: setup/whatsapp-auth.ts, setup/whatsapp-auth-version.ts, .claude/skills/add-whatsapp/SKILL.md @ 7203e00d (v2026.10.0); channels branch src/channels/whatsapp.ts @ d73e8f44 */}
+{/* verified-against (scoped correction): Baileys pin: .claude/skills/add-whatsapp/SKILL.md, .github/skill-pins/package.json @ 5356b6c3 (nanoclaw #4024) */}
 
-The WhatsApp adapter connects NanoClaw to a personal WhatsApp account as a linked device — no Meta business account, no API key. It's a native adapter built directly on `@whiskeysockets/baileys` 7.0.0-rc.9 (pinned; the WhatsApp Web protocol), not the Chat SDK bridge. For Meta's official Cloud API instead, use `/add-whatsapp-cloud` — see the [channels overview](/channels/overview).
+The WhatsApp adapter connects NanoClaw to a personal WhatsApp account as a linked device — no Meta business account, no API key. It's a native adapter built directly on `@whiskeysockets/baileys` 7.0.0-rc14 (pinned; the WhatsApp Web protocol), not the Chat SDK bridge. For Meta's official Cloud API instead, use `/add-whatsapp-cloud` — see the [channels overview](/channels/overview).
 
 You can run it in two modes:
 

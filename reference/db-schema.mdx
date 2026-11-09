@@ -8,6 +8,7 @@ tag: "UPDATED"
 {/* verified-against: src/db/schema.ts, src/db/migrations/index.ts, src/db/migrations/{001..025 incl. module-*}.ts, src/db/connection.ts, src/db/compose.ts, src/db/coordination.ts, src/delivery.ts, src/request-wake.ts, src/types.ts, src/mailbox/sqlite/schema.ts, src/mailbox/sqlite/session-db.ts, src/mailbox/sqlite/index.ts, src/db/container-configs.ts @ 7203e00d (v2026.10.0) */}
 
 {/* verified-against (scoped correction): src/request-wake.ts, src/db/coordination.ts @ b76fcb3d */}
+{/* verified-against (scoped correction): auto-create sender policy, gateway approval action, channel-approval approver: src/router.ts, src/channels/channel-defaults.ts, src/gateway-approval-coordinator.ts, src/modules/permissions/channel-approval.ts @ 5356b6c3 */}
 
 NanoClaw stores everything in SQLite, split across two layers:
 
@@ -53,7 +54,7 @@ Platform chats and channels, one row per `(channel_type, platform_id, instance)`
 | `detached_at` | TEXT | `NULL` | Set when NanoClaw's own bot leaves the conversation; delivery is refused until a membership hook clears it on rejoin (migration 022) |
 | `created_at` | TEXT | — | ISO timestamp |
 
-The `'strict'` column default is mostly vestigial: every creation callsite passes the policy explicitly, and the router's auto-create path hardcodes `'request_approval'`.
+The `'strict'` column default is mostly vestigial: every creation callsite passes the policy explicitly, and the router's auto-create path uses the receiving adapter's declared DM or group policy (`'request_approval'` for undeclared adapters).
 
 Migration 016 added `instance` and relaxed the UNIQUE constraint from `(channel_type, platform_id)` to `(channel_type, platform_id, instance)` via a full table rebuild (SQLite can't relax a table-level UNIQUE in place). Existing rows backfill to `instance = channel_type`, so single-instance installs see no behavioral change.
 
@@ -194,7 +195,7 @@ Interactive `ask_user_question` cards awaiting an answer.
 
 ### pending_approvals
 
-Host-side records for any approval-requiring request: `install_packages` / `add_mcp_server` (session-bound), and OneCLI credential approvals (`session_id` may be NULL, `action='onecli_credential'`). The OneCLI-specific columns let the host edit the admin card when a request expires and sweep stale rows on startup.
+Host-side records for any approval-requiring request: `install_packages` / `add_mcp_server` (session-bound), and credential-gateway approvals (`session_id` may be NULL, `action='gateway_request'`; older OneCLI rows used `onecli_credential`). The card-location and expiry columns let the host edit the admin card when a request expires and sweep stale rows on startup.
 
 | Column | Type | Default | Meaning |
 |---|---|---|---|
@@ -240,7 +241,7 @@ Unknown-channel registration flow (migration 012). When an unwired channel recei
 | `messaging_group_id` | TEXT | — | Primary key, FK → `messaging_groups(id)` |
 | `agent_group_id` | TEXT | — | FK → `agent_groups(id)` — the agent the approved wiring will target |
 | `original_message` | TEXT | — | JSON-serialized triggering `InboundEvent` |
-| `approver_user_id` | TEXT | — | The owner who got the card |
+| `approver_user_id` | TEXT | — | The approver who got the card |
 | `title` / `options_json` | TEXT | `''` / `'[]'` | Card render metadata (migration 013) |
 | `question` | TEXT | `''` | Original card body for terminal card edits (migration 021) |
 | `created_at` | TEXT | — | ISO timestamp |

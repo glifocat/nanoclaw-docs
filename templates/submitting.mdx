@@ -6,6 +6,7 @@ keywords: ["submit template", "contribute template", "template acceptance", "tem
 
 {/* verified-against: src/templates/{manifest,mcp,tasks,skills}.ts @ 7203e00d (v2026.10.0); nanocoai/nanoclaw-templates {CONTRIBUTING.md, index.json, scripts/check-templates.mjs, scripts/check-version-bump.mjs, .github/workflows/check-templates.yml} @ 7d3cb404 */}
 {/* verified-against (scoped correction) — NanoClaw reads index.json: setup/auto.ts, src/templates/library.ts, src/cli/resources/templates.ts @ f2224a2f; nanocoai/nanoclaw-templates scripts/build-index.mjs @ 7d3cb404 */}
+{/* verified-against (scoped correction): gateway-neutral credential wording: src/gateway-providers/index.ts, setup/gateways/install.ts @ 5356b6c3 */}
 
 Templates ship in [`nanocoai/nanoclaw-templates`](https://github.com/nanocoai/nanoclaw-templates), a separate repo from NanoClaw itself. Contributions are accepted by pull request, and CI enforces most of the standards below automatically.
 
@@ -102,7 +103,7 @@ A template may depend on paid MCP servers or paid API tiers. That is fine. What 
 - and which plan or tier the template needs, where the vendor gates the required capability behind one,
 - and that the user supplies **their own key**.
 
-Never ship a shared key, a template-owner key, or any credential the contributor controls. The user's key goes in their own [OneCLI Agent Vault](/operate/credentials) and stays there.
+Never ship a shared key, a template-owner key, or any credential the contributor controls. The user's key goes in their own credential gateway's vault (see [Credentials](/operate/credentials)) and stays there.
 
 <Tip>
 **Name the tier, don't quote the price.** Prices change and a stale figure in a README is worse than none — link the vendor's pricing page and name the plan instead. Tier names are far more stable than dollar amounts.
