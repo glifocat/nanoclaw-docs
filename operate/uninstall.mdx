@@ -48,7 +48,7 @@ Your `.env` is never deleted outright — it's copied to `.env.bak` first (a tim
 
 The uninstaller is deliberately narrow. It does **not** touch:
 
-- **A shared gateway and your credentials in it** — the OneCLI vault, the default credential gateway, is a shared, out-of-band component, so removing one NanoClaw copy never tears it down. Only this copy's labeled containers and the volumes and networks of their Compose projects are removed (see group 2). A gateway that runs per copy is not shared: Iron Proxy's containers carry this copy's labels, so they are removed with it, and its database volume and encryption keys go with `data/`.
+- **A shared gateway and your credentials in it** — the OneCLI vault, the default credential gateway, is a shared, out-of-band component, so removing one NanoClaw copy never tears it down. Only this copy's labeled containers and the volumes and networks of their Compose projects are removed (see group 2). A gateway that runs per copy is not shared: Iron Proxy's containers carry this copy's labels, so they are removed with it. Removing `data/` also removes its database volume, found through those containers; if they were already gone, the volume stays and the next setup prints the commands to remove it (see the skill's `REMOVE.md`).
 - **Other install identities on the machine** — the install slug scopes runtime cleanup. Keep explicit `NANOCLAW_INSTALL_ID` values distinct.
 - **Host-wide config** — `~/.config/nanoclaw/` (mount and sender allowlists) and the PATH line in `~/.bashrc` and `~/.zshrc`.
 
