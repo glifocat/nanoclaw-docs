@@ -8,6 +8,7 @@ keywords: ["uninstall", "remove", "delete", "cleanup", "nanoclaw.sh --uninstall"
 {/* verified-against: setup/uninstall/flow.ts, setup/uninstall/scan.ts, setup/uninstall/plan.ts, setup/uninstall/remove.ts, setup/lib/setup-config.ts, setup/auto.ts, uninstall.sh, nanoclaw.sh, src/install-slug.ts, .claude/skills/add-iron-proxy/REMOVE.md @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction): shared gateway left alone, gateway-neutral wording: setup/uninstall/{flow,scan}.ts @ 533b922a9 */}
 {/* verified-against (scoped correction): uninstall fallback slug: nanoclaw.sh, setup/lib/install-slug.sh @ 533b922a9 (nanoclaw #4350) */}
+{/* verified-against (scoped correction): per-copy gateways are removed: setup/uninstall/plan.ts, .claude/skills/add-iron-proxy/{SKILL,REMOVE}.md @ 533b922a9 */}
 
 NanoClaw ships an interactive uninstaller that removes a single install — its service, containers, image, and data. Runtime artifacts are scoped by an **install slug**, defaulting to the first 8 hex characters of `sha1(projectRoot)`. `NANOCLAW_INSTALL_ID` overrides that default; each install needs a distinct ID to keep its runtime artifacts separate. Review the preview before removal, particularly if you assigned an ID explicitly.
 
@@ -47,7 +48,7 @@ Your `.env` is never deleted outright — it's copied to `.env.bak` first (a tim
 
 The uninstaller is deliberately narrow. It does **not** touch:
 
-- **The shared gateway application and your credentials** — a credential gateway such as the OneCLI vault is a shared, out-of-band component, so removing one NanoClaw copy never tears it down. Only this copy's labeled containers and the volumes and networks of their Compose projects are removed (see group 2).
+- **A shared gateway and your credentials in it** — the OneCLI vault, the default credential gateway, is a shared, out-of-band component, so removing one NanoClaw copy never tears it down. Only this copy's labeled containers and the volumes and networks of their Compose projects are removed (see group 2). A gateway that runs per copy is not shared: Iron Proxy's containers carry this copy's labels, so they are removed with it, and its database volume and encryption keys go with `data/`.
 - **Other install identities on the machine** — the install slug scopes runtime cleanup. Keep explicit `NANOCLAW_INSTALL_ID` values distinct.
 - **Host-wide config** — `~/.config/nanoclaw/` (mount and sender allowlists) and the PATH line in `~/.bashrc` and `~/.zshrc`.
 
@@ -93,6 +94,6 @@ docker rmi nanoclaw-agent-v2-<slug>:latest
     Update NanoClaw and its skills the supported way.
   </Card>
   <Card title="Credentials" icon="key" href="/operate/credentials">
-    The credential gateway the uninstaller deliberately leaves running.
+    The shared OneCLI vault the uninstaller deliberately leaves running.
   </Card>
 </CardGroup>
