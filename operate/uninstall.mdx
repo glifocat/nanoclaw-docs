@@ -6,7 +6,8 @@ keywords: ["uninstall", "remove", "delete", "cleanup", "nanoclaw.sh --uninstall"
 ---
 
 {/* verified-against: setup/uninstall/flow.ts, setup/uninstall/scan.ts, setup/uninstall/plan.ts, setup/uninstall/remove.ts, setup/lib/setup-config.ts, setup/auto.ts, uninstall.sh, nanoclaw.sh, src/install-slug.ts, .claude/skills/add-iron-proxy/REMOVE.md @ 7203e00d (v2026.10.0) */}
-{/* verified-against (scoped correction): shared gateway left alone, gateway-neutral wording: setup/uninstall/{flow,scan}.ts @ 5356b6c3 */}
+{/* verified-against (scoped correction): shared gateway left alone, gateway-neutral wording: setup/uninstall/{flow,scan}.ts @ 533b922a9 */}
+{/* verified-against (scoped correction): uninstall fallback slug: nanoclaw.sh, setup/lib/install-slug.sh @ 533b922a9 (nanoclaw #4350) */}
 
 NanoClaw ships an interactive uninstaller that removes a single install — its service, containers, image, and data. Runtime artifacts are scoped by an **install slug**, defaulting to the first 8 hex characters of `sha1(projectRoot)`. `NANOCLAW_INSTALL_ID` overrides that default; each install needs a distinct ID to keep its runtime artifacts separate. Review the preview before removal, particularly if you assigned an ID explicitly.
 
@@ -78,7 +79,7 @@ Applies your choices in a safe order — service and containers first (so nothin
 
 ## If dependencies are missing
 
-The uninstaller runs on the TypeScript toolchain in `node_modules/`. If those are already gone, `bash nanoclaw.sh --uninstall` can't run the full flow — it prints manual cleanup commands instead, including how to remove this install's containers and image by slug:
+The uninstaller runs on the TypeScript toolchain in `node_modules/`. If those are already gone, `bash nanoclaw.sh --uninstall` can't run the full flow — it prints manual cleanup commands instead, including how to remove this install's containers and image by slug. If you set `NANOCLAW_INSTALL_ID`, export the same value first: the commands use it, and an invalid value stops with an error instead:
 
 ```bash
 docker ps -aq --filter label=nanoclaw-install=<slug> | xargs -r docker rm -f

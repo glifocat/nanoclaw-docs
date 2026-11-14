@@ -5,7 +5,8 @@ keywords: ["channels", "adapters", "channel registry", "chat sdk", "webhook", "a
 ---
 
 {/* verified-against: src/channels/{adapter,channel-registry,channel-defaults,index,chat-sdk-bridge,cli}.ts, src/webhook-server.ts, setup/auto.ts, setup/channels/{run-channel-skill,slack-auto-register,slack-auto}.ts, .claude/skills/{manage-channels,add-telegram}/SKILL.md @ 53ea1e8b; channels branch src/channels/, src/modules/{slack-room-membership,canvas-actions,slack-onboarding,slack-agent-flow}/, .claude/skills/{add-slack,slack-agent-flow,slack-a2a-rooms}/SKILL.md @ d69c9c5d; Dial: .claude/skills/add-dial/SKILL.md, setup/auto.ts picker @ 475ba766, channels branch src/channels/dial.ts @ a45fab71; Mattermost: .claude/skills/add-mattermost/SKILL.md, setup/channels/initial-setup.ts @ 294ef2ae, channels branch src/channels/mattermost.ts @ 4a263658; rerun behavior and Slack companion location: .claude/skills/{add-telegram,add-whatsapp,add-slack}/SKILL.md, setup/channels/{slack-auto-register,run-channel-skill}.ts @ b76fcb3d; registry browser channel: channels branch src/channels/{index,local-web}.ts @ 6d5c1d08 */}
-{/* verified-against (scoped correction): webhook listen host; /add-mattermost never installs a server: src/config.ts, src/webhook-server.ts, .claude/skills/add-mattermost/SKILL.md, setup/channels/initial-setup.ts @ 5356b6c3 (nanoclaw #4185, #3777) */}
+{/* verified-against (scoped correction): webhook listen host; /add-mattermost never installs a server: src/config.ts, src/webhook-server.ts, .claude/skills/add-mattermost/SKILL.md, setup/channels/initial-setup.ts @ 533b922a9 (nanoclaw #4185, #3777) */}
+{/* verified-against (scoped correction): re-running a skill fills gaps, /update-skills refreshes: scripts/{skill-apply,update-skills}.ts, .claude/skills/update-skills/SKILL.md @ 533b922a9 */}
 
 NanoClaw trunk ships channel **infrastructure** — the adapter interface, the registry, the Chat SDK bridge, the webhook server — plus one built-in channel: `cli`, an always-on local-terminal channel that needs no credentials. Every platform adapter (Telegram, Discord, Slack, WhatsApp, …) lives on the `channels` branch of the repo and is installed on demand with an `/add-<channel>` skill. Your fork only contains the channels you actually use.
 
@@ -45,7 +46,7 @@ Each install skill follows the same pattern (see `/add-telegram` for the canonic
 5. **Build and validate** — `pnpm run build` plus the channel's registration test, which asserts the adapter actually lands in the registry
 6. **Collect credentials** — bot tokens, QR pairing, linked devices, whatever the platform needs, into `.env`
 
-The install steps are designed to be re-run: adapter files are refreshed from the registry and existing imports are not duplicated. Credential steps can reuse an existing connection or offer another identity, depending on the channel. Re-running an `/add-<channel>` skill is how you pick up adapter improvements from the `channels` branch.
+The install steps are designed to be re-run: missing files are copied and existing imports are not duplicated, but adapter files already in place are left as they are. Credential steps can reuse an existing connection or offer another identity, depending on the channel. To pick up adapter improvements from the `channels` branch, run `/update-skills` (or let `/update-nanoclaw` trigger it after a core update): it refreshes installed channel code without touching credentials, `.env` or wiring.
 
 ## Adapter catalog
 

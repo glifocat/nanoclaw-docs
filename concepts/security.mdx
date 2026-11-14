@@ -6,7 +6,8 @@ keywords: ["security", "threat model", "prompt injection", "container isolation"
 
 {/* verified-against: src/container-runner.ts, src/egress-lockdown.ts, src/inbox-safety.ts, src/session-manager.ts, src/modules/mount-security/index.ts, src/command-gate.ts, src/modules/permissions/{index.ts,access.ts,channel-approval.ts,sender-approval.ts}, src/modules/approvals/{index.ts,primitive.ts,onecli-approvals.ts,reason-capture.ts,finalize.ts,response-handler.ts}, src/modules/agent-to-agent/{message-gate.ts,agent-route.ts,db/agent-message-policies.ts}, src/modules/self-mod/index.ts, container/Dockerfile, pnpm-workspace.yaml, docs/SECURITY.md @ 639577c3 */}
 {/* verified-against (scoped correction) — group-scoped history, plugin mounts, sender defaults and build-script allowlist: src/cli/resources/sessions.ts, src/modules/cross-session-context/history.ts, src/container-runner.ts, src/channels/{channel-defaults,channel-registry}.ts, src/router.ts, pnpm-workspace.yaml @ b76fcb3d */}
-{/* verified-against (scoped correction): adoption under egress lockdown: src/container-runner.ts, src/host-sweep.ts @ 5356b6c3 (nanoclaw #4160) */}
+{/* verified-against (scoped correction): adoption under egress lockdown: src/container-runner.ts, src/host-sweep.ts @ 533b922a9 (nanoclaw #4160) */}
+{/* verified-against (scoped correction): credential approval card contents: src/gateway-approval-{presentation,summary,coordinator}.ts @ 533b922a9 (nanoclaw #4147) */}
 
 NanoClaw connects an AI agent with real tools — a shell, a filesystem, network access — to chat platforms where anyone can type. Every inbound message is untrusted input fed straight into the model's context, and no model reliably distinguishes "instructions from my operator" from "instructions an attacker pasted into the group chat." So the design assumption is blunt: **prompt injection eventually succeeds, and the agent acts as if the attacker wrote its instructions.**
 
@@ -67,7 +68,7 @@ Configuration in [Hardening](/operate/hardening#restrict-who-can-talk-to-your-ag
 
 Some actions are too consequential to leave to a model that might be acting on injected instructions, so they pause for a human. The approvals module delivers a card to an admin DM — group admins first, then global admins, then owners, and **no reachable approver means auto-deny** — and nothing happens until someone taps Approve:
 
-- **Credential use** — vault secrets can require per-request approval; the gateway holds the HTTPS request open while the card shows an admin the method, host, path, and body preview.
+- **Credential use** — vault secrets can require per-request approval; the gateway holds the HTTPS request open while the card shows an admin the agent, the action, the method, host and path, and any details the gateway adds, with a shortened value marked as such. A channel that can't show the whole card gets a notice instead, and nothing is approved.
 - **Self-modification** — an agent asking to install packages or add an MCP server into its own container is asking to expand its own capabilities, which is exactly what an attacker would ask for. Both actions queue an approval card.
 - **Channel registration** — new chats reaching agents, as above.
 - **Agent-to-agent messages** — an operator can gate a connection between two agents so every message from one to the other is held until a human approves it, without un-wiring the connection. Set it with [`ncl policies set`](/guides/multi-agent-swarm#gate-a-connection); no policy means messages flow freely.

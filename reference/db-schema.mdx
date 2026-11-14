@@ -8,7 +8,8 @@ tag: "UPDATED"
 {/* verified-against: src/db/schema.ts, src/db/migrations/index.ts, src/db/migrations/{001..025 incl. module-*}.ts, src/db/connection.ts, src/db/compose.ts, src/db/coordination.ts, src/delivery.ts, src/request-wake.ts, src/types.ts, src/mailbox/sqlite/schema.ts, src/mailbox/sqlite/session-db.ts, src/mailbox/sqlite/index.ts, src/db/container-configs.ts @ 7203e00d (v2026.10.0) */}
 
 {/* verified-against (scoped correction): src/request-wake.ts, src/db/coordination.ts @ b76fcb3d */}
-{/* verified-against (scoped correction): auto-create sender policy, gateway approval action, channel-approval approver: src/router.ts, src/channels/channel-defaults.ts, src/gateway-approval-coordinator.ts, src/modules/permissions/channel-approval.ts @ 5356b6c3 */}
+{/* verified-against (scoped correction): auto-create sender policy, gateway approval action, channel-approval approver: src/router.ts, src/channels/channel-defaults.ts, src/gateway-approval-coordinator.ts, src/modules/permissions/channel-approval.ts @ 533b922a9 */}
+{/* verified-against (scoped correction): pending_questions.question: src/db/migrations/026-pending-question-body.ts, src/db/{schema,sessions}.ts @ 533b922a9 (nanoclaw #4328) */}
 
 NanoClaw stores everything in SQLite, split across two layers:
 
@@ -190,6 +191,7 @@ Interactive `ask_user_question` cards awaiting an answer.
 | `message_out_id` | TEXT | — | The outbound message that carried the question |
 | `platform_id` / `channel_type` / `thread_id` | TEXT | `NULL` | Where the card was posted |
 | `title` | TEXT | — | Question title |
+| `question` | TEXT | `''` | The question body, kept so the answered card still shows it; rows from before migration 026 stay empty, and their answered card shows only the title and answer |
 | `options_json` | TEXT | — | JSON array of answer options |
 | `created_at` | TEXT | — | ISO timestamp |
 

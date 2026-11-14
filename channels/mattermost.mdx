@@ -5,7 +5,8 @@ keywords: ["mattermost", "add-mattermost", "self-hosted", "bot account", "websoc
 ---
 
 {/* verified-against: .claude/skills/add-mattermost/{SKILL.md,SERVER_SETUP.md,REMOVE.md}, .claude/skills/add-mattermost/scripts/{configure.ts,verify-runtime.ts,discover-server.mjs,select-server.mjs,read-response.mjs}, setup/channels/initial-setup.ts, setup/channels/fixtures/mattermost/README.md @ 7203e00d (v2026.10.0); channels branch src/channels/mattermost.ts, src/channels/mattermost-adapter/{adapter,websocket,index}.ts @ d73e8f44 */}
-{/* verified-against (scoped correction): webhook listen host for card callbacks: src/config.ts, .claude/skills/add-mattermost/SKILL.md, setup/channels/fixtures/mattermost/README.md @ 5356b6c3 (nanoclaw #4185) */}
+{/* verified-against (scoped correction): webhook listen host for card callbacks: src/config.ts, .claude/skills/add-mattermost/SKILL.md, setup/channels/fixtures/mattermost/README.md @ 533b922a9 (nanoclaw #4185) */}
+{/* verified-against (scoped correction): threads and mentions, long replies, upgrade deadline, refused clicks: channels:src/channels/mattermost.ts, channels:src/channels/mattermost-adapter/{adapter,websocket}.ts @ c16f0e425; src/channels/chat-sdk-bridge.ts @ 533b922a9 (nanoclaw #3797, #4320, #4351, #4168, #4171) */}
 
 The Mattermost adapter connects NanoClaw to a Mattermost server you control, self-hosted or cloud. NanoClaw connects to a server; it does not install or manage one. It supports DMs, channels, threads, files, reactions, and interactive approval cards. Messages arrive over Mattermost's WebSocket, so no public URL is needed for inbound chat; card clicks return to NanoClaw over an authenticated HTTP callback.
 
@@ -50,11 +51,12 @@ The credentials written to `.env`: `MATTERMOST_BASE_URL`, `MATTERMOST_BOT_TOKEN`
 
 ## Platform notes
 
-- **Transport**: WebSocket inbound, REST outbound, HTTP action callbacks. The WebSocket runs a protocol-level heartbeat (default every 30 s) and terminates the socket when a pong doesn't arrive in time, so half-dead connections reconnect instead of sitting deaf.
+- **Transport**: WebSocket inbound, REST outbound, HTTP action callbacks. The WebSocket runs a protocol-level heartbeat (default every 30 s) and terminates the socket when a pong doesn't arrive in time, so half-dead connections reconnect instead of sitting deaf. The WebSocket upgrade itself must finish within 10 s; a server that stalls it is cut off with `Mattermost WS: opening handshake timed out` in the log.
 - **Platform IDs**: `mattermost:<channel-id>` for channels and DMs alike.
-- **Threads**: the adapter sets `supportsThreads: true`, so in group channels the router forces `per-thread` sessions: each Mattermost reply root gets its own agent session (unless the wiring uses `agent-shared`). See the [entity model](/concepts/entity-model).
-- **Engagement defaults**: group channels default to `mention-sticky` (the first @-mention subscribes the thread; the bot then hears everything in it), DMs respond to every message, and unknown channels request owner approval: the first mention in an unwired channel sends an approval card to the owner's bot DM, and NanoClaw replays the held message once the wiring is approved.
-- **Approval cards**: clicks arrive on `/webhook/mattermost` and must carry the shared callback secret; the card updates in place with the decision.
+- **Long replies**: replies over 16,383 characters (Mattermost's post limit) are split into several posts.
+- **Threads**: the adapter sets `supportsThreads: true`, so in group channels the router forces `per-thread` sessions: each Mattermost thread gets its own agent session, and every top-level post in a group channel starts its own thread, as on Slack (unless the wiring uses `agent-shared`). See the [entity model](/concepts/entity-model).
+- **Engagement defaults**: group channels default to `mention-sticky` (an @-mention subscribes that post's thread; the bot then hears every reply in it, but a later top-level post needs its own mention). `@channel`, `@all` or `@here` alone is not a mention of the bot, and posts from other bot accounts never reach an agent, even when they mention it. DMs respond to every message, and unknown channels request owner approval: the first mention in an unwired channel sends an approval card to the owner's bot DM, and NanoClaw replays the held message once the wiring is approved.
+- **Approval cards**: clicks arrive on `/webhook/mattermost` and must carry the shared callback secret; the card updates in place with the decision once NanoClaw accepts the click. A click from someone who may not approve leaves the card as it is, and only that person sees `Only an approver can answer this.` (an ephemeral post, or a DM from the bot if it lacks the `create_post_ephemeral` permission).
 
 ## Troubleshooting
 

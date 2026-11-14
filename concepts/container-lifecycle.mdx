@@ -9,7 +9,7 @@ tag: "UPDATED"
 {/* verified-against (scoped correction) — driver lifecycle, adoption, claims, mounts and heartbeat fallback: src/{container-runner,session-manager,reconcile-session,index}.ts, src/drivers/{index,docker-driver}.ts, container/pull.sh @ b76fcb3d */}
 {/* verified-against (scoped correction): uid mapping, exit logging, sweep kill conditions: src/container-runner.ts, src/drivers/docker-driver.ts, src/reconcile-session.ts, src/host-sweep.ts @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — sweep timer env overrides NANOCLAW_ABSOLUTE_CEILING_MS / NANOCLAW_CLAIM_STUCK_MS: src/{config,reconcile-session}.ts @ 2105169d */}
-{/* verified-against (scoped correction): image reference order, digest-pinned base, poppler-utils, adoption under egress lockdown: container/pull.sh, container/Dockerfile, src/container-runner.ts, src/host-sweep.ts @ 5356b6c3 (nanoclaw #4139, #4174, #4183, #4160) */}
+{/* verified-against (scoped correction): image reference order, digest-pinned base, poppler-utils, adoption under egress lockdown: container/pull.sh, container/Dockerfile, src/container-runner.ts, src/host-sweep.ts @ 533b922a9 (nanoclaw #4139, #4174, #4183, #4160) */}
 
 Every active session gets exactly one Docker container, spawned on demand and killed when it goes quiet. The container is deliberately disposable: all state lives in mounted host directories, so a kill loses nothing but an in-flight provider call — and the [host sweep](/concepts/architecture#what-runs-when) retries the messages the container was still holding ([which ones](/operate/troubleshooting#container-killed-mid-task)).
 

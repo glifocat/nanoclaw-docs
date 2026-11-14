@@ -6,7 +6,7 @@ keywords: ["ncl", "cli", "admin", "unix socket", "cli_scope", "groups", "wirings
 
 {/* verified-against: src/cli/{dispatch,guard,registry,crud,args,parse-argv,client,format,frame,transport-errors,stdin-json,socket-server,help-render}.ts, src/cli/commands/{help,index,status}.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,policies,roles,sessions,tasks,user-dms,users,wirings,index}.ts, src/channels/channel-defaults.ts, src/types.ts, src/container-config.ts, src/host-sweep.ts, src/templates/{create-agent,local-dir}.ts, src/modules/cross-session-context/history.ts, src/modules/scheduling/create.ts, setup/service.ts, bin/ncl @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — templates resource, group-scope list: src/cli/resources/templates.ts, src/cli/registry.ts @ 3a68cc7c */}
-{/* verified-against (scoped correction): resource count, no-systemd restart line: src/cli/resources/index.ts, src/cli/transport-errors.ts @ 5356b6c3 (nanoclaw #4206) */}
+{/* verified-against (scoped correction): resource count, no-systemd restart line: src/cli/resources/index.ts, src/cli/transport-errors.ts @ 533b922a9 (nanoclaw #4206) */}
 
 `ncl` is the admin CLI for a running NanoClaw host. It sends one request frame over a Unix socket at `data/ncl.sock` and prints the response — commands inspect and manage the running host's state, including central configuration and per-session mailboxes. The socket is `chmod 0600`, so only the user that started the host can connect.
 

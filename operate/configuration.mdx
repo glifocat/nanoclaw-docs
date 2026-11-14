@@ -7,7 +7,8 @@ tag: "UPDATED"
 
 {/* verified-against: src/config.ts, src/env.ts, src/log.ts, src/install-slug.ts, src/drivers/index.ts, src/gateway-providers/index.ts, src/gateway-read-policy.ts, src/egress-lockdown.ts, src/container-config.ts, src/db/container-configs.ts, src/db/migrations/015-cli-scope.ts, src/providers/claude.ts, setup/service.ts, setup/container.ts, setup/lib/registry-state.ts, container/pull.sh, .claude/skills/add-onecli/payload/src/gateway-providers/onecli.ts @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — sweep timer env overrides NANOCLAW_ABSOLUTE_CEILING_MS / NANOCLAW_CLAIM_STUCK_MS: src/{config,reconcile-session}.ts @ 2105169d */}
-{/* verified-against (scoped correction): WEBHOOK_HOST, OneCLI-only keys, gateway-neutral token injection, unlabeled-image key read from .env: src/config.ts, src/webhook-server.ts, container/pull.sh, .claude/skills/add-onecli/payload/src/gateway-providers/onecli.ts, .claude/skills/add-iron-proxy/payload/src/gateway-providers/iron-proxy.ts @ 5356b6c3 (nanoclaw #4185) */}
+{/* verified-against (scoped correction): WEBHOOK_HOST, OneCLI-only keys, gateway-neutral token injection, unlabeled-image key read from .env: src/config.ts, src/webhook-server.ts, container/pull.sh, .claude/skills/add-onecli/payload/src/gateway-providers/onecli.ts, .claude/skills/add-iron-proxy/payload/src/gateway-providers/iron-proxy.ts @ 533b922a9 (nanoclaw #4185) */}
+{/* verified-against (scoped correction): install ID in the service environment: setup/service.ts @ 533b922a9 (nanoclaw #4350, #4358) */}
 
 NanoClaw has two configuration layers:
 
@@ -19,7 +20,7 @@ NanoClaw has two configuration layers:
 Variables come from two sources, and the distinction matters:
 
 - A **small set is read from `.env`** at the project root by NanoClaw's own parser. These work with a plain "edit `.env`, restart" flow. Values are not loaded into `process.env`, so secrets don't leak to child processes; a value already in the process environment takes precedence.
-- **The process-only settings listed below are read from `process.env` only.** The launchd plist and systemd unit that setup generates set `PATH` and `HOME`, plus the outbound proxy variables when a proxy is configured (see [Environment variables](/reference/environment-variables#outbound-proxy)). The nohup wrapper loads only that proxy file. None of them source `.env`. Putting these variables in `.env` has no effect; you have to set them in the service environment (see [Applying changes](#applying-changes)).
+- **The process-only settings listed below are read from `process.env` only.** The launchd plist and systemd unit that setup generates set `PATH` and `HOME`, plus `NANOCLAW_INSTALL_ID` when setup ran with it set and the outbound proxy variables when a proxy is configured (see [Environment variables](/reference/environment-variables#outbound-proxy)). The nohup wrapper sets only that install ID and loads only that proxy file. None of them source `.env`. Putting these variables in `.env` has no effect; you have to set them in the service environment (see [Applying changes](#applying-changes)).
 
 ### Read from .env
 

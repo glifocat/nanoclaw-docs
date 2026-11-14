@@ -6,7 +6,7 @@ keywords: ["container config", "container_configs", "container.json", "provider"
 
 {/* verified-against: src/container-config.ts, src/config.ts, src/types.ts, src/db/container-configs.ts, src/db/migrations/{014,015,020,025}-*.ts, src/cli/resources/groups.ts, src/cli/guard.ts, src/cli/registry.ts, src/providers/provider-name.ts, src/container-runner.ts, src/drivers/types.ts, src/drivers/index.ts, container/agent-runner/src/config.ts, container/agent-runner/src/providers/{types,claude-config}.ts @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — templates resource, group-scope list: src/cli/resources/templates.ts, src/cli/registry.ts @ 3a68cc7c */}
-{/* verified-against (scoped correction): provider default stamped on new groups: src/db/container-configs.ts, src/config.ts @ 5356b6c3 */}
+{/* verified-against (scoped correction): provider default stamped on new groups: src/db/container-configs.ts, src/config.ts @ 533b922a9 */}
 
 Each agent group has one row in the `container_configs` table in the central SQLite database — the source of truth for how that group's containers spawn. You change it with the [`ncl groups config` subcommands](/reference/ncl-cli#groups); the row is created automatically with defaults when the group is created.
 

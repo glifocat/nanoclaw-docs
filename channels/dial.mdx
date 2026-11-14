@@ -5,7 +5,7 @@ keywords: ["dial", "getdial", "phone number", "sms", "voice calls", "add-dial", 
 ---
 
 {/* verified-against: .claude/skills/{add-dial,add-dial-number,add-dial-tool}/SKILL.md, .claude/skills/add-dial-tool/scripts/dial-policy.ts, setup/pair-dial.ts, setup/channels/initial-setup.ts, setup/lib/skill-driver.ts, src/cli/resources/messaging-groups.ts @ 7203e00d (v2026.10.0); channels branch src/channels/dial.ts, src/channels/dial-pairing.ts @ d73e8f44 */}
-{/* verified-against (scoped correction): Dial tool access through OneCLI agent grants, first-install answer, secret update in place, grants gate: .claude/skills/{add-dial,add-dial-tool}/SKILL.md, .claude/skills/add-dial-tool/scripts/dial-secret.ts, .claude/skills/add-onecli/scripts/check-grants-gateway.sh @ 5356b6c3 (nanoclaw #4095, #4189) */}
+{/* verified-against (scoped correction): Dial tool access through OneCLI agent grants, first-install answer, secret update in place, grants gate: .claude/skills/{add-dial,add-dial-tool}/SKILL.md, .claude/skills/add-dial-tool/scripts/dial-secret.ts, .claude/skills/add-onecli/scripts/check-grants-gateway.sh @ 533b922a9 (nanoclaw #4095, #4189) */}
 
 The Dial adapter gives your agent a **real phone number** through [Dial](https://getdial.ai): people text or call it, and the agent answers over SMS; the agent can also place outbound calls that Dial's AI voice agent handles. It's a **native adapter** — no Chat SDK bridge — and both directions go through the `dial` CLI: outbound SMS is `dial message --json`, inbound events arrive through the `dial listen` daemon, which runs a small handler script that spools each event into `data/dial/inbound/` for the adapter to pick up. No public URL, webhook, or open port.
 

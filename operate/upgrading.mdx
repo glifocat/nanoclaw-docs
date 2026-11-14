@@ -9,7 +9,8 @@ keywords: ["upgrade", "update", "update-nanoclaw", "update-skills", "migrate-nan
 {/* verified-against: scripts/update-nanoclaw.ts, scripts/update/transaction.ts, scripts/update/service.ts, scripts/update-skills.ts, scripts/upgrade-state.ts, src/upgrade-state.ts, src/index.ts, src/install-slug.ts, setup/service.ts, .claude/skills/update-nanoclaw/SKILL.md, .claude/skills/update-skills/SKILL.md, .claude/skills/migrate-nanoclaw/SKILL.md, docs/upgrade-recovery.md @ 294ef2ae; install identity override: src/install-slug.ts @ b76fcb3d */}
 {/* verified-against (scoped correction): rollback restore order: scripts/update/transaction.ts, scripts/update/service.ts @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — provider refresh from skill payloads: scripts/update-skills.ts, scripts/skill-apply.ts, .claude/skills/{add-codex,add-opencode}/SKILL.md @ 5878d9e7 (nanocoai/nanoclaw#4104) */}
-{/* verified-against (scoped correction): update requirements are breaking changes only, gateway containers skipped at cutover: scripts/update/{transaction,service}.ts, versions.json @ 5356b6c3 */}
+{/* verified-against (scoped correction): update requirements are breaking changes only, gateway containers skipped at cutover: scripts/update/{transaction,service}.ts, versions.json @ 533b922a9 */}
+{/* verified-against (scoped correction): lockfile-only conflicts regenerated: scripts/update/{transaction,lockfiles}.ts, .claude/skills/update-nanoclaw/SKILL.md @ 533b922a9 (nanoclaw #4312) */}
 
 Do not update with a raw `git pull`. NanoClaw records each sanctioned upgrade in `data/upgrade-state.json`, and the marker carries three values: the version, the commit, and the tree hash. A startup tripwire compares all three against the running code and refuses to boot when they disagree. A commit that leaves the version alone trips it too. The supported path is the `/update-nanoclaw` skill.
 
@@ -36,7 +37,7 @@ Run `/update-nanoclaw` in a Claude Code session at your project root. The skill 
     - **Cherry-pick**, with a named commit list.
   </Step>
   <Step title="Resolve conflicts, if any">
-    A conflicting merge leaves the transaction in the `conflict` phase and the controller exits `2`. Resolve the conflict inside the stage worktree, never in your live checkout. Then resume from the stage worktree:
+    A conflicting merge leaves the transaction in the `conflict` phase and the controller exits `2`. Lockfiles are the exception: when `pnpm-lock.yaml` or `container/agent-runner/bun.lock` are a merge's only conflicts, the controller takes upstream's copy, regenerates it, commits the merge and carries on, so a version pinned only in your local lockfile becomes upstream's. Never merge a lockfile by hand. Resolve any other conflict inside the stage worktree, never in your live checkout. If lockfiles conflict too, `git add` the other files, leave the lockfiles alone and don't commit: resume regenerates them and commits the merge. Then resume from the stage worktree:
 
     ```bash
     pnpm exec tsx scripts/update-nanoclaw.ts resume --id "$id"

@@ -8,7 +8,8 @@ keywords: ["hardening", "security", "egress lockdown", "NANOCLAW_EGRESS_LOCKDOWN
 {/* verified-against (scoped correction) — channels-only Slack bot under decline_notify: src/modules/permissions/sender-approval.ts @ 15c6124f; channels branch src/modules/slack-room-membership/membership.ts @ d2407fe3 */}
 {/* verified-against (scoped correction) — sweep timer env overrides NANOCLAW_ABSOLUTE_CEILING_MS / NANOCLAW_CLAIM_STUCK_MS: src/{config,reconcile-session}.ts @ 2105169d */}
 {/* verified-against (scoped correction) — src/config.ts line anchor re-pointed @ f2224a2f */}
-{/* verified-against (scoped correction): non-internal egress network refusal, gateway-neutral injection, line anchors re-pointed: src/egress-lockdown.ts, src/config.ts, container/Dockerfile, src/container-runner.ts, src/gateway-providers/index.ts @ 5356b6c3 (nanoclaw #4160) */}
+{/* verified-against (scoped correction): non-internal egress network refusal, gateway-neutral injection, line anchors re-pointed: src/egress-lockdown.ts, src/config.ts, container/Dockerfile, src/container-runner.ts, src/gateway-providers/index.ts @ 533b922a9 (nanoclaw #4160) */}
+{/* verified-against (scoped correction): line anchors re-pointed: container/Dockerfile, src/container-runner.ts @ 533b922a9 (nanoclaw #4270, #4317) */}
 
 NanoClaw's isolation boundary is the Docker container: each agent runs in its own container with a scoped workspace mount (see [Container lifecycle](/concepts/container-lifecycle)). There is no micro-VM or alternative sandbox runtime — hardening means tightening what those containers can reach. This page walks the defense-in-depth controls from network to filesystem to people.
 
@@ -116,19 +117,19 @@ Some of the container's posture isn't configurable at all. Every spawn gets the 
 - **`--init`** — Docker's own init runs as PID 1 and forwards signals to the agent runner. Not optional: the spawn's `--entrypoint bash` override defeats the image's tini, and Linux discards default-action signals sent to PID 1, so without it SIGTERM would be ignored and every `docker stop` would end in SIGKILL after the full grace period.
 - **`--shm-size=1g`** — Docker defaults `/dev/shm` to 64 MB, which silently short-writes past that size. `agent-browser` passes `--disable-dev-shm-usage`, but a third-party Puppeteer or Playwright launcher inside the container may not.
 
-The agent image adds one more that isn't a flag: the build strips the setuid-root bit from every binary Debian ships (`mount`, `su`, `passwd`, and friends), none of which an unprivileged agent needs (`container/Dockerfile:138`).
+The agent image adds one more that isn't a flag: the build strips the setuid-root bit from every binary Debian ships (`mount`, `su`, `passwd`, and friends), none of which an unprivileged agent needs (`container/Dockerfile:144`).
 
 ## Hardened image option
 
 The fresh-install wizard recommends the pre-built, patched image when available for the selected provider. Building locally remains an explicit choice and a fallback — see [Get started with the Echo hardened runtime](/guides/echo-hardened-runtime).
 
-Every agent image carries a `dev.nanoclaw.image-source` label recording where it actually came from (`container/Dockerfile:163-164`, `setup/lib/registry-state.ts`):
+Every agent image carries a `dev.nanoclaw.image-source` label recording where it actually came from (`container/Dockerfile:169-170`, `setup/lib/registry-state.ts`):
 
 | Value | Meaning |
 |---|---|
 | `local` | Built on this machine from the public base. |
 | `hardened` | Pulled from the gated registry — the vendor's scanned bytes, unmodified. |
-| `derived` | A per-group image built on top of a pulled `hardened` image (a group's `install_packages` adding apt or npm packages). The label is overwritten to `derived` because the added bytes were never scanned by the vendor — a derived image can't keep claiming `hardened` (`src/container-runner.ts:1647-1648`). |
+| `derived` | A per-group image built on top of a pulled `hardened` image (a group's `install_packages` adding apt or npm packages). The label is overwritten to `derived` because the added bytes were never scanned by the vendor — a derived image can't keep claiming `hardened` (`src/container-runner.ts:1654-1655`). |
 
 A second label, `dev.nanoclaw.agent-runner-lock-sha256`, records which `container/agent-runner/bun.lock` the baked `node_modules` was built from. `container/pull.sh` checks it before retagging. A missing label fails unless `NANOCLAW_ALLOW_UNLABELED_IMAGE=true`; a mismatched label currently prints a warning and continues. Upstream marks that mismatch allowance temporary. A wrong image architecture still fails. See the [hardened runtime guide](/guides/echo-hardened-runtime) for the exact warning and local-build fallback.
 
