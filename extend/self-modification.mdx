@@ -7,6 +7,7 @@ keywords: ["self-modification", "install_packages", "add_mcp_server", "memory", 
 {/* verified-against: src/modules/self-mod/{request.ts,apply.ts,index.ts}, src/modules/approvals/{primitive.ts,finalize.ts,reason-capture.ts}, src/cli/resources/{groups.ts,approvals.ts}, container/agent-runner/src/mcp-tools/{self-mod.ts,self-mod.instructions.md}, container/skills/self-customize/SKILL.md, src/container-runner.ts (nested read-only mounts, `/app/src`), src/container-config.ts (URL rule), src/project-doc-compose.ts, src/group-persona.ts, setup/verify.ts, container/build.sh @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — plugin ownership and cwd limits, immutable plugin content: src/modules/self-mod/{request,apply}.ts, src/container-runner.ts @ b76fcb3d */}
 {/* verified-against (scoped correction): add_mcp_server URL rejection text: container/agent-runner/src/mcp-tools/self-mod.ts, src/container-config.ts @ 533b922a9 */}
+{/* verified-against (scoped correction): failed rebuild leaves packages in config: src/modules/self-mod/apply.ts @ 61cf826d */}
 
 Agents can change their own environment — but every change that touches the container goes through you. The self-mod module exposes exactly two operations, `install_packages` and `add_mcp_server`, and **both are always approval-gated**: the agent submits a request, an admin gets a card, and nothing changes until someone taps Approve. What an agent can change freely is its own memory and standing instructions.
 
@@ -38,6 +39,8 @@ The request is fire-and-forget. On approval, the host does the whole follow-up i
 1. Appends the packages to the group's `packages_apt` / `packages_npm` config (deduplicated)
 2. Rebuilds the per-agent image
 3. Kills the container and queues an on-wake message telling the fresh agent to verify the packages and report back to the user
+
+If the rebuild fails, the packages stay in the config and the agent is told the build failed. Fix the cause and run `ncl groups restart --id <group-id> --rebuild`, or remove the package.
 
 Packages installed this way are baked into the image and available in every future session — unlike a `pnpm install` in the per-session workspace, which needs no approval but doesn't persist into the image or other sessions. The self-customize skill recommends exactly that for one-off tasks, and prototyping in the workspace before promoting a dependency to a container-level install.
 

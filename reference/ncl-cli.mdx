@@ -11,6 +11,7 @@ keywords: ["ncl", "cli", "reference", "commands", "flags", "groups", "wirings", 
 {/* verified-against (scoped correction) — templates resource, group-scope list: src/cli/resources/templates.ts, src/cli/registry.ts, src/templates/{library,local-dir}.ts @ 3a68cc7c */}
 {/* verified-against (scoped correction): approvals columns, groups create folder rule, groups delete cleanup and destination refresh: src/cli/resources/{approvals,groups}.ts, src/group-folder.ts @ 533b922a9 (nanoclaw #4148, #4110) */}
 {/* verified-against (scoped correction): groups restart --id of another group: src/cli/resources/groups.ts (nanoclaw #4026) @ 61cf826d */}
+{/* verified-against (scoped correction): named approver is strict: src/modules/approvals/response-handler.ts @ 61cf826d */}
 
 Exhaustive reference for the `ncl` admin CLI. For a task-oriented walkthrough, see [The ncl admin CLI](/operate/ncl-cli).
 
@@ -34,7 +35,7 @@ Conventions that apply to every command:
 - **`--json`** prints the raw response frame; default output is an aligned table for lists, pretty JSON otherwise, `error (<code>): <message>` on failure.
 - **Exit codes:** `0` success, `1` command error, `2` transport error (host unreachable, missing command).
 - **Error codes** in response frames: `unknown-command`, `invalid-args`, `forbidden`, `approval-pending`, `handler-error`, `transport-error`.
-- **Help is introspected:** `ncl help` lists resources and verbs; `ncl <resource> help` shows its fields, enums, and defaults.
+- **Help is introspected:** `ncl help` lists resources and verbs; `ncl <resource> help` shows its fields, enums, and defaults; `ncl <resource> help <verb>` (or `--help` on any command) shows one verb's flags and examples.
 
 ## Access control
 
@@ -112,7 +113,7 @@ Membership rows granting unprivileged users access to an agent group. Admins/own
 | Operation | Invocation | Access | Notes |
 | --- | --- | --- | --- |
 | list | `ncl members list [--agent-group-id <id>] [...]` | open | Columns: `user_id`, `agent_group_id`, `added_by`, `added_at`. |
-| add | `ncl members add --user <user-id> --group <group-id> [--added-by <user-id>]` | approval | Idempotent (`INSERT OR IGNORE`). `--user` must reference an existing `users.id`. |
+| add | `ncl members add --user <user-id> --group <group-id> [--added-by <user-id>]` | approval | Idempotent (re-adding an existing member is a no-op). `--user` must reference an existing `users.id`. |
 | remove | `ncl members remove --user <user-id> --group <group-id>` | approval | Errors if no matching row. |
 
 ## messaging-groups
@@ -126,6 +127,8 @@ One chat or channel on one platform. Identity is the unique `(channel_type, plat
 | update | `ncl messaging-groups update --id <id> [flags]` | approval |
 | delete | `ncl messaging-groups delete --id <id>` | approval |
 | send | `ncl messaging-groups send --channel-type <type> --platform-id <pid> --text <message> [--instance] [--sender-id] [--sender]` | approval |
+
+`delete` cascades: it removes the chat's wirings, sessions, destinations, DM records and pending approvals. Agent-shared sessions still used elsewhere and agent-to-agent sessions are kept and listed in `kept_sessions`. Session folders stay on disk.
 
 | Flag | Type | Notes |
 | --- | --- | --- |
@@ -141,7 +144,7 @@ One chat or channel on one platform. Identity is the unique `(channel_type, plat
 
 ## policies
 
-Per-message approval gate on an agent-to-agent connection. A row forces every message from one agent to another to be approved by a human before delivery — without un-wiring the [destination](#destinations). **No row = free flow.** Directed and per-pair: gate both directions with two policies. Operator-only — agents can't manage their own gates, and self-messages (`--from` equal to `--to`) are never gated.
+Per-message approval gate on an agent-to-agent connection. A row forces every message from one agent to another to be approved by a human before delivery — without un-wiring the [destination](#destinations). **No row = free flow.** Directed and per-pair: gate both directions with two policies. Not self-serve — a group-scope agent can't run these commands, and a global-scope agent's request waits for admin approval, and self-messages (`--from` equal to `--to`) are never gated.
 
 | Operation | Invocation | Access |
 | --- | --- | --- |
@@ -149,7 +152,7 @@ Per-message approval gate on an agent-to-agent connection. A row forces every me
 | set | `ncl policies set --from <agent-group-id> --to <agent-group-id> --approver <user-id>` | approval |
 | remove | `ncl policies remove --from <agent-group-id> --to <agent-group-id>` | approval |
 
-`set` upserts — re-running with a different `--approver` replaces it. Only the named `--approver` (or an owner) can approve a held message. Removing a policy returns the edge to free flow. Columns: `from_agent_group_id`, `to_agent_group_id`, `approver`, `created_at`.
+`set` upserts — re-running with a different `--approver` replaces it. Only the named `--approver` can approve a held message; an owner can't stand in. Removing a policy returns the edge to free flow. Columns: `from_agent_group_id`, `to_agent_group_id`, `approver`, `created_at`.
 
 ## roles
 

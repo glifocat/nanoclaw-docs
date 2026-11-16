@@ -40,7 +40,7 @@ The uninstaller groups everything it finds into three confirmation groups. Each 
 |---|---|
 | **1) App & background service** | The background service (launchd/systemd), any running NanoClaw process, this install's Docker containers and image (matched by the install slug), and the `ncl` command symlink. |
 | **2) App data, logs & secrets** | Runtime data, including the central database and per-session message history, logs, build files (`dist/`, `node_modules/`), the active `.env`, and this install's update rollback snapshots (`<parent-of-project>/.nanoclaw-updates/<slug>`). It also removes this copy's service containers, data volumes and networks (for example a gateway's database), even if you keep group 1. Those volumes cannot be read without the keys in `data/`, which this group deletes. Removing this erases stored conversations; the `.env` is backed up first. |
-| **3) Agents' memory & files** | Notes and memory your agents created (`groups/`) and any migrated data (`store/`). Content you made — unrecoverable after deletion. |
+| **3) Your agents' memory & files** | Notes and memory your agents created (`groups/`) and any migrated data (`store/`). Content you made — unrecoverable after deletion. |
 
 Your `.env` is never deleted outright — it's copied to `.env.bak` first (a timestamped name if a backup already exists), so saved credentials survive the removal.
 

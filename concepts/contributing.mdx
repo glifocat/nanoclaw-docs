@@ -50,7 +50,7 @@ pnpm run typecheck    # tsc --noEmit
 pnpm run format       # prettier --write
 
 # Container image
-./container/build.sh  # rebuild nanoclaw-agent-v2-<slug>:latest
+./container/build.sh build  # rebuild nanoclaw-agent-v2-<slug>:latest from the Dockerfile (a bare build.sh on a hardened-image install only overlays the tool manifest)
 
 # Agent-runner (Bun, separate tree)
 cd container/agent-runner

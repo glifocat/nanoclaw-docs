@@ -5,6 +5,7 @@ keywords: ["imessage", "add-imessage", "photon", "photon.codes", "spectrum-ts", 
 ---
 
 {/* verified-against: .claude/skills/add-imessage/SKILL.md, .claude/skills/add-imessage/docs.md, setup/channels/imessage-configure.sh, scripts/photon-setup.ts, setup/channels/initial-setup.ts @ 7203e00d (v2026.10.0); channels branch src/channels/imessage.ts @ d73e8f44 */}
+{/* verified-against (scoped correction): local handle asked after restart, wizard name and role first: .claude/skills/add-imessage/SKILL.md, setup/channels/run-channel-skill.ts @ 61cf826d */}
 
 NanoClaw connects to Apple's Messages network through a single `imessage` channel with two pluggable backends. You pick one at install time (or force it with `IMESSAGE_BACKEND=local|hosted`); only one runs per install.
 
@@ -41,15 +42,15 @@ iMessage is offered in the first-run setup wizard ("local Mac or hosted iMessage
     The skill copies the unified adapter from the `channels` branch and installs the backend's pinned package — `chat-adapter-imessage@0.1.1` for local, `spectrum-ts@11.0.0` for hosted. For local it also points the `chat.db` reader at NanoClaw's own prebuilt `better-sqlite3` (a pnpm override) and checks that it loads under Node. Idempotent: safe to re-run.
   </Step>
   <Step title="Backend setup">
-    **Local:** grant Full Disk Access (below), then enter the phone number or email you iMessage from — this becomes the platform ID wired to your first agent.
+    **Local:** grant Full Disk Access (below).
 
     **Hosted:** enter your phone number in `+`E.164 format (email handles are local-only), then the wizard runs the Photon device login (below).
   </Step>
   <Step title="Configuration write + restart">
-    `setup/channels/imessage-configure.sh <backend>` writes the backend selection to `.env` — `local` sets `IMESSAGE_BACKEND=local` and `IMESSAGE_ENABLED=true`; `hosted` sets `IMESSAGE_BACKEND=hosted` and removes `IMESSAGE_ENABLED` — and the service restarts.
+    `setup/channels/imessage-configure.sh <backend>` writes the backend selection to `.env` — `local` sets `IMESSAGE_BACKEND=local` and `IMESSAGE_ENABLED=true`; `hosted` sets `IMESSAGE_BACKEND=hosted` and removes `IMESSAGE_ENABLED` — and the service restarts. On local, the skill then asks for the phone number or email you iMessage from; this becomes the platform ID wired to your first agent.
   </Step>
-  <Step title="Name the agent and get the welcome message">
-    The wizard asks for your operator role and an agent name (default `Nano`), wires your handle to your first agent group, and sends a welcome iMessage. On the hosted backend the welcome only goes out after you've texted the line once — see the warning below.
+  <Step title="Get the welcome message">
+    In the setup wizard, your operator role and the agent name (default `Nano`) are asked at the very start, before the skill runs. The wizard then wires your handle to your first agent group, and sends a welcome iMessage. On the hosted backend the welcome only goes out after you've texted the line once — see the warning below.
   </Step>
 </Steps>
 

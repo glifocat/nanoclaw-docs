@@ -9,6 +9,7 @@ tag: "UPDATED"
 {/* verified-against (scoped correction) — create_agent template param, fetch, approval card: container/agent-runner/src/mcp-tools/{agents.ts,agents.instructions.md}, src/modules/agent-to-agent/{create-agent,guard}.ts, src/templates/{library,local-dir}.ts @ 3a68cc7c */}
 {/* verified-against (scoped correction): create_agent refuses an invalid folder before the card: src/modules/agent-to-agent/create-agent.ts, src/group-folder.ts @ 533b922a9 (nanoclaw #4148) */}
 {/* verified-against (scoped correction): send_card parts and limits, answered question card: container/agent-runner/src/mcp-tools/{interactive,card-parts}.ts, src/channels/{card-parts,chat-sdk-bridge}.ts @ 533b922a9 (nanoclaw #4292, #4296, #4328) */}
+{/* verified-against (scoped correction): ask_user_question failure modes: container/agent-runner/src/mcp-tools/interactive.ts @ 61cf826d */}
 
 These are the tools the agent can call from inside its container. They're exposed by the built-in `nanoclaw` MCP server (`container/agent-runner/src/mcp-tools/`), so the agent sees them with the `mcp__nanoclaw__` prefix — e.g. `mcp__nanoclaw__send_message`. As an operator you never call them directly; you see their effects: messages arriving in chats, schedule changes, and approval cards.
 
@@ -73,7 +74,7 @@ Scheduling is no longer an MCP tool. The `schedule_task`, `list_tasks`, `update_
 | `options` | array | yes | Choices: plain strings or `{ label, selectedLabel?, value? }` objects |
 | `timeout` | number | no | Seconds to wait (default: 300) |
 
-Blocking — the agent's turn pauses while it polls for your answer. You see a question card with buttons; tapping one returns its `value` to the agent, and the answered card keeps its title and, where it still fits, its question, with the buttons replaced by the `selectedLabel` and who chose it. Errors out if the timeout expires.
+Blocking — the agent's turn pauses while it polls for your answer. You see a question card with buttons; tapping one returns its `value` to the agent, and the answered card keeps its title and, where it still fits, its question, with the buttons replaced by the `selectedLabel` and who chose it. Errors out if the timeout expires, if the card can't be delivered (for example it is too long for the channel), or if the turn is cancelled.
 
 ### `send_card`
 

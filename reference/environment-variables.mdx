@@ -10,6 +10,7 @@ keywords: ["environment variables", ".env", "configuration", "ASSISTANT_NAME", "
 {/* verified-against (scoped correction): WEBHOOK_HOST row and every file:line anchor re-pointed: src/config.ts, setup/auto.ts, migrate-v2.sh, container/pull.sh, .claude/skills/{add-onecli,add-iron-proxy}/scripts/{setup,auth}.ts @ 533b922a9 (nanoclaw #4185) */}
 {/* verified-against (scoped correction) — NANOCLAW_TEMPLATES_DIR fill sources, NANOCLAW_TEMPLATE_PATH picker note, and every file:line anchor re-pointed: src/config.ts, src/templates/library.ts, setup/auto.ts @ f2224a2f */}
 {/* verified-against (scoped correction): install ID in services and scripts, remote gateway proxy check, transcript age, every line anchor: setup/service.ts, setup/lib/install-slug.sh, .claude/skills/add-onecli/scripts/remote-proxy.ts, container/agent-runner/src/providers/claude-history.ts, setup/auto.ts @ 533b922a9 (nanoclaw #4350, #4358, #4203, #4332) */}
+{/* verified-against (scoped correction): transcript rotation line numbers, ASSISTANT_NAME reader, skip names, NANOCLAW_AGENT_NAME: container/agent-runner/src/providers/claude-history.ts, src/config.ts, channels:src/channels/whatsapp.ts, setup/auto.ts, setup/channels/run-channel-skill.ts @ 61cf826d */}
 
 Core environment settings read by the NanoClaw host, setup wizard, and agent runner. For how to actually set these — `.env` editing, service definitions, restart commands — see [Configuration](/operate/configuration).
 
@@ -21,8 +22,8 @@ NanoClaw's own parser ([`src/env.ts`](https://github.com/nanocoai/nanoclaw/blob/
 
 | Variable | Default | Read in | Effect |
 |---|---|---|---|
-| `ASSISTANT_NAME` | `Andy` | `src/config.ts:33` | Assistant name. Also sets the default trigger, `@<name>`. |
-| `ASSISTANT_HAS_OWN_NUMBER` | `false` | `src/config.ts:66` | Set `true` when the assistant runs on its own WhatsApp number instead of yours. |
+| `ASSISTANT_NAME` | `Andy` | WhatsApp adapter (`src/channels/whatsapp.ts` on `channels`, `.env` only) | The name the WhatsApp adapter prefixes onto replies on a shared number and matches for typed mentions. The `src/config.ts:33` export is deprecated and has no reader in core. |
+| `ASSISTANT_HAS_OWN_NUMBER` | `false` | WhatsApp adapter (`.env` only; the `src/config.ts:66` export is deprecated) | Set `true` when the assistant runs on its own WhatsApp number instead of yours. |
 | `ONECLI_URL` | — | OneCLI gateway skill (`src/gateway-providers/onecli.ts`) | URL of the OneCLI Agent Vault. Read only when the OneCLI gateway is installed. |
 | `ONECLI_API_KEY` | — | OneCLI gateway skill | API key for the vault. Read only when the OneCLI gateway is installed. See [Credentials](/operate/credentials). |
 | `TZ` | system timezone, else `UTC` | `src/config.ts:147` | IANA timezone for scheduled tasks and timestamps. Invalid values are skipped, not errored. Injected into every agent container at spawn. |
@@ -81,11 +82,11 @@ Consumed by the setup wizard (`pnpm run setup:auto`) and migration scripts, not 
 
 | Variable | Default | Read in | Effect |
 |---|---|---|---|
-| `NANOCLAW_SKIP` | — | `setup/auto.ts:231` | Comma-separated step names to skip: `environment`, `container`, `gateway`, `auth`, `mounts`, `service`, `cli-agent`, `timezone`, `channel`, `verify`, `first-chat`. |
+| `NANOCLAW_SKIP` | — | `setup/auto.ts:231` | Comma-separated step names to skip: `environment`, `container`, `gateway`, `auth`, `mounts`, `service`, `cli-agent`, `timezone`, `channel`, `verify`, `first-chat`, `echo-reminder`, `slack-reminder`. |
 | `NANOCLAW_DISPLAY_NAME` | `$USER` | `setup/auto.ts:598` | How agents address the operator — skips the prompt. |
 | `NANOCLAW_AGENT_PROVIDER` | — | `setup/auto.ts:543` | Preselects the agent provider and skips the setup picker (e.g. `claude`, `codex`). Setup fails if the value isn't a provider available in this install. |
 | `NANOCLAW_TEMPLATE_PATH` | — | `setup/auto.ts:287` | Presets the first-agent [template](/templates/using-templates) as a local ref (e.g. `<category>/<template>`), skipping the picker. Same as `--template-path`. Honored even on an existing install, where the picker otherwise defaults to **No template changes**. Setup warns and falls back to the picker if the ref isn't found. |
-| `NANOCLAW_AGENT_NAME` | — | `setup/channels/*.ts` | Pre-fills the agent name prompt in each channel setup flow. The CLI scratch agent is always "Terminal Agent". |
+| `NANOCLAW_AGENT_NAME` | — | `setup/auto.ts:1206`, `setup/channels/run-channel-skill.ts:168` | Skips the agent name prompt in each channel setup flow and uses this value. The CLI scratch agent is always "Terminal Agent". |
 | `NANOCLAW_CHANNELS` | — | `setup/migrate-v2/select-channels.ts:43` | Comma-separated channel names (e.g. `telegram,discord`) — skips the channel picker in the v2 migration flow. |
 | `NANOCLAW_V1_PATH` | sibling-directory scan | `migrate-v2.sh:214` | Explicit override for v1 install discovery in the migration flow. Validated against `$NANOCLAW_V1_PATH/store/messages.db` — the script fails with a message telling you to set it when auto-discovery misses. |
 | `INSTALL_CJK_FONTS` | `false` | `setup/container.ts:266` | Set `true` to bake CJK fonts (~200 MB) into the agent image. Read from `.env` with a dedicated regex during the container build step and passed as a Docker `--build-arg` — the only build-arg passed through today. Set it in `.env`, not the service environment. |
@@ -117,9 +118,9 @@ Read inside the agent container by the agent runner. The host injects runtime, r
 |---|---|---|---|
 | `TZ` | injected from host `TIMEZONE` | `agent-runner/src/timezone.ts:68` | Timezone for timestamps and scheduling inside the container. |
 | `NANOCLAW_CONVERSATIONS_DIR` | `/workspace/agent/conversations` | `agent-runner/src/providers/claude-history.ts:108` | Where pre-compaction conversation transcripts are archived as Markdown. |
-| `CLAUDE_TRANSCRIPT_ROTATE_BYTES` | `12582912` (12 MiB) | `agent-runner/src/providers/claude-history.ts:261` | Transcript size past which the session is rotated instead of resumed — cold resumes of huge transcripts would outlive the idle ceiling. |
-| `CLAUDE_TRANSCRIPT_ROTATE_AGE_DAYS` | `14` | `agent-runner/src/providers/claude-history.ts:262` | Age trigger for transcript rotation, measured from the first entry that carries a timestamp. Zero or negative disables the age check; size alone governs. |
+| `CLAUDE_TRANSCRIPT_ROTATE_BYTES` | `12582912` (12 MiB) | `agent-runner/src/providers/claude-history.ts:265` | Transcript size past which the session is rotated instead of resumed — cold resumes of huge transcripts would outlive the idle ceiling. |
+| `CLAUDE_TRANSCRIPT_ROTATE_AGE_DAYS` | `14` | `agent-runner/src/providers/claude-history.ts:266` | Age trigger for transcript rotation, measured from the first entry that carries a timestamp. Zero or negative disables the age check; size alone governs. |
 | `CLAUDE_CONFIG_DIR` | `~/.claude` | `agent-runner/src/providers/claude-history.ts:54` | Base directory the runner scans for Claude Code project transcripts. |
 | `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | `165000` | `agent-runner/src/providers/claude.ts:202` | Token window at which Claude Code auto-compacts context. Raise for 1M-context model variants. Settable on the host from v2026.10.0: put it in `.env` or the process environment and the Claude provider passes it into the container (`src/providers/claude.ts`). In v2.4.0 and earlier a host value never reaches the container. Must be a positive integer; other values are ignored with a warning. `.env` is read at each container spawn; a process-environment change needs a host restart. Either way, restart affected sessions to apply it. |
 
-Line numbers reference [`nanocoai/nanoclaw`](https://github.com/nanocoai/nanoclaw) at `533b922a9` (`main`, 2026.11.0-beta.3) and will drift with future releases.
+Line numbers reference [`nanocoai/nanoclaw`](https://github.com/nanocoai/nanoclaw) at `61cf826d` (`main`, after 2026.11.0-beta.3) and will drift with future releases.

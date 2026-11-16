@@ -7,6 +7,7 @@ keywords: ["echo", "hardened runtime", "security", "sandbox", "container image",
 
 {/* verified-against: setup/auto.ts, setup/registry-login.ts, setup/registry-login.sh, setup/registry.ts, setup/lib/registry-state.ts, container/Dockerfile, container/build.sh, docs/hardened-image.md @ 639577c3 (main, #3150 merge); pins, pull checks, sign-in verification, and the pin gate: versions.json, container/pull.sh, setup/registry-login.ts, setup/registry.ts, setup/lib/registry-state.ts, setup/set-env.ts, setup/channels/slack-auto.ts, .github/workflows/verify-agent-image.yml @ 294ef2ae. Auth screenshots are production captures (authenticate.nanoclaw.dev, 2026-07-29); wizard default and pull checks: setup/auto.ts, container/pull.sh @ b76fcb3d */}
 {/* verified-against (scoped correction): pin gate workflow: .github/workflows/verify-agent-image.yml @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction): per-release image lookup, pin gate covers agent-images.json, signature check blocks: container/pull.sh, container/release-image.sh, setup/lib/registry-state.ts, .github/workflows/verify-agent-image.yml (nanoclaw #4139) @ 61cf826d */}
 
 <Note>
   The hardened runtime is free and opt-in. Your existing local-build setup keeps working exactly as it does today. Choosing the hardened runtime is additive, not a replacement.
@@ -95,10 +96,10 @@ Choose the hardened runtime while you set up NanoClaw for the first time.
     If authentication doesn't finish, setup says so and builds the sandbox locally instead — nothing breaks, and you can [opt in later](#already-running-nanoclaw).
   </Step>
   <Step title="Finish the install">
-    Let the installer finish. It pulls the image by its pinned digest and checks the architecture and agent-runner lock label before tagging it as this install's sandbox image. Wrong architecture fails. A missing lock label fails unless you explicitly allow an unlabeled image; a mismatched label currently warns and continues, as described below.
+    Let the installer finish. It pulls the image published for your release (listed in upstream `agent-images.json`), falling back to the `agent-image` pin in `versions.json`, always by digest, and checks the architecture and agent-runner lock label before tagging it as this install's sandbox image. Wrong architecture fails. A missing lock label fails unless you explicitly allow an unlabeled image; a mismatched label currently warns and continues, as described below.
 
     <Warning>
-      The pull accepts a lockfile that does not match your checkout. Every published hardened image still carries the v2.2.0 agent-runner lockfile, so refusing the tag would block every new hardened install. The pull prints `Warning: agent-runner lock drift — tagging this image anyway.` and continues. Upstream marks this temporary. If an agent then dies on a missing module, build locally with `./container/build.sh build`.
+      The pull accepts a lockfile that does not match your checkout. This happens when your checkout's agent-runner lockfile differs from the one the image was built with, for example a checkout ahead of the newest release that has an image. The pull prints `Warning: agent-runner lock drift — tagging this image anyway.` and continues. Upstream marks this allowance temporary. If an agent then dies on a missing module, build locally with `./container/build.sh build`.
     </Warning>
   </Step>
 </Steps>
@@ -135,7 +136,7 @@ The status report shows:
 
 - **Image source** — how this install gets its image: `pull a pinned image` or `build here`
 - **On this machine** — what is actually present locally
-- **Pinned** — the image reference this install tracks
+- **Pinned** — the image reference this install tracks: `NANOCLAW_AGENT_IMAGE_REF` if set, else the image published for your release, else the `versions.json` pin
 - **Signed in as** — the account, if any
 - **Perks**: the entitlements on the account, listed only when it has any
 - **Docker helper**: which registry hosts Docker asks NanoClaw for credentials on, or `not installed`
@@ -144,18 +145,19 @@ Provenance also rides in the image itself: the `dev.nanoclaw.image-source` label
 
 ## How a pin bump is gated
 
-A repin is not merged on trust. A CI workflow re-checks the new digest on every pull request, and the checks finish at once when the pin has not changed, before the change can reach you.
+A repin is not merged on trust. A CI workflow gates both the `agent-image` pin in `versions.json` and `agent-images.json`, the list that maps each release to its hardened image. It re-checks every changed reference on the pull request, before the change can reach you, and finishes at once when neither file changed.
 
-Four checks block the merge. They run on every pull request, and finish at once when the pin has not changed:
+Five checks block the merge:
 
 1. The reference must be digest-pinned. A mutable tag fails.
 2. The image must be a multi-architecture index covering `linux/amd64` and `linux/arm64`.
-3. The `dev.nanoclaw.agent-runner-lock-sha256` label must equal the checkout's own agent-runner lockfile hash.
+3. The `dev.nanoclaw.agent-runner-lock-sha256` label must equal the agent-runner lockfile hash of the release the image is listed for, or of the branch for a pin that is not a listed release image. An image listed for a release must also carry that release's version and commit in its OCI labels.
 4. The `dev.nanoclaw.image-source` label must read `hardened`.
+5. The publisher's keyless Sigstore signature must verify against the digest with `cosign verify`. An image with no verified signature fails the pull request.
 
 A manifest whose size moves by more than threefold in either direction raises a warning rather than blocking.
 
-One more check is reported but does not block: a keyless Sigstore signature is verified against the digest with `cosign verify`. The result goes to the job summary for the person who merges. An image with no verified signature does not fail the pull request. Nothing in the workflow merges anything; a person merges every repin.
+Nothing in the workflow merges anything; a person merges every repin.
 
 <Note>
   No attestation or SBOM is checked, because the publisher attaches none. The workflow verifies the image's shape and, when present, its signature.

@@ -7,6 +7,7 @@ keywords: ["mattermost", "add-mattermost", "self-hosted", "bot account", "websoc
 {/* verified-against: .claude/skills/add-mattermost/{SKILL.md,SERVER_SETUP.md,REMOVE.md}, .claude/skills/add-mattermost/scripts/{configure.ts,verify-runtime.ts,discover-server.mjs,select-server.mjs,read-response.mjs}, setup/channels/initial-setup.ts, setup/channels/fixtures/mattermost/README.md @ 7203e00d (v2026.10.0); channels branch src/channels/mattermost.ts, src/channels/mattermost-adapter/{adapter,websocket,index}.ts @ d73e8f44 */}
 {/* verified-against (scoped correction): webhook listen host for card callbacks: src/config.ts, .claude/skills/add-mattermost/SKILL.md, setup/channels/fixtures/mattermost/README.md @ 533b922a9 (nanoclaw #4185) */}
 {/* verified-against (scoped correction): threads and mentions, long replies, upgrade deadline, refused clicks: channels:src/channels/mattermost.ts, channels:src/channels/mattermost-adapter/{adapter,websocket}.ts @ c16f0e425; src/channels/chat-sdk-bridge.ts @ 533b922a9 (nanoclaw #3797, #4320, #4351, #4168, #4171) */}
+{/* verified-against (scoped correction): wizard wires the owner DM, 401 alone does not identify the host: .claude/skills/add-mattermost/SKILL.md, setup/channels/{initial-setup,run-channel-skill}.ts @ 61cf826d */}
 
 The Mattermost adapter connects NanoClaw to a Mattermost server you control, self-hosted or cloud. NanoClaw connects to a server; it does not install or manage one. It supports DMs, channels, threads, files, reactions, and interactive approval cards. Messages arrive over Mattermost's WebSocket, so no public URL is needed for inbound chat; card clicks return to NanoClaw over an authenticated HTTP callback.
 
@@ -43,7 +44,7 @@ Mattermost is offered in the first-run setup wizard, or add it later by running 
     The skill asks for your Mattermost username (without `@`), resolves it against `/api/v4/users/username/<name>`, checks the user ID the server returns before using it, and opens the DM between you and the bot, capturing the `mattermost:<channel-id>` platform ID that `/init-first-agent` wires as your first chat.
   </Step>
   <Step title="Build, test, restart">
-    `pnpm run build`, the registration and adapter regression tests, then a service restart so the channel and credentials load. A runtime check then confirms the running service loaded your bot and settings: it posts a temporary diagnostic card in the owner's DM, triggers its button through Mattermost, requires this host to receive the callback, and deletes the card. For a first channel, continue with `/init-first-agent`; otherwise `/manage-channels`.
+    `pnpm run build`, the registration and adapter regression tests, then a service restart so the channel and credentials load. A runtime check then confirms the running service loaded your bot and settings: it posts a temporary diagnostic card in the owner's DM, triggers its button through Mattermost, requires this host to receive the callback, and deletes the card. In the setup wizard, the agent name and your role are asked at the start, and the wizard wires the owner DM and sends the welcome message itself. When you run `/add-mattermost` on its own, continue with `/init-first-agent` for a first channel, otherwise `/manage-channels`.
   </Step>
 </Steps>
 
@@ -65,7 +66,7 @@ The `/add-mattermost` skill carries the full troubleshooting list; the high poin
 - **The token check returns 401**: the token is stale, mistyped, or belongs to a deactivated bot. Create a replacement token, then deactivate the old one after the replacement works.
 - **The bot ignores a channel**: add it to that team *and* channel. Membership changes are observed, but restarting NanoClaw forces a fresh subscription.
 - **Desktop messages appear only after a manual refresh**: the server is rejecting the WebSocket `Origin`. Use the same host name in the Desktop server URL, `MATTERMOST_BASE_URL`, and `ServiceSettings.SiteURL`; keep `WebsocketURL` blank; check server logs for `request origin not allowed`. Do not "fix" this by changing `ServiceSettings.AllowCorsFrom`.
-- **Cards render but clicks do nothing**: from the Mattermost server, POST to the callback URL. A `401` proves the path reaches NanoClaw; a timeout or refusal means routing or firewall failure, or that the webhook server is still on its `127.0.0.1` default (add `WEBHOOK_HOST=0.0.0.0` to `.env` and restart).
+- **Cards render but clicks do nothing**: rerun `/add-mattermost`: its runtime check proves this host receives the callback. A manual POST from the Mattermost server that returns `401` shows something answered at that URL, not that it was this NanoClaw; a timeout or refusal means routing or firewall failure, or that the webhook server is still on its `127.0.0.1` default (add `WEBHOOK_HOST=0.0.0.0` to `.env` and restart).
 - **Messages arrive but no agent runs**: inspect `ncl dropped-messages list` and `ncl wirings list`. `no_agent_wired` means approval is pending or no wiring exists; it is not an adapter failure.
 
 For service-level checks (logs, restarts, wiring queries), see [troubleshooting](/operate/troubleshooting).

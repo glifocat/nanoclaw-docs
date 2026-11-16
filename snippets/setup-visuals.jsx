@@ -1,5 +1,6 @@
 // Synthetic terminal illustrations. Exact questions/options: NanoClaw
-// setup/auto.ts and setup/providers/registry.ts @ b76fcb3d.
+// setup/auto.ts, setup/providers/skill-descriptor.ts, .claude/skills/add-{codex,cursor,opencode}/SKILL.md
+// and .claude/skills/add-onecli/scripts/auth.ts @ 61cf826d.
 // Presentation inspired by setup/lib/bright-select.ts at the same revision.
 // Hints and surrounding output are omitted; selection is the guide's choice,
 // not necessarily the installer's default. No installation capture is claimed.

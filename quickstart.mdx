@@ -11,6 +11,7 @@ import { TerminalMenu, SetupCheck } from "/snippets/setup-visuals.jsx";
 {/* verified-against: setup sequence, exact prompt labels, fresh terminal agent creation, channel handoff, and final checks: setup/auto.ts, setup/channels/initial-setup.ts, setup/lib/bright-select.ts, scripts/chat.ts @ b76fcb3d; prerequisites and bootstrap: nanoclaw.sh, setup.sh @ b76fcb3d. Synthetic menu illustrations: setup/auto.ts, setup/providers/registry.ts, setup/lib/bright-select.ts @ b76fcb3d, inspected 2026-09-05; simplified presentation with exact questions/options, omitted hints/output, and the guide's choice highlighted (not necessarily the default). These are not installation captures. Existing NanoClaw browser screenshots are reused from the hardened-runtime guide; they are reference captures, not a recording of this verification. */}
 {/* verified-against (scoped correction): sandbox image prompt, provider picker, Claude sign-in labels, final check: setup/auto.ts, setup/portal.ts, .claude/skills/add-onecli/scripts/auth.ts, .claude/skills/add-onecli/scripts/register-claude-token.sh, .claude/skills/add-codex/SKILL.md, .claude/skills/add-opencode/SKILL.md @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction): provider picker options, Claude sign-in success line: setup/auto.ts, setup/providers/skill-descriptor.ts, .claude/skills/add-cursor/SKILL.md, .claude/skills/add-onecli/scripts/{auth.ts,register-claude-token.sh} @ 533b922a9 (nanoclaw #4107, #4094, #4187) */}
+{/* verified-against (scoped correction): perk choice in the browser, keep-waiting prompt: setup/portal.ts, setup/lib/first-chat-progress.ts, setup/lib/first-chat-wait.ts, setup/auto.ts @ 61cf826d */}
 
 {/* Scoped verification, 2026-09-05: access-rule defaults/preservation in setup/auto.ts and setup/mounts.ts; channel preparation in executable .claude/skills/add-{telegram,whatsapp}/SKILL.md and setup/channels/slack-auto.ts @ b76fcb3d. Time allowance is editorial planning guidance, not a timed installation result. */}
 
@@ -117,7 +118,7 @@ NanoClaw installs the other software it needs. If you choose the recommended dow
 
     For the download option, sign in to NanoClaw in the browser window that opens. You can create an account there. If no browser opens, open the link shown in Terminal.
 
-    If asked to confirm a code, check that it matches the code in Terminal. Once you see the confirmation screen, return to Terminal.
+    Check that the code on the sign-in page matches the code in Terminal, then turn on the Echo hardened image on the page that follows. Terminal waits until you choose, then shows **Image choice saved. Continuing setup.**
 
     <Tabs>
       <Tab title="Sign-in screen">
@@ -155,7 +156,7 @@ NanoClaw installs the other software it needs. If you choose the recommended dow
   </Step>
 
   <Step title="Have your first conversation" id="first-conversation">
-    Setup sends a test message to check your assistant can reply. The first response may take a little time while it starts.
+    Setup sends a test message to check your assistant can reply. The first response can take a minute or more while it starts. If it takes more than two minutes, setup asks whether to keep waiting: choose **Keep waiting**. If you skip the first chat, setup does not offer the terminal conversation below.
 
     Choose **Pause here and chat with your agent from the terminal**. This creates the terminal assistant you'll use in this guide. Move down to that option with the arrow key, then press **Enter**.
 
@@ -191,7 +192,7 @@ NanoClaw installs the other software it needs. If you choose the recommended dow
       Follow the final instructions for that app: some require you to send the first message. A messaging app can connect to a different assistant from the one you met in Terminal.
     </Accordion>
 
-    <SetupCheck>If you skipped the channel question, Terminal ends with <strong>You're ready! Chat with <code>pnpm run chat hi</code>.</strong> If you connected a messaging app, it ends with <strong>You're set.</strong> and tells you to look for a welcome message in that app. If setup reports a problem instead, follow its recovery instructions before continuing.</SetupCheck>
+    <SetupCheck>If you skipped the channel question, Terminal ends with <strong>You're ready! Chat with <code>pnpm run chat hi</code>.</strong> If you connected a messaging app, it ends with <strong>You're set.</strong> and tells you to look for a welcome message in that app, or with a note about the one step left in that app. If setup reports a problem instead, follow its recovery instructions before continuing.</SetupCheck>
 
     To send another message later, run this from the same Terminal window, still in the `nanoclaw` folder:
 

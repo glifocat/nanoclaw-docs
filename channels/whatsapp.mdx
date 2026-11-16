@@ -9,6 +9,7 @@ keywords: ["whatsapp", "baileys", "qr code", "pairing code", "add-whatsapp", "AS
 {/* verified-against (scoped correction): Baileys pin: .claude/skills/add-whatsapp/SKILL.md, .github/skill-pins/package.json @ 533b922a9 (nanoclaw #4024) */}
 {/* verified-against (scoped correction): answers posted after the host accepts them: channels:src/channels/whatsapp.ts @ c16f0e425; src/modules/approvals/response-handler.ts @ 533b922a9 (nanoclaw #4171, #4168) */}
 {/* verified-against (scoped correction): link step fails at once on a closed connection: setup/whatsapp-auth.ts, .claude/skills/add-whatsapp/SKILL.md (nanoclaw #4372, #4387) @ 61cf826d */}
+{/* verified-against (scoped correction): wizard name and role first, self-chat engagement prompt, QR refresh, WHATSAPP_ENABLED: .claude/skills/add-whatsapp/SKILL.md, setup/channels/run-channel-skill.ts, channels:src/channels/whatsapp.ts @ 61cf826d */}
 
 The WhatsApp adapter connects NanoClaw to a personal WhatsApp account as a linked device — no Meta business account, no API key. It's a native adapter built directly on `@whiskeysockets/baileys` 7.0.0-rc14 (pinned; the WhatsApp Web protocol), not the Chat SDK bridge. For Meta's official Cloud API instead, use `/add-whatsapp-cloud` — see the [channels overview](/channels/overview).
 
@@ -28,12 +29,13 @@ You can run it in two modes:
 WhatsApp is offered in the first-run setup wizard, or add it later by running `/add-whatsapp` in Claude Code. Both flows do the same thing:
 
 <Steps>
+  <Step title="Name the agent (setup wizard)">
+    In the setup wizard, the first questions are what to call your assistant (default `Nano`) and how to register your own account: Owner, Admin or Member. A standalone `/add-whatsapp` run skips this step.
+  </Step>
   <Step title="Choose your mode">
     The skill first asks which number the agent will use. **Dedicated** (recommended) is a separate number the agent owns, such as a spare SIM or eSIM. **Shared** is your own everyday number; the agent then lives only in your "You" self-chat.
 
     If you pick shared, the skill warns that WhatsApp may suspend or ban a personal number and asks you to confirm before it goes on.
-
-    If you pick dedicated, the skill also asks for your own number, the one you will chat from. It must be different from the number you are about to link.
 
     The choice is saved as `ASSISTANT_HAS_OWN_NUMBER=true` (dedicated) or `false` (shared) in `.env`.
   </Step>
@@ -44,10 +46,15 @@ WhatsApp is offered in the first-run setup wizard, or add it later by running `/
     QR code (scan with your phone's camera) or pairing code (enter an 8-character code on your phone — no camera needed). The pairing-code flow asks for your phone number first.
   </Step>
   <Step title="Link your phone">
-    A QR code renders (terminal, or a local browser page via the skill) and refreshes until you scan it. If nothing is scanned within 2 minutes the link step stops and reports `timeout`; run the step again for a fresh code. Pairing codes also expire in ~60 seconds — enter them immediately under **Linked Devices → Link a Device → Link with phone number instead**. Credentials land in `store/auth/`, and the wizard restarts the service so the adapter picks them up.
+    A QR code renders (terminal, or a local browser page via the skill) and refreshes about every 20 seconds until you scan it. If nothing is scanned within 2 minutes the link step stops and reports `timeout`; run the step again for a fresh code. Pairing codes also expire in ~60 seconds — enter them immediately under **Linked Devices → Link a Device → Link with phone number instead**. Credentials land in `store/auth/`, and the wizard restarts the service so the adapter picks them up.
   </Step>
-  <Step title="Name the agent and get the welcome DM">
-    The wizard asks for an agent name (default `Nano`), wires your DM to the first agent group, and sends a welcome message.
+  <Step title="Say who the agent talks to">
+    On a dedicated number, the skill asks for your own number, the one you will chat from. It must be different from the number you just linked.
+
+    On a shared number, it asks how the agent should engage in your "You" chat: `all` (it answers every message you write there) or `mention` (only messages that start with `@<agent name>`, so you can keep using the chat for your own notes).
+  </Step>
+  <Step title="Get the welcome DM">
+    The wizard wires your DM to the first agent group and sends a welcome message.
   </Step>
 </Steps>
 
@@ -56,7 +63,7 @@ To wire more chats or groups later, run `/manage-channels`.
 ## Platform notes
 
 - **Auth persistence** — credentials live in `store/auth/` (multi-file auth state). Restarts reuse the saved session; you only re-pair if WhatsApp logs the device out. On a server-side logout the adapter wipes `store/auth/` so the next start prompts a fresh pair.
-- **Activation** — the adapter only starts when `store/auth/creds.json` exists, `WHATSAPP_PHONE_NUMBER` is set (pairing-code mode), or `WHATSAPP_ENABLED=true` (QR mode). Otherwise it's skipped at startup.
+- **Activation** — the adapter only starts when `store/auth/creds.json` exists, `WHATSAPP_PHONE_NUMBER` is set (pairing-code mode), or `WHATSAPP_ENABLED` is set (QR mode). Any non-empty value counts, so remove the key to turn it off; `false` does not. Otherwise it's skipped at startup.
 - **Reconnection** — on disconnect the adapter reconnects immediately (with one retry after 5s if that attempt throws) unless it was logged out. Messages sent while disconnected are queued in memory and flushed when the connection reopens.
 - **No threads** — the adapter sets `supportsThreads: false`; every inbound message has a null thread ID. Wirings with `per-thread` session mode behave like `shared` here — see the [entity model](/concepts/entity-model).
 - **DMs vs groups** — On a dedicated number, DMs always count as addressed to the agent. On a shared number, only your own "You" self-chat reaches the agent. A DM from someone else is addressed to you, not the agent, so it is ignored and never creates a chat. Group behavior (`…@g.us` JIDs) also depends on the mode. **Shared number**: an @-tag of the number addresses you, the human — it never engages the agent; instead the agent triggers when its name appears as a whole word in the message, and unknown senders fall under the `strict` policy so strangers DMing you never spawn agent state. **Dedicated number**: groups engage on an explicit @-mention of the bot's number — either the tap-to-select mention pill, or a typed `@<agent name>` / `@<bot number>` in the text when the message doesn't mention-pill anyone else — and unknown senders get the `request_approval` policy. Group names sync from WhatsApp every 24 hours.
@@ -71,6 +78,6 @@ To wire more chats or groups later, run `/manage-channels`.
 - **`Could not fetch current WhatsApp Web version`** — Baileys' hardcoded protocol version goes stale and WhatsApp rejects it (405), so the adapter fetches the current version at startup from wppconnect.io with web.whatsapp.com as fallback. The linking step does the same lookup once before it connects and stops at once with this error instead of hanging; it never falls back to the bundled version. This error means both fetches failed: check outbound network access to those hosts, then run the step again in a few minutes.
 - **Agent silent, messages arrive late in a burst** — the connection dropped; outbound messages were queued (`WA disconnected, message queued` in logs) and flushed on reconnect. Confirm the last `Connected to WhatsApp` log line and that only **one** NanoClaw process holds these credentials — a second instance causes "conflict" disconnect loops.
 - **`WhatsApp closed the connection before linking`** — the link step stops at once with the status code when WhatsApp closes the connection before a device is linked (a refused WhatsApp Web version shows `405`). A requested pairing code leaves credentials behind, so clear `store/auth/` and run the step again. If the message says `after pairing` instead, the link is already saved in `store/auth/`: run the step again without clearing it.
-- **QR or pairing code expired** — both rotate/expire in ~60 seconds. Re-run the auth step for a fresh code; for pairing codes, the number must be digits only with country code, no `+`. If pairing codes keep getting rejected, switch to the QR method — it's more reliable.
+- **QR or pairing code expired** — the QR refreshes about every 20 seconds while the step runs, and a pairing code expires in about 60 seconds. Re-run the auth step for a fresh code; for pairing codes, the number must be digits only with country code, no `+`. If pairing codes keep getting rejected, switch to the QR method — it's more reliable.
 
 For service-level checks (logs, restarts, wiring queries), see [troubleshooting](/operate/troubleshooting).

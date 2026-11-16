@@ -7,6 +7,7 @@ keywords: ["entity model", "agent groups", "messaging groups", "wirings", "messa
 {/* verified-against: src/db/schema.ts, src/db/migrations/{010-engage-modes,011-pending-sender-approvals,012-channel-registration,016-messaging-group-instance,019-wiring-threads}.ts, src/types.ts, src/router.ts, src/channels/channel-defaults.ts, src/session-manager.ts, src/modules/permissions/{index.ts,access.ts}, src/command-gate.ts @ 639577c3 */}
 {/* verified-against (scoped correction) — adapter sender/session defaults and thread-policy validation: src/router.ts, src/channels/{channel-defaults,channel-registry}.ts, src/cli/resources/wirings.ts @ b76fcb3d */}
 {/* verified-against (scoped correction): command gate list: src/command-gate.ts, src/provider-contracts/claude.ts @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction): mention-sticky needs a real wake, ncl wirings create session defaults: src/router.ts, src/cli/resources/wirings.ts (nanoclaw #3802) @ 61cf826d */}
 
 Everything NanoClaw does reduces to five entities in `data/v2.db`: **agent groups** (where agents run), **messaging groups** (where people talk), **wirings** (the edge connecting them, which holds all the behavior), **users** (who is allowed to do what), and **sessions** (the conversation state in between). This page is the mental model; for column-level detail see the [database schema](/reference/db-schema).
 
@@ -53,7 +54,7 @@ A wiring (`messaging_group_agents` row) connects one messaging group to one agen
 | Mode | Fires when |
 |---|---|
 | `mention` | The bot is mentioned at the platform level (`@botname` on Telegram, user-id mention on Slack/Discord). Resolved by the adapter, not by text matching. DMs count as addressed to the bot. |
-| `mention-sticky` | A platform mention, **or** a session already exists for this (agent, chat, thread). The session's existence is the subscription: once a mention activates a thread, follow-ups fire without re-mentioning. On threaded platforms the adapter also subscribes to the thread. DMs never stick without a mention. |
+| `mention-sticky` | A platform mention, **or** the agent was already woken in an active session for this (agent, chat, thread). Once a mention activates a thread, follow-ups fire without re-mentioning. A session that holds only accumulated context (`ignored_message_policy = accumulate`) does not count: the thread sticks only after something actually woke the agent there. On threaded platforms the adapter also subscribes to the thread. DMs never stick without a mention. |
 | `pattern` | The message text matches the `engage_pattern` regex. `'.'` is the sentinel for "every message" — the always-on flavor. An invalid regex fails open so you notice and fix it. |
 
 <Warning>
@@ -74,7 +75,7 @@ When a message doesn't engage a wiring, `drop` skips it silently. `accumulate` s
 
 ### `threads` — honoring platform threads
 
-Unless explicitly overridden, new wirings inherit the adapter's declared `sessionMode`; a declared `per-thread` default also stamps `threads = 1`. An undeclared adapter falls back to `shared` with `threads = NULL`.
+Wirings created by setup, by the channel-approval card, or by the first-agent scripts inherit the adapter's declared `sessionMode`; a declared `per-thread` default also stamps `threads = 1`. An undeclared adapter falls back to `shared` with `threads = NULL`. `ncl wirings create` takes only the engage defaults from the adapter: without `--session-mode` it stores `shared`, and without `--threads` it leaves `threads = NULL`.
 
 The `threads` field is a per-wiring override on whether inbound thread ids are honored for this wiring. `NULL` inherits the channel adapter's declared default for the context (DM versus group); `1` forces thread honoring on, `0` forces it off. It's hard-ANDed with the adapter's raw capability at router fanout: it can disable threads on a thread-capable platform, but never invent them on one that has none. Setting `threads = 0` also lifts the per-thread forcing described below.
 

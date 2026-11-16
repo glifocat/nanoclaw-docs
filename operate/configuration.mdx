@@ -9,6 +9,7 @@ tag: "UPDATED"
 {/* verified-against (scoped correction) — sweep timer env overrides NANOCLAW_ABSOLUTE_CEILING_MS / NANOCLAW_CLAIM_STUCK_MS: src/{config,reconcile-session}.ts @ 2105169d */}
 {/* verified-against (scoped correction): WEBHOOK_HOST, OneCLI-only keys, gateway-neutral token injection, unlabeled-image key read from .env: src/config.ts, src/webhook-server.ts, container/pull.sh, .claude/skills/add-onecli/payload/src/gateway-providers/onecli.ts, .claude/skills/add-iron-proxy/payload/src/gateway-providers/iron-proxy.ts @ 533b922a9 (nanoclaw #4185) */}
 {/* verified-against (scoped correction): install ID in the service environment: setup/service.ts @ 533b922a9 (nanoclaw #4350, #4358) */}
+{/* verified-against (scoped correction): image reference default order, CLAUDE_CODE_AUTO_COMPACT_WINDOW: container/pull.sh, src/providers/claude.ts @ 61cf826d */}
 
 NanoClaw has two configuration layers:
 
@@ -26,11 +27,12 @@ Variables come from two sources, and the distinction matters:
 
 | Variable | Default | What it does |
 |---|---|---|
-| `ASSISTANT_NAME` | `Andy` | The assistant's name. Also sets the default trigger, `@<name>`. |
+| `ASSISTANT_NAME` | `Andy` | The name the WhatsApp adapter prefixes onto replies on a shared number and matches for typed mentions. Each agent's own name comes from its agent group, not from this value. |
 | `ASSISTANT_HAS_OWN_NUMBER` | `false` | Set `true` when the assistant runs on its own WhatsApp number instead of yours. |
 | `DEFAULT_AGENT_PROVIDER` | `claude` | Provider stamped on **new** agent groups at creation. Existing groups are never touched, and the per-group `provider` config still wins. |
 | `NANOCLAW_DEFAULT_MODEL` | provider SDK default | Model used at the next spawn for groups without their own model. Unlike the provider default, this is not stamped at group creation. |
 | `NANOCLAW_FAST_MODE` | `false` | Enables the faster, higher-priced serving tier for the Claude provider. Only `1` or `true` enables it, case-insensitively. |
+| `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | provider default | Token count at which the Claude provider auto-compacts. Must be a positive integer; any other value is logged and ignored. Read from the process environment first, then `.env`. |
 | `NANOCLAW_RUNTIME_DRIVER` | `docker` | Selects an installed session driver. Docker is the only driver shipped here; an unregistered value fails. |
 | `NANOCLAW_GATEWAY_PROVIDER` | the only installed gateway | Selects an installed credential-gateway provider (`onecli` or `iron-proxy`). Unset works only when exactly one gateway is installed. An unregistered value fails. See [Credential gateways](/operate/gateways). |
 | `NANOCLAW_SESSION_MATERIAL_ROOT` | `data/session-materials` | Host directory admitted for session identity material. |
@@ -60,7 +62,7 @@ Host-only settings need the service environment or an exported value in your dev
 | `CONTAINER_IMAGE` | per-install tag | Full agent image override (name and tag). |
 | `CONTAINER_IMAGE_BASE` | per-install name | Base image name override. The default includes an install slug so two checkouts on one host don't clobber each other's `nanoclaw-agent` image. |
 | `NANOCLAW_HARDENED_IMAGE` | `false` | Set `true` to fetch the pre-built [Echo hardened image](/guides/echo-hardened-runtime) at the next build/install step instead of building locally (`setup/container.ts:281`). |
-| `NANOCLAW_AGENT_IMAGE_REF` | committed `agent-image` pin in `versions.json` | Override which pullable image reference to fetch (`setup/container.ts:305`). |
+| `NANOCLAW_AGENT_IMAGE_REF` | the image published for this release (upstream `agent-images.json`), else the committed `agent-image` pin in `versions.json` | Override which pullable image reference to fetch (`setup/container.ts:305`). |
 | `NANOCLAW_ALLOW_UNLABELED_IMAGE` | `false` (unset) | Accept a pulled image with no `dev.nanoclaw.agent-runner-lock-sha256` label instead of refusing it (`container/pull.sh:190`). See [Hardening](/operate/hardening#hardened-image-option). |
 
 See the [environment variables reference](/reference/environment-variables) for the full list.

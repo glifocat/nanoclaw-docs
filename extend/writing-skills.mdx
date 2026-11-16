@@ -7,6 +7,7 @@ keywords: ["writing skills", "SKILL.md", "REMOVE.md", "skill authoring", "idempo
 {/* verified-against: docs/skill-guidelines.md, docs/skill-directives.md, CONTRIBUTING.md, vitest.skills.config.ts, .claude/skills/{add-telegram,manage-mounts,update-skills,add-ollama-tool}/SKILL.md, .claude/skills/add-telegram/REMOVE.md @ 639577c3 */}
 {/* verified-against (scoped correction) — structured skill refresh boundaries: .claude/skills/update-skills/SKILL.md, scripts/update-skills.ts @ b76fcb3d */}
 {/* verified-against (scoped correction): data/env mirror retired: .claude/skills/add-telegram/REMOVE.md @ 533b922a9 (nanoclaw 872259158) */}
+{/* verified-against (scoped correction): service logs live in logs/: setup/service.ts @ 61cf826d */}
 
 A skill is a markdown file that Claude Code executes — there's no engine you must integrate with, so writing one is mostly writing good instructions. The bar upstream holds skills to is [docs/skill-guidelines.md](https://github.com/nanocoai/nanoclaw/blob/main/docs/skill-guidelines.md), and it boils down to three principles: **single responsibility** (one independently useful customization with one cohesive reason to change), **open for extension, closed for modification** (mostly add files; keep reach-ins into existing code to a line or two that calls your own code), and **a test for every functional integration point** (one that goes red if the wiring is deleted or drifts). This page covers the conventions; [the overview](/extend/overview) explains the model.
 
@@ -79,12 +80,12 @@ description: Archive and truncate NanoClaw agent logs. Triggers on "rotate logs"
 
 ## Pre-flight
 
-Check `ls data/logs/*.log` — if no log file exceeds 50MB, tell the user
+Check `ls logs/*.log` — if no log file exceeds 50MB, tell the user
 nothing needs rotating and stop. Every step below is safe to re-run.
 
 ## 1. Archive
 
-For each oversized log, copy it to `data/logs/archive/<name>-<date>.log.gz`
+For each oversized log, copy it to `logs/archive/<name>-<date>.log.gz`
 (create the directory if missing, skip files already archived today).
 
 ## 2. Truncate and restart

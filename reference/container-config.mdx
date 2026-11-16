@@ -7,6 +7,7 @@ keywords: ["container config", "container_configs", "container.json", "provider"
 {/* verified-against: src/container-config.ts, src/config.ts, src/types.ts, src/db/container-configs.ts, src/db/migrations/{014,015,020,025}-*.ts, src/cli/resources/groups.ts, src/cli/guard.ts, src/cli/registry.ts, src/providers/provider-name.ts, src/container-runner.ts, src/drivers/types.ts, src/drivers/index.ts, container/agent-runner/src/config.ts, container/agent-runner/src/providers/{types,claude-config}.ts @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — templates resource, group-scope list: src/cli/resources/templates.ts, src/cli/registry.ts @ 3a68cc7c */}
 {/* verified-against (scoped correction): provider default stamped on new groups: src/db/container-configs.ts, src/config.ts @ 533b922a9 */}
+{/* verified-against (scoped correction): resolveProviderName location, MCP type values: src/providers/provider-name.ts, src/container-config.ts @ 61cf826d */}
 
 Each agent group has one row in the `container_configs` table in the central SQLite database — the source of truth for how that group's containers spawn. You change it with the [`ncl groups config` subcommands](/reference/ncl-cli#groups); the row is created automatically with defaults when the group is created.
 
@@ -42,7 +43,7 @@ Config edits write to the database only — a **running container keeps its old 
 
 ### provider
 
-Which agent CLI runs in the container. Resolution order at spawn (`resolveProviderName` in `container-runner.ts`):
+Which agent CLI runs in the container. Resolution order at spawn (`resolveProviderName` in `src/providers/provider-name.ts`):
 
 1. `sessions.agent_provider` (per-session override)
 2. `container_configs.provider`
@@ -103,7 +104,7 @@ External MCP servers merged with the built-in `nanoclaw` server at runner startu
 }
 ```
 
-`args` and `env` are optional and valid only on the stdio form (`type` defaults to `stdio`). Server names must be 1-64 chars of letters, digits, `_`, `-`. An `http` entry's `url` must be HTTPS — plain HTTP passes only for `localhost`, `127.0.0.1`, `[::1]`, and `host.docker.internal` — and URLs carrying credentials, fragments, or secret-looking query parameters are rejected. `instructions`, if present, is inlined into the group's composed `CLAUDE.md` at spawn as a `# MCP Server: <name>` section — but neither `ncl groups config add-mcp-server` nor the agent's `add_mcp_server` tool accepts it as of v2.1.38; to set it, update the JSON column directly in the database. Manage the rest with `ncl groups config add-mcp-server` / `remove-mcp-server`.
+`args` and `env` are optional and valid only on the stdio form (`type` defaults to `stdio`; `streamable-http` is accepted as an alias for `http`, and `sse` is rejected). Server names must be 1-64 chars of letters, digits, `_`, `-`. An `http` entry's `url` must be HTTPS — plain HTTP passes only for `localhost`, `127.0.0.1`, `[::1]`, and `host.docker.internal` — and URLs carrying credentials, fragments, or secret-looking query parameters are rejected. `instructions`, if present, is inlined into the group's composed `CLAUDE.md` at spawn as a `# MCP Server: <name>` section — but neither `ncl groups config add-mcp-server` nor the agent's `add_mcp_server` tool accepts it as of v2.1.38; to set it, update the JSON column directly in the database. Manage the rest with `ncl groups config add-mcp-server` / `remove-mcp-server`.
 
 ### packages_apt and packages_npm
 
