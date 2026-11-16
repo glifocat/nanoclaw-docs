@@ -6,6 +6,8 @@ keywords: ["channel adapter", "ChannelAdapter", "adapter interface", "custom cha
 
 {/* verified-against: src/webhook-server.ts @ 639577c3; src/channels/{adapter,channel-registry,chat-sdk-bridge,index}.ts, src/router.ts + src/delivery.ts hook seams, container/agent-runner/src/mcp-tools/server.ts, setup/channels/companions.ts @ 294ef2ae; channels branch src/channels/telegram.ts @ 6ee516ad; raw-text recovery and conversation metadata: src/channels/adapter.ts, src/channels/chat-sdk-bridge.ts @ b76fcb3d */}
 {/* verified-against (scoped correction): isConnected and onAction signatures; Telegram worked example: src/channels/adapter.ts, src/channels/chat-sdk-bridge.ts, src/cli/commands/status.ts @ 7203e00d (v2026.10.0); channels branch src/channels/telegram.ts @ d73e8f44 */}
+{/* verified-against (scoped correction): webhook listen host; Telegram worked example keeps commands as messages: src/config.ts, src/webhook-server.ts @ 533b922a9 (nanoclaw #4185); channels branch src/channels/telegram.ts @ c16f0e425 */}
+{/* verified-against (scoped correction): onAction outcome, card titles and redraws, Telegram example, firstDelivery: src/channels/{adapter,chat-sdk-bridge}.ts, src/response-registry.ts, src/delivery.ts @ 533b922a9; channels:src/channels/telegram.ts @ c16f0e425 (nanoclaw #4147, #4168, #4171, #4192) */}
 
 A channel adapter bridges NanoClaw with a messaging platform. There are two ways to build one:
 
@@ -163,7 +165,10 @@ export interface ChannelSetup {
   /** Called when the adapter discovers metadata about a conversation. */
   onMetadata(platformId: string, name?: string, isGroup?: boolean): void;
 
-  /** Called when a user clicks a button/action in a card (e.g., ask_user_question response). */
+  /**
+   * Called when a user clicks a button/action in a card (e.g., ask_user_question response).
+   * Resolves with what the host did: a card shows a resolution only for 'accepted'.
+   */
   onAction(
     questionId: string,
     selectedOption: string,
@@ -174,7 +179,7 @@ export interface ChannelSetup {
       platformId?: string;
       threadId?: string | null;
     },
-  ): void;
+  ): void | Promise<ResponseOutcome>;
 }
 ```
 
@@ -248,13 +253,13 @@ These feed the wiring defaults an operator gets when they don't pass explicit `-
 `createChatSdkBridge(config)` from `src/channels/chat-sdk-bridge.ts` wraps a Chat SDK `Adapter` into a complete `ChannelAdapter`. What it handles for you:
 
 - **Inbound dispatch** — wires all four SDK paths (subscribed threads, new mentions, DMs, plain messages) into `onInbound`, with the platform-confirmed `isMention` flag set correctly for each.
-- **Webhook or gateway registration** — gateway-capable adapters (Discord) get a supervised gateway listener with exponential backoff; non-gateway adapters are registered on the shared webhook server unless their runtime mode is `polling` at `/webhook/{routingPath}` (port `WEBHOOK_PORT`, default 3000). The routing path defaults to the adapter name, so single-instance routes are unchanged; a second instance of the same platform passes an `instance` and registers on `/webhook/{instance}` with its own signing secret and Chat SDK state namespace. Modules can also claim a raw `/webhook/{path}` for non–Chat SDK webhooks via `registerWebhookHandler()` — raw routes take priority over adapter routes.
+- **Webhook or gateway registration** — gateway-capable adapters (Discord) get a supervised gateway listener with exponential backoff; non-gateway adapters are registered on the shared webhook server unless their runtime mode is `polling` at `/webhook/{routingPath}` (host `WEBHOOK_HOST`, default `127.0.0.1`; port `WEBHOOK_PORT`, default 3000). The routing path defaults to the adapter name, so single-instance routes are unchanged; a second instance of the same platform passes an `instance` and registers on `/webhook/{instance}` with its own signing secret and Chat SDK state namespace. Modules can also claim a raw `/webhook/{path}` for non–Chat SDK webhooks via `registerWebhookHandler()` — raw routes take priority over adapter routes.
 - **Chunking** — set `maxTextLength` and outbound text longer than the platform limit is split on paragraph → line → word (space) → hard-character boundaries into multiple messages. Files ride on the first chunk, and the first chunk's id is returned so edits and reactions still target the head of the reply. Without it, platforms like Discord (2000) and Telegram (4096) truncate silently.
 - **Reply context** — pass `extractReplyContext` to pull quoted-reply text and sender out of the platform's raw message.
 - **Raw-text recovery** — pass `extractRawText(raw)` to recover readable text that the SDK adapter leaves only in `message.raw`. Non-empty recovered text is appended to the serialized message body with a blank-line separator before the raw payload is discarded. Without an extractor, the body is unchanged.
 - **Attachments** — inbound attachments are downloaded and base64-embedded before serialization; outbound `message.files` are posted as uploads.
-- **Cards and actions** — `ask_user_question` renders as a card with buttons; clicks are decoded and dispatched to `onAction`, and the card is edited to show the selected answer. Long question text is posted as several text blocks of at most 2,000 characters each (measured after `escapeCardText`), which keeps each block under the cap of a platform that allows more per block. An adapter can still lengthen text (emoji names, for example) after the bridge measures it, so do not rely on this for a cap of exactly 2,000. If your platform caps the text of a whole card, set `maxCardTextLength` in the bridge config: when the bridge builds a question card whose title plus text (after escaping, and counting the code-fence lines a split adds) is longer than that, it refuses the card instead of showing part of it. The limit applies to the card the bridge builds when the question is posted, not to the edit that later shows the chosen answer or to a card the adapter renders itself.
-- **Card text escaping** — pass `escapeCardText(text)` if your platform reads card text as its own markup. The bridge runs the question text of host-built cards, open and resolved, through it, so a sender or agent name inside an approval card cannot form markup. The card title is left alone, and a question an agent asks for itself keeps its markup.
+- **Cards and actions** — `ask_user_question` renders as a card with buttons; clicks are decoded and dispatched to `onAction` (its `ResponseOutcome` is `'accepted'`, `'refused'`, `'closed'` or `'ignored'`, from `src/response-registry.ts`), and the bridge edits the card only after the host answers: an accepted click shows the selected answer and who chose it under the kept question, a request that is gone shows `No longer available`, a refused clicker is told `Only an approver can answer this.` in a message only they see (where the platform has one), and any other click leaves the card as it is. Long question text is posted as several text blocks of at most 2,000 characters each (measured after `escapeCardText`), which keeps each block under the cap of a platform that allows more per block. An adapter can still lengthen text (emoji names, for example) after the bridge measures it, so do not rely on this for a cap of exactly 2,000. If your platform caps the text of a whole card, set `maxCardTextLength` in the bridge config: when the bridge builds a question card whose title plus text (after escaping, and counting the code-fence lines a split adds) is longer than that, it refuses the card instead of showing part of it. The limit refuses only the card the bridge builds when the question is posted, not a card the adapter renders itself; when the edit that later shows the chosen answer would pass it (4,000 on Discord when unset), the bridge drops the question text and keeps the title and the answer.
+- **Card text escaping** — pass `escapeCardText(text)` if your platform reads card text as its own markup. The bridge runs the question text of host-built cards, open and resolved, through it, so a sender or agent name inside an approval card cannot form markup. A question an agent asks for itself keeps its markup, open and answered. Card titles are plain text: for the `telegram`, `teams`, `webex` and `mattermost` adapters the bridge backslash-escapes Markdown characters and `&` in the title; pass `escapeCardTitle(title)` when your adapter handles plain titles itself.
 - **Typing, subscribe, openDM** — `setTyping` maps to the SDK's typing indicator, `subscribe` to the SDK state adapter, and `openDM` is exposed when the underlying adapter implements it.
 
 You declare `supportsThreads` yourself — it's a product decision, not something the bridge infers.
@@ -273,7 +278,11 @@ export function createTelegramBridge(options: TelegramBridgeOptions = {}): Chann
     botToken: token,
     mode: 'polling',
   });
+  keepCommandsAsMessages(telegramAdapter);
+  refuseCutCards(telegramAdapter);
   const bridge = createChatSdkBridge({
+    // refuseCutCards owns title encoding before measuring the actual wire text.
+    ...{ escapeCardTitle: (title: string) => title },
     adapter: telegramAdapter,
     instance: options.instanceKey, // undefined ⇒ default instance (keyed by channelType)
     concurrency: 'concurrent',
@@ -281,6 +290,7 @@ export function createTelegramBridge(options: TelegramBridgeOptions = {}): Chann
     supportsThreads: false,
     defaults: TELEGRAM_DEFAULTS,
     maxTextLength: 4000,
+    ...{ maxCardTextLength: 2000 },
   });
   ...
 }
@@ -304,7 +314,7 @@ A channel is often more than its adapter: the Slack agents feature, for example,
 | Membership | `setMembershipHandler(channelType, fn)` (`src/channels/chat-sdk-bridge.ts`) | When a member joins a conversation a bridge instance is in (the SDK's `member_joined_channel`; `left` is reserved but the pinned chat core does not dispatch leave events). One handler per channel type; a second registration overwrites with a warning. |
 | Bridge inbound policy | `registerBridgeInboundPolicy(channelType, wrap)` (`src/channels/chat-sdk-bridge.ts`) | At bridge setup: the policy wraps the `ChannelSetup` the bridge hands the SDK, so a module can intercept or decorate every inbound path of that channel type without forking the bridge. |
 | Session created | `registerSessionCreatedHook(hook)` (`src/router.ts`) | Once per brand-new engaged session, with the session, messaging group, platform address, resolved thread id, session mode, and the triggering inbound message; it is the seam behind per-thread DM thread titles and retiring onboarding affordances. |
-| Post-delivery | `registerPostDeliveryHook(hook)` (`src/delivery.ts`) | After each successfully delivered user-facing message (non-system, non-agent, non-task_log), with a `firstDelivery` flag exactly one row per session carries, for one-time follow-through on a session's first outbound message. |
+| Post-delivery | `registerPostDeliveryHook(hook)` (`src/delivery.ts`) | After each successfully delivered user-facing message (non-system, non-agent, non-task_log), with a `firstDelivery` flag for one-time follow-through on a session's first outbound message. One row per session carries it, except when sends that went out before any landed pass the 60-second delivery deadline: each of those, and the next row sent, can carry it too. |
 | Tool extension | `extendTool(name, extension)` (`container/agent-runner/src/mcp-tools/server.ts`) | At agent-runner import time: additively extends a built-in MCP tool's schema, description, and payload passthrough keys instead of editing the base tool's source. Two extensions of one tool merge. |
 | Wizard companions | `registerChannelPreStep(channel, step)` and `registerCompanionSkills(channel, skills)` (`setup/channels/companions.ts`) | During the setup wizard: a channel can run a pre-step before its `/add-<channel>` skill and have companion skills materialized alongside it (Slack's auto-provision path registers both). |
 

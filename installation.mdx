@@ -8,6 +8,8 @@ keywords: ["requirements", "docker", "node", "pnpm", "bun", "wsl", "launchd", "s
 {/* verified-against: nanoclaw.sh, setup.sh, setup/probe.sh, setup/auto.ts, setup/index.ts, setup/install-node.sh, setup/install-docker.sh, setup/container.ts, setup/service.ts, setup/set-env.ts, container/Dockerfile, container/pull.sh, versions.json, src/container-runtime.ts, src/container-runner.ts, src/claude-md-compose.ts, src/group-init.ts, src/config.ts, src/install-slug.ts, src/session-manager.ts, src/index.ts, package.json @ dce271c6 (main); runtime selection, identity, and state layout: src/drivers/index.ts, src/install-slug.ts, src/container-config.ts, src/project-doc-compose.ts, src/cli/resources/tasks.ts, src/mailbox/sqlite/schema.ts @ b76fcb3d */}
 {/* verified-against (scoped correction): accepted Anthropic API key types: setup/lib/anthropic-credential.ts @ 38beea0d (nanoclaw #4161) */}
 {/* verified-against (scoped correction): setup steps, skip flags, env vars, service proxy, OneCLI pin, Bun pin: setup/index.ts, setup/auto.ts, setup/service.ts, setup/gateways/install.ts, container/Dockerfile, .claude/skills/add-onecli/versions.json, .claude/skills/add-onecli/scripts/setup.ts, scripts/skill-directives.ts @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction): Node minimums, Linux sudo pre-flight, OneCLI 1.45 pin, Bun and base image pins, removed SECRET_NAME/HOST_PATTERN: setup/lib/node-version.sh, setup/install-node.sh, setup.sh, nanoclaw.sh, setup/lib/sudo-preflight.sh, container/Dockerfile, .claude/skills/add-onecli/{versions.json,scripts/auth.ts,scripts/check-grants-gateway.sh} @ 533b922a9 (nanoclaw #4183, #4200, #4094, #4193) */}
+{/* verified-against (scoped correction): jq install, Docker socket ACL, install ID in the service: setup.sh, setup/lib/{jq,sudo-preflight,install-slug}.sh, nanoclaw.sh, setup/service.ts, setup/lib/docker-access-hint.ts, setup/peer-cleanup.ts @ 533b922a9 (nanoclaw #4202, #4201, #4350, #4358) */}
 
 This page is the depth companion to [Quick start](/quickstart): what the installer actually does, how to install by hand, how the background service works, and where everything lands on disk. If you just want a running assistant, run `bash nanoclaw.sh` and follow the wizard — quick start covers that flow end to end.
 
@@ -17,7 +19,7 @@ This page is the depth companion to [Quick start](/quickstart): what the install
 |---|---|
 | Platform | macOS or Linux. Windows works through WSL2 — the installer detects WSL and treats it as Linux. |
 | RAM | 4 GB+. The installer warns below 3,700 MB (a "4 GB" VM typically reports 3,700–3,900 MB after kernel reserves) and lets you override. |
-| Node.js | 22 or newer on the host (`engines` in `package.json`). Installed or upgraded for you if needed. |
+| Node.js | 22.23.4+, 24.22.1+ or 26.12.1+ on the host (the October 2026 security releases; Node 23, 25 and pre-releases are refused). Installed or upgraded for you if needed, except a version-manager Node (nvm, fnm, volta, asdf) on Linux, which you update yourself. |
 | git | To clone the repository. Not auto-installed. |
 | Agent credential | A credential for the provider you pick at setup. Default **Claude**: a subscription (browser sign-in), an OAuth token (`sk-ant-oat…`), or an Anthropic API key (`sk-ant-api…`, or a `sk-ant-usr…` or `sk-ant-svc…` key scoped to one workspace). Pick **Codex** instead and it's a ChatGPT subscription or an OpenAI API key. Either way it lands in the OneCLI vault, never the container. |
 
@@ -33,11 +35,12 @@ Two hosts the installer explicitly flags in pre-flight:
 | Dependency | Where it runs | How it's installed |
 |---|---|---|
 | Homebrew (macOS only) | Host | Official installer, after a prompt. Pulls in Apple's Command Line Tools (can take 5–10 minutes on a factory Mac). |
-| Node 22 | Host | `uvx nodeenv -n lts` if `uvx` is present; otherwise `brew install node@22` (macOS) or NodeSource + `apt-get` (Linux). Skipped if you already have Node 22+. |
+| Node (22.23.4+, 24.22.1+ or 26.12.1+) | Host | `uvx nodeenv -n lts` if `uvx` is present; otherwise `brew install node@22` (macOS) or NodeSource + `apt-get` on your current 22, 24 or 26 line, else 22 (Linux). Skipped if the Node on your PATH already meets the minimum. |
 | pnpm 10 | Host | `corepack enable`, falling back to `npm install -g pnpm@<pinned>` at the version from `packageManager`. |
-| Docker | Host | `brew install --cask docker` (macOS) or `get.docker.com` + `usermod -aG docker` (Linux/WSL). Setup also starts the daemon and works around stale group membership (`sg docker` re-exec, or a temporary ACL on the socket) so you don't have to log out and back in. |
-| OneCLI vault | Host | Installed by the wizard at the pinned gateway version (1.42.0), or reuses an existing healthy OneCLI instance if it finds one. A reused instance is not version-checked; see [upgrading](/operate/upgrading). OneCLI 1.43 and later are not supported yet. |
-| Bun 1.4.0 | Container | Baked into the agent container image. Never touches the host. |
+| jq | Host | `brew install jq` (macOS) or your distribution's package manager (Linux). Only channel skills need it, so if it can't be installed, setup carries on and says so. |
+| Docker | Host | `brew install --cask docker` (macOS) or `get.docker.com` + `usermod -aG docker` (Linux/WSL). Setup also starts the daemon and works around stale group membership (`sg docker` re-exec, or a temporary ACL on the socket) so the service can reach Docker right away. The ACL lasts until Docker restarts; a reboot (on WSL, `wsl --shutdown`) fixes it for good. If setup can't apply it, it prints the commands to run. |
+| OneCLI vault | Host | Installed by the wizard at the pinned gateway version (1.45.0), or reuses an existing healthy OneCLI instance if it finds one. A reused instance is not version-checked; see [upgrading](/operate/upgrading). Only the pinned 1.45 is supported: older gateways lack the agent grants API, and OneCLI 2.x is not supported. |
+| Bun 1.4.4 | Container | Baked into the agent container image. Never touches the host. |
 
 Build tools (Xcode Command Line Tools on macOS, `gcc`/`make` on Linux) are checked and reported but not installed. They only matter if `better-sqlite3` has to compile from source — setup verifies the native binding loads and fails loudly if it doesn't.
 
@@ -45,8 +48,8 @@ Build tools (Xcode Command Line Tools on macOS, `gcc`/`make` on Linux) are check
 
 `bash nanoclaw.sh` is a three-stage chain:
 
-1. **`nanoclaw.sh`** — pre-flight checks (RAM floor, GCE detection, root warning, Homebrew prompt on macOS), then runs the bootstrap under a spinner. Bash only — nothing else exists on the machine yet.
-2. **`setup.sh`** — detects the platform (macOS / Linux / WSL), installs or upgrades to Node 22 via `setup/install-node.sh` if Node 22+ isn't present, gets pnpm onto the PATH, runs `pnpm install --frozen-lockfile`, and verifies the `better-sqlite3` native module loads.
+1. **`nanoclaw.sh`** — pre-flight checks (RAM floor, GCE detection, root warning, Homebrew prompt on macOS, and on Linux a sudo password prompt when Node or jq must be installed), then runs the bootstrap under a spinner. Bash only — nothing else exists on the machine yet.
+2. **`setup.sh`** — detects the platform (macOS / Linux / WSL), installs or upgrades Node via `setup/install-node.sh` if no installed Node meets the minimum (22.23.4, 24.22.1 or 26.12.1), installs jq if it's missing, gets pnpm onto the PATH, runs `pnpm install --frozen-lockfile`, and verifies the `better-sqlite3` native module loads.
 3. **`pnpm run setup:auto`** — the interactive wizard (`setup/auto.ts`). This is where the container build, [credential gateway](/operate/gateways) install (OneCLI by default; Advanced setup can pick Iron Proxy), provider auth, service install, and channel pairing happen. [Quick start](/quickstart) walks through every wizard step.
 
 {/* Diagram source (Mermaid) - kept for regeneration. Edit this, then redraw the
@@ -63,13 +66,13 @@ Every run writes two logs: a progression log at `logs/setup.log` (one entry per 
 
 NanoClaw deliberately splits runtimes:
 
-- **Host**: Node 22+ and pnpm. The wizard compiles TypeScript with `tsc` and the service runs `node dist/index.js`.
-- **Agent container**: Bun 1.4.0 runs the agent-runner TypeScript directly — no build step. The image (from `container/Dockerfile`) is based on `node:22-slim` with Chromium for browser automation and globally installed CLIs — `@anthropic-ai/claude-code` and `agent-browser`, each pinned to an exact version for reproducibility (the Vercel CLI is opt-in via `/add-vercel`). The versions live in `container/cli-tools.json` (installed by `install-cli-tools.sh`).
+- **Host**: Node (22.23.4+, 24.22.1+ or 26.12.1+) and pnpm. The wizard compiles TypeScript with `tsc` and the service runs `node dist/index.js`.
+- **Agent container**: Bun 1.4.4 runs the agent-runner TypeScript directly — no build step. The image (from `container/Dockerfile`) is based on `node:22.23.4-slim` (pinned by digest) with Chromium for browser automation and globally installed CLIs — `@anthropic-ai/claude-code` and `agent-browser`, each pinned to an exact version for reproducibility (the Vercel CLI is opt-in via `/add-vercel`). The versions live in `container/cli-tools.json` (installed by `install-cli-tools.sh`).
 
 Two consequences worth knowing:
 
 - **Agent source is never baked into the image.** The host bind-mounts `container/agent-runner/src` read-only at `/app/src`, so agent-runner changes take effect on the next container spawn without a rebuild. The host's own `src/` is different: the service runs the compiled `dist/`, so host changes need `pnpm run build` and a service restart.
-- **The image is per-checkout**: `nanoclaw-agent-v2-<slug>:latest`, where the slug defaults to the first 8 hex chars of `sha1(projectRoot)`. `NANOCLAW_INSTALL_ID` in the process environment overrides it with a stable ID: 1–32 lowercase letters, digits, underscores, or hyphens, starting with a letter or digit. Use a distinct ID for each install; sharing an ID also shares the scope used for images, services, and container cleanup.
+- **The image is per-checkout**: `nanoclaw-agent-v2-<slug>:latest`, where the slug defaults to the first 8 hex chars of `sha1(projectRoot)`. `NANOCLAW_INSTALL_ID` in the process environment overrides it with a stable ID: 1–32 lowercase letters, digits, underscores, or hyphens, starting with a letter or digit. Set it in the shell you run setup from: the service step copies it into the launchd plist, systemd unit or `start-nanoclaw.sh`, and when it changes, the step retires the service this checkout had under the old name. Use a distinct ID for each install; sharing an ID also shares the scope used for images, services, and container cleanup.
 
 The container step fetches a pre-built image by default: sign in with your NanoClaw account, and setup pulls the reference pinned as `agent-image` in `versions.json` — implemented by `container/pull.sh` — and retags it to the same local tag a build would produce. Building locally is the explicit **Build it here** choice (and the fallback when the pin or its login script is missing, sign-in doesn't complete, or the provider isn't claude). The choice persists as `NANOCLAW_HARDENED_IMAGE` in `.env`. See [Get started with the Echo hardened runtime](/guides/echo-hardened-runtime).
 
@@ -116,8 +119,6 @@ Available steps: `timezone`, `set-env`, `environment`, `container`, `register`, 
 | `NANOCLAW_SKIP` | Comma-separated wizard steps to skip: `environment`, `container`, `gateway`, `auth`, `mounts`, `service`, `cli-agent`, `first-chat`, `timezone`, `channel`, `verify` |
 | `NANOCLAW_DISPLAY_NAME` | Skip the "what should the assistant call you" prompt |
 | `NANOCLAW_AGENT_NAME` | Set the messaging-channel agent name |
-| `SECRET_NAME` | OneCLI secret name (default: `Anthropic`) |
-| `HOST_PATTERN` | OneCLI host pattern (default: `api.anthropic.com`) |
 | `NANOCLAW_AGENT_PROVIDER` | Preselect the agent runtime (for example `claude`) and skip the provider question |
 | `NANOCLAW_GATEWAY_PROVIDER` | Select the credential gateway (`onecli` by default, or `iron-proxy`) without asking |
 
