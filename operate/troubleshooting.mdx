@@ -10,6 +10,7 @@ keywords: ["troubleshooting", "debugging", "dropped messages", "container spawn"
 {/* verified-against (scoped correction) — sweep timer env overrides NANOCLAW_ABSOLUTE_CEILING_MS / NANOCLAW_CLAIM_STUCK_MS: src/{config,reconcile-session,container-runner}.ts, container/agent-runner/src/poll-loop.ts @ 2105169d */}
 {/* verified-against (scoped correction) — src/config.ts line anchor re-pointed @ f2224a2f */}
 {/* verified-against (scoped correction): webhook 404 body, listen host, WEBHOOK_PORT anchor, gateway-neutral wake failure hint: src/webhook-server.ts, src/config.ts, src/container-runner.ts @ 533b922a9 (nanoclaw #4185) */}
+{/* verified-against (scoped correction): absolute-ceiling log levels: src/reconcile-session.ts (nanoclaw #4382) @ 61cf826d */}
 
 ## Start here
 
@@ -105,7 +106,7 @@ The first two of these abort the spawn; a rejected mount only degrades it (the c
 
 The host sweep kills containers it considers stuck, then resets their in-flight messages to pending:
 
-- **`Killing container past absolute ceiling`** — the container's heartbeat file went silent for longer than the ceiling (30 minutes by default; the line's `ceilingMs` field shows the value in effect), and the kill and retry lines after it carry reason `absolute-ceiling`. The ceiling stretches automatically when the agent declares a longer Bash timeout, so long-running commands aren't killed as long as they declare their timeout.
+- **`Killing container past absolute ceiling`** — the container's heartbeat file went silent for longer than the ceiling (30 minutes by default; the line's `ceilingMs` field shows the value in effect) while it still held a claimed message (`claimsInFlight` says how many), and the kill and retry lines after it carry reason `absolute-ceiling`. An idle container past the ceiling is stopped too, but logs only `Stopping idle container past absolute ceiling` at info level: nothing was cut off. The ceiling stretches automatically when the agent declares a longer Bash timeout, so long-running commands aren't killed as long as they declare their timeout.
 - **`Killing container — message claimed then silent`** — the container claimed a message and showed no sign of life since the claim for longer than the claim tolerance (60 seconds by default, also extended by a declared Bash timeout; the line's `toleranceMs` field shows the value in effect), and the lines after it carry reason `claim-stuck`.
 
 Both paths are self-healing: messages the container was still holding are reset, `Reset stale message with backoff` follows in the log, and they retry in a fresh container, until a message runs out of tries and is marked failed (see above). Messages that arrived later, while the container's query was still open (mid-turn or after an earlier reply), were marked done when they were handed to the agent, so they are not retried. If the same message keeps killing containers, look at the streamed container stderr (`LOG_LEVEL=debug`) to see what the agent was doing when it died.

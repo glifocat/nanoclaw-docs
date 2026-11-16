@@ -59,9 +59,9 @@ Host-only settings need the service environment or an exported value in your dev
 |---|---|---|
 | `CONTAINER_IMAGE` | per-install tag | Full agent image override (name and tag). |
 | `CONTAINER_IMAGE_BASE` | per-install name | Base image name override. The default includes an install slug so two checkouts on one host don't clobber each other's `nanoclaw-agent` image. |
-| `NANOCLAW_HARDENED_IMAGE` | `false` | Set `true` to fetch the pre-built [Echo hardened image](/guides/echo-hardened-runtime) at the next build/install step instead of building locally (`setup/container.ts:286`). |
-| `NANOCLAW_AGENT_IMAGE_REF` | committed `agent-image` pin in `versions.json` | Override which pullable image reference to fetch (`setup/container.ts:309`). |
-| `NANOCLAW_ALLOW_UNLABELED_IMAGE` | `false` (unset) | Accept a pulled image with no `dev.nanoclaw.agent-runner-lock-sha256` label instead of refusing it (`container/pull.sh:162`). See [Hardening](/operate/hardening#hardened-image-option). |
+| `NANOCLAW_HARDENED_IMAGE` | `false` | Set `true` to fetch the pre-built [Echo hardened image](/guides/echo-hardened-runtime) at the next build/install step instead of building locally (`setup/container.ts:281`). |
+| `NANOCLAW_AGENT_IMAGE_REF` | committed `agent-image` pin in `versions.json` | Override which pullable image reference to fetch (`setup/container.ts:305`). |
+| `NANOCLAW_ALLOW_UNLABELED_IMAGE` | `false` (unset) | Accept a pulled image with no `dev.nanoclaw.agent-runner-lock-sha256` label instead of refusing it (`container/pull.sh:190`). See [Hardening](/operate/hardening#hardened-image-option). |
 
 See the [environment variables reference](/reference/environment-variables) for the full list.
 
