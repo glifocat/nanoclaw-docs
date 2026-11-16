@@ -8,6 +8,7 @@ keywords: ["echo", "hardened runtime", "security", "sandbox", "container image",
 {/* verified-against: setup/auto.ts, setup/registry-login.ts, setup/registry-login.sh, setup/registry.ts, setup/lib/registry-state.ts, container/Dockerfile, container/build.sh, docs/hardened-image.md @ 639577c3 (main, #3150 merge); pins, pull checks, sign-in verification, and the pin gate: versions.json, container/pull.sh, setup/registry-login.ts, setup/registry.ts, setup/lib/registry-state.ts, setup/set-env.ts, setup/channels/slack-auto.ts, .github/workflows/verify-agent-image.yml @ 294ef2ae. Auth screenshots are production captures (authenticate.nanoclaw.dev, 2026-07-29); wizard default and pull checks: setup/auto.ts, container/pull.sh @ b76fcb3d */}
 {/* verified-against (scoped correction): pin gate workflow: .github/workflows/verify-agent-image.yml @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction): per-release image lookup, pin gate covers agent-images.json, signature check blocks: container/pull.sh, container/release-image.sh, setup/lib/registry-state.ts, .github/workflows/verify-agent-image.yml (nanoclaw #4139) @ 61cf826d */}
+{/* verified-against (scoped correction): fresh-install image question, portal link and code, and terminal illustrations: setup/portal.ts, setup/auto.ts @ 61cf826d */}
 
 <Note>
   The hardened runtime is free and opt-in. Your existing local-build setup keeps working exactly as it does today. Choosing the hardened runtime is additive, not a replacement.
@@ -63,37 +64,43 @@ Choose the hardened runtime while you set up NanoClaw for the first time.
     bash nanoclaw.sh
     ```
   </Step>
-  <Step title="Choose the image source">
-    The wizard asks **"Where should your assistant's sandbox image come from?"**. Pick **"Fetch the hardened image, built by Echo"** — the pre-selected, recommended choice — instead of **"Build it here"**.
+  <Step title="Say yes to the hardened image">
+    The wizard asks **"Enable Echo’s hardened agent image? Open the perks dashboard in your browser?"** with **Yes** already selected. Press **Enter**. Answering **No** builds the sandbox on your machine instead.
 
-    <Frame caption="The wizard's sandbox image choice — the pre-built, patched image is the recommended default.">
-      ![Setup wizard asking where the sandbox image should come from, with the pre-built patched image option selected and the build-it-here alternative below](/images/echo/hardened-runtime/install-01-runtime-choice.png)
+    {/* Visual provenance: images/setup/portal-01-enable-prompt.png is an illustration, not a capture. Generated 2026-11-16 by scripts/setup-illustrations from the strings in setup/portal.ts @ 61cf826d, drawn by @clack/prompts 1.2.0. No installer was run. */}
+    <Frame caption="Illustration, not a screenshot: the wizard's question, drawn from the current setup text.">
+      ![Terminal illustration of the setup question about enabling Echo's hardened agent image and opening the perks dashboard, with Yes selected and No beside it](/images/setup/portal-01-enable-prompt.png)
     </Frame>
   </Step>
-  <Step title="Sign in to NanoClaw">
-    The terminal prints a link and a short code, and your browser opens on its own — if it doesn't, open the link on any device. The terminal tells you how long the code is good for, and it stops waiting when the code expires, at 15 minutes at the latest.
+  <Step title="Sign in and choose the perk in your browser">
+    The terminal prints one link and a short code, and your browser opens on its own. If it doesn't, open the link on any device.
 
-    <Frame caption="The terminal sign-in card: the link to open and the code the page will show back to you.">
-      ![Terminal sign-in card printed by the wizard, with the authentication link and short code](/images/echo/hardened-runtime/signin-01-terminal-card.png)
+    {/* Visual provenance: images/setup/portal-02-link-and-code.png is an illustration, not a capture. Same generator and revision as above. The link, code, and email are placeholders. */}
+    <Frame caption="Illustration, not a screenshot: the link to open and the code to compare. The link and code shown here are placeholders.">
+      ![Terminal illustration showing the message to open the link below to sign in, approve this terminal, and choose your perk, followed by a portal link and a line with a short code to compare with the sign-in page](/images/setup/portal-02-link-and-code.png)
     </Frame>
 
     The page asks you to sign in, or sign up:
 
-    <Frame caption="Sign in with email or a linked account.">
+    {/* Visual provenance: real production capture from 2026-07-29, taken before setup started opening the perks dashboard link. Not re-captured against the current flow; the page may look different. */}
+    <Frame caption="Real capture from July 2026, before the perks dashboard was added. Sign in with email or a linked account.">
       ![Browser sign-in page with an email field and Google and GitHub sign-in options](/images/echo/hardened-runtime/signin-02-sign-in.png)
     </Frame>
 
-    Then it shows the code back to you — confirm it matches your terminal:
+    Then it shows the code back to you. Approve only if it matches the code in your terminal:
 
-    <Frame caption="The browser confirms the code from your terminal.">
+    <Frame caption="Real capture from July 2026. The browser confirms the code from your terminal.">
       ![Browser device-activation page asking to confirm the code shown in the terminal](/images/echo/hardened-runtime/signin-03-confirm-code.png)
     </Frame>
 
-    <Frame caption="Done — the terminal picks it up from here.">
-      ![Browser confirmation page saying the device is now connected](/images/echo/hardened-runtime/signin-04-success.png)
+    After you sign in, the terminal says **"Signed in as … Choose your perk in the browser."** and keeps waiting. Turn on the Echo hardened image in the dashboard. The terminal then shows **"Image choice saved. Continuing setup."**
+
+    {/* Visual provenance: images/setup/portal-03-choice-saved.png is an illustration, not a capture. Same generator and revision as above. The perks dashboard itself is a hosted page and is not pictured. */}
+    <Frame caption="Illustration, not a screenshot: what the terminal shows once you have signed in and chosen in the browser.">
+      ![Terminal illustration of the whole exchange, ending with a line saying signed in as an example address, choose your perk in the browser, and then image choice saved, continuing setup](/images/setup/portal-03-choice-saved.png)
     </Frame>
 
-    If authentication doesn't finish, setup says so and builds the sandbox locally instead — nothing breaks, and you can [opt in later](#already-running-nanoclaw).
+    If you skip the perk in the dashboard, or the sign-in doesn't finish, setup builds the sandbox locally instead. Nothing breaks, and you can [opt in later](#already-running-nanoclaw).
   </Step>
   <Step title="Finish the install">
     Let the installer finish. It pulls the image published for your release (listed in upstream `agent-images.json`), falling back to the `agent-image` pin in `versions.json`, always by digest, and checks the architecture and agent-runner lock label before tagging it as this install's sandbox image. Wrong architecture fails. A missing lock label fails unless you explicitly allow an unlabeled image; a mismatched label currently warns and continues, as described below.
