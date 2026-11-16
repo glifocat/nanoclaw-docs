@@ -14,7 +14,7 @@ keywords: ["skills", "catalog", "reference", "add-channel", "providers", "tools"
 NanoClaw ships two kinds of skills:
 
 - **Host-side workspace skills** (`.claude/skills/`) — invoked from your coding harness in your NanoClaw checkout. They install channels, providers, and tools, or operate and maintain your install. 54 skills total: 20 channel installs, 4 provider installs, 12 tool installs, 16 operational skills, and 2 Slack feature skills.
-- **Container skills** (`container/skills/`) — 5 skills mounted into every agent container at `/app/skills`. The agent loads them at runtime; you don't invoke them yourself.
+- **Container skills** (`container/skills/`) — 4 skills ship on `main`, and a fifth (the gateway skill) is added when you install a credential gateway; all are mounted into every agent container at `/app/skills`. The agent loads them at runtime; you don't invoke them yourself.
 
 <Note>
 The `/name` form used throughout this page is Claude Code's. Codex invokes the same skills as `$name` and does not accept `/name`; OpenCode loads them through its own `skill` tool, with no typed form. The skill files are the same ones in every case. A few skills still phrase their steps in Claude Code's tool vocabulary, which other harnesses follow best-effort.

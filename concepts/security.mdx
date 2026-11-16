@@ -9,6 +9,7 @@ keywords: ["security", "threat model", "prompt injection", "container isolation"
 {/* verified-against (scoped correction): adoption under egress lockdown: src/container-runner.ts, src/host-sweep.ts @ 533b922a9 (nanoclaw #4160) */}
 {/* verified-against (scoped correction): credential approval card contents: src/gateway-approval-{presentation,summary,coordinator}.ts @ 533b922a9 (nanoclaw #4147) */}
 {/* verified-against (scoped correction): inbox writes through a descriptor-anchored directory: src/anchored-dir.ts, src/session-manager.ts, src/attachment-safety.ts @ 61cf826d (nanoclaw #4063) */}
+{/* verified-against (scoped correction): named approver is strict: src/modules/approvals/{response-handler,primitive}.ts @ 61cf826d */}
 
 NanoClaw connects an AI agent with real tools — a shell, a filesystem, network access — to chat platforms where anyone can type. Every inbound message is untrusted input fed straight into the model's context, and no model reliably distinguishes "instructions from my operator" from "instructions an attacker pasted into the group chat." So the design assumption is blunt: **prompt injection eventually succeeds, and the agent acts as if the attacker wrote its instructions.**
 
@@ -76,7 +77,7 @@ Some actions are too consequential to leave to a model that might be acting on i
 
 Two refinements control who decides and what the agent learns:
 
-- **Named approver** — most cards fall to the first reachable admin, but an agent-to-agent message policy pins a specific approver. Only that exact user (or an owner) can resolve the card, recorded as `approver_user_id` on the request — so a held message can't be cleared by just anyone with admin rights.
+- **Named approver** — a card goes to the first reachable admin unless an agent-to-agent message policy pins a specific approver. Either way the approver is recorded as `approver_user_id` on the request, and only that exact user can resolve the card: another admin, or an owner, can't clear it.
 - **Reject with reason** — alongside Approve and Reject, an admin can decline with a one-line note. NanoClaw parks the request, prompts the admin in their DM, and relays their reply back to the requesting agent (`Your <action> request was rejected by admin: "<reason>"`). If the admin doesn't reply within ~5 minutes — or the host restarts mid-prompt — the host sweep finalizes a plain reject, so the agent is never left waiting on a decision that never comes.
 
 The credential flow in detail, including card expiry and `ncl approvals`, is in [Credentials](/operate/credentials#approving-credential-use).

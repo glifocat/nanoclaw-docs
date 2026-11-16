@@ -6,6 +6,7 @@ keywords: ["signal", "signal-cli", "add-signal", "linked devices", "qr code", "j
 
 {/* verified-against: setup/install-signal-cli.sh, setup/signal-auth.ts, .claude/skills/add-signal/SKILL.md @ 4e83a0a0; channels branch src/channels/signal.ts @ 6ee516ad */}
 {/* verified-against (scoped correction): signal-cli installer: setup/install-signal-cli.sh, .claude/skills/add-signal/SKILL.md @ d61af17b */}
+{/* verified-against (scoped correction): wizard name and role first, signal-cli PATH check, strict unknown-sender default: .claude/skills/add-signal/SKILL.md, setup/channels/run-channel-skill.ts, channels:src/channels/signal.ts @ 61cf826d */}
 
 The Signal adapter is **native** — no Chat SDK bridge, only Node.js builtins. Signal has no bot API, so NanoClaw talks to [signal-cli](https://github.com/AsamK/signal-cli), which it spawns as a local daemon and drives over a newline-delimited **JSON-RPC TCP socket** (`127.0.0.1:7583` by default). Setup links NanoClaw to your existing Signal account as a **secondary device** — no new phone number needed; your assistant sends and receives as the number on your phone. All connections are outbound, so no public URL, webhook, or open port; works behind NAT and on a laptop.
 
@@ -22,8 +23,11 @@ If you'd rather give NanoClaw its own dedicated number (a SIM or VoIP number it 
 Signal is offered in the first-run setup wizard, or add it later by running `/add-signal` in Claude Code. Both paths run the same `/add-signal` skill:
 
 <Steps>
+  <Step title="Name the agent (setup wizard)">
+    In the setup wizard, the first questions are what to call your assistant (default `Nano`) and how to register your own account: Owner, Admin or Member. A standalone `/add-signal` run skips this step.
+  </Step>
   <Step title="signal-cli check">
-    The wizard probes for `signal-cli` on PATH (or `SIGNAL_CLI_PATH`) and auto-installs it if missing — about 30 seconds, one-time only.
+    The skill looks for `signal-cli` on PATH and installs it if it isn't there (the later pre-link check also accepts a binary at `SIGNAL_CLI_PATH`) — about 30 seconds, one-time only.
   </Step>
   <Step title="Adapter install">
     The `/add-signal` skill copies the adapter from the `channels` branch, registers it in the channel barrel, installs `qrcode` (only used to render the linking QR — the adapter itself has no npm dependencies), and builds. Idempotent: safe to re-run without re-linking.
@@ -34,8 +38,8 @@ Signal is offered in the first-run setup wizard, or add it later by running `/ad
   <Step title="Credentials and restart">
     The wizard reads the linked phone number back, writes `SIGNAL_ACCOUNT` to `.env`, and restarts the service so the adapter picks it up.
   </Step>
-  <Step title="Name the agent and get the welcome message">
-    The wizard asks for your operator role and an agent name (default `Nano`), wires your Signal DM to your first agent group, and sends a welcome message.
+  <Step title="Get the welcome message">
+    The wizard wires your Signal DM to your first agent group and sends a welcome message.
   </Step>
 </Steps>
 
@@ -51,6 +55,7 @@ To wire group chats or more DMs later, run `/manage-channels`. DMs are identifie
 - **Attachments** — inbound images are passed to the agent as file paths it can read (`[Image: <path>]` lines plus a structured attachments array). Outbound files from the agent are delivered via signal-cli, with caption text sent first. Voice notes get transcribed if `WHISPER_BIN` (local whisper.cpp, needs ffmpeg) or `OPENAI_API_KEY` is set; otherwise the agent sees a `[Voice Message]` placeholder.
 - **Replies and mentions** — quoted replies pass the quoted text and sender to the agent as context. Inbound @mentions are resolved from Signal's placeholder protocol to display names, so the agent sees `@Alice` instead of a raw UUID.
 - **Group engagement** — group wirings default to mention engagement: the agent responds only when the linked account is @-tagged in the group. DMs always count as addressed to the agent. Override per wiring with a different [engage mode](/reference/ncl-cli#wirings).
+- **Unknown senders** — Signal chats default to the `strict` unknown-sender policy for both DMs and groups: a message from someone who isn't already a member of the agent group is dropped, with no approval card. Give a person access with `ncl users create` and `ncl members add`.
 - **Typing indicator** — shown while the agent works, in DMs only (Signal has no group typing).
 - **Read receipts** — NanoClaw starts the managed daemon with `--send-read-receipts`, so senders see their messages marked read once the daemon receives them. An externally run daemon (`SIGNAL_MANAGE_DAEMON=false`) sends read receipts only if you add the flag to its command line yourself.
 - **Groups** — modern Signal groups (GroupV2) are detected by their group ID; group messages route to a `group:<groupId>` chat, separate from each member's DM.

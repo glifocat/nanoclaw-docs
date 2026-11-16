@@ -12,6 +12,7 @@ tag: "UPDATED"
 {/* verified-against (scoped correction) — template-built agents in the Slack flow: .claude/skills/slack-agent-flow/src/modules/slack-agent-flow/{index,orchestrate}.ts @ 3a68cc7c */}
 {/* verified-against (scoped correction): webhook listen host: src/config.ts, .claude/skills/add-slack/SKILL.md @ 533b922a9 (nanoclaw #4185) */}
 {/* verified-against (scoped correction): Slack install failure reason, long replies: setup/{auto,verify}.ts @ 533b922a9; channels:src/channels/slack.ts @ c16f0e425 (nanoclaw #4204, #4322) */}
+{/* verified-against (scoped correction): member ID prompt, finish command flags, add_to_room forks the room: .claude/skills/add-slack/SKILL.md, .claude/skills/slack-agent-flow/src/modules/slack-agent-flow/{index,room-actions}.ts @ 61cf826d */}
 
 Give each NanoClaw agent its own identity in Slack. You can talk to an agent in a direct message, bring several agents into one shared room, and use a room canvas as shared working context.
 
@@ -140,7 +141,7 @@ Slack workspace policy still applies. A workspace that turns on Slack's Admin Ap
         For webhook delivery, keep the Signing Secret and point Event Subscriptions and Interactivity to `https://<your-public-host>/webhook/slack`. Your public HTTPS endpoint must reach NanoClaw's webhook port, which defaults to `3000`. The webhook server listens on `127.0.0.1`, so a tunnel or proxy on this machine works as is; if yours runs on another machine or in Docker on Linux, add `WEBHOOK_HOST=0.0.0.0` to `.env` and restart.
       </Step>
       <Step title="Install and connect">
-        Install the app to the workspace. Run `/add-slack` from Claude Code, `$add-slack` from Codex, or load `add-slack` with your harness's skill tool. Choose the same delivery mode and paste the credentials when prompted.
+        Install the app to the workspace. Run `/add-slack` from Claude Code, `$add-slack` from Codex, or load `add-slack` with your harness's skill tool. Choose the same delivery mode, paste the credentials when prompted, then enter your Slack member ID (Profile → ⋮ → **Copy member ID**; it starts with `U`).
       </Step>
     </Steps>
   </Tab>
@@ -185,6 +186,8 @@ A canvas failure never blocks the flow. If another step fails, the agent group s
 pnpm exec tsx scripts/slack-agent-flow-finish.ts --group <group-id> --name <slug> --source-group <source-group-id>
 ```
 
+Run the command exactly as the error prints it. For an agent created without a room it ends in `--room none`; without that flag the retry opens a room. `--origin-instance <key>` and `--restart` are optional.
+
 <Note>
   Agent-enabled Slack apps do not work for workspace guests. Ask for guest access when creating the agent to provision a plain Slack app instead.
 </Note>
@@ -198,7 +201,7 @@ For a team of agents, create each agent without an individual room. Then create 
 The `slack-agent-flow` skill adds two room actions:
 
 - `create_room` creates one shared room with several agents.
-- `add_to_room` adds another agent to an existing room.
+- `add_to_room` adds one agent to a room. Slack group DMs can't grow in place, so this opens a new room with everyone from the old one plus the new agent, and the old room stays as it was. For a planned team, one `create_room` with every agent is cleaner.
 
 In rooms created by the agents feature, each agent responds only when mentioned. Other room messages accumulate as context for its next mentioned turn. Bot-to-bot turns are mention-driven, and NanoClaw stops further bot-authored turns after six consecutive hops by default. A human message resets the counter.
 

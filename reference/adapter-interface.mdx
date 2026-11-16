@@ -325,7 +325,7 @@ This is what the `/add-*` channel skills automate — doing it by hand:
 1. Write `src/channels/<name>.ts` modeled on an existing adapter — Telegram or Slack for the Chat SDK path, WhatsApp or `cli.ts` for native. End the module with a top-level `registerChannelAdapter('<name>', { factory })` call that returns `null` when credentials are missing.
 2. Append `import './<name>.js';` to the barrel, `src/channels/index.ts`.
 3. Add platform dependencies to `package.json` (e.g. `@chat-adapter/<name>`).
-4. Build (`npm run build`) and restart the service.
+4. Build (`pnpm run build`) and restart the service.
 5. Verify registration: the log should show `Channel adapter started` with your channel name — or `Channel credentials missing, skipping` until you add credentials.
 
 If you'd rather ship it as a reusable skill so others can install it, see [Extending NanoClaw](/extend/overview).

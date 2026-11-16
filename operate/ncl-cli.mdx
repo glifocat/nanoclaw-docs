@@ -7,6 +7,7 @@ keywords: ["ncl", "cli", "admin", "unix socket", "cli_scope", "groups", "wirings
 {/* verified-against: src/cli/{dispatch,guard,registry,crud,args,parse-argv,client,format,frame,transport-errors,stdin-json,socket-server,help-render}.ts, src/cli/commands/{help,index,status}.ts, src/cli/resources/{approvals,destinations,dropped-messages,groups,members,messaging-groups,policies,roles,sessions,tasks,user-dms,users,wirings,index}.ts, src/channels/channel-defaults.ts, src/types.ts, src/container-config.ts, src/host-sweep.ts, src/templates/{create-agent,local-dir}.ts, src/modules/cross-session-context/history.ts, src/modules/scheduling/create.ts, setup/service.ts, bin/ncl @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — templates resource, group-scope list: src/cli/resources/templates.ts, src/cli/registry.ts @ 3a68cc7c */}
 {/* verified-against (scoped correction): resource count, no-systemd restart line: src/cli/resources/index.ts, src/cli/transport-errors.ts @ 533b922a9 (nanoclaw #4206) */}
+{/* verified-against (scoped correction): add-mount container path is relative, messaging group identity, restart from an agent: src/cli/resources/{groups,messaging-groups}.ts, src/modules/mount-security/index.ts (nanoclaw #4026) @ 61cf826d */}
 
 `ncl` is the admin CLI for a running NanoClaw host. It sends one request frame over a Unix socket at `data/ncl.sock` and prints the response — commands inspect and manage the running host's state, including central configuration and per-session mailboxes. The socket is `chmod 0600`, so only the user that started the host can connect.
 
@@ -75,7 +76,7 @@ ncl groups restart --id <group-id> --rebuild
 
 `create` also takes `--template <ref>` to stamp the new group from a [template](/templates/overview) — a ref relative to your local `templates/` directory, e.g. `<category>/<template>`. It never downloads a template; see [templates](#templates) for what is available. When a group already carries that template's plugin, the same command shows an in-place [update plan](/templates/updating) instead; `--yes` applies it and `--new` forces a second agent.
 
-`restart` kills and respawns the group's containers (`--rebuild` rebuilds the image first — required after package changes; `--message <text>` leaves an on-wake instruction). `delete` cascades through sessions, wirings, roles, memberships, and destinations in one transaction.
+`restart` kills and respawns the group's containers; run by an agent on its own group it restarts only the calling session, and a global-scope agent that passes another group's `--id` restarts that group's containers once an admin approves (`--rebuild` rebuilds the image first — required after package changes; `--message <text>` leaves an on-wake instruction). `delete` cascades through sessions, wirings, roles, memberships, and destinations in one transaction.
 
 Config subcommands edit the group's `container_configs` row — changes apply on the next `restart`:
 
@@ -84,14 +85,14 @@ ncl groups config get --id <group-id>
 ncl groups config update --id <group-id> --model claude-sonnet-4-5 --effort high
 ncl groups config add-mcp-server --id <group-id> --name fetch --command npx --args '["mcp-fetch"]'
 ncl groups config add-package --id <group-id> --apt ffmpeg
-ncl groups config add-mount --id <group-id> --host ~/projects/site --container /workspace/extra/site --ro
+ncl groups config add-mount --id <group-id> --host ~/projects/site --container site --ro   # appears in the container at /workspace/extra/site
 ```
 
 `config update` accepts `--provider`, `--model`, `--effort`, `--speed`, `--image-tag`, `--assistant-name`, `--max-messages-per-prompt`, `--cli-scope`, and `--timezone`. `--speed` must be a speed tier the group's provider declares (Claude: `standard`, `fast`), or an empty string to follow the install default. `add-mcp-server` also takes `--url` in place of `--command`/`--args` for a remote Streamable HTTP server, with optional `--headers` as a JSON object. Plugin-owned MCP servers cannot be replaced or removed through these config commands: edit the plugin and [restamp it](/templates/updating) instead. `config add-mount` and `remove-mount` are operator-only — they run from the host socket, never from inside a container — and mounts still pass the [allowlist check](/operate/hardening#gate-additional-mounts) at spawn.
 
 ### messaging-groups and wirings
 
-A messaging group is one chat on one platform (unique `channel_type` + `platform_id`); a wiring connects it to an agent group and sets engagement rules. List commands accept column filters and `--limit`:
+A messaging group is one chat on one platform (unique `channel_type` + `platform_id` + `instance`; `instance` defaults to the channel type and only matters when you run several adapters of one type); a wiring connects it to an agent group and sets engagement rules. List commands accept column filters and `--limit`:
 
 ```bash
 ncl messaging-groups list --channel_type telegram

@@ -11,6 +11,7 @@ keywords: ["troubleshooting", "debugging", "dropped messages", "container spawn"
 {/* verified-against (scoped correction) — src/config.ts line anchor re-pointed @ f2224a2f */}
 {/* verified-against (scoped correction): webhook 404 body, listen host, WEBHOOK_PORT anchor, gateway-neutral wake failure hint: src/webhook-server.ts, src/config.ts, src/container-runner.ts @ 533b922a9 (nanoclaw #4185) */}
 {/* verified-against (scoped correction): absolute-ceiling log levels: src/reconcile-session.ts (nanoclaw #4382) @ 61cf826d */}
+{/* verified-against (scoped correction): cold-start wording, egress lockdown error list: setup/lib/first-chat-progress.ts, src/egress-lockdown.ts @ 61cf826d */}
 
 ## Start here
 
@@ -93,12 +94,12 @@ Trace the message through the pipeline, in order:
 The first two of these abort the spawn; a rejected mount only degrades it (the container starts without that mount). All three appear in `logs/nanoclaw.error.log`:
 
 - **`wakeContainer failed — host-sweep will retry`** — the host couldn't set up the credential gateway session (or another spawn step failed), so it didn't launch the agent. The `err` field in the log line says why, for example `Gateway session admission is closed: ...` when the gateway is unavailable. The message stays pending and the sweep retries every minute; fix the gateway connection (with OneCLI, is it reachable at the URL in `ONECLI_URL` in `.env`?) and the spawn recovers on its own. See [Credentials](/operate/credentials).
-- **Egress lockdown errors** — with lockdown enabled, the spawn fails fast rather than run with open egress: `the "<network>" internal network could not be created` or `gateway target "<container>" could not be attached to "<network>"`. Check `docker network inspect` for the egress network and see [Hardening](/operate/hardening#lock-down-network-egress).
+- **Egress lockdown errors** — with lockdown enabled, the spawn fails fast rather than run with open egress: `the "<network>" internal network could not be created` or `gateway target "<container>" could not be attached to "<network>"`. `the "<network>" network is not internal` means a network with that name already exists without `--internal`: remove it or set a different `NANOCLAW_EGRESS_NETWORK`. `the "<network>" network could not be inspected` means Docker itself did not answer. Check `docker network inspect` for the egress network and see [Hardening](/operate/hardening#lock-down-network-egress).
 - **`Additional mount REJECTED`** — a mount from your group's container config failed allowlist validation. The log line includes the `requestedPath` and `reason`. Fix the allowlist — see [Hardening](/operate/hardening#gate-additional-mounts).
 
 ## Replies are slow
 
-- **Cold start**: the first reply after a container spawn takes 30–60 seconds while the sandbox warms up. Setup tells you this during its ping test; it's normal.
+- **Cold start**: the first reply after a container spawn can take a minute or more while the sandbox starts and the model loads. Setup tells you this during its ping test; it's normal.
 - **Scheduled or retried messages wait for reconciliation**: a periodic resync checks active sessions roughly once a minute, and message writes or container-exit events can trigger earlier checks. Queue work and container cold starts add latency; one minute is not a strict upper bound. Look for `Waking container for due messages` in the log.
 - **Retries back off**: a message reset after a crash retries with exponential backoff (5s, 10s, 20s, ...). After five tries you'll see `Message marked as failed after max retries` — that message is dead; resend it.
 

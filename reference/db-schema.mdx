@@ -271,7 +271,7 @@ Per-message approval gate on an agent-to-agent connection (migration 017). A row
 |---|---|---|---|
 | `from_agent_group_id` | TEXT | — | Source agent (FK → `agent_groups(id)`) |
 | `to_agent_group_id` | TEXT | — | Target agent (FK → `agent_groups(id)`) |
-| `approver` | TEXT | — | User-id who must approve each gated message; only this user (or an owner) can approve. Persisted onto the held card's `pending_approvals.approver_user_id` |
+| `approver` | TEXT | — | User-id who must approve each gated message; only this user can approve. Persisted onto the held card's `pending_approvals.approver_user_id` |
 | `created_at` | TEXT | — | ISO timestamp |
 
 Primary key: `(from_agent_group_id, to_agent_group_id)`.

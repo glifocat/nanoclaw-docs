@@ -10,6 +10,7 @@ keywords: ["requirements", "docker", "node", "pnpm", "bun", "wsl", "launchd", "s
 {/* verified-against (scoped correction): setup steps, skip flags, env vars, service proxy, OneCLI pin, Bun pin: setup/index.ts, setup/auto.ts, setup/service.ts, setup/gateways/install.ts, container/Dockerfile, .claude/skills/add-onecli/versions.json, .claude/skills/add-onecli/scripts/setup.ts, scripts/skill-directives.ts @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction): Node minimums, Linux sudo pre-flight, OneCLI 1.45 pin, Bun and base image pins, removed SECRET_NAME/HOST_PATTERN: setup/lib/node-version.sh, setup/install-node.sh, setup.sh, nanoclaw.sh, setup/lib/sudo-preflight.sh, container/Dockerfile, .claude/skills/add-onecli/{versions.json,scripts/auth.ts,scripts/check-grants-gateway.sh} @ 533b922a9 (nanoclaw #4183, #4200, #4094, #4193) */}
 {/* verified-against (scoped correction): jq install, Docker socket ACL, install ID in the service: setup.sh, setup/lib/{jq,sudo-preflight,install-slug}.sh, nanoclaw.sh, setup/service.ts, setup/lib/docker-access-hint.ts, setup/peer-cleanup.ts @ 533b922a9 (nanoclaw #4202, #4201, #4350, #4358) */}
+{/* verified-against (scoped correction): sandbox question is the portal confirm, skip names, template preset, data/ sockets: setup/auto.ts, setup/portal.ts, setup/lib/setup-config.ts, src/cli/socket-client.ts, src/channels/cli.ts @ 61cf826d */}
 
 This page is the depth companion to [Quick start](/quickstart): what the installer actually does, how to install by hand, how the background service works, and where everything lands on disk. If you just want a running assistant, run `bash nanoclaw.sh` and follow the wizard — quick start covers that flow end to end.
 
@@ -74,7 +75,7 @@ Two consequences worth knowing:
 - **Agent source is never baked into the image.** The host bind-mounts `container/agent-runner/src` read-only at `/app/src`, so agent-runner changes take effect on the next container spawn without a rebuild. The host's own `src/` is different: the service runs the compiled `dist/`, so host changes need `pnpm run build` and a service restart.
 - **The image is per-checkout**: `nanoclaw-agent-v2-<slug>:latest`, where the slug defaults to the first 8 hex chars of `sha1(projectRoot)`. `NANOCLAW_INSTALL_ID` in the process environment overrides it with a stable ID: 1–32 lowercase letters, digits, underscores, or hyphens, starting with a letter or digit. Set it in the shell you run setup from: the service step copies it into the launchd plist, systemd unit or `start-nanoclaw.sh`, and when it changes, the step retires the service this checkout had under the old name. Use a distinct ID for each install; sharing an ID also shares the scope used for images, services, and container cleanup.
 
-The container step fetches a pre-built image by default: sign in with your NanoClaw account, and setup pulls the reference pinned as `agent-image` in `versions.json` — implemented by `container/pull.sh` — and retags it to the same local tag a build would produce. Building locally is the explicit **Build it here** choice (and the fallback when the pin or its login script is missing, sign-in doesn't complete, or the provider isn't claude). The choice persists as `NANOCLAW_HARDENED_IMAGE` in `.env`. See [Get started with the Echo hardened runtime](/guides/echo-hardened-runtime).
+The container step fetches a pre-built image by default: sign in with your NanoClaw account, and setup pulls the reference pinned as `agent-image` in `versions.json` — implemented by `container/pull.sh` — and retags it to the same local tag a build would produce. Building locally is what you get when you answer no to **Enable Echo’s hardened agent image? Open the perks dashboard in your browser?**, or skip the perk in the dashboard. It is also the fallback when the checkout has no `agent-image` pin, sign-in doesn't complete, or the provider isn't claude. The choice persists as `NANOCLAW_HARDENED_IMAGE` in `.env`. See [Get started with the Echo hardened runtime](/guides/echo-hardened-runtime).
 
 **Docker is the only runtime shipped in this repository.** Session lifecycle operations live behind the driver interface in `src/drivers/`. `NANOCLAW_RUNTIME_DRIVER` selects a registered driver and defaults to `docker`; an unknown driver fails instead of falling back. `src/container-runtime.ts` retains the Docker binary constant for non-session operations such as image builds.
 
@@ -116,11 +117,12 @@ Available steps: `timezone`, `set-env`, `environment`, `container`, `register`, 
 
 | Env var | Use |
 |---|---|
-| `NANOCLAW_SKIP` | Comma-separated wizard steps to skip: `environment`, `container`, `gateway`, `auth`, `mounts`, `service`, `cli-agent`, `first-chat`, `timezone`, `channel`, `verify` |
+| `NANOCLAW_SKIP` | Comma-separated wizard steps to skip: `environment`, `container`, `gateway`, `auth`, `mounts`, `service`, `cli-agent`, `first-chat`, `timezone`, `channel`, `verify`, `echo-reminder`, `slack-reminder` |
 | `NANOCLAW_DISPLAY_NAME` | Skip the "what should the assistant call you" prompt |
 | `NANOCLAW_AGENT_NAME` | Set the messaging-channel agent name |
 | `NANOCLAW_AGENT_PROVIDER` | Preselect the agent runtime (for example `claude`) and skip the provider question |
 | `NANOCLAW_GATEWAY_PROVIDER` | Select the credential gateway (`onecli` by default, or `iron-proxy`) without asking |
+| `NANOCLAW_TEMPLATE_PATH` | Create or update an agent from a local template ref under `templates/` (see [Using a template](/templates/using-templates)) |
 
 For Anthropic-compatible custom endpoints, set `ANTHROPIC_BASE_URL` in `.env` — the host passes it through to the agent SDK inside the container.
 
@@ -252,8 +254,8 @@ Most application state lives inside the checkout. Security allowlists and regist
           <Tree.Folder name=".claude-shared" />
         </Tree.Folder>
       </Tree.Folder>
-      <Tree.Folder name="ipc" />
       <Tree.File name="cli.sock" />
+      <Tree.File name="ncl.sock" />
     </Tree.Folder>
     <Tree.Folder name="logs">
       <Tree.File name="nanoclaw.log" />
