@@ -7,6 +7,8 @@ keywords: ["echo", "hardened runtime", "security", "sandbox", "container image",
 
 {/* verified-against: setup/auto.ts, setup/registry-login.ts, setup/registry-login.sh, setup/registry.ts, setup/lib/registry-state.ts, container/Dockerfile, container/build.sh, docs/hardened-image.md @ 639577c3 (main, #3150 merge); pins, pull checks, sign-in verification, and the pin gate: versions.json, container/pull.sh, setup/registry-login.ts, setup/registry.ts, setup/lib/registry-state.ts, setup/set-env.ts, setup/channels/slack-auto.ts, .github/workflows/verify-agent-image.yml @ 294ef2ae. Auth screenshots are production captures (authenticate.nanoclaw.dev, 2026-07-29); wizard default and pull checks: setup/auto.ts, container/pull.sh @ b76fcb3d */}
 {/* verified-against (scoped correction): pin gate workflow: .github/workflows/verify-agent-image.yml @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction): per-release image lookup, pin gate covers agent-images.json, signature check blocks: container/pull.sh, container/release-image.sh, setup/lib/registry-state.ts, .github/workflows/verify-agent-image.yml (nanoclaw #4139) @ 61cf826d */}
+{/* verified-against (scoped correction): fresh-install image question, portal link and code, and terminal illustrations: setup/portal.ts, setup/auto.ts @ 61cf826d; browser steps and terminal lines observed in a live fresh install @ 8e52b12 on 2026-11-16 */}
 
 <Note>
   The hardened runtime is free and opt-in. Your existing local-build setup keeps working exactly as it does today. Choosing the hardened runtime is additive, not a replacement.
@@ -62,43 +64,71 @@ Choose the hardened runtime while you set up NanoClaw for the first time.
     bash nanoclaw.sh
     ```
   </Step>
-  <Step title="Choose the image source">
-    The wizard asks **"Where should your assistant's sandbox image come from?"**. Pick **"Fetch the hardened image, built by Echo"** — the pre-selected, recommended choice — instead of **"Build it here"**.
+  <Step title="Say yes to the hardened image">
+    The wizard asks **"Enable Echo’s hardened agent image? Open the perks dashboard in your browser?"** with **Yes** already selected. Press **Enter**. Answering **No** builds the sandbox on your machine instead.
 
-    <Frame caption="The wizard's sandbox image choice — the pre-built, patched image is the recommended default.">
-      ![Setup wizard asking where the sandbox image should come from, with the pre-built patched image option selected and the build-it-here alternative below](/images/echo/hardened-runtime/install-01-runtime-choice.png)
+    {/* Visual provenance: images/setup/portal-01-enable-prompt.png is an illustration, not a capture. Generated 2026-11-16 by scripts/setup-illustrations from the strings in setup/portal.ts @ 61cf826d, drawn by @clack/prompts 1.2.0. No installer was run. */}
+    <Frame caption="Illustration, not a screenshot: the wizard's question, drawn from the current setup text.">
+      ![Terminal illustration of the setup question about enabling Echo's hardened agent image and opening the perks dashboard, with Yes selected and No beside it](/images/setup/portal-01-enable-prompt.png)
     </Frame>
   </Step>
-  <Step title="Sign in to NanoClaw">
-    The terminal prints a link and a short code, and your browser opens on its own — if it doesn't, open the link on any device. The terminal tells you how long the code is good for, and it stops waiting when the code expires, at 15 minutes at the latest.
+  <Step title="Sign in and choose the perk in your browser">
+    The terminal prints one link and a short code, and your browser opens on its own. If it doesn't, open the link on any device.
 
-    <Frame caption="The terminal sign-in card: the link to open and the code the page will show back to you.">
-      ![Terminal sign-in card printed by the wizard, with the authentication link and short code](/images/echo/hardened-runtime/signin-01-terminal-card.png)
+    {/* Visual provenance: images/setup/portal-02-link-and-code.png is an illustration, not a capture. Same generator and revision as above. The link, code, and email are placeholders. */}
+    <Frame caption="Illustration, not a screenshot: the link to open and the code to compare. The link and code shown here are placeholders.">
+      ![Terminal illustration showing the message to open the link below to sign in, approve this terminal, and choose your perk, followed by a portal link and a line with a short code to compare with the sign-in page](/images/setup/portal-02-link-and-code.png)
     </Frame>
 
-    The page asks you to sign in, or sign up:
+    The page shows the same code as your terminal. Click **Sign in and approve**:
+
+    {/* Visual provenance: real capture, 2026-11-16, of a fresh install of nanoclaw main @ 8e52b12 in a test container; pages at portal.nanoclaw.dev and authenticate.nanoclaw.dev in Chrome on macOS. Cropped; the account name is cropped out. The code shown had expired before publication. */}
+    <Frame caption="The portal page the link opens. The code must match the one in your terminal.">
+      ![Portal page titled Approve your terminal, showing a short code and a Sign in and approve button](/images/setup/portal-page-01-approve-terminal.png)
+    </Frame>
+
+    A new tab asks you to sign in, or sign up:
 
     <Frame caption="Sign in with email or a linked account.">
-      ![Browser sign-in page with an email field and Google and GitHub sign-in options](/images/echo/hardened-runtime/signin-02-sign-in.png)
+      ![Sign-in page with an email field, Continue with Google and Continue with GitHub buttons, and a Sign up link](/images/setup/portal-page-02-sign-in.png)
     </Frame>
 
-    Then it shows the code back to you — confirm it matches your terminal:
+    Then it shows the code back to you. Click **Confirm** only if it matches the code in your terminal:
 
-    <Frame caption="The browser confirms the code from your terminal.">
-      ![Browser device-activation page asking to confirm the code shown in the terminal](/images/echo/hardened-runtime/signin-03-confirm-code.png)
+    <Frame caption="The sign-in page confirms the code from your terminal.">
+      ![Device activation page asking to confirm that the code is shown on your device, with Deny and Confirm buttons](/images/setup/portal-page-03-confirm-code.png)
     </Frame>
 
-    <Frame caption="Done — the terminal picks it up from here.">
-      ![Browser confirmation page saying the device is now connected](/images/echo/hardened-runtime/signin-04-success.png)
+    <Frame caption="The sign-in tab is done. Go back to the portal tab; there is one more step.">
+      ![Confirmation saying You are all set, your device is now connected, you may close this page](/images/setup/portal-page-04-device-connected.png)
     </Frame>
 
-    If authentication doesn't finish, setup says so and builds the sandbox locally instead — nothing breaks, and you can [opt in later](#already-running-nanoclaw).
+    The code is short-lived. In our test run it stopped working after about five minutes, and the terminal then said **"That sign-in code expired before it was approved."** and built the sandbox locally. Have your sign-in ready before you press Enter.
+
+    Back on the portal tab, the terminal now says **"Signed in as … Choose your perk in the browser."** and the portal offers the hardened image. Click **Activate Echo**. The dialog's small print says that activating also agrees to product and security emails from NanoClaw and Echo; **Maybe later** skips the perk.
+
+    <Frame caption="The portal asks you to opt in. This is the choice the terminal is waiting for.">
+      ![Activate Echo dialog explaining the opt-in to Echo's hardened image, with Maybe later and Activate Echo buttons](/images/setup/portal-page-05-activate-echo.png)
+    </Frame>
+
+    <Frame caption="Done in the browser. Return to your terminal.">
+      ![Dialog saying Echo is enabled and setup is continuing in the background, with a Return to terminal button](/images/setup/portal-page-06-echo-enabled.png)
+    </Frame>
+
+    The terminal then shows **"Image choice saved. Continuing setup."** and starts fetching the image.
+
+    {/* Visual provenance: images/setup/portal-03-choice-saved.png is an illustration, not a capture. Same generator and revision as above. The perks dashboard itself is a hosted page and is not pictured. */}
+    <Frame caption="Illustration, not a screenshot: what the terminal shows once you have signed in and chosen in the browser. A real run printed the same lines.">
+      ![Terminal illustration of the whole exchange, ending with a line saying signed in as an example address, choose your perk in the browser, and then image choice saved, continuing setup](/images/setup/portal-03-choice-saved.png)
+    </Frame>
+
+    If you skip the perk in the dashboard, or the sign-in doesn't finish, setup builds the sandbox locally instead. Nothing breaks, and you can [opt in later](#already-running-nanoclaw).
   </Step>
   <Step title="Finish the install">
-    Let the installer finish. It pulls the image by its pinned digest and checks the architecture and agent-runner lock label before tagging it as this install's sandbox image. Wrong architecture fails. A missing lock label fails unless you explicitly allow an unlabeled image; a mismatched label currently warns and continues, as described below.
+    Let the installer finish. It pulls the image published for your release (listed in upstream `agent-images.json`), falling back to the `agent-image` pin in `versions.json`, always by digest, and checks the architecture and agent-runner lock label before tagging it as this install's sandbox image. Wrong architecture fails. A missing lock label fails unless you explicitly allow an unlabeled image; a mismatched label currently warns and continues, as described below.
 
     <Warning>
-      The pull accepts a lockfile that does not match your checkout. Every published hardened image still carries the v2.2.0 agent-runner lockfile, so refusing the tag would block every new hardened install. The pull prints `Warning: agent-runner lock drift — tagging this image anyway.` and continues. Upstream marks this temporary. If an agent then dies on a missing module, build locally with `./container/build.sh build`.
+      The pull accepts a lockfile that does not match your checkout. This happens when your checkout's agent-runner lockfile differs from the one the image was built with, for example a checkout ahead of the newest release that has an image. The pull prints `Warning: agent-runner lock drift — tagging this image anyway.` and continues. Upstream marks this allowance temporary. If an agent then dies on a missing module, build locally with `./container/build.sh build`.
     </Warning>
   </Step>
 </Steps>
@@ -135,7 +165,7 @@ The status report shows:
 
 - **Image source** — how this install gets its image: `pull a pinned image` or `build here`
 - **On this machine** — what is actually present locally
-- **Pinned** — the image reference this install tracks
+- **Pinned** — the image reference this install tracks: `NANOCLAW_AGENT_IMAGE_REF` if set, else the image published for your release, else the `versions.json` pin
 - **Signed in as** — the account, if any
 - **Perks**: the entitlements on the account, listed only when it has any
 - **Docker helper**: which registry hosts Docker asks NanoClaw for credentials on, or `not installed`
@@ -144,18 +174,19 @@ Provenance also rides in the image itself: the `dev.nanoclaw.image-source` label
 
 ## How a pin bump is gated
 
-A repin is not merged on trust. A CI workflow re-checks the new digest on every pull request, and the checks finish at once when the pin has not changed, before the change can reach you.
+A repin is not merged on trust. A CI workflow gates both the `agent-image` pin in `versions.json` and `agent-images.json`, the list that maps each release to its hardened image. It re-checks every changed reference on the pull request, before the change can reach you, and finishes at once when neither file changed.
 
-Four checks block the merge. They run on every pull request, and finish at once when the pin has not changed:
+Five checks block the merge:
 
 1. The reference must be digest-pinned. A mutable tag fails.
 2. The image must be a multi-architecture index covering `linux/amd64` and `linux/arm64`.
-3. The `dev.nanoclaw.agent-runner-lock-sha256` label must equal the checkout's own agent-runner lockfile hash.
+3. The `dev.nanoclaw.agent-runner-lock-sha256` label must equal the agent-runner lockfile hash of the release the image is listed for, or of the branch for a pin that is not a listed release image. An image listed for a release must also carry that release's version and commit in its OCI labels.
 4. The `dev.nanoclaw.image-source` label must read `hardened`.
+5. The publisher's keyless Sigstore signature must verify against the digest with `cosign verify`. An image with no verified signature fails the pull request.
 
 A manifest whose size moves by more than threefold in either direction raises a warning rather than blocking.
 
-One more check is reported but does not block: a keyless Sigstore signature is verified against the digest with `cosign verify`. The result goes to the job summary for the person who merges. An image with no verified signature does not fail the pull request. Nothing in the workflow merges anything; a person merges every repin.
+Nothing in the workflow merges anything; a person merges every repin.
 
 <Note>
   No attestation or SBOM is checked, because the publisher attaches none. The workflow verifies the image's shape and, when present, its signature.

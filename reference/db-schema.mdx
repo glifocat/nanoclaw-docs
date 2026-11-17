@@ -8,6 +8,9 @@ tag: "UPDATED"
 {/* verified-against: src/db/schema.ts, src/db/migrations/index.ts, src/db/migrations/{001..025 incl. module-*}.ts, src/db/connection.ts, src/db/compose.ts, src/db/coordination.ts, src/delivery.ts, src/request-wake.ts, src/types.ts, src/mailbox/sqlite/schema.ts, src/mailbox/sqlite/session-db.ts, src/mailbox/sqlite/index.ts, src/db/container-configs.ts @ 7203e00d (v2026.10.0) */}
 
 {/* verified-against (scoped correction): src/request-wake.ts, src/db/coordination.ts @ b76fcb3d */}
+{/* verified-against (scoped correction): auto-create sender policy, gateway approval action, channel-approval approver: src/router.ts, src/channels/channel-defaults.ts, src/gateway-approval-coordinator.ts, src/modules/permissions/channel-approval.ts @ 533b922a9 */}
+{/* verified-against (scoped correction): pending_questions.question: src/db/migrations/026-pending-question-body.ts, src/db/{schema,sessions}.ts @ 533b922a9 (nanoclaw #4328) */}
+{/* verified-against (scoped correction): messages_in.kind union: src/mailbox/model.ts (nanoclaw #4374) @ 61cf826d */}
 
 NanoClaw stores everything in SQLite, split across two layers:
 
@@ -53,7 +56,7 @@ Platform chats and channels, one row per `(channel_type, platform_id, instance)`
 | `detached_at` | TEXT | `NULL` | Set when NanoClaw's own bot leaves the conversation; delivery is refused until a membership hook clears it on rejoin (migration 022) |
 | `created_at` | TEXT | — | ISO timestamp |
 
-The `'strict'` column default is mostly vestigial: every creation callsite passes the policy explicitly, and the router's auto-create path hardcodes `'request_approval'`.
+The `'strict'` column default is mostly vestigial: every creation callsite passes the policy explicitly, and the router's auto-create path uses the receiving adapter's declared DM or group policy (`'request_approval'` for undeclared adapters).
 
 Migration 016 added `instance` and relaxed the UNIQUE constraint from `(channel_type, platform_id)` to `(channel_type, platform_id, instance)` via a full table rebuild (SQLite can't relax a table-level UNIQUE in place). Existing rows backfill to `instance = channel_type`, so single-instance installs see no behavioral change.
 
@@ -189,12 +192,13 @@ Interactive `ask_user_question` cards awaiting an answer.
 | `message_out_id` | TEXT | — | The outbound message that carried the question |
 | `platform_id` / `channel_type` / `thread_id` | TEXT | `NULL` | Where the card was posted |
 | `title` | TEXT | — | Question title |
+| `question` | TEXT | `''` | The question body, kept so the answered card still shows it; rows from before migration 026 stay empty, and their answered card shows only the title and answer |
 | `options_json` | TEXT | — | JSON array of answer options |
 | `created_at` | TEXT | — | ISO timestamp |
 
 ### pending_approvals
 
-Host-side records for any approval-requiring request: `install_packages` / `add_mcp_server` (session-bound), and OneCLI credential approvals (`session_id` may be NULL, `action='onecli_credential'`). The OneCLI-specific columns let the host edit the admin card when a request expires and sweep stale rows on startup.
+Host-side records for any approval-requiring request: `install_packages` / `add_mcp_server` (session-bound), and credential-gateway approvals (`session_id` may be NULL, `action='gateway_request'`; older OneCLI rows used `onecli_credential`). The card-location and expiry columns let the host edit the admin card when a request expires and sweep stale rows on startup.
 
 | Column | Type | Default | Meaning |
 |---|---|---|---|
@@ -240,7 +244,7 @@ Unknown-channel registration flow (migration 012). When an unwired channel recei
 | `messaging_group_id` | TEXT | — | Primary key, FK → `messaging_groups(id)` |
 | `agent_group_id` | TEXT | — | FK → `agent_groups(id)` — the agent the approved wiring will target |
 | `original_message` | TEXT | — | JSON-serialized triggering `InboundEvent` |
-| `approver_user_id` | TEXT | — | The owner who got the card |
+| `approver_user_id` | TEXT | — | The approver who got the card |
 | `title` / `options_json` | TEXT | `''` / `'[]'` | Card render metadata (migration 013) |
 | `question` | TEXT | `''` | Original card body for terminal card edits (migration 021) |
 | `created_at` | TEXT | — | ISO timestamp |
@@ -267,7 +271,7 @@ Per-message approval gate on an agent-to-agent connection (migration 017). A row
 |---|---|---|---|
 | `from_agent_group_id` | TEXT | — | Source agent (FK → `agent_groups(id)`) |
 | `to_agent_group_id` | TEXT | — | Target agent (FK → `agent_groups(id)`) |
-| `approver` | TEXT | — | User-id who must approve each gated message; only this user (or an owner) can approve. Persisted onto the held card's `pending_approvals.approver_user_id` |
+| `approver` | TEXT | — | User-id who must approve each gated message; only this user can approve. Persisted onto the held card's `pending_approvals.approver_user_id` |
 | `created_at` | TEXT | — | ISO timestamp |
 
 Primary key: `(from_agent_group_id, to_agent_group_id)`.
@@ -332,7 +336,7 @@ Everything the agent receives — chat messages, system events, and scheduled ta
 |---|---|---|---|
 | `id` | TEXT | — | Primary key |
 | `seq` | INTEGER | — | Even, UNIQUE — globally ordered agent-facing ID |
-| `kind` | TEXT | — | `'chat'` \| `'chat-sdk'` \| `'task'` \| `'webhook'` \| `'system'` (the `MessageInKind` union) — task vs. message is just this column. `'webhook'` is in the union but has no writer on main yet |
+| `kind` | TEXT | — | `'chat'` \| `'chat-sdk'` \| `'task'` \| `'webhook'` \| `'system'` (the `InboundKind` union in `src/mailbox/model.ts`) — task vs. message is just this column. `'webhook'` is in the union but has no writer on main yet |
 | `timestamp` | TEXT | — | ISO timestamp |
 | `status` | TEXT | `'pending'` | `pending` → `completed` / `failed`; tasks can also be `paused` or `cancelled` |
 | `process_after` | TEXT | `NULL` | Don't deliver before this time — scheduling and retry backoff |

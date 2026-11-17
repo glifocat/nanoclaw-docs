@@ -5,6 +5,7 @@ keywords: ["scheduled tasks", "ncl tasks", "cron", "recurrence", "process_after"
 ---
 
 {/* verified-against: src/cli/resources/tasks.ts, src/cli/resources/groups.ts, src/modules/scheduling/create.ts, src/modules/scheduling/recurrence.ts, container/agent-runner/src/scheduling/task-script.ts, container/agent-runner/src/formatter.ts, container/agent-runner/src/poll-loop.ts, src/host-sweep.ts, src/config.ts, src/container-runner.ts @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction): task runs deliver only through send_message: container/agent-runner/src/{formatter,poll-loop}.ts @ 61cf826d */}
 
 v2 has no scheduler service. A scheduled task is a row in an isolated per-task session's `messages_in` table with `kind='task'` and a `process_after` timestamp — the same inbox machinery, swept by the same host sweep, as any chat message. You drive it through the `ncl tasks` CLI: ask the agent in chat and it runs `ncl tasks` on your behalf, or run the commands yourself from the host. This tutorial assumes a working install with a wired agent (see [your first agent](/guides/first-agent)).
 
@@ -28,7 +29,7 @@ The agent confirms with the generated id. Passing `--name "standup"` yields a re
 </Step>
 <Step title="Know what fires it">
 
-There is no separate per-task scheduler. The [host sweep](/concepts/architecture#what-runs-when) periodically queues active sessions for reconciliation, waiting 60 seconds after the previous tick's work drains. Message writes and container-exit events can trigger earlier checks. Reconciliation counts pending rows with `process_after <= now` and wakes the task session's container if one isn't already running. The agent's poll loop then picks the task up like any inbound message and executes the prompt.
+There is no separate per-task scheduler. The [host sweep](/concepts/architecture#what-runs-when) periodically queues active sessions for reconciliation, waiting 60 seconds after the previous tick's work drains. Message writes and container-exit events can trigger earlier checks. Reconciliation counts pending rows with `process_after <= now` and wakes the task session's container if one isn't already running. The agent's poll loop then picks the task up like any inbound message and executes the prompt. A task run delivers through one door: it runs in its own session with no chat attached, so the agent has to send its result with an explicitly addressed `send_message`. The turn's final text isn't sent anywhere; it is appended to the series run log (the lines `ncl tasks get <id>` shows). If a task fires but nothing reaches your chat, read that log first.
 
 Two consequences worth internalizing:
 

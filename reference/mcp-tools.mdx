@@ -7,6 +7,9 @@ tag: "UPDATED"
 
 {/* verified-against: container/agent-runner/src/mcp-tools/{index,server,core,interactive,agents,self-mod}.ts, src/modules/self-mod/apply.ts, src/modules/agent-to-agent/{create-agent,guard}.ts, src/group-init.ts, src/cli/guard.ts, src/cli/registry.ts, src/cli/resources/wirings.ts, container/Dockerfile @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — create_agent template param, fetch, approval card: container/agent-runner/src/mcp-tools/{agents.ts,agents.instructions.md}, src/modules/agent-to-agent/{create-agent,guard}.ts, src/templates/{library,local-dir}.ts @ 3a68cc7c */}
+{/* verified-against (scoped correction): create_agent refuses an invalid folder before the card: src/modules/agent-to-agent/create-agent.ts, src/group-folder.ts @ 533b922a9 (nanoclaw #4148) */}
+{/* verified-against (scoped correction): send_card parts and limits, answered question card: container/agent-runner/src/mcp-tools/{interactive,card-parts}.ts, src/channels/{card-parts,chat-sdk-bridge}.ts @ 533b922a9 (nanoclaw #4292, #4296, #4328) */}
+{/* verified-against (scoped correction): ask_user_question failure modes: container/agent-runner/src/mcp-tools/interactive.ts @ 61cf826d */}
 
 These are the tools the agent can call from inside its container. They're exposed by the built-in `nanoclaw` MCP server (`container/agent-runner/src/mcp-tools/`), so the agent sees them with the `mcp__nanoclaw__` prefix — e.g. `mcp__nanoclaw__send_message`. As an operator you never call them directly; you see their effects: messages arriving in chats, schedule changes, and approval cards.
 
@@ -67,22 +70,30 @@ Scheduling is no longer an MCP tool. The `schedule_task`, `list_tasks`, `update_
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `title` | string | yes | Short card title |
-| `question` | string | yes | The question text |
+| `question` | string | yes | The question text. Title and question together can be at most 2,000 characters; a longer card is refused with an error so the agent can shorten it |
 | `options` | array | yes | Choices: plain strings or `{ label, selectedLabel?, value? }` objects |
 | `timeout` | number | no | Seconds to wait (default: 300) |
 
-Blocking — the agent's turn pauses while it polls for your answer. You see a question card with buttons; tapping one returns its `value` to the agent (`selectedLabel` replaces the button text after selection). Errors out if the timeout expires.
+Blocking — the agent's turn pauses while it polls for your answer. You see a question card with buttons; tapping one returns its `value` to the agent, and the answered card keeps its title and, where it still fits, its question, with the buttons replaced by the `selectedLabel` and who chose it. Errors out if the timeout expires, if the card can't be delivered (for example it is too long for the channel), or if the turn is cancelled.
 
 ### `send_card`
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `card` | object | yes | Display card: optional `title`, `description`, text `children`, and top-level URL-link `actions` |
+| `card` | object | yes | Display card: optional `title`, `description`, `children` (text and card parts), and top-level URL-link `actions` |
 | `fallbackText` | string | no | Plain-text fallback for platforms without card support |
 
 Non-blocking — renders the card and returns immediately, with no response collected. Actions are **link buttons only**: each needs a non-empty `label` and an HTTP or HTTPS `url`. Invalid actions, including callback buttons, `#`, relative paths, `mailto:` and `tel:` links, are dropped; the tool result reports the dropped count. `style` can be `primary`, `danger`, or `default`; unrecognized styles render as `default`.
 
-`children` accepts strings or objects with a `text` field. Nested action blocks are unsupported. Use `ask_user_question` for choices that must return a value to the agent. `fallbackText` supplies a text rendering for channels that need one; it does not enable callback buttons.
+`children` takes strings, objects with a `text` field, and card parts:
+
+- `{ type: 'Text', props: { content, style? } }`, with `style` `plain`, `bold` or `muted`
+- `{ type: 'Fields', children: [{ type: 'Field', props: { label, value } }] }`
+- `{ type: 'Table', props: { headers, rows, align?, caption? } }`, with one cell per header in each row
+- `{ type: 'Chart', props: { title, chart } }`, where `chart` is `{ type: 'pie', segments: [{ label, value }] }` or `{ type: 'bar' | 'line' | 'area', categories, series: [{ name, values }] }`
+- `{ type: 'Divider' }`
+
+A card holds at most 10 parts, 10 fields, one table (30 rows, 6 columns) and two charts (20 categories, 12 series or slices). All its text together, title, description and link buttons included, is capped at 12,000 characters, counted as Teams receives it, so quote marks, backslashes and line breaks count twice. Smaller caps apply inside parts: 2,500 characters for a Text part, 1,500 for a field's label and value together, 10,000 for a table's text, 50 for a chart title or axis label, and 20 for a category, series or slice label. A card that breaks a rule is not sent: the tool returns `Error: Card not sent. Fix these and send it again:` followed by each problem, such as `children[2]: at most 30 rows`. The host runs the same check. Nested action blocks are unsupported; use `ask_user_question` for choices that must return a value to the agent. `fallbackText` (default: the `description`, then the `title`) is the text a channel shows when it renders a card as text; it does not enable callback buttons.
 
 ## Agents
 
@@ -94,7 +105,7 @@ Non-blocking — renders the card and returns immediately, with no response coll
 | `instructions` | string | no | Seeds the new agent's starting role and personality. The host stages it to the group's `instructions.prepend.md` (standing instructions, composed into the agent's `CLAUDE.md` at spawn) — not the composed `CLAUDE.md` itself. Ignored when `template` is set. |
 | `template` | string | no | A [template](/templates/using-templates#from-chat) ref the user picked, such as `sales/sdr`, from `ncl templates list`. The template supplies the persona. Each `/`-separated part starts with a letter or digit and holds only letters, digits, `.`, `_`, and `-`, up to 128 characters in all. An empty value counts as no template; any other value that breaks these rules is refused before an approval card is created. Added after v2026.10.0. |
 
-Provisions a long-lived companion agent: its own group, container, and persistent workspace under `groups/<folder>/`, wired bidirectionally as a destination on both sides. Fire-and-forget — the call returns immediately and messages queue until the agent is up.
+Provisions a long-lived companion agent: its own group, container, and persistent workspace under `groups/<folder>/`, wired bidirectionally as a destination on both sides. Fire-and-forget — the call returns immediately and messages queue until the agent is up. A name whose folder can't be valid (more than 63 characters once normalized, or `global`) is refused before any approval card, and the agent is told nothing was created.
 
 With `template`, the agent is stamped from that template instead: persona, skills, MCP servers, and paused tasks. A template that is not in the install's templates directory is downloaded from the public template library first; a local copy always wins and is never overwritten. The download runs only once the request is allowed and before anything is written, so a failed download creates nothing. Either way, the new agent runs on its creator's provider.
 
