@@ -104,7 +104,7 @@
   </g>
 
   <!-- Editorial aside — the deliberate runtime split -->
-  <text x="64" y="432" fill="#B0B0B0" font-size="12" font-style="italic">Deliberate runtime split: the host runs Node 20+ and pnpm; the agent container runs our code on Bun.</text>
+  <text x="64" y="432" fill="#B0B0B0" font-size="12" font-style="italic">Deliberate runtime split: the host runs Node 22.23.4+ and pnpm; the agent container runs our code on Bun.</text>
 
   <!-- ==========================================================
        FOOTER NOTE — the two logs

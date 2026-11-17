@@ -65,8 +65,10 @@
     <rect x="358" y="192" width="116" height="12" rx="2" fill="#000000"/>
     <text x="416" y="201" text-anchor="middle">DUE TASK · OR RESTART</text>
 
-    <rect x="784" y="192" width="96" height="12" rx="2" fill="#000000"/>
-    <text x="832" y="201" text-anchor="middle">DOCKER RUN --RM</text>
+    <rect x="774" y="178" width="116" height="12" rx="2" fill="#000000"/>
+    <text x="832" y="187" text-anchor="middle">DOCKER CREATE --RM</text>
+    <rect x="771" y="192" width="122" height="12" rx="2" fill="#000000"/>
+    <text x="832" y="201" text-anchor="middle">THEN START --ATTACH</text>
 
     <rect x="688" y="274" width="224" height="12" rx="2" fill="#000000"/>
     <text x="800" y="283" text-anchor="middle">RUNNER SELF-EXITS · CRASH OR CORRUPT DB</text>
