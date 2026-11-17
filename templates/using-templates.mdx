@@ -10,6 +10,7 @@ tag: "UPDATED"
 {/* verified-against (scoped correction): setup/{auto,templates}.ts, src/cli/resources/groups.ts @ b76fcb3d */}
 
 {/* verified-against (scoped correction) — create from chat, library fetch, gitignored templates/: container/agent-runner/src/mcp-tools/{agents.ts,agents.instructions.md}, src/modules/agent-to-agent/{create-agent,guard}.ts, src/cli/resources/templates.ts, src/templates/{library,local-dir}.ts, .gitignore, templates/README.md @ 3a68cc7c; library picker: setup/auto.ts, src/templates/library.ts @ f2224a2f */}
+{/* verified-against (scoped correction): saved template pick is confirmed on rerun: setup/auto.ts @ 61cf826d */}
 
 There are three ways to stamp an agent from a [template](/templates/overview): during installation, anytime with `ncl`, or by asking an agent in chat.
 
@@ -39,7 +40,7 @@ The provider you pick during setup stays separate from the template.
 Existing installs see **"Would you like to add or update an agent from a template?"**, with **No template changes** selected by default. You can also use the CLI below or pass an explicit template path.
 </Note>
 
-**If setup failed partway through**, the unfinished selection stays in `.env` for retry. When the template already has agents, setup offers to connect an unwired agent, update a selected agent in place, create another agent with a distinct name, or cancel. Updates preserve the provider and skip channel setup; declining the update cancels that operation. Completed create, connect, or update operations clear the saved selection. See [Updating a stamped agent](/templates/updating) for what an update covers.
+**If setup failed partway through**, the unfinished selection stays in `.env`. The next run asks **Continue with template "`<ref>`" from the previous run?**; answer no to pick again. When the template already has agents, setup offers to connect an unwired agent, update a selected agent in place, create another agent with a distinct name, or cancel. Updates preserve the provider and skip channel setup; declining the update cancels that operation. Completed create, connect, or update operations clear the saved selection. See [Updating a stamped agent](/templates/updating) for what an update covers.
 
 ### Presetting a template
 

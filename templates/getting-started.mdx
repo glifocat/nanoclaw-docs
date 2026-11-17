@@ -8,6 +8,8 @@ tag: "UPDATED"
 {/* verified-against: nanoclaw.sh, setup/{auto,templates}.ts, setup/channels/{initial-setup,run-channel-skill}.ts, scripts/{init-first-agent,delete-cli-agent,chat}.ts, .claude/skills/init-first-agent/SKILL.md, src/templates/create-agent.ts, src/cli/resources/{groups,wirings,tasks}.ts, src/cli/format-tasks.ts, src/channels/cli.ts, src/mailbox/sqlite/tasks.ts @ b76fcb3d. Catalog examples: nanocoai/nanoclaw-templates index.json and lifestyle/family-assistant, product/competitor-analysis, sales/sdr instructions @ fe904545. */}
 {/* verified-against (scoped correction): Claude subscription sign-in label: setup/providers/claude.ts, .claude/skills/add-onecli/scripts/auth.ts, .claude/skills/add-iron-proxy/scripts/auth.ts @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction) — library picker shows index.json name + description, load-failure text: setup/auto.ts, src/templates/library.ts @ f2224a2f */}
+{/* verified-against (scoped correction): providers offered and their local-build requirement, library categories: setup/auto.ts, setup/providers/skill-descriptor.ts, .claude/skills/add-{codex,cursor,opencode}/SKILL.md @ 533b922a9 (nanoclaw #4107); nanocoai/nanoclaw-templates index.json @ 7d3cb404 */}
+{/* verified-against (scoped correction): sandbox question is the portal confirm: setup/auto.ts, setup/portal.ts @ 61cf826d */}
 
 A **template** gives your assistant a starting set of instructions and tools for a particular job. You choose what you need help with, then tell the assistant about your own situation.
 
@@ -33,15 +35,15 @@ Choose a starting point that matches your goal. These are examples from the [tem
 
 Open the template's page before choosing it. Read its description and account requirements. **Some templates need paid services or access to accounts you already use.** For example, the sales template uses HubSpot and Exa. Check that those requirements suit you before installing.
 
-The library also includes data-analysis and journalism templates. You can choose any listed template; the setup steps below are the same.
+The library also includes data-analysis, journalism, and software-architecture templates. You can choose any listed template; the setup steps below are the same.
 
 ## Before you start
 
 - Use a **Mac or Linux computer with at least 4 GB of memory**, an internet connection, and permission to install software. On Windows, first follow [Microsoft's WSL setup guide](https://learn.microsoft.com/en-us/windows/wsl/install), then work inside the Linux app it installs.
-- Have your **AI account sign-in** ready. Setup offers Claude, including subscription sign-in or an Anthropic API key, and Codex with its own sign-in options. The [quickstart's account guidance](/quickstart#before-you-start) explains the choices.
+- Have your **AI account sign-in** ready. Setup offers Claude, including subscription sign-in or an Anthropic API key, and Codex, Cursor, and OpenCode with their own sign-in options. The [quickstart's account guidance](/quickstart#before-you-start) explains the choices.
 - Keep the computer on and connected when you want your assistant to respond.
 
-If you choose the prebuilt sandbox download, setup also asks you to sign in to **NanoClaw**. That is separate from your AI account. Choosing **Build it here** skips the download-account step.
+If you choose the prebuilt sandbox download, setup also asks you to sign in to **NanoClaw**. That is separate from your AI account. Answering no to setup's sandbox question skips the download-account step.
 
 On Linux, use a regular user account. If you're installing on a server, read the [installation requirements](/installation#requirements), including the Google Cloud caveat, first.
 
@@ -86,11 +88,11 @@ On Linux, use a regular user account. If you're installing on a server, read the
   </Step>
 
   <Step title="Finish the accounts and software setup" id="finish-software-setup">
-    At the sandbox choice, **Fetch the hardened image, built by Echo** downloads the prepared software and opens a NanoClaw sign-in. **Build it here** prepares the software locally instead. Choose the local build if you plan to use Codex; the prebuilt image supports Claude.
+    Setup asks **Enable Echo’s hardened agent image? Open the perks dashboard in your browser?** Press **Enter** to download the prepared software; this opens a NanoClaw sign-in in your browser. Answer no to build the software on your computer instead. Answer no if you plan to use Codex, Cursor, or OpenCode; the prebuilt image supports Claude only.
 
-    {/* Visual provenance: reused images/echo/hardened-runtime/signin-04-success.png; original capture date and version unknown. Visually checked for caption alignment; not a new sign-in test. */}
-    <Frame caption="If you chose the download: this browser screen completes NanoClaw sign-in. Return to Terminal to continue.">
-      <img src="/images/echo/hardened-runtime/signin-04-success.png" alt="NanoClaw browser confirmation saying the device is connected and the page may be closed" />
+    {/* Visual provenance: images/setup/portal-03-choice-saved.png is an illustration, not a capture. Generated 2026-11-16 by scripts/setup-illustrations from the strings in setup/portal.ts @ 61cf826d, drawn by @clack/prompts 1.2.0. No installer was run. The link, code, and email are placeholders. */}
+    <Frame caption="Illustration, not a screenshot: if you chose the download, Terminal shows a link and a code, waits while you sign in and turn on the image in your browser, then continues.">
+      <img src="/images/setup/portal-03-choice-saved.png" alt="Terminal illustration showing the hardened image question answered Yes, a portal link and a code to compare, then signed in as an example address, choose your perk in the browser, and image choice saved, continuing setup" />
     </Frame>
 
     Leave Terminal open while the download or local build finishes. Setup then installs **OneCLI**, the vault that stores account credentials.

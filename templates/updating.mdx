@@ -6,6 +6,7 @@ keywords: ["restamp", "template update", "ncl groups create --template --yes", "
 
 {/* verified-against: src/templates/restamp.ts, src/cli/resources/groups.ts, src/container-config.ts @ 20d61af; docs/templates.md @ 20d61af */}
 {/* verified-against (scoped correction) — create_agent keeps an existing local copy: src/templates/library.ts @ f2224a2f */}
+{/* verified-against (scoped correction): task skipped while re-arming: src/templates/restamp.ts @ 61cf826d */}
 
 When a template gains a skill, fixes a persona, or changes a task schedule, you don't have to rebuild the agent. Restamping updates an already-stamped agent in place.
 
@@ -83,7 +84,7 @@ DRY RUN — nothing was changed. Re-run with --yes to apply. Pass --new to stamp
   update    task       morning-digest  (series morning-digest-9d2f; status "paused" kept)
 ```
 
-Actions are `create`, `update`, `remove`, `skip`, and `unchanged`. Surfaces are `plugin`, `persona`, `context`, `skill`, `mcp-server`, and `task`. If the reader skipped or ignored anything, a `Template reader notices:` block follows the table.
+Actions are `create`, `update`, `remove`, `skip`, and `unchanged`. Surfaces are `plugin`, `persona`, `context`, `skill`, `mcp-server`, and `task`. A recurring task that has just run and is being re-armed shows `skip` with the note `series <id> is re-arming between runs; re-run restamp to update it`: run the command again a minute later. If the reader skipped or ignored anything, a `Template reader notices:` block follows the table.
 
 Applying swaps the status line for ``Restamp applied. Run `ncl groups restart --id <group-id>` for skill and MCP changes to take effect.`` — or `Nothing to apply — the group already matches the template.` when every surface was already current.
 

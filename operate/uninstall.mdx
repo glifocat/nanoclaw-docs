@@ -6,6 +6,9 @@ keywords: ["uninstall", "remove", "delete", "cleanup", "nanoclaw.sh --uninstall"
 ---
 
 {/* verified-against: setup/uninstall/flow.ts, setup/uninstall/scan.ts, setup/uninstall/plan.ts, setup/uninstall/remove.ts, setup/lib/setup-config.ts, setup/auto.ts, uninstall.sh, nanoclaw.sh, src/install-slug.ts, .claude/skills/add-iron-proxy/REMOVE.md @ 7203e00d (v2026.10.0) */}
+{/* verified-against (scoped correction): shared gateway left alone, gateway-neutral wording: setup/uninstall/{flow,scan}.ts @ 533b922a9 */}
+{/* verified-against (scoped correction): uninstall fallback slug: nanoclaw.sh, setup/lib/install-slug.sh @ 533b922a9 (nanoclaw #4350) */}
+{/* verified-against (scoped correction): per-copy gateways are removed: setup/uninstall/plan.ts, .claude/skills/add-iron-proxy/{SKILL,REMOVE}.md @ 533b922a9 */}
 
 NanoClaw ships an interactive uninstaller that removes a single install — its service, containers, image, and data. Runtime artifacts are scoped by an **install slug**, defaulting to the first 8 hex characters of `sha1(projectRoot)`. `NANOCLAW_INSTALL_ID` overrides that default; each install needs a distinct ID to keep its runtime artifacts separate. Review the preview before removal, particularly if you assigned an ID explicitly.
 
@@ -37,7 +40,7 @@ The uninstaller groups everything it finds into three confirmation groups. Each 
 |---|---|
 | **1) App & background service** | The background service (launchd/systemd), any running NanoClaw process, this install's Docker containers and image (matched by the install slug), and the `ncl` command symlink. |
 | **2) App data, logs & secrets** | Runtime data, including the central database and per-session message history, logs, build files (`dist/`, `node_modules/`), the active `.env`, and this install's update rollback snapshots (`<parent-of-project>/.nanoclaw-updates/<slug>`). It also removes this copy's service containers, data volumes and networks (for example a gateway's database), even if you keep group 1. Those volumes cannot be read without the keys in `data/`, which this group deletes. Removing this erases stored conversations; the `.env` is backed up first. |
-| **3) Agents' memory & files** | Notes and memory your agents created (`groups/`) and any migrated data (`store/`). Content you made — unrecoverable after deletion. |
+| **3) Your agents' memory & files** | Notes and memory your agents created (`groups/`) and any migrated data (`store/`). Content you made — unrecoverable after deletion. |
 
 Your `.env` is never deleted outright — it's copied to `.env.bak` first (a timestamped name if a backup already exists), so saved credentials survive the removal.
 
@@ -45,7 +48,7 @@ Your `.env` is never deleted outright — it's copied to `.env.bak` first (a tim
 
 The uninstaller is deliberately narrow. It does **not** touch:
 
-- **The shared gateway application and your credentials** — the OneCLI vault is a shared, out-of-band component, so removing one NanoClaw copy never tears it down. Only this copy's labeled containers and the volumes and networks of their Compose projects are removed (see group 2).
+- **A shared gateway and your credentials in it** — the OneCLI vault, the default credential gateway, is a shared, out-of-band component, so removing one NanoClaw copy never tears it down. Only this copy's labeled containers and the volumes and networks of their Compose projects are removed (see group 2). A gateway that runs per copy is not shared: Iron Proxy's containers carry this copy's labels, so they are removed with it. Removing `data/` also removes its database volume, found through those containers; if they were already gone, the volume stays, and only a later Iron Proxy setup for this copy prints the commands to remove it (see the skill's `REMOVE.md`).
 - **Other install identities on the machine** — the install slug scopes runtime cleanup. Keep explicit `NANOCLAW_INSTALL_ID` values distinct.
 - **Host-wide config** — `~/.config/nanoclaw/` (mount and sender allowlists) and the PATH line in `~/.bashrc` and `~/.zshrc`.
 
@@ -77,7 +80,7 @@ Applies your choices in a safe order — service and containers first (so nothin
 
 ## If dependencies are missing
 
-The uninstaller runs on the TypeScript toolchain in `node_modules/`. If those are already gone, `bash nanoclaw.sh --uninstall` can't run the full flow — it prints manual cleanup commands instead, including how to remove this install's containers and image by slug:
+The uninstaller runs on the TypeScript toolchain in `node_modules/`. If those are already gone, `bash nanoclaw.sh --uninstall` can't run the full flow — it prints manual cleanup commands instead, including how to remove this install's containers and image by slug. If you set `NANOCLAW_INSTALL_ID`, export the same value first: the commands use it, and an invalid value stops with an error instead:
 
 ```bash
 docker ps -aq --filter label=nanoclaw-install=<slug> | xargs -r docker rm -f
@@ -91,6 +94,6 @@ docker rmi nanoclaw-agent-v2-<slug>:latest
     Update NanoClaw and its skills the supported way.
   </Card>
   <Card title="Credentials" icon="key" href="/operate/credentials">
-    The OneCLI vault the uninstaller deliberately leaves running.
+    The shared OneCLI vault the uninstaller deliberately leaves running.
   </Card>
 </CardGroup>

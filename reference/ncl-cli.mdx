@@ -9,6 +9,9 @@ keywords: ["ncl", "cli", "reference", "commands", "flags", "groups", "wirings", 
 {/* verified-against (scoped correction): src/cli/resources/{tasks,groups}.ts, src/modules/permissions/user-dm.ts, src/channels/chat-sdk-bridge.ts @ b76fcb3d */}
 {/* verified-against (scoped correction) — tasks synopsis flags: src/cli/resources/tasks.ts @ 143db6c9 (v2.4.0) */}
 {/* verified-against (scoped correction) — templates resource, group-scope list: src/cli/resources/templates.ts, src/cli/registry.ts, src/templates/{library,local-dir}.ts @ 3a68cc7c */}
+{/* verified-against (scoped correction): approvals columns, groups create folder rule, groups delete cleanup and destination refresh: src/cli/resources/{approvals,groups}.ts, src/group-folder.ts @ 533b922a9 (nanoclaw #4148, #4110) */}
+{/* verified-against (scoped correction): groups restart --id of another group: src/cli/resources/groups.ts (nanoclaw #4026) @ 61cf826d */}
+{/* verified-against (scoped correction): named approver is strict: src/modules/approvals/response-handler.ts @ 61cf826d */}
 
 Exhaustive reference for the `ncl` admin CLI. For a task-oriented walkthrough, see [The ncl admin CLI](/operate/ncl-cli).
 
@@ -32,11 +35,11 @@ Conventions that apply to every command:
 - **`--json`** prints the raw response frame; default output is an aligned table for lists, pretty JSON otherwise, `error (<code>): <message>` on failure.
 - **Exit codes:** `0` success, `1` command error, `2` transport error (host unreachable, missing command).
 - **Error codes** in response frames: `unknown-command`, `invalid-args`, `forbidden`, `approval-pending`, `handler-error`, `transport-error`.
-- **Help is introspected:** `ncl help` lists resources and verbs; `ncl <resource> help` shows its fields, enums, and defaults.
+- **Help is introspected:** `ncl help` lists resources and verbs; `ncl <resource> help` shows its fields, enums, and defaults; `ncl <resource> help <verb>` (or `--help` on any command) shows one verb's flags and examples.
 
 ## Access control
 
-Each operation has an access level: `open` or `approval`. **Host callers (your terminal) bypass approval entirely** — every command runs inline. When a containerized agent calls an `approval` operation, the command is not executed; an approval card goes to an admin, the call returns `approval-pending`, and on approval the host executes it and notifies the agent. Across the resources the rule is near-uniform: reads (`list`, `get`, `config get`) are `open` and mutations are `approval` — except `tasks`, where every verb is `open`: an agent scheduling its own future work is scoped to its own group and doesn't gate on an admin.
+Each operation has an access level: `open` or `approval`. **Host callers (your terminal) bypass approval entirely** — every command runs inline. When a containerized agent calls an `approval` operation, the command is not executed; an approval card goes to an admin, the call returns `approval-pending`, and on approval the host executes it and notifies the agent. The card shows the whole command line, so a command whose card would run past 2,000 characters (title plus text) is refused with `invalid-args` and no card is sent; the agent shortens the arguments and tries again. Across the resources the rule is near-uniform: reads (`list`, `get`, `config get`) are `open` and mutations are `approval` — except `tasks`, where every verb is `open`: an agent scheduling its own future work is scoped to its own group and doesn't gate on an admin.
 
 Agent callers are also subject to the group's `cli_scope` (set via `ncl groups config update --cli-scope`):
 
@@ -55,7 +58,7 @@ In-flight approval cards waiting for an admin response. Read-only; rows are dele
 | list | `ncl approvals list [--<column> <value>] [--limit N]` | open |
 | get | `ncl approvals get --id <approval-id>` | open |
 
-Columns (all usable as list filters): `approval_id`, `session_id`, `request_id`, `action` (e.g. `install_packages`, `add_mcp_server`, `cli_command`, `gateway_request`), `payload` (JSON), `created_at`, `agent_group_id`, `channel_type`, `platform_id`, `platform_message_id`, `expires_at`, `status` (`pending` | `approved` | `rejected` | `expired` | `awaiting_reason`), `approver_user_id`, `title`, `options_json`.
+Columns (all usable as list filters): `approval_id`, `session_id`, `request_id`, `action` (e.g. `install_packages`, `add_mcp_server`, `cli_command`, `gateway_request`), `payload` (JSON), `created_at`, `agent_group_id`, `channel_type`, `platform_id`, `platform_message_id`, `expires_at`, `status` (`pending` | `approved` | `rejected` | `expired` | `awaiting_reason`), `title`, `options_json`.
 
 ## destinations
 
@@ -87,10 +90,10 @@ Agent groups — logical agent identities with their own workspace folder, histo
 | --- | --- | --- | --- |
 | list | `ncl groups list` | open | |
 | get | `ncl groups get --id <id>` | open | |
-| create | `ncl groups create --folder <folder> [--name <name>] [--timezone <iana-id>]` or `ncl groups create --template <ref> [--name <name>] [--timezone <iana-id>] [--id <id>] [--new] [--yes]` | approval | **Without `--template`:** `--folder` required and immutable, `--name` defaults to the folder, idempotent on `--folder` (creating an existing folder returns the existing row), and new ids are prefixed `ag-<uuid>`. **With `--template <ref>`:** stamps from a local [template](/templates/overview) under `templates/`; it never downloads one. Combining it with `--folder` is **rejected** — a bare group *is* its folder, a templated group *is* its plugin. The display name is `--name`, else the manifest's `agentName`, else the template ref's leaf folder; the group folder derives from that name, with a random `-XXXXXXXX` suffix on collision. Always creates a new agent, except when updating one this template already made: a group can only be targeted if its workspace holds that plugin's manifest, so a hand-built group or one stamped from another template is rejected. Convergent rather than folder-idempotent: if a group already carries that plugin, the command returns an in-place [update plan](/templates/updating) instead of creating anything — `--yes` applies it, `--id` picks the target when several groups carry it, and `--new` forces a fresh stamp. `--name` and `--timezone` apply only when a group is created; both are ignored on an in-place update. Reader notices come back as `templateReport` on a create, and as `report` on an update. |
+| create | `ncl groups create --folder <folder> [--name <name>] [--timezone <iana-id>]` or `ncl groups create --template <ref> [--name <name>] [--timezone <iana-id>] [--id <id>] [--new] [--yes]` | approval | **Without `--template`:** `--folder` required and immutable (at most 63 characters of `[A-Za-z0-9_-]`, alphanumeric at both ends, not `global`; anything else is refused), `--name` defaults to the folder, idempotent on `--folder` (creating an existing folder returns the existing row), and new ids are prefixed `ag-<uuid>`. **With `--template <ref>`:** stamps from a local [template](/templates/overview) under `templates/`; it never downloads one. Combining it with `--folder` is **rejected** — a bare group *is* its folder, a templated group *is* its plugin. The display name is `--name`, else the manifest's `agentName`, else the template ref's leaf folder; the group folder derives from that name, with a random `-XXXXXXXX` suffix on collision. Always creates a new agent, except when updating one this template already made: a group can only be targeted if its workspace holds that plugin's manifest, so a hand-built group or one stamped from another template is rejected. Convergent rather than folder-idempotent: if a group already carries that plugin, the command returns an in-place [update plan](/templates/updating) instead of creating anything — `--yes` applies it, `--id` picks the target when several groups carry it, and `--new` forces a fresh stamp. `--name` and `--timezone` apply only when a group is created; both are ignored on an in-place update. Reader notices come back as `templateReport` on a create, and as `report` on an update. |
 | update | `ncl groups update --id <id> --name <name>` | approval | `name` is the only updatable column. |
-| delete | `ncl groups delete --id <id>` | approval | Custom cascading handler (not the generic single-table delete): removes sessions, destinations, approvals, role grants, memberships, and wirings in one FK-ordered transaction. The host sweep stops the group's running containers within about a minute. It does **not** clean up `groups/<folder>/` and `data/v2-sessions/<id>/` on disk, and the leftover `groups/<folder>/` blocks creating a new group with the same `--folder` until you move or remove it. |
-| restart | `ncl groups restart --id <id> [--rebuild] [--message <text>]` | approval | Host caller: restarts all running containers in the group. Agent caller: `--id` auto-filled, only the calling session restarts. `--rebuild` rebuilds the image first (required after package changes). `--message` queues an on-wake instruction so the fresh container starts and acts on it; without it the container stays stopped until the next user message. |
+| delete | `ncl groups delete --id <id>` | approval | Custom cascading handler (not the generic single-table delete): removes sessions (with their host bookkeeping), destinations, approvals, role grants, memberships, and wirings in one FK-ordered transaction, then refreshes the destination list in the running containers of every agent that had a destination pointing at the deleted group. The host sweep stops the group's running containers within about a minute. It does **not** clean up `groups/<folder>/` and `data/v2-sessions/<id>/` on disk, and the leftover `groups/<folder>/` blocks creating a new group with the same `--folder` until you move or remove it. |
+| restart | `ncl groups restart --id <id> [--rebuild] [--message <text>]` | approval | Host caller: restarts all running containers in the group. Agent caller: `--id` auto-filled, only the calling session restarts; a global-scope agent that names another group with `--id` restarts that group's running containers instead, as a host call would. `--rebuild` rebuilds the image first (required after package changes). `--message` queues an on-wake instruction so the fresh container starts and acts on it; without it the container stays stopped until the next user message. |
 | config get | `ncl groups config get --id <id>` | open | Shows `agent_group_id`, `provider`, `model`, `effort`, `speed`, `image_tag`, `assistant_name`, `max_messages_per_prompt`, `skills`, `mcp_servers`, `packages_apt`, `packages_npm`, `additional_mounts`, `cli_scope`, `timezone`, `updated_at`. |
 | config update | `ncl groups config update --id <id> [--provider] [--model] [--effort] [--speed <tier>] [--image-tag] [--assistant-name] [--max-messages-per-prompt] [--cli-scope <disabled\|group\|global>] [--timezone <iana-id>]` | approval | At least one flag required. Most changes take effect after `ncl groups restart`; `--timezone` grounds task scheduling immediately (empty string clears it back to the install default). `--speed` must be a speed tier the group's provider declares (Claude: `standard`, `fast`); an empty string clears it back to the install default, and a provider that declares no tiers accepts only the empty string. |
 | config add-mcp-server | `ncl groups config add-mcp-server --id <id> --name <server> --command <cmd> [--args <json-array>] [--env <json-object>]` or `--url <url> [--headers <json-object>]` | approval | Exactly one of `--command`/`--url`. Server name: 1-64 chars of `[A-Za-z0-9_-]`. `--url` is a remote Streamable HTTP endpoint — HTTPS required (plain HTTP only for localhost / `host.docker.internal`), and URLs with embedded credentials, fragments, or secret-looking query params are rejected. Restart required to take effect. |
@@ -110,7 +113,7 @@ Membership rows granting unprivileged users access to an agent group. Admins/own
 | Operation | Invocation | Access | Notes |
 | --- | --- | --- | --- |
 | list | `ncl members list [--agent-group-id <id>] [...]` | open | Columns: `user_id`, `agent_group_id`, `added_by`, `added_at`. |
-| add | `ncl members add --user <user-id> --group <group-id> [--added-by <user-id>]` | approval | Idempotent (`INSERT OR IGNORE`). `--user` must reference an existing `users.id`. |
+| add | `ncl members add --user <user-id> --group <group-id> [--added-by <user-id>]` | approval | Idempotent (re-adding an existing member is a no-op). `--user` must reference an existing `users.id`. |
 | remove | `ncl members remove --user <user-id> --group <group-id>` | approval | Errors if no matching row. |
 
 ## messaging-groups
@@ -124,6 +127,8 @@ One chat or channel on one platform. Identity is the unique `(channel_type, plat
 | update | `ncl messaging-groups update --id <id> [flags]` | approval |
 | delete | `ncl messaging-groups delete --id <id>` | approval |
 | send | `ncl messaging-groups send --channel-type <type> --platform-id <pid> --text <message> [--instance] [--sender-id] [--sender]` | approval |
+
+`delete` cascades: it removes the chat's wirings, sessions, destinations, DM records and pending approvals. Agent-shared sessions still used elsewhere and agent-to-agent sessions are kept and listed in `kept_sessions`. Session folders stay on disk.
 
 | Flag | Type | Notes |
 | --- | --- | --- |
@@ -139,7 +144,7 @@ One chat or channel on one platform. Identity is the unique `(channel_type, plat
 
 ## policies
 
-Per-message approval gate on an agent-to-agent connection. A row forces every message from one agent to another to be approved by a human before delivery — without un-wiring the [destination](#destinations). **No row = free flow.** Directed and per-pair: gate both directions with two policies. Operator-only — agents can't manage their own gates, and self-messages (`--from` equal to `--to`) are never gated.
+Per-message approval gate on an agent-to-agent connection. A row forces every message from one agent to another to be approved by a human before delivery — without un-wiring the [destination](#destinations). **No row = free flow.** Directed and per-pair: gate both directions with two policies. Not self-serve — a group-scope agent can't run these commands, and a global-scope agent's request waits for admin approval, and self-messages (`--from` equal to `--to`) are never gated.
 
 | Operation | Invocation | Access |
 | --- | --- | --- |
@@ -147,7 +152,7 @@ Per-message approval gate on an agent-to-agent connection. A row forces every me
 | set | `ncl policies set --from <agent-group-id> --to <agent-group-id> --approver <user-id>` | approval |
 | remove | `ncl policies remove --from <agent-group-id> --to <agent-group-id>` | approval |
 
-`set` upserts — re-running with a different `--approver` replaces it. Only the named `--approver` (or an owner) can approve a held message. Removing a policy returns the edge to free flow. Columns: `from_agent_group_id`, `to_agent_group_id`, `approver`, `created_at`.
+`set` upserts — re-running with a different `--approver` replaces it. Only the named `--approver` can approve a held message; an owner can't stand in. Removing a policy returns the edge to free flow. Columns: `from_agent_group_id`, `to_agent_group_id`, `approver`, `created_at`.
 
 ## roles
 
