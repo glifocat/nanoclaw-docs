@@ -12,6 +12,7 @@ import { TerminalMenu, SetupCheck } from "/snippets/setup-visuals.jsx";
 {/* verified-against (scoped correction): sandbox image prompt, provider picker, Claude sign-in labels, final check: setup/auto.ts, setup/portal.ts, .claude/skills/add-onecli/scripts/auth.ts, .claude/skills/add-onecli/scripts/register-claude-token.sh, .claude/skills/add-codex/SKILL.md, .claude/skills/add-opencode/SKILL.md @ 7203e00d (v2026.10.0) */}
 {/* verified-against (scoped correction): provider picker options, Claude sign-in success line: setup/auto.ts, setup/providers/skill-descriptor.ts, .claude/skills/add-cursor/SKILL.md, .claude/skills/add-onecli/scripts/{auth.ts,register-claude-token.sh} @ 533b922a9 (nanoclaw #4107, #4094, #4187) */}
 {/* verified-against (scoped correction): perk choice in the browser, keep-waiting prompt: setup/portal.ts, setup/lib/first-chat-progress.ts, setup/lib/first-chat-wait.ts, setup/auto.ts @ 61cf826d */}
+{/* verified-against (scoped correction): browser steps of the hardened image handoff and the expired-code fallback: observed in a live fresh install @ 8e52b12 on 2026-11-16; strings in setup/portal.ts @ 61cf826d */}
 
 {/* Scoped verification, 2026-09-05: access-rule defaults/preservation in setup/auto.ts and setup/mounts.ts; channel preparation in executable .claude/skills/add-{telegram,whatsapp}/SKILL.md and setup/channels/slack-auto.ts @ b76fcb3d. Time allowance is editorial planning guidance, not a timed installation result. */}
 
@@ -120,18 +121,36 @@ NanoClaw installs the other software it needs. If you choose the recommended dow
 
     Check that the code on the sign-in page matches the code in Terminal, then turn on the Echo hardened image on the page that follows. Terminal waits until you choose, then shows **Image choice saved. Continuing setup.**
 
+    {/* Visual provenance: images/setup/portal-02-link-and-code.png is an illustration, not a capture. Generated 2026-11-16 by scripts/setup-illustrations from the strings in setup/portal.ts @ 61cf826d, drawn by @clack/prompts 1.2.0. No installer was run. The link and code are placeholders. */}
+    <Frame caption="Illustration, not a screenshot: what Terminal shows after you press Enter. Your link and code will differ.">
+      <img src="/images/setup/portal-02-link-and-code.png" alt="Terminal illustration showing the answer Yes, a message to open the link below to sign in, approve this terminal, and choose your perk, then a portal link and a short code to compare with the sign-in page" />
+    </Frame>
+
+    {/* Visual provenance: real capture, 2026-11-16, of a fresh install of nanoclaw main @ 8e52b12 in a test container; pages at portal.nanoclaw.dev and authenticate.nanoclaw.dev in Chrome on macOS. Cropped; the account name is cropped out. The code shown had expired before publication. */}
     <Tabs>
-      <Tab title="Sign-in screen">
-        <Frame caption="Real NanoClaw sign-in screen. Use an existing account or choose Sign up.">
-          <img src="/images/echo/hardened-runtime/signin-02-sign-in.png" alt="NanoClaw sign-in page with email, Google, and GitHub options and a Sign up link" style={{ maxHeight: '320px', width: 'auto', maxWidth: '100%', margin: '0 auto' }} />
+      <Tab title="1. Approve">
+        <Frame caption="The page the link opens. Check the code, then choose Sign in and approve.">
+          <img src="/images/setup/portal-page-01-approve-terminal.png" alt="Portal page titled Approve your terminal, showing a short code and a Sign in and approve button" />
         </Frame>
       </Tab>
-      <Tab title="Confirmation screen">
-        <Frame caption="Real NanoClaw confirmation screen. You can return to Terminal.">
-          <img src="/images/echo/hardened-runtime/signin-04-success.png" alt="NanoClaw confirmation saying You are all set, your device is connected, and you may close the page" />
+      <Tab title="2. Sign in">
+        <Frame caption="Use an existing account or choose Sign up.">
+          <img src="/images/setup/portal-page-02-sign-in.png" alt="NanoClaw sign-in page with email, Google, and GitHub options and a Sign up link" style={{ maxHeight: '320px', width: 'auto', maxWidth: '100%', margin: '0 auto' }} />
+        </Frame>
+      </Tab>
+      <Tab title="3. Confirm the code">
+        <Frame caption="Choose Confirm only if this code matches the one in Terminal.">
+          <img src="/images/setup/portal-page-03-confirm-code.png" alt="Device activation page asking to confirm the code shown on your device, with Deny and Confirm buttons" />
+        </Frame>
+      </Tab>
+      <Tab title="4. Turn on Echo">
+        <Frame caption="Back on the first tab, choose Activate Echo. Then return to Terminal.">
+          <img src="/images/setup/portal-page-05-activate-echo.png" alt="Activate Echo dialog with Maybe later and Activate Echo buttons" style={{ maxHeight: '360px', width: 'auto', maxWidth: '100%', margin: '0 auto' }} />
         </Frame>
       </Tab>
     </Tabs>
+
+    The code only works for a few minutes. If Terminal says the code expired, setup builds the software on your computer instead.
 
     <SetupCheck>Keep Terminal open until the download or local build finishes and setup moves on to your AI account.</SetupCheck>
   </Step>
