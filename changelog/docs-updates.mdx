@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Installation and container lifecycle diagrams corrected" description="2026-11-17" tags={["Updated"]}>
+  Two diagram labels now match the pages around them. The [Installation](/installation) diagram says the host runs Node 22.23.4+, not Node 20+. The [Container lifecycle](/concepts/container-lifecycle) diagram says a container starts with `docker create --rm` then `docker start --attach`, not `docker run --rm`.
+</Update>
+
 <Update label="Google Chat: Workspace add-on and webhook keys" description="2026-11-17" tags={["Updated"]}>
   [Google Chat](/channels/more-channels#google-chat) now says the Chat app must be built as a Google Workspace add-on, and lists every `.env` key `/add-gchat` sets. `GOOGLE_CHAT_ENDPOINT_URL` and `GOOGLE_CHAT_PROJECT_NUMBER` are required, since Google Chat checks each webhook against them and won't start without them. `GOOGLE_CHAT_BOT_USER_ID` is optional and only needed for @mentions in spaces (nanoclaw #4132, #4100).
 </Update>
