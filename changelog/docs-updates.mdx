@@ -5,6 +5,10 @@ icon: "file-pen"
 rss: true
 ---
 
+<Update label="Installation: which skills need jq, and the Arch upgrade question" description="2026-11-18" tags={["Updated"]}>
+  [Installation](/installation) no longer says only channel skills need jq. Many skills use it, including `/add-onecli` and `/add-vercel`, and NanoClaw itself works without it. The installer section now covers the new question on an Arch system that has never synced its package lists: jq can only be installed there after a full system upgrade, so setup asks first, and only `y` or `yes` runs it. A system that has synced is never upgraded (nanoclaw #4371, added after v2026.11.0-rc.1).
+</Update>
+
 <Update label="Terminal illustrations for the hardened image sign-in" description="2026-11-16" tags={["Updated"]}>
   The [hardened runtime guide](/guides/echo-hardened-runtime), [Quickstart](/quickstart#prepare-workspace), and [template guide](/templates/getting-started) now picture the current setup question, the link and code, and the "Image choice saved" ending. The terminal images are labelled illustrations drawn from the setup text at nanoclaw `61cf826d`, not screenshots. The hardened runtime guide's install steps are rewritten around the browser handoff, and its two outdated terminal captures are removed. The browser steps (approve, sign in, confirm the code, activate Echo) are fresh real captures from a test install on 2026-11-16, replacing the July 2026 ones. Both guides now warn that the sign-in code only lasts a few minutes.
 </Update>
